@@ -1,0 +1,42 @@
+{
+  "actualEndUtc": "2026-10-02T01:06:37.846392+00:00",
+  "affinity": [
+    2
+  ],
+  "probes": [
+    {
+      "name": "pure-boundaries",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-so-088-20261002/pure-boundaries.mjs"
+      ],
+      "startUtc": "2026-10-02T01:06:37.777024+00:00",
+      "endUtc": "2026-10-02T01:06:37.823896+00:00",
+      "exitCode": 0,
+      "envPATH": "",
+      "stdoutSha256": "276343ea33aafbdd30dc8207196dc72ef61013b96ab5caa1a0c95eef56de7ad9",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "native-linkage",
+      "argv": [
+        "/usr/bin/readelf",
+        "-d",
+        "/tmp/motion-native-clock-api-smoke-green-20261002/native-clock/thread-cpu-clock.node"
+      ],
+      "startUtc": "2026-10-02T01:06:37.824084+00:00",
+      "endUtc": "2026-10-02T01:06:37.826422+00:00",
+      "exitCode": 0,
+      "envPATH": null,
+      "stdoutSha256": "34d21fa515fbad52832fa02b36a08bad6c6da3548ed42bebcdb9199d6d2bbc21",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "allCompleted": true,
+  "heavy": 0,
+  "queued": 0,
+  "priorHarnessRun": {
+    "exitCode": 1,
+    "cause": "Review-only overbroad string assertion matched shipped docs/benchmark.md. Corrected to bench/ prefix; no product finding."
+  }
+}

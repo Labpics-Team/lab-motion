@@ -1,0 +1,5 @@
+fatal: path 'missing.txt' does not exist in '778a3c62ecfbc5fff18e77f886fb36fd51845dd6'
+fatal: could not open 'missing.txt' for reading: No such file or directory
+fatal: ambiguous argument 'missing-revision': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'

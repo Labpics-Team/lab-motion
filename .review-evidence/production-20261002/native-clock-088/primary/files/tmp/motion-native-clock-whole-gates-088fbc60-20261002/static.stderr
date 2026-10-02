@@ -1,0 +1,7 @@
+$ pnpm audit --audit-level moderate && pnpm check:native-gate && pnpm check:cycles && pnpm check:error-catalog && pnpm typecheck && pnpm typecheck:browser && pnpm typecheck:motion-program
+$ node scripts/check-native-gate.mjs
+$ node scripts/check-import-cycles.mjs
+$ node scripts/check-error-catalog.mjs
+$ tsc --noEmit
+$ tsc --noEmit -p tsconfig.browser.json
+$ tsc -p tsconfig.motion-program.json

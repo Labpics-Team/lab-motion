@@ -1,0 +1,38 @@
+{
+  "argv": [
+    "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "test/server-profile-contract.test.ts",
+    "-t",
+    "native scheduled CPU endpoints",
+    "--reporter=json",
+    "--outputFile=/tmp/motion-native-clock-consumer-closure-20261002/red.json"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "path": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+  "nodePathUnset": true,
+  "nodeOptionsUnset": true,
+  "nodeVersion": "v24.19.0",
+  "pnpmVersion": "11.11.0",
+  "startUtc": "2026-10-02T00:19:24.342835+00:00",
+  "capSeconds": 5,
+  "actualRegisteredTimingSamples": 0,
+  "exitCode": 1,
+  "timedOut": false,
+  "endUtc": "2026-10-02T00:19:26.721107+00:00",
+  "elapsedSeconds": 2.378269464999903,
+  "red.json": {
+    "bytes": 95170,
+    "sha256": "1eb73a49a46fe3ab73f300e516cec61344e509a149d0eca9d897ee2c1ab0c1b8"
+  },
+  "red.stdout.log": {
+    "bytes": 249,
+    "sha256": "f4b4e05f78403989404ebc83bef115ed4440bfede9532f96bc4d2d6c2fc6ccd2"
+  },
+  "red.stderr.log": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

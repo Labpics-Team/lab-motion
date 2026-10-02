@@ -1,0 +1,105 @@
+{
+  "started": "2026-10-02T01:01:32.727580+00:00",
+  "refNotWritten": true,
+  "priorFailure": "receipt.json",
+  "bodies": [
+    {
+      "path": "bench/profile/native-clock/LICENSE",
+      "bytes": 2337,
+      "gitOid": "2873b3b2e595072e66330369d83e8af46655970c",
+      "sha256": "ec62dc96da0099b87f4511736c87309335527fb7031639493e06c95728dc8c54",
+      "match": true
+    },
+    {
+      "path": "bench/profile/native-clock/README.md",
+      "bytes": 1105,
+      "gitOid": "3366ea76bf84d567d43d3b2259c65a73d65dd4dc",
+      "sha256": "1525470faf40e14918937094ac475ed9e9f6cdcadf1b51a4f603a78dc733d7a6",
+      "match": true
+    },
+    {
+      "path": "bench/profile/native-clock/include/js_native_api.h",
+      "bytes": 33158,
+      "gitOid": "d2375ecd32483ff57840d30f804100372f2e12db",
+      "sha256": "8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788",
+      "match": true
+    },
+    {
+      "path": "bench/profile/native-clock/include/js_native_api_types.h",
+      "bytes": 7871,
+      "gitOid": "ddbbb82e1d541f596b88edb8df3c3b7d4efd58f9",
+      "sha256": "4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0",
+      "match": true
+    },
+    {
+      "path": "bench/profile/native-clock/include/node_api.h",
+      "bytes": 10370,
+      "gitOid": "46dbb02b47d24ba9fa3a1f9251d5d42ace6fc829",
+      "sha256": "2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a",
+      "match": true
+    },
+    {
+      "path": "bench/profile/native-clock/include/node_api_types.h",
+      "bytes": 1930,
+      "gitOid": "79123f0423d6dd93747fd0faf1534b48c026de3a",
+      "sha256": "a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00",
+      "match": true
+    },
+    {
+      "path": "bench/profile/server-profile-contract.mjs",
+      "bytes": 69001,
+      "gitOid": "e6c090c592854974ede8f870570d9bc28c9af71e",
+      "sha256": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8",
+      "match": true
+    },
+    {
+      "path": "bench/profile/server-profile-registration.mjs",
+      "bytes": 18946,
+      "gitOid": "d988631487fc55315cdc6e293fff724919beefed",
+      "sha256": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87",
+      "match": true
+    },
+    {
+      "path": "bench/profile/server-profile-runner.mjs",
+      "bytes": 50951,
+      "gitOid": "ea54a7edd0ab1bc993ef8080239c3e1b67baf6e9",
+      "sha256": "72383a1abfd70b2bdb163995f8d6dac7cf70624e6f4658db395123554dcfffcf",
+      "match": true
+    },
+    {
+      "path": "bench/profile/server-thread-cpu-clock.c",
+      "bytes": 4159,
+      "gitOid": "8a6aa76e6ebb0d95343cce409dcb2e4b59dfacfa",
+      "sha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+      "match": true
+    },
+    {
+      "path": "bench/profile/server-thread-cpu-clock.mjs",
+      "bytes": 7279,
+      "gitOid": "7057fd7fbe90aa4ba531e68abb4b88f6f8fa5bc1",
+      "sha256": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71",
+      "match": true
+    },
+    {
+      "path": "docs/server-profile.md",
+      "bytes": 9198,
+      "gitOid": "ec693900fcffca82329baf24945adc545dde586d",
+      "sha256": "488f3c61436d88924d218fd990fa1840e0c30c850c7af2992755e6872f0a5c18",
+      "match": true
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "bytes": 95174,
+      "gitOid": "0a654395769fa53d0a370bbd58891e0ea99fd8aa",
+      "sha256": "694bfdf8b75b4ee102cc05f9857312c531a39984bdc9ccf0c592bc94684f0991",
+      "match": true
+    }
+  ],
+  "all13Match": true,
+  "prHead": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "mainBefore": "957ceaf26501525eff476cdc1d149d81fd5ebcd7",
+  "mainAfter": "957ceaf26501525eff476cdc1d149d81fd5ebcd7",
+  "exit": 0,
+  "ended": "2026-10-02T01:01:38.642534+00:00",
+  "allChildrenEnded": true
+}

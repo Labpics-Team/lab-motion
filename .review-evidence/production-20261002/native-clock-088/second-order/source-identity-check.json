@@ -1,0 +1,22 @@
+{
+  "head": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "tree": "ebc3c2ac51e957b5b1d4f7959feac36c6184fd2d",
+  "filesChecked": 639,
+  "mismatches": [],
+  "changedPaths": [
+    "bench/profile/native-clock/LICENSE",
+    "bench/profile/native-clock/README.md",
+    "bench/profile/native-clock/include/js_native_api.h",
+    "bench/profile/native-clock/include/js_native_api_types.h",
+    "bench/profile/native-clock/include/node_api.h",
+    "bench/profile/native-clock/include/node_api_types.h",
+    "bench/profile/server-profile-contract.mjs",
+    "bench/profile/server-profile-registration.mjs",
+    "bench/profile/server-profile-runner.mjs",
+    "bench/profile/server-thread-cpu-clock.c",
+    "bench/profile/server-thread-cpu-clock.mjs",
+    "docs/server-profile.md",
+    "test/server-profile-contract.test.ts"
+  ],
+  "noChangedRuntimePackageBoundary": true
+}

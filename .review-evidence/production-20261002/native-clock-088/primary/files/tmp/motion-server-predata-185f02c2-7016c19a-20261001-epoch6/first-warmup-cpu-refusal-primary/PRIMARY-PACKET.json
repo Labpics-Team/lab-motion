@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "subject": "Первый фактически приобретённый baseline warmup engine sample; ни pilot, ни AA/AB ещё не получены",
+  "sourceHead": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "registrationDigest": "24c31634618a1d0d55e4e774ac1ac6940c6f826016f5ce95119c1e76efaa7674",
+  "primary": [
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/server-profile.json",
+      "bytes": 86606,
+      "sha256": "672b6740f847404966ae86564f8a809deb45d4fbd74bb65d35bebbcd844416e4"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/journal.ndjson",
+      "bytes": 177601,
+      "sha256": "78f6f2919ea07a71c470a5e83f9e4105194366af01cd0932cbdf785a3153d29f"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/server-profile.sha256",
+      "bytes": 86,
+      "sha256": "32b9e09605deb43be9c74553562ef410b589275b0585b7db0dce0d52f81c5af4"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual-launch.json",
+      "bytes": 1531,
+      "sha256": "d25f4a3772ad86b93ffacd160e44ab544dfaf47b3a33d8f2221b2fd9ad0d6df0"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual-execution.json",
+      "bytes": 1355,
+      "sha256": "c884dae1d2bada0717426df404d5afff5cc109f653c4782165257eaacaa95868"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual.stdout.log",
+      "bytes": 51681,
+      "sha256": "312852d3451a939efc2622aab15bb7dfc7e0f3fc462619e5478faa74db07a682"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual.stderr.log",
+      "bytes": 90,
+      "sha256": "305ccfaef64f47f74b8c6fa6ce2dfe7c01b26160f4bd6f7d24712352b273c08b"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/predata-tuple.json",
+      "bytes": 39450,
+      "sha256": "e9687480c8ce7d2028a55275e84a77f9ce195cdbae783170573bf63035c52f31"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/first-warmup-cpu-refusal-primary/acquired-clock-readback.json",
+      "bytes": 47604,
+      "sha256": "9459dfddf9a903ab099b4e2492bb515789cd1d5d855a136942ec4665105e93e7"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "bytes": 16782,
+      "sha256": "1596ca1be9d490bae7c82d13a97c7c6ecb9ba65be959f1a1290b18b92c84337e"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "bytes": 65202,
+      "sha256": "7eff7e001c8f075ee02990c99b49609c8446dea4b59564cf03bd03e134510c83"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "bytes": 49601,
+      "sha256": "5d0f11e31fceedfc524c09fe3cd0948395f218ce45f117c659a0a3551d4a3168"
+    },
+    {
+      "path": "/workspace/lab-motion/scripts/bench-transform-support.mjs",
+      "bytes": 31565,
+      "sha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c"
+    }
+  ]
+}

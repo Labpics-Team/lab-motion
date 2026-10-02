@@ -1,0 +1,112 @@
+{
+  "schema": 1,
+  "createdAt": "2026-10-02T00:23:14.808107+00:00",
+  "subject": "Один known-work clock-source comparison; не SUT/performance series, не N selection; native source additions ещё не приняты",
+  "historicalSourceHead": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "observedWarmupPredecessor": {
+    "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/first-warmup-cpu-refusal-primary/PRIMARY-PACKET.json",
+    "sha256": "9d8b010f9ddd38e6bac25004fa156daae0200f71c3a8f18f1412619b8dea8983"
+  },
+  "primary": [
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters",
+      "bytes": 16632,
+      "sha256": "4329153b93d608ba19f3f23378c54be7e1398b242b8b1e01db093be27c935618"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters.c",
+      "bytes": 2516,
+      "sha256": "d17df8ca1eb2f290cbb0df7e50c500d317b450b7794d4958be34357417411caf"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compile.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compile.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/diagnostic-raw.json",
+      "bytes": 18162,
+      "sha256": "fda29e81d18c42ea0049e6aeb39057d9c4d3be9d603da4d595b0624fe5f73dc3"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/diagnostic.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/execution.json",
+      "bytes": 939,
+      "sha256": "8a31743e8a75047f0d1e9ae75dcfcc5f8b7d2ed79d744e28425dbe6187a660ab"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--clock.c",
+      "bytes": 13050,
+      "sha256": "043618ff56eb333bd7c3a243bc9597387f8e9bb7b240c7383712a4643d196118"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--core.c",
+      "bytes": 289670,
+      "sha256": "5b510e027f1a6236165f26da4b1195530264dc0013ff8883bf49d03114ea26c2"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--cputime.c",
+      "bytes": 27252,
+      "sha256": "eabd7ccf5bafd87ccd686829b1192e56dafb8c213f10f12aec619405246977a6"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--time--posix-cpu-timers.c",
+      "bytes": 49795,
+      "sha256": "23255e35526f6582c00ad0c88438c378bfa45d49316019fa76cacd6be1983621"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel-config.gz",
+      "bytes": 20709,
+      "sha256": "7f98e7fb11220b6ec5891c2e2165c115d4a20ba5087898d436f3ab843b3baa96"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel-source-manifest.json",
+      "bytes": 1292,
+      "sha256": "1357b0dad58a27b9d6bf0c2bab35e80d6000df50b63e6b824fb3065d41885841"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/napi-header-source-manifest.json",
+      "bytes": 1153,
+      "sha256": "c6cfb7e6313756e31e07f42021a3123e83b5f7b59708326ced3d93a4c23c3f1f"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/native-source-pins.json",
+      "bytes": 614,
+      "sha256": "9e77ba12491bb7b5b9ce7f82ead941442afdc50a7646cce15d9050f3c07eebb2"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/raw-delta-readback.json",
+      "bytes": 7886,
+      "sha256": "91f258044fed7255e6f4e10561400b983e9b7011a2f3e36fa55212f38289c77d"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/runtime-clock-metadata.json",
+      "bytes": 213,
+      "sha256": "3ae33f840b1ea1c6496bcd539df774b3262c6eb036d8ff2a48c1aa7f574e4331"
+    },
+    {
+      "path": "/workspace/scratch/motion-server-method-final-20261001T144242Z/primary-clock-sources/libuv-core.c",
+      "bytes": 50911,
+      "sha256": "18bfd5f2045417f8ace5d76e222bf7441b31ead5fc2cbaf6225965e0afea8767"
+    },
+    {
+      "path": "/workspace/scratch/motion-server-method-final-20261001T144242Z/primary-clock-sources/linux-sys.c",
+      "bytes": 73523,
+      "sha256": "0b656f8809d781b7e684a1a4c4144d925684c69e9f6050c41c6374c5206d2c8d"
+    },
+    {
+      "path": "/workspace/scratch/motion-server-method-final-20261001T144242Z/primary-clock-sources/linux-time.c",
+      "bytes": 27429,
+      "sha256": "e757e825d72489c929a273f22aba8fa31487c29738960aea2683ac0274a58e6a"
+    }
+  ]
+}

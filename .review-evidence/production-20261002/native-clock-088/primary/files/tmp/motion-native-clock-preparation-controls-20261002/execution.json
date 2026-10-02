@@ -1,0 +1,241 @@
+{
+  "start": "2026-10-02T00:41:36.939844+00:00",
+  "end": "2026-10-02T00:41:37.469665+00:00",
+  "wallSeconds": 0.5298262410069583,
+  "results": [
+    {
+      "mode": "worker",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-preparation-controls-20261002/control.mjs",
+        "worker",
+        "/tmp/motion-native-clock-preparation-controls-20261002/worker"
+      ],
+      "exit": 0,
+      "result": {
+        "message": "server CPU clock: \u043d\u0443\u0436\u043d\u044b \u0437\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0435 Linux x64/main-thread/Node",
+        "raw": {
+          "platform": "linux",
+          "arch": "x64",
+          "isMainThread": false,
+          "node": "v24.19.0"
+        }
+      },
+      "passed": true
+    },
+    {
+      "mode": "nonlinux",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-preparation-controls-20261002/control.mjs",
+        "nonlinux",
+        "/tmp/motion-native-clock-preparation-controls-20261002/nonlinux"
+      ],
+      "exit": 0,
+      "result": {
+        "message": "server CPU clock: \u043d\u0443\u0436\u043d\u044b \u0437\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0435 Linux x64/main-thread/Node",
+        "raw": {
+          "platform": "darwin",
+          "arch": "x64",
+          "isMainThread": true,
+          "node": "v24.19.0"
+        }
+      },
+      "passed": true
+    },
+    {
+      "mode": "wrong-node",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-preparation-controls-20261002/control.mjs",
+        "wrong-node",
+        "/tmp/motion-native-clock-preparation-controls-20261002/wrong-node"
+      ],
+      "exit": 0,
+      "result": {
+        "message": "server CPU clock: \u043d\u0443\u0436\u043d\u044b \u0437\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0435 Linux x64/main-thread/Node",
+        "raw": {
+          "platform": "linux",
+          "arch": "x64",
+          "isMainThread": true,
+          "node": "v24.19.1"
+        }
+      },
+      "passed": true
+    },
+    {
+      "mode": "missing-compiler",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-preparation-controls-20261002/control.mjs",
+        "missing-compiler",
+        "/tmp/motion-native-clock-preparation-controls-20261002/missing-compiler"
+      ],
+      "exit": 0,
+      "result": {
+        "message": "server CPU clock: \u043d\u0435\u0442 C compiler \u0434\u043b\u044f \u0447\u0430\u0441\u0442\u043d\u043e\u0433\u043e getter",
+        "raw": {
+          "path": ""
+        }
+      },
+      "passed": true
+    },
+    {
+      "mode": "stale-binary",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-preparation-controls-20261002/control.mjs",
+        "stale-binary",
+        "/tmp/motion-native-clock-preparation-controls-20261002/stale-binary"
+      ],
+      "exit": 0,
+      "result": {
+        "message": "server CPU clock: native binary \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442; stale/replay \u0437\u0430\u043f\u0440\u0435\u0449\u0451\u043d",
+        "raw": {
+          "binary": "/tmp/motion-native-clock-preparation-controls-20261002/stale-binary/native-clock/thread-cpu-clock.node"
+        }
+      },
+      "passed": true
+    },
+    {
+      "mode": "binary-mutation",
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-preparation-controls-20261002/control.mjs",
+        "binary-mutation",
+        "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation"
+      ],
+      "exit": 0,
+      "result": {
+        "message": "server CPU clock: native getter/source/compiler/libc/runtime identity \u0438\u0437\u043c\u0435\u043d\u0438\u043b\u0438\u0441\u044c",
+        "raw": {
+          "metadata": {
+            "schema": 1,
+            "clock": "CLOCK_THREAD_CPUTIME_ID",
+            "pid": 678646,
+            "tid": 678646,
+            "napiVersion": 8,
+            "node": {
+              "version": "v24.19.0",
+              "executableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
+            },
+            "nativeBinary": {
+              "path": "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation/native-clock/thread-cpu-clock.node",
+              "bytes": 16192,
+              "sha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a"
+            },
+            "nativeSources": {
+              "bench/profile/native-clock/include/js_native_api.h": "8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788",
+              "bench/profile/native-clock/include/js_native_api_types.h": "4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0",
+              "bench/profile/native-clock/include/node_api.h": "2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a",
+              "bench/profile/native-clock/include/node_api_types.h": "a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00",
+              "bench/profile/server-thread-cpu-clock.c": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0"
+            },
+            "nativeSourceDigest": "6bea5676da3bcc677eef962aaa265edbc285964e6cf4f4e1867591a6705abf62",
+            "compiler": {
+              "path": "/usr/bin/x86_64-linux-gnu-gcc-14",
+              "version": "x86_64-linux-gnu-gcc-14 (Debian 14.2.0-19) 14.2.0\nCopyright (C) 2024 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+              "binarySha256": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f",
+              "flags": [
+                "-std=c11",
+                "-O2",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-shared",
+                "-fPIC",
+                "-fvisibility=hidden",
+                "-DNAPI_VERSION=8",
+                "-I",
+                "/workspace/lab-motion/bench/profile/native-clock/include",
+                "-o",
+                "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation/native-clock/thread-cpu-clock.node",
+                "/workspace/lab-motion/bench/profile/server-thread-cpu-clock.c"
+              ]
+            },
+            "libc": {
+              "path": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+              "sha256": "fa430b8f298f817a266046af84a77533185ad6fc4406c7d3787b5a0a0c207826"
+            },
+            "nominalResolutionNs": "1",
+            "nominalResolutionIsNotErrorCertificate": true
+          }
+        }
+      },
+      "passed": true
+    }
+  ],
+  "allPassed": true,
+  "files": {
+    "binary-mutation.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "binary-mutation.stdout": {
+      "bytes": 2208,
+      "sha256": "a61a0a17c5540dba59420c26bfba6b0e9a051947b4da02af9e03da3dd6bcfab5"
+    },
+    "stale-binary.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stale-binary.stdout": {
+      "bytes": 227,
+      "sha256": "966c6d6dfd9067fd45ab9066d2032bb6719937fc2ff8a960624c47ab3a16744d"
+    },
+    "missing-compiler.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "missing-compiler.stdout": {
+      "bytes": 99,
+      "sha256": "f8e348ea3490cd857542133049c5de27dc017d85bfa73493e8f9fbbf5ae450f0"
+    },
+    "wrong-node.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "wrong-node.stdout": {
+      "bytes": 185,
+      "sha256": "27988329930b381fab623b0bcec1e00654d32591544cf230a6c3440df01aec52"
+    },
+    "nonlinux.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "nonlinux.stdout": {
+      "bytes": 186,
+      "sha256": "7b45ef0a7077796cc20a454f6848cb8398eb90c78494b2378a97295707712d0b"
+    },
+    "worker.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "worker.stdout": {
+      "bytes": 186,
+      "sha256": "ff4f6e040e7e7a34ba8a3994057f6c3783f9bec4650d85ffc46fb8356693c340"
+    },
+    "control.mjs": {
+      "bytes": 1547,
+      "sha256": "05177572a8c021eb5de03e84321b8ef38dd1f9089b548dde9ca97cb03606f038"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "argv": [
+    "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "test/server-profile-contract.test.ts",
+    "-t",
+    "native scheduled CPU endpoints",
+    "--reporter=json",
+    "--outputFile=/tmp/motion-native-clock-consumer-closure-20261002/green-leaf.json"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "path": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+  "nodePathUnset": true,
+  "nodeOptionsUnset": true,
+  "nodeVersion": "v24.19.0",
+  "pnpmVersion": "11.11.0",
+  "startUtc": "2026-10-02T00:32:30.622916+00:00",
+  "capSeconds": 5,
+  "actualRegisteredTimingSamples": 0,
+  "exitCode": 0,
+  "timedOut": false,
+  "endUtc": "2026-10-02T00:32:32.447583+00:00",
+  "elapsedSeconds": 1.824691405010526,
+  "green-leaf.json": {
+    "bytes": 79017,
+    "sha256": "aff5c804917b414e73403e8d2d6fd9cecf00a28924c6dab85f76e40d5806f01a"
+  },
+  "green-leaf.stdout.log": {
+    "bytes": 143,
+    "sha256": "5da65b5e2635d3f438c0f21810bc0e0fd795a378031a5aa094d348aa09898968"
+  },
+  "green-leaf.stderr.log": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,692 @@
+{
+  "at": "2026-10-02T01:04:11.932288+00:00",
+  "head": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "tree": "ebc3c2ac51e957b5b1d4f7959feac36c6184fd2d",
+  "primaryManifestSha256": "80e5dd4b030bbb8287416eb4b1372af7164801eacde39ed642a14a9ea86fec4a",
+  "all93PrimaryBindingsMatch": true,
+  "primaryFiles": [
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/PRIMARY-PACKET.json",
+      "bytes": 4741,
+      "sha256": "0477e5a11434b0be4c4eb43ac63a33de6a9dc6888e1caebde0d0ceaa635b56e0"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters",
+      "bytes": 16632,
+      "sha256": "4329153b93d608ba19f3f23378c54be7e1398b242b8b1e01db093be27c935618"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters.c",
+      "bytes": 2516,
+      "sha256": "d17df8ca1eb2f290cbb0df7e50c500d317b450b7794d4958be34357417411caf"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compile.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compile.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/diagnostic-raw.json",
+      "bytes": 18162,
+      "sha256": "fda29e81d18c42ea0049e6aeb39057d9c4d3be9d603da4d595b0624fe5f73dc3"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/diagnostic.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/execution.json",
+      "bytes": 939,
+      "sha256": "8a31743e8a75047f0d1e9ae75dcfcc5f8b7d2ed79d744e28425dbe6187a660ab"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--clock.c",
+      "bytes": 13050,
+      "sha256": "043618ff56eb333bd7c3a243bc9597387f8e9bb7b240c7383712a4643d196118"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--core.c",
+      "bytes": 289670,
+      "sha256": "5b510e027f1a6236165f26da4b1195530264dc0013ff8883bf49d03114ea26c2"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--cputime.c",
+      "bytes": 27252,
+      "sha256": "eabd7ccf5bafd87ccd686829b1192e56dafb8c213f10f12aec619405246977a6"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--time--posix-cpu-timers.c",
+      "bytes": 49795,
+      "sha256": "23255e35526f6582c00ad0c88438c378bfa45d49316019fa76cacd6be1983621"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel-config.gz",
+      "bytes": 20709,
+      "sha256": "7f98e7fb11220b6ec5891c2e2165c115d4a20ba5087898d436f3ab843b3baa96"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel-source-manifest.json",
+      "bytes": 1292,
+      "sha256": "1357b0dad58a27b9d6bf0c2bab35e80d6000df50b63e6b824fb3065d41885841"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/napi-header-source-manifest.json",
+      "bytes": 1153,
+      "sha256": "c6cfb7e6313756e31e07f42021a3123e83b5f7b59708326ced3d93a4c23c3f1f"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/native-source-pins.json",
+      "bytes": 614,
+      "sha256": "9e77ba12491bb7b5b9ce7f82ead941442afdc50a7646cce15d9050f3c07eebb2"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/node-LICENSE.raw",
+      "bytes": 157606,
+      "sha256": "148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/raw-delta-readback.json",
+      "bytes": 7886,
+      "sha256": "91f258044fed7255e6f4e10561400b983e9b7011a2f3e36fa55212f38289c77d"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/runtime-clock-metadata.json",
+      "bytes": 213,
+      "sha256": "3ae33f840b1ea1c6496bcd539df774b3262c6eb036d8ff2a48c1aa7f574e4331"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-20261002/execution.json",
+      "bytes": 1482,
+      "sha256": "c15eb2563969d841d9842895d77521e216898ed7dbe062eb23a7b1348b0937cb"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-20261002/smoke.mjs",
+      "bytes": 510,
+      "sha256": "788ee354014a90a8ebeb0ac7828c4778cc099b513febc818cc84ee5e3d29aaf2"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-20261002/stderr.log",
+      "bytes": 2093,
+      "sha256": "6346296f424f540872a4bdd6e6582c8f336bd58236081de3e61921224c8d61c5"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-20261002/stdout.json",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/execution.json",
+      "bytes": 1494,
+      "sha256": "89f363e2eb84919b4e96f1b0d717141a8cc539e3e01dd9404adf81aa327276db"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/native-clock/thread-cpu-clock.node",
+      "bytes": 16192,
+      "sha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/smoke.mjs",
+      "bytes": 510,
+      "sha256": "788ee354014a90a8ebeb0ac7828c4778cc099b513febc818cc84ee5e3d29aaf2"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/stdout.json",
+      "bytes": 2814,
+      "sha256": "9e5badf12d7aefbb0c9abb1439d640de30461279a87866918cd2ad0b9eebcc28"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/PRIMARY/PRIMARY-PACKET.json",
+      "bytes": 953,
+      "sha256": "3763645ca66eeb14352c265f2fb9b9037a1e0b6db724324ce02dffc03be120d2"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/affected-full.execution.json",
+      "bytes": 3311,
+      "sha256": "85ed4b1857e925c15d7edf89f07f4799bf2986397063b66f2c7262f9da7bbc42"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/affected-full.json",
+      "bytes": 83334,
+      "sha256": "63d9519cf22ea314ee1cfa6007de31a9ba1ab538bfea6129b1afc0b0c6367473"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/affected-full.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/affected-full.stdout.log",
+      "bytes": 146,
+      "sha256": "ea834240acbb67972f5bd97ac02795351f1e1b8ffc7eadf115573d7670f299f0"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/green-leaf.execution.json",
+      "bytes": 1647,
+      "sha256": "461f1e6fe0a4bb0ab121cae31589c9a6778d114caa4d89734087b94b2b098d1f"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/green-leaf.json",
+      "bytes": 79017,
+      "sha256": "aff5c804917b414e73403e8d2d6fd9cecf00a28924c6dab85f76e40d5806f01a"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/green-leaf.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/green-leaf.stdout.log",
+      "bytes": 143,
+      "sha256": "5da65b5e2635d3f438c0f21810bc0e0fd795a378031a5aa094d348aa09898968"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/red.execution.json",
+      "bytes": 1619,
+      "sha256": "f013e97b7b328a1e4714c8e1bed4fdb454f8da57de87cceb38b3b7250f4bfd0e"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/red.json",
+      "bytes": 95170,
+      "sha256": "1eb73a49a46fe3ab73f300e516cec61344e509a149d0eca9d897ee2c1ab0c1b8"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/red.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/red.stdout.log",
+      "bytes": 249,
+      "sha256": "f4b4e05f78403989404ebc83bef115ed4440bfede9532f96bc4d2d6c2fc6ccd2"
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/source-before.json",
+      "bytes": 904,
+      "sha256": "f5ab84c7b32da57ad958087efa9ed454ab93f41227254de336bc01b4c427517e"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/compile.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/compile.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/control.mjs",
+      "bytes": 245,
+      "sha256": "c94f0565092e0ca16e19ebf697f7453d28166bcc8175b45dbf9e5577f95afde9"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/errno.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/errno.stdout",
+      "bytes": 53,
+      "sha256": "def380c13e6734f89e3d1f7139d256c224d8e1b7be9aa60991334c96fbc388b5"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/execution.json",
+      "bytes": 5971,
+      "sha256": "dc1b27afd678854401b38cc8ed2a712045d5d5795981621f04ad15cc01a1196a"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/fault-clock.node",
+      "bytes": 16320,
+      "sha256": "a8b9383e868574b5bb5c7f1c4f5f028823b30997a0e98dd73a267294ae215f91"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/large-ns.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/large-ns.stdout",
+      "bytes": 80,
+      "sha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/large-sec.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/large-sec.stdout",
+      "bytes": 84,
+      "sha256": "55db18e17e6f4d302b08258127c40a60eeed9122b8bbeef75ef5b4d9dc1d80fe"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/negative-ns.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/negative-ns.stdout",
+      "bytes": 80,
+      "sha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/negative-sec.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/negative-sec.stdout",
+      "bytes": 80,
+      "sha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851"
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/wrap-clock.c",
+      "bytes": 536,
+      "sha256": "a7374c48444a0d20c37fbc7da4169b7aa087b8598824752853b33a8e5367230f"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation/native-clock/thread-cpu-clock.node",
+      "bytes": 16200,
+      "sha256": "3400a54578b7035affd608bb3f9fb52c4b424156d18156aa8f84e1123540d6ca"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation.stdout",
+      "bytes": 2208,
+      "sha256": "a61a0a17c5540dba59420c26bfba6b0e9a051947b4da02af9e03da3dd6bcfab5"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/control.mjs",
+      "bytes": 1547,
+      "sha256": "05177572a8c021eb5de03e84321b8ef38dd1f9089b548dde9ca97cb03606f038"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/execution.json",
+      "bytes": 9236,
+      "sha256": "08096eccba064211cf92d5289e27208a14b8c68553f415ef914cae4fc56a0494"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/missing-compiler.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/missing-compiler.stdout",
+      "bytes": 99,
+      "sha256": "f8e348ea3490cd857542133049c5de27dc017d85bfa73493e8f9fbbf5ae450f0"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/nonlinux.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/nonlinux.stdout",
+      "bytes": 186,
+      "sha256": "7b45ef0a7077796cc20a454f6848cb8398eb90c78494b2378a97295707712d0b"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/stale-binary/native-clock/thread-cpu-clock.node",
+      "bytes": 5,
+      "sha256": "a03f2386ae06b21109577020844df367857b72c2fcce384c1896fed98a89c82b"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/stale-binary.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/stale-binary.stdout",
+      "bytes": 227,
+      "sha256": "966c6d6dfd9067fd45ab9066d2032bb6719937fc2ff8a960624c47ab3a16744d"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/worker.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/worker.stdout",
+      "bytes": 186,
+      "sha256": "ff4f6e040e7e7a34ba8a3994057f6c3783f9bec4650d85ffc46fb8356693c340"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/wrong-node.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/wrong-node.stdout",
+      "bytes": 185,
+      "sha256": "27988329930b381fab623b0bcec1e00654d32591544cf230a6c3440df01aec52"
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/archive-acquisition-initial-error.txt",
+      "bytes": 258,
+      "sha256": "309b35fb953cbe5406e7c5e07cc923256d35dacab4f1533597a691165a7d5d3d"
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/diff.patch",
+      "bytes": 166454,
+      "sha256": "c20b40756914d860d754188c97512dd2b83e3fbb86f089fe575b41ebe06b679f"
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/method-readset.json",
+      "bytes": 7068,
+      "sha256": "7f234a2aff0925bb3315d49ed311455022834efead7f2fd84c5fa77613c26d2f"
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/source-manifest.json",
+      "bytes": 151106,
+      "sha256": "81e832fa375a233931e26eb41dfd1624c14402292c5f9b75d325e8eb8fba3388"
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/source.tar.gz",
+      "bytes": 1766073,
+      "sha256": "bc22b2359f3a8466a9daa9ced434f561525d120782ec7efeefbe2e57ff410db3"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual-execution.json",
+      "bytes": 1355,
+      "sha256": "c884dae1d2bada0717426df404d5afff5cc109f653c4782165257eaacaa95868"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual-launch.json",
+      "bytes": 1531,
+      "sha256": "d25f4a3772ad86b93ffacd160e44ab544dfaf47b3a33d8f2221b2fd9ad0d6df0"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual.stderr.log",
+      "bytes": 90,
+      "sha256": "305ccfaef64f47f74b8c6fa6ce2dfe7c01b26160f4bd6f7d24712352b273c08b"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual.stdout.log",
+      "bytes": 51681,
+      "sha256": "312852d3451a939efc2622aab15bb7dfc7e0f3fc462619e5478faa74db07a682"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/first-warmup-cpu-refusal-primary/PRIMARY-PACKET.json",
+      "bytes": 3110,
+      "sha256": "9d8b010f9ddd38e6bac25004fa156daae0200f71c3a8f18f1412619b8dea8983"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/first-warmup-cpu-refusal-primary/acquired-clock-readback.json",
+      "bytes": 47604,
+      "sha256": "9459dfddf9a903ab099b4e2492bb515789cd1d5d855a136942ec4665105e93e7"
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/predata-tuple.json",
+      "bytes": 39450,
+      "sha256": "e9687480c8ce7d2028a55275e84a77f9ce195cdbae783170573bf63035c52f31"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/journal.ndjson",
+      "bytes": 177601,
+      "sha256": "78f6f2919ea07a71c470a5e83f9e4105194366af01cd0932cbdf785a3153d29f"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/server-profile.json",
+      "bytes": 86606,
+      "sha256": "672b6740f847404966ae86564f8a809deb45d4fbd74bb65d35bebbcd844416e4"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/server-profile.sha256",
+      "bytes": 86,
+      "sha256": "32b9e09605deb43be9c74553562ef410b589275b0585b7db0dce0d52f81c5af4"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "bytes": 69001,
+      "sha256": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "bytes": 18946,
+      "sha256": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87"
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "bytes": 50951,
+      "sha256": "72383a1abfd70b2bdb163995f8d6dac7cf70624e6f4658db395123554dcfffcf"
+    },
+    {
+      "path": "/workspace/lab-motion/scripts/bench-transform-support.mjs",
+      "bytes": 31565,
+      "sha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c"
+    }
+  ],
+  "sourceDelta13Paths": [
+    "bench/profile/native-clock/LICENSE",
+    "bench/profile/native-clock/README.md",
+    "bench/profile/native-clock/include/js_native_api.h",
+    "bench/profile/native-clock/include/js_native_api_types.h",
+    "bench/profile/native-clock/include/node_api.h",
+    "bench/profile/native-clock/include/node_api_types.h",
+    "bench/profile/server-profile-contract.mjs",
+    "bench/profile/server-profile-registration.mjs",
+    "bench/profile/server-profile-runner.mjs",
+    "bench/profile/server-thread-cpu-clock.c",
+    "bench/profile/server-thread-cpu-clock.mjs",
+    "docs/server-profile.md",
+    "test/server-profile-contract.test.ts"
+  ],
+  "shippedSourcePackagePathsUntouched": true,
+  "whole5014AllPass": true,
+  "wholeJson": {
+    "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/whole.json",
+    "bytes": 2137539,
+    "sha256": "bb03acb69fb734d9069720f5c359ce0ad4838de7fc81c4cbe75abfd9d2ef085d"
+  },
+  "all12LogsFullRead": [
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/whole.stdout",
+      "bytes": 255,
+      "sha256": "04aa1af1536e49c4bf0cfc56e830d5ec8b36cc402970b14a92525f057c6f7b88",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/whole.stderr",
+      "bytes": 359,
+      "sha256": "2976e9767d7b5be66eba90364f414761cc9d16d32ca86cc2cbe9457bf2f0df35",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/static.stdout",
+      "bytes": 260,
+      "sha256": "69dd4cf2f42ba6787da569495b2ecfaa4289f3ff44f3db0252b7a15dd9d620c1",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/static.stderr",
+      "bytes": 396,
+      "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/docs-facts.stdout",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/docs-facts.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/docs-drift.stdout",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/docs-drift.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/pnpm-pack.stdout",
+      "bytes": 8070,
+      "sha256": "798e44d8d7ee5bd22a4db6c59432ef9abe1a5ec2fc8bf39876714bd42b4e3f7a",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/pnpm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/npm-pack.stdout",
+      "bytes": 32706,
+      "sha256": "e58f4b564341b98e739ebb8cf483bfe38c42e5a151d74084276083ca0ca50a2f",
+      "fullRead": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/npm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "fullRead": true
+    }
+  ],
+  "criticalTests": [
+    {
+      "name": "animate: единый pause -> seek -> play full main: seek(NaN | +/-Infinity) — полный no-op",
+      "duration": 0.6737959999999816,
+      "status": "passed"
+    },
+    {
+      "name": "animate: единый pause -> seek -> play full WAAPI: seek(NaN | +/-Infinity) — полный no-op",
+      "duration": 0.552063000000004,
+      "status": "passed"
+    },
+    {
+      "name": "каскад: lifetime слоя и полный отказ уведомлений destroy отдельного слоя раскрывает нижний target и запрещает resurrection",
+      "duration": 0.27721800000000485,
+      "status": "passed"
+    },
+    {
+      "name": "каскад: lifetime слоя и полный отказ уведомлений destroy слоя из getter отзывает pending set",
+      "duration": 0.13534400000000346,
+      "status": "passed"
+    },
+    {
+      "name": "каскад: lifetime слоя и полный отказ уведомлений clear сохраняет приоритет повторно включённого слоя",
+      "duration": 0.1615639999999985,
+      "status": "passed"
+    },
+    {
+      "name": "каскад: lifetime слоя и полный отказ уведомлений отказ initial constructor не оставляет orphan owner; rollback тоже доставляется",
+      "duration": 0.23899099999999862,
+      "status": "passed"
+    },
+    {
+      "name": "каскад: lifetime слоя и полный отказ уведомлений ошибки нескольких подписчиков не теряются и сохраняют порядок",
+      "duration": 0.26032299999999964,
+      "status": "passed"
+    },
+    {
+      "name": "каскад: lifetime слоя и полный отказ уведомлений конечная цепочка 10000 реентрантных коммитов не растит call stack",
+      "duration": 91.74829700000001,
+      "status": "passed"
+    },
+    {
+      "name": "каскад: lifetime слоя и полный отказ уведомлений destroy обрывает накопленную очередь, не только один текущий callback",
+      "duration": 0.32492099999998914,
+      "status": "passed"
+    },
+    {
+      "name": "каскад: lifetime слоя и полный отказ уведомлений inert handles не читают новые входы и не подписывают callbacks",
+      "duration": 0.7371030000000189,
+      "status": "passed"
+    },
+    {
+      "name": "schema 10 motion conformance admission принимает полный отчёт с 8 × 8 траекториями и независимой пружиной",
+      "duration": 663.8885579999999,
+      "status": "passed"
+    },
+    {
+      "name": "нативный граф CI отвергает изменение: неполный Firefox",
+      "duration": 27.381434999999897,
+      "status": "passed"
+    },
+    {
+      "name": "C1-4 hex-парсинг: doubling, parseInt base16, alpha/255, trim #aabbcc → полный hex: 170,187,204",
+      "duration": 0.9022909999999911,
+      "status": "passed"
+    },
+    {
+      "name": "C1-4 hex-парсинг: doubling, parseInt base16, alpha/255, trim #aabbccdd → полный hex + alpha 0.8667",
+      "duration": 0.1765359999999987,
+      "status": "passed"
+    },
+    {
+      "name": "keyframes post-settle: ни эмиссий, ни планирования, ни движения времени seek(NaN) mid-run — полный no-op: время не меняется, эмиссий нет, время конечно",
+      "duration": 0.48112599999998906,
+      "status": "passed"
+    },
+    {
+      "name": "presets/typewriterAt А: края — p=0 → \"\", p=1 → полный текст",
+      "duration": 0.1308170000000075,
+      "status": "passed"
+    },
+    {
+      "name": "presets/typewriterAt А: хостильный прогресс клэмпится — NaN → \"\", 2 → полный текст",
+      "duration": 0.09694599999997422,
+      "status": "passed"
+    },
+    {
+      "name": "presets/runTypewriter Б: полный прогон — монотонные префиксы, финал = полный текст",
+      "duration": 3.1154300000000035,
+      "status": "passed"
+    },
+    {
+      "name": "управляемая перестановка, не вторая модель данных сетка, неполный ряд и перенос всей geometry сохраняют выбор",
+      "duration": 0.49753099999998085,
+      "status": "passed"
+    },
+    {
+      "name": "серверный PROFILE: clock/progress falsifiers сохраняет неполный acquired onset до отказа и все extra raw fields",
+      "duration": 1.6861329999996997,
+      "status": "passed"
+    },
+    {
+      "name": "timeline-finiteness-fuzz: 10k+ случайных сегментов (полный fuzz) никогда не эмитирует NaN/Infinity при случайных from/to/duration/seek",
+      "duration": 92.62406800000002,
+      "status": "passed"
+    },
+    {
+      "name": "γ=2 color contract: отличие от точного sRGB-linear полный byte-midpoint corpus характеризует ошибку сериализованного API",
+      "duration": 89.859758,
+      "status": "passed"
+    },
+    {
+      "name": "buildTransform полный набор: порядок translate→scale→rotate→skew",
+      "duration": 0.29167000000001053,
+      "status": "passed"
+    }
+  ],
+  "fullNewCAndHelperAndDocRead": true,
+  "modelScope": "Linux-reported scheduled-runtime; unchanged2000nsoutwardpaddingnotphysicalcertificate; getteroverheadincluded; nativecontrolsnotperformancesamples",
+  "protocolDigest": "a7a3279d573e4ee9e5b9723eb351e53e93f468410a1652a103e1132ba6bd1570",
+  "clockDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+  "qualification": "Авторские local checks прочитаны; независимые measurement+SO и currentCI+FULLCodeRabbit ещё ожидаются. Actual calibration/A/B отсутствуют."
+}

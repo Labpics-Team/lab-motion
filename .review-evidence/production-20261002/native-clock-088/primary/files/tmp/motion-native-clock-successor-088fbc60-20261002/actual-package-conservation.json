@@ -1,0 +1,41 @@
+{
+  "head": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "packages": [
+    {
+      "current": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/candidate-pnpm.tgz",
+      "prior": "/workspace/lab-motion/scratchpad/runtime-upstream-final-cut-20261001T124549Z/actual-package.tgz",
+      "tarBytesLiteralMatch": true,
+      "currentTarSha256": "46c9067832760159d35ccd2166b28e6486a57602b1e96d6d23e1c4c06804a402",
+      "members": 312,
+      "memberBytesMatch": true,
+      "serverDocOrNativeIncluded": false,
+      "packageFiles": [
+        "dist",
+        "docs/errors.md",
+        "docs/benchmark.md",
+        "docs/motion-conformance.md",
+        "docs/recipes.md",
+        "!dist/**/*.map",
+        "docs/bindings.md"
+      ]
+    },
+    {
+      "current": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/labpics-motion-0.3.0.tgz",
+      "prior": "/workspace/lab-motion/scratchpad/runtime-upstream-final-cut-20261001T124549Z/primary/current-browser-actual-package/labpics-motion-0.3.0.tgz",
+      "tarBytesLiteralMatch": true,
+      "currentTarSha256": "364f9ff8b505191965040eb17059a034e2cb39be5dd0b1468855ca7e9c61c524",
+      "members": 312,
+      "memberBytesMatch": true,
+      "serverDocOrNativeIncluded": false,
+      "packageFiles": [
+        "dist",
+        "docs/errors.md",
+        "docs/benchmark.md",
+        "docs/motion-conformance.md",
+        "docs/recipes.md",
+        "!dist/**/*.map",
+        "docs/bindings.md"
+      ]
+    }
+  ]
+}

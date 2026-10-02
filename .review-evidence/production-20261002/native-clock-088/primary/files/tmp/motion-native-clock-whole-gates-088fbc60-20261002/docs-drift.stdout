@@ -1,0 +1,2 @@
+check-docs-drift: факт ФС — субпутей 44, биндингов 9, --lab-motion-* 0, вне --lab-motion-* 0, вне kebab 0
+check-docs-drift: PASS — доки совпадают с реальностью

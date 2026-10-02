@@ -1,0 +1,27 @@
+{
+  "capturedAt": "2026-10-02T00:14:51.997399+00:00",
+  "head": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "files": [
+    {
+      "path": "bench/profile/server-profile-registration.mjs",
+      "sha256": "1596ca1be9d490bae7c82d13a97c7c6ecb9ba65be959f1a1290b18b92c84337e",
+      "bytes": 16782
+    },
+    {
+      "path": "bench/profile/server-profile-contract.mjs",
+      "sha256": "7eff7e001c8f075ee02990c99b49609c8446dea4b59564cf03bd03e134510c83",
+      "bytes": 65202
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "sha256": "4e02a006e4647ed7705cad3d933992d76fa665184facdee287f54f3efc13dc63",
+      "bytes": 85833
+    },
+    {
+      "path": "docs/server-profile.md",
+      "sha256": "56ae95327e3590196371d3b06e4a4f955482b16d98255d49cd44624e8b4fd0f2",
+      "bytes": 26839
+    }
+  ],
+  "scope": "before CPU clock consumer/registration transition; historical raw unchanged"
+}

@@ -1,0 +1,1576 @@
+[
+  {
+    "id": "@labpics/motion@0.3.0",
+    "name": "@labpics/motion",
+    "version": "0.3.0",
+    "size": 560840,
+    "unpackedSize": 1818496,
+    "shasum": "9b9f1da43819335616c7e58ee222016455f9a65e",
+    "integrity": "sha512-0kZsZPP+ohHVPtspoq09MW1k0Z1loJ16G3n6AET1m4HCJc/kcTiIf8a9xngo/qkruv/D5HhSXuT3leqOmmEH6Q==",
+    "filename": "labpics-motion-0.3.0.tgz",
+    "files": [
+      {
+        "path": "LICENSE",
+        "size": 1064,
+        "mode": 384
+      },
+      {
+        "path": "README.md",
+        "size": 13068,
+        "mode": 384
+      },
+      {
+        "path": "dist/a11y/index.cjs",
+        "size": 1291,
+        "mode": 384
+      },
+      {
+        "path": "dist/a11y/index.d.cts",
+        "size": 3901,
+        "mode": 384
+      },
+      {
+        "path": "dist/a11y/index.d.ts",
+        "size": 3901,
+        "mode": 384
+      },
+      {
+        "path": "dist/a11y/index.js",
+        "size": 1284,
+        "mode": 384
+      },
+      {
+        "path": "dist/angular/index.cjs",
+        "size": 4254,
+        "mode": 384
+      },
+      {
+        "path": "dist/angular/index.d.cts",
+        "size": 2209,
+        "mode": 384
+      },
+      {
+        "path": "dist/angular/index.d.ts",
+        "size": 2207,
+        "mode": 384
+      },
+      {
+        "path": "dist/angular/index.js",
+        "size": 4233,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/channels.d.cts",
+        "size": 11249,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/channels.d.ts",
+        "size": 11248,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/index.cjs",
+        "size": 38894,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/index.d.cts",
+        "size": 9618,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/index.d.ts",
+        "size": 9613,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/index.js",
+        "size": 38908,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/main-unit.d.cts",
+        "size": 2855,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/main-unit.d.ts",
+        "size": 2851,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/surface-batch.d.cts",
+        "size": 1723,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/surface-batch.d.ts",
+        "size": 1719,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/targets.d.cts",
+        "size": 1164,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/targets.d.ts",
+        "size": 1164,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/waapi-unit.d.cts",
+        "size": 7413,
+        "mode": 384
+      },
+      {
+        "path": "dist/animate/waapi-unit.d.ts",
+        "size": 7408,
+        "mode": 384
+      },
+      {
+        "path": "dist/auto/index.cjs",
+        "size": 13253,
+        "mode": 384
+      },
+      {
+        "path": "dist/auto/index.d.cts",
+        "size": 8072,
+        "mode": 384
+      },
+      {
+        "path": "dist/auto/index.d.ts",
+        "size": 8069,
+        "mode": 384
+      },
+      {
+        "path": "dist/auto/index.js",
+        "size": 13229,
+        "mode": 384
+      },
+      {
+        "path": "dist/behaviors/index.cjs",
+        "size": 11511,
+        "mode": 384
+      },
+      {
+        "path": "dist/behaviors/index.d.cts",
+        "size": 18475,
+        "mode": 384
+      },
+      {
+        "path": "dist/behaviors/index.d.ts",
+        "size": 18470,
+        "mode": 384
+      },
+      {
+        "path": "dist/behaviors/index.js",
+        "size": 11496,
+        "mode": 384
+      },
+      {
+        "path": "dist/behaviors/reorder/index.cjs",
+        "size": 3305,
+        "mode": 384
+      },
+      {
+        "path": "dist/behaviors/reorder/index.d.cts",
+        "size": 3134,
+        "mode": 384
+      },
+      {
+        "path": "dist/behaviors/reorder/index.d.ts",
+        "size": 3133,
+        "mode": 384
+      },
+      {
+        "path": "dist/behaviors/reorder/index.js",
+        "size": 3298,
+        "mode": 384
+      },
+      {
+        "path": "dist/behaviors/state-cascade.d.cts",
+        "size": 3669,
+        "mode": 384
+      },
+      {
+        "path": "dist/behaviors/state-cascade.d.ts",
+        "size": 3669,
+        "mode": 384
+      },
+      {
+        "path": "dist/bindings/index.cjs",
+        "size": 2817,
+        "mode": 384
+      },
+      {
+        "path": "dist/bindings/index.d.cts",
+        "size": 2137,
+        "mode": 384
+      },
+      {
+        "path": "dist/bindings/index.d.ts",
+        "size": 2135,
+        "mode": 384
+      },
+      {
+        "path": "dist/bindings/index.js",
+        "size": 2805,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/core.d.cts",
+        "size": 7372,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/core.d.ts",
+        "size": 7372,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/nano-default-artifact.d.cts",
+        "size": 450,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/nano-default-artifact.d.ts",
+        "size": 450,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/runtime/index.cjs",
+        "size": 486,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/runtime/index.d.cts",
+        "size": 1518,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/runtime/index.d.ts",
+        "size": 1516,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/runtime/index.js",
+        "size": 479,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/surface/index.cjs",
+        "size": 2178,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/surface/index.d.cts",
+        "size": 3359,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/surface/index.d.ts",
+        "size": 3359,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/surface/index.js",
+        "size": 2171,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/vite/index.cjs",
+        "size": 14828,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/vite/index.d.cts",
+        "size": 2002,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/vite/index.d.ts",
+        "size": 2002,
+        "mode": 384
+      },
+      {
+        "path": "dist/compiler/vite/index.js",
+        "size": 14821,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/cache.d.cts",
+        "size": 4542,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/cache.d.ts",
+        "size": 4542,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/core.d.cts",
+        "size": 25494,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/core.d.ts",
+        "size": 25485,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/curve.d.cts",
+        "size": 4116,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/curve.d.ts",
+        "size": 4113,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/detect.d.cts",
+        "size": 8037,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/detect.d.ts",
+        "size": 8036,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/error-bound.d.cts",
+        "size": 2241,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/error-bound.d.ts",
+        "size": 2240,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/execution.d.cts",
+        "size": 3492,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/execution.d.ts",
+        "size": 3490,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/format.d.cts",
+        "size": 2227,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/format.d.ts",
+        "size": 2227,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/handoff.d.cts",
+        "size": 4102,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/handoff.d.ts",
+        "size": 4100,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/index.cjs",
+        "size": 15837,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/index.d.cts",
+        "size": 305,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/index.d.ts",
+        "size": 304,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/index.js",
+        "size": 15815,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/sample.d.cts",
+        "size": 2771,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/sample.d.ts",
+        "size": 2770,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/segmenter.d.cts",
+        "size": 8848,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/segmenter.d.ts",
+        "size": 8847,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/stagger.d.cts",
+        "size": 13540,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/stagger.d.ts",
+        "size": 13534,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/stagger/index.cjs",
+        "size": 16683,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/stagger/index.d.cts",
+        "size": 676,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/stagger/index.d.ts",
+        "size": 674,
+        "mode": 384
+      },
+      {
+        "path": "dist/compositor/stagger/index.js",
+        "size": 16669,
+        "mode": 384
+      },
+      {
+        "path": "dist/decay.d.cts",
+        "size": 6546,
+        "mode": 384
+      },
+      {
+        "path": "dist/decay.d.ts",
+        "size": 6545,
+        "mode": 384
+      },
+      {
+        "path": "dist/decay/index.cjs",
+        "size": 1204,
+        "mode": 384
+      },
+      {
+        "path": "dist/decay/index.d.cts",
+        "size": 526,
+        "mode": 384
+      },
+      {
+        "path": "dist/decay/index.d.ts",
+        "size": 524,
+        "mode": 384
+      },
+      {
+        "path": "dist/decay/index.js",
+        "size": 1197,
+        "mode": 384
+      },
+      {
+        "path": "dist/drive.d.cts",
+        "size": 5526,
+        "mode": 384
+      },
+      {
+        "path": "dist/drive.d.ts",
+        "size": 5524,
+        "mode": 384
+      },
+      {
+        "path": "dist/driver.d.cts",
+        "size": 7607,
+        "mode": 384
+      },
+      {
+        "path": "dist/driver.d.ts",
+        "size": 7605,
+        "mode": 384
+      },
+      {
+        "path": "dist/driver/index.cjs",
+        "size": 3751,
+        "mode": 384
+      },
+      {
+        "path": "dist/driver/index.d.cts",
+        "size": 536,
+        "mode": 384
+      },
+      {
+        "path": "dist/driver/index.d.ts",
+        "size": 534,
+        "mode": 384
+      },
+      {
+        "path": "dist/driver/index.js",
+        "size": 3744,
+        "mode": 384
+      },
+      {
+        "path": "dist/easing/index.cjs",
+        "size": 4083,
+        "mode": 384
+      },
+      {
+        "path": "dist/easing/index.d.cts",
+        "size": 12100,
+        "mode": 384
+      },
+      {
+        "path": "dist/easing/index.d.ts",
+        "size": 12100,
+        "mode": 384
+      },
+      {
+        "path": "dist/easing/index.js",
+        "size": 4037,
+        "mode": 384
+      },
+      {
+        "path": "dist/errors.d.cts",
+        "size": 1257,
+        "mode": 384
+      },
+      {
+        "path": "dist/errors.d.ts",
+        "size": 1257,
+        "mode": 384
+      },
+      {
+        "path": "dist/flip/index.cjs",
+        "size": 2910,
+        "mode": 384
+      },
+      {
+        "path": "dist/flip/index.d.cts",
+        "size": 6204,
+        "mode": 384
+      },
+      {
+        "path": "dist/flip/index.d.ts",
+        "size": 6201,
+        "mode": 384
+      },
+      {
+        "path": "dist/flip/index.js",
+        "size": 2889,
+        "mode": 384
+      },
+      {
+        "path": "dist/frame/index.cjs",
+        "size": 1445,
+        "mode": 384
+      },
+      {
+        "path": "dist/frame/index.d.cts",
+        "size": 6355,
+        "mode": 384
+      },
+      {
+        "path": "dist/frame/index.d.ts",
+        "size": 6354,
+        "mode": 384
+      },
+      {
+        "path": "dist/frame/index.js",
+        "size": 1428,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/artifact.d.cts",
+        "size": 2680,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/artifact.d.ts",
+        "size": 2678,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/coordinator.d.cts",
+        "size": 2495,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/coordinator.d.ts",
+        "size": 2495,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/index.d.cts",
+        "size": 1555,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/index.d.ts",
+        "size": 1549,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/observer.d.cts",
+        "size": 1754,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/observer.d.ts",
+        "size": 1753,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/proof.d.cts",
+        "size": 2448,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/proof.d.ts",
+        "size": 2446,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/receipt.d.cts",
+        "size": 3938,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/receipt.d.ts",
+        "size": 3937,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/route.d.cts",
+        "size": 1926,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/route.d.ts",
+        "size": 1925,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/transaction.d.cts",
+        "size": 7351,
+        "mode": 384
+      },
+      {
+        "path": "dist/future-layout/transaction.d.ts",
+        "size": 7348,
+        "mode": 384
+      },
+      {
+        "path": "dist/gestures/index.cjs",
+        "size": 7370,
+        "mode": 384
+      },
+      {
+        "path": "dist/gestures/index.d.cts",
+        "size": 12034,
+        "mode": 384
+      },
+      {
+        "path": "dist/gestures/index.d.ts",
+        "size": 12031,
+        "mode": 384
+      },
+      {
+        "path": "dist/gestures/index.js",
+        "size": 7352,
+        "mode": 384
+      },
+      {
+        "path": "dist/in-view/index.cjs",
+        "size": 4829,
+        "mode": 384
+      },
+      {
+        "path": "dist/in-view/index.d.cts",
+        "size": 2598,
+        "mode": 384
+      },
+      {
+        "path": "dist/in-view/index.d.ts",
+        "size": 2598,
+        "mode": 384
+      },
+      {
+        "path": "dist/in-view/index.js",
+        "size": 4817,
+        "mode": 384
+      },
+      {
+        "path": "dist/index.cjs",
+        "size": 5302,
+        "mode": 384
+      },
+      {
+        "path": "dist/index.d.cts",
+        "size": 947,
+        "mode": 384
+      },
+      {
+        "path": "dist/index.d.ts",
+        "size": 942,
+        "mode": 384
+      },
+      {
+        "path": "dist/index.js",
+        "size": 5284,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/binding-value.d.cts",
+        "size": 1512,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/binding-value.d.ts",
+        "size": 1511,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/constants.d.cts",
+        "size": 1225,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/constants.d.ts",
+        "size": 1225,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/cubic-bezier.d.cts",
+        "size": 322,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/cubic-bezier.d.ts",
+        "size": 322,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/finite.d.cts",
+        "size": 360,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/finite.d.ts",
+        "size": 360,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/frame-requester.d.cts",
+        "size": 458,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/frame-requester.d.ts",
+        "size": 458,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/media-query.d.cts",
+        "size": 353,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/media-query.d.ts",
+        "size": 353,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/motion-defaults.d.cts",
+        "size": 861,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/motion-defaults.d.ts",
+        "size": 860,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/motion-program.d.cts",
+        "size": 19663,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/motion-program.d.ts",
+        "size": 19662,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/read-spring.d.cts",
+        "size": 1919,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/read-spring.d.ts",
+        "size": 1917,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/repeat-cursor.d.cts",
+        "size": 1631,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/repeat-cursor.d.ts",
+        "size": 1631,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/request-frame.d.cts",
+        "size": 209,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/request-frame.d.ts",
+        "size": 209,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/sample-keyframes.d.cts",
+        "size": 358,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/sample-keyframes.d.ts",
+        "size": 358,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/schedule-v1.d.cts",
+        "size": 1529,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/schedule-v1.d.ts",
+        "size": 1529,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/sliding-window.d.cts",
+        "size": 1454,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/sliding-window.d.ts",
+        "size": 1454,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/solver.d.cts",
+        "size": 3052,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/solver.d.ts",
+        "size": 3051,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/template.d.cts",
+        "size": 664,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/template.d.ts",
+        "size": 664,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/types.d.cts",
+        "size": 724,
+        "mode": 384
+      },
+      {
+        "path": "dist/internal/types.d.ts",
+        "size": 724,
+        "mode": 384
+      },
+      {
+        "path": "dist/keyframes/index.cjs",
+        "size": 5925,
+        "mode": 384
+      },
+      {
+        "path": "dist/keyframes/index.d.cts",
+        "size": 9973,
+        "mode": 384
+      },
+      {
+        "path": "dist/keyframes/index.d.ts",
+        "size": 9973,
+        "mode": 384
+      },
+      {
+        "path": "dist/keyframes/index.js",
+        "size": 5916,
+        "mode": 384
+      },
+      {
+        "path": "dist/lit/controller.d.cts",
+        "size": 5027,
+        "mode": 384
+      },
+      {
+        "path": "dist/lit/controller.d.ts",
+        "size": 5025,
+        "mode": 384
+      },
+      {
+        "path": "dist/lit/element.d.cts",
+        "size": 4168,
+        "mode": 384
+      },
+      {
+        "path": "dist/lit/element.d.ts",
+        "size": 4165,
+        "mode": 384
+      },
+      {
+        "path": "dist/lit/index.cjs",
+        "size": 5293,
+        "mode": 384
+      },
+      {
+        "path": "dist/lit/index.d.cts",
+        "size": 1137,
+        "mode": 384
+      },
+      {
+        "path": "dist/lit/index.d.ts",
+        "size": 1135,
+        "mode": 384
+      },
+      {
+        "path": "dist/lit/index.js",
+        "size": 5304,
+        "mode": 384
+      },
+      {
+        "path": "dist/motion-value.d.cts",
+        "size": 10948,
+        "mode": 384
+      },
+      {
+        "path": "dist/motion-value.d.ts",
+        "size": 10947,
+        "mode": 384
+      },
+      {
+        "path": "dist/nano/index.cjs",
+        "size": 1731,
+        "mode": 384
+      },
+      {
+        "path": "dist/nano/index.d.cts",
+        "size": 2167,
+        "mode": 384
+      },
+      {
+        "path": "dist/nano/index.d.ts",
+        "size": 2165,
+        "mode": 384
+      },
+      {
+        "path": "dist/nano/index.js",
+        "size": 1724,
+        "mode": 384
+      },
+      {
+        "path": "dist/nano/spring-linear.d.cts",
+        "size": 812,
+        "mode": 384
+      },
+      {
+        "path": "dist/nano/spring-linear.d.ts",
+        "size": 812,
+        "mode": 384
+      },
+      {
+        "path": "dist/preact/index.cjs",
+        "size": 4218,
+        "mode": 384
+      },
+      {
+        "path": "dist/preact/index.d.cts",
+        "size": 1746,
+        "mode": 384
+      },
+      {
+        "path": "dist/preact/index.d.ts",
+        "size": 1744,
+        "mode": 384
+      },
+      {
+        "path": "dist/preact/index.js",
+        "size": 4217,
+        "mode": 384
+      },
+      {
+        "path": "dist/presence/index.cjs",
+        "size": 4392,
+        "mode": 384
+      },
+      {
+        "path": "dist/presence/index.d.cts",
+        "size": 555,
+        "mode": 384
+      },
+      {
+        "path": "dist/presence/index.d.ts",
+        "size": 551,
+        "mode": 384
+      },
+      {
+        "path": "dist/presence/index.js",
+        "size": 4378,
+        "mode": 384
+      },
+      {
+        "path": "dist/presence/machine.d.cts",
+        "size": 12332,
+        "mode": 384
+      },
+      {
+        "path": "dist/presence/machine.d.ts",
+        "size": 12331,
+        "mode": 384
+      },
+      {
+        "path": "dist/presence/transition.d.cts",
+        "size": 3035,
+        "mode": 384
+      },
+      {
+        "path": "dist/presence/transition.d.ts",
+        "size": 3034,
+        "mode": 384
+      },
+      {
+        "path": "dist/presets/index.cjs",
+        "size": 14623,
+        "mode": 384
+      },
+      {
+        "path": "dist/presets/index.d.cts",
+        "size": 25555,
+        "mode": 384
+      },
+      {
+        "path": "dist/presets/index.d.ts",
+        "size": 25554,
+        "mode": 384
+      },
+      {
+        "path": "dist/presets/index.js",
+        "size": 14557,
+        "mode": 384
+      },
+      {
+        "path": "dist/projection/dom.d.cts",
+        "size": 6053,
+        "mode": 384
+      },
+      {
+        "path": "dist/projection/dom.d.ts",
+        "size": 6051,
+        "mode": 384
+      },
+      {
+        "path": "dist/projection/driver.d.cts",
+        "size": 8682,
+        "mode": 384
+      },
+      {
+        "path": "dist/projection/driver.d.ts",
+        "size": 8678,
+        "mode": 384
+      },
+      {
+        "path": "dist/projection/geometry.d.cts",
+        "size": 9607,
+        "mode": 384
+      },
+      {
+        "path": "dist/projection/geometry.d.ts",
+        "size": 9606,
+        "mode": 384
+      },
+      {
+        "path": "dist/projection/index.cjs",
+        "size": 14749,
+        "mode": 384
+      },
+      {
+        "path": "dist/projection/index.d.cts",
+        "size": 8062,
+        "mode": 384
+      },
+      {
+        "path": "dist/projection/index.d.ts",
+        "size": 8057,
+        "mode": 384
+      },
+      {
+        "path": "dist/projection/index.js",
+        "size": 14723,
+        "mode": 384
+      },
+      {
+        "path": "dist/qwik/index.cjs",
+        "size": 4259,
+        "mode": 384
+      },
+      {
+        "path": "dist/qwik/index.d.cts",
+        "size": 3235,
+        "mode": 384
+      },
+      {
+        "path": "dist/qwik/index.d.ts",
+        "size": 3233,
+        "mode": 384
+      },
+      {
+        "path": "dist/qwik/index.js",
+        "size": 4247,
+        "mode": 384
+      },
+      {
+        "path": "dist/react/index.cjs",
+        "size": 7093,
+        "mode": 384
+      },
+      {
+        "path": "dist/react/index.d.cts",
+        "size": 6940,
+        "mode": 384
+      },
+      {
+        "path": "dist/react/index.d.ts",
+        "size": 6938,
+        "mode": 384
+      },
+      {
+        "path": "dist/react/index.js",
+        "size": 7032,
+        "mode": 384
+      },
+      {
+        "path": "dist/scroll/index.cjs",
+        "size": 2205,
+        "mode": 384
+      },
+      {
+        "path": "dist/scroll/index.d.cts",
+        "size": 8589,
+        "mode": 384
+      },
+      {
+        "path": "dist/scroll/index.d.ts",
+        "size": 8589,
+        "mode": 384
+      },
+      {
+        "path": "dist/scroll/index.js",
+        "size": 2176,
+        "mode": 384
+      },
+      {
+        "path": "dist/smart/index.cjs",
+        "size": 20692,
+        "mode": 384
+      },
+      {
+        "path": "dist/smart/index.d.cts",
+        "size": 9890,
+        "mode": 384
+      },
+      {
+        "path": "dist/smart/index.d.ts",
+        "size": 9889,
+        "mode": 384
+      },
+      {
+        "path": "dist/smart/index.js",
+        "size": 20677,
+        "mode": 384
+      },
+      {
+        "path": "dist/solid/index.cjs",
+        "size": 4212,
+        "mode": 384
+      },
+      {
+        "path": "dist/solid/index.d.cts",
+        "size": 2447,
+        "mode": 384
+      },
+      {
+        "path": "dist/solid/index.d.ts",
+        "size": 2445,
+        "mode": 384
+      },
+      {
+        "path": "dist/solid/index.js",
+        "size": 4212,
+        "mode": 384
+      },
+      {
+        "path": "dist/spring.d.cts",
+        "size": 5684,
+        "mode": 384
+      },
+      {
+        "path": "dist/spring.d.ts",
+        "size": 5683,
+        "mode": 384
+      },
+      {
+        "path": "dist/spring/index.cjs",
+        "size": 4585,
+        "mode": 384
+      },
+      {
+        "path": "dist/spring/index.d.cts",
+        "size": 9898,
+        "mode": 384
+      },
+      {
+        "path": "dist/spring/index.d.ts",
+        "size": 9896,
+        "mode": 384
+      },
+      {
+        "path": "dist/spring/index.js",
+        "size": 4558,
+        "mode": 384
+      },
+      {
+        "path": "dist/stagger/index.cjs",
+        "size": 1268,
+        "mode": 384
+      },
+      {
+        "path": "dist/stagger/index.d.cts",
+        "size": 5242,
+        "mode": 384
+      },
+      {
+        "path": "dist/stagger/index.d.ts",
+        "size": 5239,
+        "mode": 384
+      },
+      {
+        "path": "dist/stagger/index.js",
+        "size": 1261,
+        "mode": 384
+      },
+      {
+        "path": "dist/stagger/scheduler.d.cts",
+        "size": 1115,
+        "mode": 384
+      },
+      {
+        "path": "dist/stagger/scheduler.d.ts",
+        "size": 1115,
+        "mode": 384
+      },
+      {
+        "path": "dist/svelte/index.cjs",
+        "size": 4066,
+        "mode": 384
+      },
+      {
+        "path": "dist/svelte/index.d.cts",
+        "size": 3243,
+        "mode": 384
+      },
+      {
+        "path": "dist/svelte/index.d.ts",
+        "size": 3241,
+        "mode": 384
+      },
+      {
+        "path": "dist/svelte/index.js",
+        "size": 4075,
+        "mode": 384
+      },
+      {
+        "path": "dist/svg-morph/index.cjs",
+        "size": 7566,
+        "mode": 384
+      },
+      {
+        "path": "dist/svg-morph/index.d.cts",
+        "size": 4427,
+        "mode": 384
+      },
+      {
+        "path": "dist/svg-morph/index.d.ts",
+        "size": 4427,
+        "mode": 384
+      },
+      {
+        "path": "dist/svg-morph/index.js",
+        "size": 7557,
+        "mode": 384
+      },
+      {
+        "path": "dist/svg/index.cjs",
+        "size": 4876,
+        "mode": 384
+      },
+      {
+        "path": "dist/svg/index.d.cts",
+        "size": 3757,
+        "mode": 384
+      },
+      {
+        "path": "dist/svg/index.d.ts",
+        "size": 3757,
+        "mode": 384
+      },
+      {
+        "path": "dist/svg/index.js",
+        "size": 4857,
+        "mode": 384
+      },
+      {
+        "path": "dist/timeline/index.cjs",
+        "size": 3550,
+        "mode": 384
+      },
+      {
+        "path": "dist/timeline/index.d.cts",
+        "size": 8628,
+        "mode": 384
+      },
+      {
+        "path": "dist/timeline/index.d.ts",
+        "size": 8628,
+        "mode": 384
+      },
+      {
+        "path": "dist/timeline/index.js",
+        "size": 3543,
+        "mode": 384
+      },
+      {
+        "path": "dist/tokens/index.cjs",
+        "size": 2509,
+        "mode": 384
+      },
+      {
+        "path": "dist/tokens/index.d.cts",
+        "size": 11301,
+        "mode": 384
+      },
+      {
+        "path": "dist/tokens/index.d.ts",
+        "size": 11300,
+        "mode": 384
+      },
+      {
+        "path": "dist/tokens/index.js",
+        "size": 2476,
+        "mode": 384
+      },
+      {
+        "path": "dist/tween.d.cts",
+        "size": 1147,
+        "mode": 384
+      },
+      {
+        "path": "dist/tween.d.ts",
+        "size": 1147,
+        "mode": 384
+      },
+      {
+        "path": "dist/utils/index.cjs",
+        "size": 2270,
+        "mode": 384
+      },
+      {
+        "path": "dist/utils/index.d.cts",
+        "size": 9895,
+        "mode": 384
+      },
+      {
+        "path": "dist/utils/index.d.ts",
+        "size": 9895,
+        "mode": 384
+      },
+      {
+        "path": "dist/utils/index.js",
+        "size": 2251,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/color.d.cts",
+        "size": 5648,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/color.d.ts",
+        "size": 5648,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/index.cjs",
+        "size": 6336,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/index.d.cts",
+        "size": 2611,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/index.d.ts",
+        "size": 2602,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/index.js",
+        "size": 6291,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/parse.d.cts",
+        "size": 769,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/parse.d.ts",
+        "size": 767,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/transform.d.cts",
+        "size": 3401,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/transform.d.ts",
+        "size": 3401,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/units.d.cts",
+        "size": 4059,
+        "mode": 384
+      },
+      {
+        "path": "dist/value/units.d.ts",
+        "size": 4059,
+        "mode": 384
+      },
+      {
+        "path": "dist/vue/index.cjs",
+        "size": 5499,
+        "mode": 384
+      },
+      {
+        "path": "dist/vue/index.d.cts",
+        "size": 6063,
+        "mode": 384
+      },
+      {
+        "path": "dist/vue/index.d.ts",
+        "size": 6061,
+        "mode": 384
+      },
+      {
+        "path": "dist/vue/index.js",
+        "size": 5501,
+        "mode": 384
+      },
+      {
+        "path": "dist/waapi/index.cjs",
+        "size": 4733,
+        "mode": 384
+      },
+      {
+        "path": "dist/waapi/index.d.cts",
+        "size": 8566,
+        "mode": 384
+      },
+      {
+        "path": "dist/waapi/index.d.ts",
+        "size": 8566,
+        "mode": 384
+      },
+      {
+        "path": "dist/waapi/index.js",
+        "size": 4703,
+        "mode": 384
+      },
+      {
+        "path": "dist/wc/index.cjs",
+        "size": 5180,
+        "mode": 384
+      },
+      {
+        "path": "dist/wc/index.d.cts",
+        "size": 4267,
+        "mode": 384
+      },
+      {
+        "path": "dist/wc/index.d.ts",
+        "size": 4264,
+        "mode": 384
+      },
+      {
+        "path": "dist/wc/index.js",
+        "size": 5171,
+        "mode": 384
+      },
+      {
+        "path": "docs/benchmark.md",
+        "size": 18097,
+        "mode": 384
+      },
+      {
+        "path": "docs/bindings.md",
+        "size": 8288,
+        "mode": 384
+      },
+      {
+        "path": "docs/errors.md",
+        "size": 30632,
+        "mode": 384
+      },
+      {
+        "path": "docs/motion-conformance.md",
+        "size": 7711,
+        "mode": 384
+      },
+      {
+        "path": "docs/recipes.md",
+        "size": 60121,
+        "mode": 384
+      },
+      {
+        "path": "package.json",
+        "size": 16122,
+        "mode": 384
+      }
+    ],
+    "entryCount": 312,
+    "bundled": []
+  }
+]

@@ -1,0 +1,207 @@
+{
+  "start": "2026-10-02T00:35:57.262326+00:00",
+  "end": "2026-10-02T00:35:57.521180+00:00",
+  "wallSeconds": 0.2588613129919395,
+  "commands": [
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/usr/bin/cc",
+        "-std=c11",
+        "-D_POSIX_C_SOURCE=200809L",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-shared",
+        "-fPIC",
+        "-fvisibility=hidden",
+        "-DNAPI_VERSION=8",
+        "-I",
+        "/workspace/lab-motion/bench/profile/native-clock/include",
+        "-Wl,--wrap=clock_gettime",
+        "-o",
+        "/tmp/motion-native-clock-fault-controls-20261002/fault-clock.node",
+        "/workspace/lab-motion/bench/profile/server-thread-cpu-clock.c",
+        "/tmp/motion-native-clock-fault-controls-20261002/wrap-clock.c"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-fault-controls-20261002/control.mjs",
+        "/tmp/motion-native-clock-fault-controls-20261002/fault-clock.node"
+      ],
+      "CLOCK_CONTROL_MODE": "errno",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-fault-controls-20261002/control.mjs",
+        "/tmp/motion-native-clock-fault-controls-20261002/fault-clock.node"
+      ],
+      "CLOCK_CONTROL_MODE": "negative-sec",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-fault-controls-20261002/control.mjs",
+        "/tmp/motion-native-clock-fault-controls-20261002/fault-clock.node"
+      ],
+      "CLOCK_CONTROL_MODE": "negative-ns",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-fault-controls-20261002/control.mjs",
+        "/tmp/motion-native-clock-fault-controls-20261002/fault-clock.node"
+      ],
+      "CLOCK_CONTROL_MODE": "large-ns",
+      "exit": 0
+    },
+    {
+      "argv": [
+        "taskset",
+        "-c",
+        "0",
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "/tmp/motion-native-clock-fault-controls-20261002/control.mjs",
+        "/tmp/motion-native-clock-fault-controls-20261002/fault-clock.node"
+      ],
+      "CLOCK_CONTROL_MODE": "large-sec",
+      "exit": 0
+    }
+  ],
+  "results": [
+    {
+      "mode": "errno",
+      "exit": 0,
+      "result": {
+        "code": "CLOCK_READ",
+        "message": "Input/output error"
+      },
+      "expectedPass": true
+    },
+    {
+      "mode": "negative-sec",
+      "exit": 0,
+      "result": {
+        "code": "CLOCK_VALUE",
+        "message": "\u041d\u0435\u0434\u043e\u043f\u0443\u0441\u0442\u0438\u043c\u044b\u0439 timespec CPU getter"
+      },
+      "expectedPass": true
+    },
+    {
+      "mode": "negative-ns",
+      "exit": 0,
+      "result": {
+        "code": "CLOCK_VALUE",
+        "message": "\u041d\u0435\u0434\u043e\u043f\u0443\u0441\u0442\u0438\u043c\u044b\u0439 timespec CPU getter"
+      },
+      "expectedPass": true
+    },
+    {
+      "mode": "large-ns",
+      "exit": 0,
+      "result": {
+        "code": "CLOCK_VALUE",
+        "message": "\u041d\u0435\u0434\u043e\u043f\u0443\u0441\u0442\u0438\u043c\u044b\u0439 timespec CPU getter"
+      },
+      "expectedPass": true
+    },
+    {
+      "mode": "large-sec",
+      "exit": 0,
+      "result": {
+        "value": {
+          "seconds": "9007199254740993",
+          "nanoseconds": 17,
+          "pid": 662242,
+          "tid": 662242
+        }
+      },
+      "expectedPass": true
+    }
+  ],
+  "allPassed": true,
+  "files": {
+    "large-sec.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "large-sec.stdout": {
+      "bytes": 84,
+      "sha256": "55db18e17e6f4d302b08258127c40a60eeed9122b8bbeef75ef5b4d9dc1d80fe"
+    },
+    "large-ns.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "large-ns.stdout": {
+      "bytes": 80,
+      "sha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851"
+    },
+    "negative-ns.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "negative-ns.stdout": {
+      "bytes": 80,
+      "sha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851"
+    },
+    "negative-sec.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "negative-sec.stdout": {
+      "bytes": 80,
+      "sha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851"
+    },
+    "errno.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "errno.stdout": {
+      "bytes": 53,
+      "sha256": "def380c13e6734f89e3d1f7139d256c224d8e1b7be9aa60991334c96fbc388b5"
+    },
+    "compile.stderr": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "compile.stdout": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "fault-clock.node": {
+      "bytes": 16320,
+      "sha256": "a8b9383e868574b5bb5c7f1c4f5f028823b30997a0e98dd73a267294ae215f91"
+    },
+    "control.mjs": {
+      "bytes": 245,
+      "sha256": "c94f0565092e0ca16e19ebf697f7453d28166bcc8175b45dbf9e5577f95afde9"
+    },
+    "wrap-clock.c": {
+      "bytes": 536,
+      "sha256": "a7374c48444a0d20c37fbc7da4169b7aa087b8598824752853b33a8e5367230f"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+file:///workspace/lab-motion/bench/profile/server-thread-cpu-clock.mjs:24
+  return Object.assign(new Error(`server CPU clock: ${message}`), { raw });
+                       ^
+
+Error: server CPU clock: native source/header bytes не совпадают с clock model
+    at refuse (file:///workspace/lab-motion/bench/profile/server-thread-cpu-clock.mjs:24:24)
+    at prepareServerThreadCpuClock (file:///workspace/lab-motion/bench/profile/server-thread-cpu-clock.mjs:58:11)
+    at file:///tmp/motion-native-clock-api-smoke-20261002/smoke.mjs:2:16
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  raw: {
+    observed: {
+      'bench/profile/native-clock/include/js_native_api.h': '8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788',
+      'bench/profile/native-clock/include/js_native_api_types.h': '4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0',
+      'bench/profile/native-clock/include/node_api.h': '2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a',
+      'bench/profile/native-clock/include/node_api_types.h': 'a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00',
+      'bench/profile/server-thread-cpu-clock.c': '4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0'
+    },
+    registered: {
+      'bench/profile/server-thread-cpu-clock.c': '4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0',
+      'bench/profile/native-clock/include/js_native_api.h': '8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788',
+      'bench/profile/native-clock/include/js_native_api_types.h': '4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0',
+      'bench/profile/native-clock/include/node_api.h': '2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a',
+      'bench/profile/native-clock/include/node_api_types.h': 'a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00'
+    }
+  }
+}
+
+Node.js v24.19.0

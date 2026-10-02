@@ -1,0 +1,19 @@
+{
+  "startUtc": "2026-10-02T01:06:27.720833+00:00",
+  "endUtc": "2026-10-02T01:06:27.775432+00:00",
+  "argv": [
+    "taskset",
+    "-c",
+    "3",
+    "node",
+    "/tmp/motion-native-clock-measurement-088-20261002/consumer-witness.mjs"
+  ],
+  "exitCode": 0,
+  "syntheticOnly": true,
+  "heavy": 0,
+  "queued": 0,
+  "allEND": true,
+  "sourceSha256": "2651f75d9fc804494bc26e09dde74f2a2ba7f2f226a3bada71fb8d5ced26e009",
+  "stdoutSha256": "7e355c425ab0863dc5268843c2e40622e94954f54f46df0fb676fc822f64bd01",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

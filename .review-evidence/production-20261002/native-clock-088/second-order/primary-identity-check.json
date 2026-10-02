@@ -1,0 +1,563 @@
+{
+  "checkedAt": "2026-10-02T01:02:40.693969+00:00",
+  "results": [
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/PRIMARY-PACKET.json",
+      "expectedSha256": "0477e5a11434b0be4c4eb43ac63a33de6a9dc6888e1caebde0d0ceaa635b56e0",
+      "actualSha256": "0477e5a11434b0be4c4eb43ac63a33de6a9dc6888e1caebde0d0ceaa635b56e0",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters",
+      "expectedSha256": "4329153b93d608ba19f3f23378c54be7e1398b242b8b1e01db093be27c935618",
+      "actualSha256": "4329153b93d608ba19f3f23378c54be7e1398b242b8b1e01db093be27c935618",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters.c",
+      "expectedSha256": "d17df8ca1eb2f290cbb0df7e50c500d317b450b7794d4958be34357417411caf",
+      "actualSha256": "d17df8ca1eb2f290cbb0df7e50c500d317b450b7794d4958be34357417411caf",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compile.stderr.log",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compile.stdout.log",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/diagnostic-raw.json",
+      "expectedSha256": "fda29e81d18c42ea0049e6aeb39057d9c4d3be9d603da4d595b0624fe5f73dc3",
+      "actualSha256": "fda29e81d18c42ea0049e6aeb39057d9c4d3be9d603da4d595b0624fe5f73dc3",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/diagnostic.stderr.log",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/execution.json",
+      "expectedSha256": "8a31743e8a75047f0d1e9ae75dcfcc5f8b7d2ed79d744e28425dbe6187a660ab",
+      "actualSha256": "8a31743e8a75047f0d1e9ae75dcfcc5f8b7d2ed79d744e28425dbe6187a660ab",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--clock.c",
+      "expectedSha256": "043618ff56eb333bd7c3a243bc9597387f8e9bb7b240c7383712a4643d196118",
+      "actualSha256": "043618ff56eb333bd7c3a243bc9597387f8e9bb7b240c7383712a4643d196118",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--core.c",
+      "expectedSha256": "5b510e027f1a6236165f26da4b1195530264dc0013ff8883bf49d03114ea26c2",
+      "actualSha256": "5b510e027f1a6236165f26da4b1195530264dc0013ff8883bf49d03114ea26c2",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--cputime.c",
+      "expectedSha256": "eabd7ccf5bafd87ccd686829b1192e56dafb8c213f10f12aec619405246977a6",
+      "actualSha256": "eabd7ccf5bafd87ccd686829b1192e56dafb8c213f10f12aec619405246977a6",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--time--posix-cpu-timers.c",
+      "expectedSha256": "23255e35526f6582c00ad0c88438c378bfa45d49316019fa76cacd6be1983621",
+      "actualSha256": "23255e35526f6582c00ad0c88438c378bfa45d49316019fa76cacd6be1983621",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel-config.gz",
+      "expectedSha256": "7f98e7fb11220b6ec5891c2e2165c115d4a20ba5087898d436f3ab843b3baa96",
+      "actualSha256": "7f98e7fb11220b6ec5891c2e2165c115d4a20ba5087898d436f3ab843b3baa96",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel-source-manifest.json",
+      "expectedSha256": "1357b0dad58a27b9d6bf0c2bab35e80d6000df50b63e6b824fb3065d41885841",
+      "actualSha256": "1357b0dad58a27b9d6bf0c2bab35e80d6000df50b63e6b824fb3065d41885841",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/napi-header-source-manifest.json",
+      "expectedSha256": "c6cfb7e6313756e31e07f42021a3123e83b5f7b59708326ced3d93a4c23c3f1f",
+      "actualSha256": "c6cfb7e6313756e31e07f42021a3123e83b5f7b59708326ced3d93a4c23c3f1f",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/native-source-pins.json",
+      "expectedSha256": "9e77ba12491bb7b5b9ce7f82ead941442afdc50a7646cce15d9050f3c07eebb2",
+      "actualSha256": "9e77ba12491bb7b5b9ce7f82ead941442afdc50a7646cce15d9050f3c07eebb2",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/node-LICENSE.raw",
+      "expectedSha256": "148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5",
+      "actualSha256": "148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/raw-delta-readback.json",
+      "expectedSha256": "91f258044fed7255e6f4e10561400b983e9b7011a2f3e36fa55212f38289c77d",
+      "actualSha256": "91f258044fed7255e6f4e10561400b983e9b7011a2f3e36fa55212f38289c77d",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/runtime-clock-metadata.json",
+      "expectedSha256": "3ae33f840b1ea1c6496bcd539df774b3262c6eb036d8ff2a48c1aa7f574e4331",
+      "actualSha256": "3ae33f840b1ea1c6496bcd539df774b3262c6eb036d8ff2a48c1aa7f574e4331",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-20261002/execution.json",
+      "expectedSha256": "c15eb2563969d841d9842895d77521e216898ed7dbe062eb23a7b1348b0937cb",
+      "actualSha256": "c15eb2563969d841d9842895d77521e216898ed7dbe062eb23a7b1348b0937cb",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-20261002/smoke.mjs",
+      "expectedSha256": "788ee354014a90a8ebeb0ac7828c4778cc099b513febc818cc84ee5e3d29aaf2",
+      "actualSha256": "788ee354014a90a8ebeb0ac7828c4778cc099b513febc818cc84ee5e3d29aaf2",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-20261002/stderr.log",
+      "expectedSha256": "6346296f424f540872a4bdd6e6582c8f336bd58236081de3e61921224c8d61c5",
+      "actualSha256": "6346296f424f540872a4bdd6e6582c8f336bd58236081de3e61921224c8d61c5",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-20261002/stdout.json",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/execution.json",
+      "expectedSha256": "89f363e2eb84919b4e96f1b0d717141a8cc539e3e01dd9404adf81aa327276db",
+      "actualSha256": "89f363e2eb84919b4e96f1b0d717141a8cc539e3e01dd9404adf81aa327276db",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/native-clock/thread-cpu-clock.node",
+      "expectedSha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a",
+      "actualSha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/smoke.mjs",
+      "expectedSha256": "788ee354014a90a8ebeb0ac7828c4778cc099b513febc818cc84ee5e3d29aaf2",
+      "actualSha256": "788ee354014a90a8ebeb0ac7828c4778cc099b513febc818cc84ee5e3d29aaf2",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/stderr.log",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/stdout.json",
+      "expectedSha256": "9e5badf12d7aefbb0c9abb1439d640de30461279a87866918cd2ad0b9eebcc28",
+      "actualSha256": "9e5badf12d7aefbb0c9abb1439d640de30461279a87866918cd2ad0b9eebcc28",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/PRIMARY/PRIMARY-PACKET.json",
+      "expectedSha256": "3763645ca66eeb14352c265f2fb9b9037a1e0b6db724324ce02dffc03be120d2",
+      "actualSha256": "3763645ca66eeb14352c265f2fb9b9037a1e0b6db724324ce02dffc03be120d2",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/affected-full.execution.json",
+      "expectedSha256": "85ed4b1857e925c15d7edf89f07f4799bf2986397063b66f2c7262f9da7bbc42",
+      "actualSha256": "85ed4b1857e925c15d7edf89f07f4799bf2986397063b66f2c7262f9da7bbc42",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/affected-full.json",
+      "expectedSha256": "63d9519cf22ea314ee1cfa6007de31a9ba1ab538bfea6129b1afc0b0c6367473",
+      "actualSha256": "63d9519cf22ea314ee1cfa6007de31a9ba1ab538bfea6129b1afc0b0c6367473",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/affected-full.stderr.log",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/affected-full.stdout.log",
+      "expectedSha256": "ea834240acbb67972f5bd97ac02795351f1e1b8ffc7eadf115573d7670f299f0",
+      "actualSha256": "ea834240acbb67972f5bd97ac02795351f1e1b8ffc7eadf115573d7670f299f0",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/green-leaf.execution.json",
+      "expectedSha256": "461f1e6fe0a4bb0ab121cae31589c9a6778d114caa4d89734087b94b2b098d1f",
+      "actualSha256": "461f1e6fe0a4bb0ab121cae31589c9a6778d114caa4d89734087b94b2b098d1f",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/green-leaf.json",
+      "expectedSha256": "aff5c804917b414e73403e8d2d6fd9cecf00a28924c6dab85f76e40d5806f01a",
+      "actualSha256": "aff5c804917b414e73403e8d2d6fd9cecf00a28924c6dab85f76e40d5806f01a",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/green-leaf.stderr.log",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/green-leaf.stdout.log",
+      "expectedSha256": "5da65b5e2635d3f438c0f21810bc0e0fd795a378031a5aa094d348aa09898968",
+      "actualSha256": "5da65b5e2635d3f438c0f21810bc0e0fd795a378031a5aa094d348aa09898968",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/red.execution.json",
+      "expectedSha256": "f013e97b7b328a1e4714c8e1bed4fdb454f8da57de87cceb38b3b7250f4bfd0e",
+      "actualSha256": "f013e97b7b328a1e4714c8e1bed4fdb454f8da57de87cceb38b3b7250f4bfd0e",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/red.json",
+      "expectedSha256": "1eb73a49a46fe3ab73f300e516cec61344e509a149d0eca9d897ee2c1ab0c1b8",
+      "actualSha256": "1eb73a49a46fe3ab73f300e516cec61344e509a149d0eca9d897ee2c1ab0c1b8",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/red.stderr.log",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/red.stdout.log",
+      "expectedSha256": "f4b4e05f78403989404ebc83bef115ed4440bfede9532f96bc4d2d6c2fc6ccd2",
+      "actualSha256": "f4b4e05f78403989404ebc83bef115ed4440bfede9532f96bc4d2d6c2fc6ccd2",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-consumer-closure-20261002/source-before.json",
+      "expectedSha256": "f5ab84c7b32da57ad958087efa9ed454ab93f41227254de336bc01b4c427517e",
+      "actualSha256": "f5ab84c7b32da57ad958087efa9ed454ab93f41227254de336bc01b4c427517e",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/compile.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/compile.stdout",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/control.mjs",
+      "expectedSha256": "c94f0565092e0ca16e19ebf697f7453d28166bcc8175b45dbf9e5577f95afde9",
+      "actualSha256": "c94f0565092e0ca16e19ebf697f7453d28166bcc8175b45dbf9e5577f95afde9",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/errno.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/errno.stdout",
+      "expectedSha256": "def380c13e6734f89e3d1f7139d256c224d8e1b7be9aa60991334c96fbc388b5",
+      "actualSha256": "def380c13e6734f89e3d1f7139d256c224d8e1b7be9aa60991334c96fbc388b5",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/execution.json",
+      "expectedSha256": "dc1b27afd678854401b38cc8ed2a712045d5d5795981621f04ad15cc01a1196a",
+      "actualSha256": "dc1b27afd678854401b38cc8ed2a712045d5d5795981621f04ad15cc01a1196a",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/fault-clock.node",
+      "expectedSha256": "a8b9383e868574b5bb5c7f1c4f5f028823b30997a0e98dd73a267294ae215f91",
+      "actualSha256": "a8b9383e868574b5bb5c7f1c4f5f028823b30997a0e98dd73a267294ae215f91",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/large-ns.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/large-ns.stdout",
+      "expectedSha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851",
+      "actualSha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/large-sec.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/large-sec.stdout",
+      "expectedSha256": "55db18e17e6f4d302b08258127c40a60eeed9122b8bbeef75ef5b4d9dc1d80fe",
+      "actualSha256": "55db18e17e6f4d302b08258127c40a60eeed9122b8bbeef75ef5b4d9dc1d80fe",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/negative-ns.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/negative-ns.stdout",
+      "expectedSha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851",
+      "actualSha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/negative-sec.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/negative-sec.stdout",
+      "expectedSha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851",
+      "actualSha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-fault-controls-20261002/wrap-clock.c",
+      "expectedSha256": "a7374c48444a0d20c37fbc7da4169b7aa087b8598824752853b33a8e5367230f",
+      "actualSha256": "a7374c48444a0d20c37fbc7da4169b7aa087b8598824752853b33a8e5367230f",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation/native-clock/thread-cpu-clock.node",
+      "expectedSha256": "3400a54578b7035affd608bb3f9fb52c4b424156d18156aa8f84e1123540d6ca",
+      "actualSha256": "3400a54578b7035affd608bb3f9fb52c4b424156d18156aa8f84e1123540d6ca",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation.stdout",
+      "expectedSha256": "a61a0a17c5540dba59420c26bfba6b0e9a051947b4da02af9e03da3dd6bcfab5",
+      "actualSha256": "a61a0a17c5540dba59420c26bfba6b0e9a051947b4da02af9e03da3dd6bcfab5",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/control.mjs",
+      "expectedSha256": "05177572a8c021eb5de03e84321b8ef38dd1f9089b548dde9ca97cb03606f038",
+      "actualSha256": "05177572a8c021eb5de03e84321b8ef38dd1f9089b548dde9ca97cb03606f038",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/execution.json",
+      "expectedSha256": "08096eccba064211cf92d5289e27208a14b8c68553f415ef914cae4fc56a0494",
+      "actualSha256": "08096eccba064211cf92d5289e27208a14b8c68553f415ef914cae4fc56a0494",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/missing-compiler.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/missing-compiler.stdout",
+      "expectedSha256": "f8e348ea3490cd857542133049c5de27dc017d85bfa73493e8f9fbbf5ae450f0",
+      "actualSha256": "f8e348ea3490cd857542133049c5de27dc017d85bfa73493e8f9fbbf5ae450f0",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/nonlinux.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/nonlinux.stdout",
+      "expectedSha256": "7b45ef0a7077796cc20a454f6848cb8398eb90c78494b2378a97295707712d0b",
+      "actualSha256": "7b45ef0a7077796cc20a454f6848cb8398eb90c78494b2378a97295707712d0b",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/stale-binary/native-clock/thread-cpu-clock.node",
+      "expectedSha256": "a03f2386ae06b21109577020844df367857b72c2fcce384c1896fed98a89c82b",
+      "actualSha256": "a03f2386ae06b21109577020844df367857b72c2fcce384c1896fed98a89c82b",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/stale-binary.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/stale-binary.stdout",
+      "expectedSha256": "966c6d6dfd9067fd45ab9066d2032bb6719937fc2ff8a960624c47ab3a16744d",
+      "actualSha256": "966c6d6dfd9067fd45ab9066d2032bb6719937fc2ff8a960624c47ab3a16744d",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/worker.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/worker.stdout",
+      "expectedSha256": "ff4f6e040e7e7a34ba8a3994057f6c3783f9bec4650d85ffc46fb8356693c340",
+      "actualSha256": "ff4f6e040e7e7a34ba8a3994057f6c3783f9bec4650d85ffc46fb8356693c340",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/wrong-node.stderr",
+      "expectedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actualSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/wrong-node.stdout",
+      "expectedSha256": "27988329930b381fab623b0bcec1e00654d32591544cf230a6c3440df01aec52",
+      "actualSha256": "27988329930b381fab623b0bcec1e00654d32591544cf230a6c3440df01aec52",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/archive-acquisition-initial-error.txt",
+      "expectedSha256": "309b35fb953cbe5406e7c5e07cc923256d35dacab4f1533597a691165a7d5d3d",
+      "actualSha256": "309b35fb953cbe5406e7c5e07cc923256d35dacab4f1533597a691165a7d5d3d",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/diff.patch",
+      "expectedSha256": "c20b40756914d860d754188c97512dd2b83e3fbb86f089fe575b41ebe06b679f",
+      "actualSha256": "c20b40756914d860d754188c97512dd2b83e3fbb86f089fe575b41ebe06b679f",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/method-readset.json",
+      "expectedSha256": "7f234a2aff0925bb3315d49ed311455022834efead7f2fd84c5fa77613c26d2f",
+      "actualSha256": "7f234a2aff0925bb3315d49ed311455022834efead7f2fd84c5fa77613c26d2f",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/source-manifest.json",
+      "expectedSha256": "81e832fa375a233931e26eb41dfd1624c14402292c5f9b75d325e8eb8fba3388",
+      "actualSha256": "81e832fa375a233931e26eb41dfd1624c14402292c5f9b75d325e8eb8fba3388",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/source.tar.gz",
+      "expectedSha256": "bc22b2359f3a8466a9daa9ced434f561525d120782ec7efeefbe2e57ff410db3",
+      "actualSha256": "bc22b2359f3a8466a9daa9ced434f561525d120782ec7efeefbe2e57ff410db3",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual-execution.json",
+      "expectedSha256": "c884dae1d2bada0717426df404d5afff5cc109f653c4782165257eaacaa95868",
+      "actualSha256": "c884dae1d2bada0717426df404d5afff5cc109f653c4782165257eaacaa95868",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual-launch.json",
+      "expectedSha256": "d25f4a3772ad86b93ffacd160e44ab544dfaf47b3a33d8f2221b2fd9ad0d6df0",
+      "actualSha256": "d25f4a3772ad86b93ffacd160e44ab544dfaf47b3a33d8f2221b2fd9ad0d6df0",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual.stderr.log",
+      "expectedSha256": "305ccfaef64f47f74b8c6fa6ce2dfe7c01b26160f4bd6f7d24712352b273c08b",
+      "actualSha256": "305ccfaef64f47f74b8c6fa6ce2dfe7c01b26160f4bd6f7d24712352b273c08b",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/actual.stdout.log",
+      "expectedSha256": "312852d3451a939efc2622aab15bb7dfc7e0f3fc462619e5478faa74db07a682",
+      "actualSha256": "312852d3451a939efc2622aab15bb7dfc7e0f3fc462619e5478faa74db07a682",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/first-warmup-cpu-refusal-primary/PRIMARY-PACKET.json",
+      "expectedSha256": "9d8b010f9ddd38e6bac25004fa156daae0200f71c3a8f18f1412619b8dea8983",
+      "actualSha256": "9d8b010f9ddd38e6bac25004fa156daae0200f71c3a8f18f1412619b8dea8983",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/first-warmup-cpu-refusal-primary/acquired-clock-readback.json",
+      "expectedSha256": "9459dfddf9a903ab099b4e2492bb515789cd1d5d855a136942ec4665105e93e7",
+      "actualSha256": "9459dfddf9a903ab099b4e2492bb515789cd1d5d855a136942ec4665105e93e7",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/predata-tuple.json",
+      "expectedSha256": "e9687480c8ce7d2028a55275e84a77f9ce195cdbae783170573bf63035c52f31",
+      "actualSha256": "e9687480c8ce7d2028a55275e84a77f9ce195cdbae783170573bf63035c52f31",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/journal.ndjson",
+      "expectedSha256": "78f6f2919ea07a71c470a5e83f9e4105194366af01cd0932cbdf785a3153d29f",
+      "actualSha256": "78f6f2919ea07a71c470a5e83f9e4105194366af01cd0932cbdf785a3153d29f",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/server-profile.json",
+      "expectedSha256": "672b6740f847404966ae86564f8a809deb45d4fbd74bb65d35bebbcd844416e4",
+      "actualSha256": "672b6740f847404966ae86564f8a809deb45d4fbd74bb65d35bebbcd844416e4",
+      "matches": true
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/server-profile.sha256",
+      "expectedSha256": "32b9e09605deb43be9c74553562ef410b589275b0585b7db0dce0d52f81c5af4",
+      "actualSha256": "32b9e09605deb43be9c74553562ef410b589275b0585b7db0dce0d52f81c5af4",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "expectedSha256": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8",
+      "actualSha256": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "expectedSha256": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87",
+      "actualSha256": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/bench/profile/server-profile-runner.mjs",
+      "expectedSha256": "72383a1abfd70b2bdb163995f8d6dac7cf70624e6f4658db395123554dcfffcf",
+      "actualSha256": "72383a1abfd70b2bdb163995f8d6dac7cf70624e6f4658db395123554dcfffcf",
+      "matches": true
+    },
+    {
+      "path": "/workspace/lab-motion/scripts/bench-transform-support.mjs",
+      "expectedSha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+      "actualSha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+      "matches": true
+    }
+  ]
+}

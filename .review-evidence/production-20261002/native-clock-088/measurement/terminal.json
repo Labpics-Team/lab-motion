@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "axis": "correctness of private Linux thread CPU measurement method",
+  "verdict": "PASS",
+  "sourceHead": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "sourceTree": "ebc3c2ac51e957b5b1d4f7959feac36c6184fd2d",
+  "startedAt": "2026-10-02T00:59:37.452924+00:00",
+  "finalizationStartUtc": "2026-10-02T01:18:05.952155+00:00",
+  "actualEndUtc": "2026-10-02T01:18:05.981169+00:00",
+  "exitCode": 0,
+  "allEND": true,
+  "heavy": 0,
+  "queued": 0,
+  "remainingOwnExec": 0,
+  "STOPOwnExecAfterSeal": true,
+  "childExecutions": [
+    {
+      "receipt": "consumer-witness-attempt1.execution.json",
+      "startUtc": "2026-10-02T01:05:52.968320+00:00",
+      "endUtc": "2026-10-02T01:05:53.017126+00:00",
+      "argv": [
+        "taskset",
+        "-c",
+        "3",
+        "node",
+        "/tmp/motion-native-clock-measurement-088-20261002/consumer-witness.mjs"
+      ],
+      "exitCode": 1,
+      "syntheticOnly": true,
+      "heavy": 0,
+      "queued": 0,
+      "allEND": true,
+      "sourceSha256": "7026afa2fd6b103a0b2c5003db2be647869bfc0e322b0d9133f88c3eb3059b14",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "84663b8bb64651a46d588865fd6193ee11e4e610a72ecd2728423476a5eb79f5"
+    },
+    {
+      "receipt": "consumer-witness.execution.json",
+      "startUtc": "2026-10-02T01:06:27.720833+00:00",
+      "endUtc": "2026-10-02T01:06:27.775432+00:00",
+      "argv": [
+        "taskset",
+        "-c",
+        "3",
+        "node",
+        "/tmp/motion-native-clock-measurement-088-20261002/consumer-witness.mjs"
+      ],
+      "exitCode": 0,
+      "syntheticOnly": true,
+      "heavy": 0,
+      "queued": 0,
+      "allEND": true,
+      "sourceSha256": "2651f75d9fc804494bc26e09dde74f2a2ba7f2f226a3bada71fb8d5ced26e009",
+      "stdoutSha256": "7e355c425ab0863dc5268843c2e40622e94954f54f46df0fb676fc822f64bd01",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "receipt": "native-api-witness.execution.json",
+      "startUtc": "2026-10-02T01:12:00.695811+00:00",
+      "endUtc": "2026-10-02T01:12:01.105149+00:00",
+      "argv": [
+        "taskset",
+        "-c",
+        "3",
+        "node",
+        "/tmp/motion-native-clock-measurement-088-20261002/native-api-witness.mjs",
+        "/tmp/motion-native-clock-measurement-088-20261002/native-api-witness-output"
+      ],
+      "exitCode": 0,
+      "abiOnly": true,
+      "performanceClaim": false,
+      "heavy": 0,
+      "queued": 0,
+      "allEND": true,
+      "sourceSha256": "7e5942a12d6b987d2db7c193456241ad6880881edc907f8235543536df3644ba",
+      "stdoutSha256": "4258b4d7ed5ecbb3446892ddc6610fe01360fe01db057de9bd6bc6b2354d67a0",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "receipt": "independent-diagnostic-replay.execution.json",
+      "startUtc": "2026-10-02T01:08:26.344195+00:00",
+      "endUtc": "2026-10-02T01:08:26.351680+00:00",
+      "cpu": "3",
+      "exitCode": 0,
+      "allEND": true,
+      "heavy": 0,
+      "queued": 0
+    }
+  ]
+}

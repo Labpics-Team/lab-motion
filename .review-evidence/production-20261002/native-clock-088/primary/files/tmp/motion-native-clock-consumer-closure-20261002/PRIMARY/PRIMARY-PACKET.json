@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "sourceBasis": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "protocolDigest": "a7a3279d573e4ee9e5b9723eb351e53e93f468410a1652a103e1132ba6bd1570",
+  "clockModelDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+  "nativeSourceDigest": "6bea5676da3bcc677eef962aaa265edbc285964e6cf4f4e1867591a6705abf62",
+  "manifest": {
+    "path": "MANIFEST.json",
+    "sha256": "299e77dd49a4a039e22df1386fedf2a17d49ee1daaee371ff1394440c46447a3"
+  },
+  "source": "before/after four-owner paths; executable bytes equal affected-full run, doc-only prose changed afterward",
+  "counterexampleSourceBefore": "source-before.json",
+  "executions": [
+    "red.execution.json",
+    "green-leaf.execution.json",
+    "affected-full.execution.json"
+  ],
+  "externalPrimaryReferences": "external-primary-refs.json",
+  "performanceScope": "no registered timing series acquired by these controls; old failed epochs preserved externally"
+}

@@ -1,0 +1,32 @@
+{
+  "started": "2026-10-02T01:00:26.966791+00:00",
+  "path": "/workspace/lab-motion",
+  "repo": "Labpics-Team/lab-motion",
+  "base": "185f02c2a85972a531627e14b7e0207e27855f95",
+  "head": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "branch": "codex/motion-production-20261001",
+  "pr": 460,
+  "objects": {
+    "argv": [
+      "python3",
+      "/workspace/scratch/publish-git-objects-only-20261001.py",
+      "--path",
+      "/workspace/lab-motion",
+      "--repo",
+      "Labpics-Team/lab-motion",
+      "--base",
+      "185f02c2a85972a531627e14b7e0207e27855f95",
+      "--head",
+      "088fbc605c95fd6a6a7620301a450d6388386997",
+      "--branch",
+      "codex/motion-production-20261001"
+    ],
+    "ended": "2026-10-02T01:00:41.628176+00:00",
+    "exit": 0
+  },
+  "casEnded": "2026-10-02T01:00:43.385050+00:00",
+  "exit": 1,
+  "error": "RuntimeError('gh: Bad credentials (HTTP 401)\\n')",
+  "ended": "2026-10-02T01:00:43.958802+00:00",
+  "allChildrenEnded": true
+}

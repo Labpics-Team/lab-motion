@@ -1,0 +1,27 @@
+{
+  "scope": "Serialization model from source field counts; no observed max-N run. Same numeric endpoint and six-digit PID example. Metadata overhead omitted.",
+  "oldEndpointBytes": 67,
+  "newEndpointBytes": 135,
+  "perEndpointByteDelta": 68,
+  "rawAndJournalCopies": 2,
+  "seriesCounts": [
+    {
+      "N": 292,
+      "totalRunsAcrossStages": 888,
+      "cpuEndpoints": 483072,
+      "engineSamples": 5328,
+      "extraBytesOneCarrierIllustrative": 33237840,
+      "extraMiBRawAndJournalIllustrative": 63.4
+    },
+    {
+      "N": 1024,
+      "totalRunsAcrossStages": 3084,
+      "cpuEndpoints": 1677696,
+      "engineSamples": 18504,
+      "extraBytesOneCarrierIllustrative": 115434120,
+      "extraMiBRawAndJournalIllustrative": 220.17
+    }
+  ],
+  "nativeSourceBytes": 68209,
+  "primaryNativeBinaryBytes": 16192
+}

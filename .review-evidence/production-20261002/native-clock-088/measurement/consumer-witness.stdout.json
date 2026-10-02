@@ -1,0 +1,123 @@
+{
+  "schema": 1,
+  "syntheticOnly": true,
+  "sourceHead": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "absoluteBaseNs": "9223372030999999000",
+  "durationNs": "2000000",
+  "results": [
+    {
+      "name": "healthy seconds carry above Number safe absolute range",
+      "expected": "ACCEPTED",
+      "outcome": "ACCEPTED",
+      "error": null
+    },
+    {
+      "name": "healthy double work uses unchanged divisor",
+      "expected": "ACCEPTED",
+      "outcome": "ACCEPTED",
+      "error": null
+    },
+    {
+      "name": "legacy RUSAGE source",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидная native CPU clock main-thread identity"
+    },
+    {
+      "name": "foreign TID",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидные native CPU timespec/identity/sequence fields"
+    },
+    {
+      "name": "foreign PID",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидные native CPU timespec/identity/sequence fields"
+    },
+    {
+      "name": "negative seconds",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидные native CPU timespec/identity/sequence fields"
+    },
+    {
+      "name": "leading-zero seconds",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидные native CPU timespec/identity/sequence fields"
+    },
+    {
+      "name": "seconds outside signed time_t",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидные native CPU timespec/identity/sequence fields"
+    },
+    {
+      "name": "negative nanoseconds",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидные native CPU timespec/identity/sequence fields"
+    },
+    {
+      "name": "negative-zero nanoseconds",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидные native CPU timespec/identity/sequence fields"
+    },
+    {
+      "name": "nanoseconds outside timespec",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидные native CPU timespec/identity/sequence fields"
+    },
+    {
+      "name": "fractional nanoseconds",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидные native CPU timespec/identity/sequence fields"
+    },
+    {
+      "name": "forged acquired value",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: native CPU endpoint не пересчитывается из timespec"
+    },
+    {
+      "name": "wrong endpoint sequence",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: невалидные native CPU timespec/identity/sequence fields"
+    },
+    {
+      "name": "missing native endpoint",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: потеряны actual thread CPU fields"
+    },
+    {
+      "name": "cross-repetition rollback with otherwise internally valid batches",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "server profile: native CPU endpoints идут назад"
+    },
+    {
+      "name": "Number conversion before endpoint subtraction",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "stock C: metric не пересчитывается из raw/2000"
+    },
+    {
+      "name": "double-work erased by division through actual call count",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "stock C: metric не пересчитывается из raw/2000"
+    },
+    {
+      "name": "unsafe interval conversion",
+      "expected": "REFUSED",
+      "outcome": "REFUSED",
+      "error": "stock C: CPU interval вне safe range"
+    }
+  ]
+}

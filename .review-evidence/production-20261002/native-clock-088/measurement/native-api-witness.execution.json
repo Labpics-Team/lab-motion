@@ -1,0 +1,21 @@
+{
+  "startUtc": "2026-10-02T01:12:00.695811+00:00",
+  "endUtc": "2026-10-02T01:12:01.105149+00:00",
+  "argv": [
+    "taskset",
+    "-c",
+    "3",
+    "node",
+    "/tmp/motion-native-clock-measurement-088-20261002/native-api-witness.mjs",
+    "/tmp/motion-native-clock-measurement-088-20261002/native-api-witness-output"
+  ],
+  "exitCode": 0,
+  "abiOnly": true,
+  "performanceClaim": false,
+  "heavy": 0,
+  "queued": 0,
+  "allEND": true,
+  "sourceSha256": "7e5942a12d6b987d2db7c193456241ad6880881edc907f8235543536df3644ba",
+  "stdoutSha256": "4258b4d7ed5ecbb3446892ddc6610fe01360fe01db057de9bd6bc6b2354d67a0",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

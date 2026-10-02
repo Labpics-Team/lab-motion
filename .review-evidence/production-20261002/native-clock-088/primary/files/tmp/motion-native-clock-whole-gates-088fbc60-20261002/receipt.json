@@ -1,0 +1,157 @@
+{
+  "head": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "startedAt": "2026-10-02T00:50:32.564412+00:00",
+  "environment": {
+    "PATH": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null,
+    "CI": "true"
+  },
+  "commands": [
+    {
+      "name": "whole",
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--reporter=json",
+        "--outputFile=/tmp/motion-native-clock-whole-gates-088fbc60-20261002/whole.json"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T00:50:32.564516+00:00",
+      "finishedAt": "2026-10-02T00:52:09.355099+00:00",
+      "wallSeconds": 96.79060035001021,
+      "exit": 0,
+      "files": {
+        "whole.stdout": {
+          "bytes": 255,
+          "sha256": "04aa1af1536e49c4bf0cfc56e830d5ec8b36cc402970b14a92525f057c6f7b88"
+        },
+        "whole.stderr": {
+          "bytes": 359,
+          "sha256": "2976e9767d7b5be66eba90364f414761cc9d16d32ca86cc2cbe9457bf2f0df35"
+        }
+      }
+    },
+    {
+      "name": "static",
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "check:static"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T00:52:09.355548+00:00",
+      "finishedAt": "2026-10-02T00:52:20.228506+00:00",
+      "wallSeconds": 10.872974070996861,
+      "exit": 0,
+      "files": {
+        "static.stdout": {
+          "bytes": 260,
+          "sha256": "69dd4cf2f42ba6787da569495b2ecfaa4289f3ff44f3db0252b7a15dd9d620c1"
+        },
+        "static.stderr": {
+          "bytes": 396,
+          "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720"
+        }
+      }
+    },
+    {
+      "name": "docs-facts",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "scripts/check-docs-facts.mjs"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T00:52:20.229034+00:00",
+      "finishedAt": "2026-10-02T00:52:20.293003+00:00",
+      "wallSeconds": 0.06398228299804032,
+      "exit": 0,
+      "files": {
+        "docs-facts.stdout": {
+          "bytes": 23,
+          "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f"
+        },
+        "docs-facts.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "docs-drift",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "scripts/check-docs-drift.mjs"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T00:52:20.293350+00:00",
+      "finishedAt": "2026-10-02T00:52:20.358030+00:00",
+      "wallSeconds": 0.06469450700387824,
+      "exit": 0,
+      "files": {
+        "docs-drift.stdout": {
+          "bytes": 218,
+          "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be"
+        },
+        "docs-drift.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "pnpm-pack",
+      "argv": [
+        "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+        "--config.ignore-scripts=true",
+        "pack",
+        "--out",
+        "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/candidate-pnpm.tgz"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T00:52:20.358473+00:00",
+      "finishedAt": "2026-10-02T00:52:20.974116+00:00",
+      "wallSeconds": 0.6156591670005582,
+      "exit": 0,
+      "files": {
+        "pnpm-pack.stdout": {
+          "bytes": 8070,
+          "sha256": "798e44d8d7ee5bd22a4db6c59432ef9abe1a5ec2fc8bf39876714bd42b4e3f7a"
+        },
+        "pnpm-pack.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    {
+      "name": "npm-pack",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/npm",
+        "pack",
+        "--ignore-scripts",
+        "--json",
+        "--pack-destination",
+        "/tmp/motion-native-clock-whole-gates-088fbc60-20261002"
+      ],
+      "cwd": "/workspace/lab-motion",
+      "startedAt": "2026-10-02T00:52:20.974617+00:00",
+      "finishedAt": "2026-10-02T00:52:22.041442+00:00",
+      "wallSeconds": 1.0668390810023993,
+      "exit": 0,
+      "files": {
+        "npm-pack.stdout": {
+          "bytes": 32706,
+          "sha256": "e58f4b564341b98e739ebb8cf483bfe38c42e5a151d74084276083ca0ca50a2f"
+        },
+        "npm-pack.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    }
+  ],
+  "finishedAt": "2026-10-02T00:52:22.041956+00:00",
+  "clean": true
+}

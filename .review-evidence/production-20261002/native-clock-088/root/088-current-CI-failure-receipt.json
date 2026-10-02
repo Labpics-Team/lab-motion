@@ -1,0 +1,25 @@
+{
+  "acquiredUtc": "2026-10-02T01:14:40.355442+00:00",
+  "source": "mcp github_fetch_workflow_job_logs decoded UTF-8 content",
+  "repository": "Labpics-Team/lab-motion",
+  "runId": 36948855716,
+  "jobId": 110657045635,
+  "candidateHead": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "actualCheckout": "b127f4b3fb104649f709494325a11b2945452b93",
+  "node": "v24.21.0",
+  "facts": {
+    "testsPassed": 5013,
+    "testsFailed": 1,
+    "testFile": "test/server-profile-contract.test.ts",
+    "testLine": 964,
+    "timeoutMs": 30000,
+    "finiteness": "not executed after suite failure"
+  },
+  "raw": {
+    "path": "/tmp/motion-ci-088fbc60-failure-20261002/job-110657045635-connector.log",
+    "bytes": 206665,
+    "sha256": "68a3eb0189ff639d51d945978b01966aba2c2c056497ded11ca51e7944f9785c",
+    "decodedCharacters": 197428
+  },
+  "qualification": "Full nontruncated decoded connector log. Original native signed-redirect failures retained separately; their private SAS URLs are excluded from delivery."
+}

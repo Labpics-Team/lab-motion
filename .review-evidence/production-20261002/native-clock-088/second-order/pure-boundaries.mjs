@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync } from 'node:fs';
+import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './source/bench/profile/server-thread-cpu-clock.mjs';
+import { SERVER_PROFILE, verifyServerProfile, serverProfileDigest } from './source/bench/profile/server-profile-registration.mjs';
+import { validateServerArtifact } from './source/bench/profile/server-profile-contract.mjs';
+assert.equal(process.env.PATH, '');
+assert.equal(typeof prepareServerThreadCpuClock, 'function');
+assert.throws(readServerThreadCpuEndpoint, /getter не подготовлен/);
+const old = JSON.parse(readFileSync('/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/server-profile.json', 'utf8'));
+assert.throws(() => verifyServerProfile(old.protocol), /изменён зарегистрированный протокол/);
+assert.throws(() => validateServerArtifact(old), /изменён зарегистрированный протокол/);
+console.log(JSON.stringify({scope:'pure imports and schema boundary; no clock acquisition or series',node:process.version,compilerPath:process.env.PATH,unpreparedReadRefused:true,oldProtocolRejected:true,newProtocolDigest:serverProfileDigest(SERVER_PROFILE),oldProtocolDigest:serverProfileDigest(old.protocol)}));

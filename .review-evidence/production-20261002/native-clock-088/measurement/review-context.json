@@ -1,0 +1,13 @@
+{
+  "initialParentWholeEndUtc": "2026-10-02T00:52:22.041956+00:00",
+  "parentPermission": "scoped CPU3 independent distinguishing probe permitted after whole END",
+  "reportFinalizationHold": {
+    "rootGrantDuringOwnHold": true,
+    "ownExecutionsWhileRootDiagnostic": 0,
+    "explicitRootOwnerEndUtc": "2026-10-02T01:15:41.312882+00:00"
+  },
+  "registeredTimingSamples": 0,
+  "fullSuiteRuns": 0,
+  "performancePilotRuns": 0,
+  "productNormTestsConfigThresholdEdits": 0
+}

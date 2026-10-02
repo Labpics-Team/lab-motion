@@ -1,0 +1,29 @@
+{
+  "startUtc": "2026-10-02T00:04:45.146578+00:00",
+  "compileArgv": [
+    "/usr/bin/cc",
+    "-O2",
+    "-std=c11",
+    "-Wall",
+    "-Wextra",
+    "-Werror",
+    "-o",
+    "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters",
+    "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters.c"
+  ],
+  "compileExitCode": 0,
+  "sourceSha256": "d17df8ca1eb2f290cbb0df7e50c500d317b450b7794d4958be34357417411caf",
+  "diagnosticNotPerformanceSeries": true,
+  "runStartUtc": "2026-10-02T00:04:45.243533+00:00",
+  "runEndUtc": "2026-10-02T00:04:45.260927+00:00",
+  "runArgv": [
+    "taskset",
+    "-c",
+    "0",
+    "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters"
+  ],
+  "runExitCode": 0,
+  "binarySha256": "4329153b93d608ba19f3f23378c54be7e1398b242b8b1e01db093be27c935618",
+  "rawSha256": "fda29e81d18c42ea0049e6aeb39057d9c4d3be9d603da4d595b0624fe5f73dc3",
+  "endUtc": "2026-10-02T00:04:45.261089+00:00"
+}

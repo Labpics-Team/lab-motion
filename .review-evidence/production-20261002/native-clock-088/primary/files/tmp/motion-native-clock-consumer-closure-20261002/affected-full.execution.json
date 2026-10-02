@@ -1,0 +1,55 @@
+{
+  "argv": [
+    "/tmp/motion-server-toolchain-20261001/bin/pnpm",
+    "exec",
+    "vitest",
+    "run",
+    "test/server-profile-contract.test.ts",
+    "--reporter=json",
+    "--outputFile=/tmp/motion-native-clock-consumer-closure-20261002/affected-full.json"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "path": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+  "nodePathUnset": true,
+  "nodeOptionsUnset": true,
+  "nodeVersion": "v24.19.0",
+  "pnpmVersion": "11.11.0",
+  "beforeSourceHashes": {
+    "bench/profile/server-profile-registration.mjs": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87",
+    "bench/profile/server-profile-contract.mjs": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8",
+    "test/server-profile-contract.test.ts": "694bfdf8b75b4ee102cc05f9857312c531a39984bdc9ccf0c592bc94684f0991",
+    "docs/server-profile.md": "a67dc4eda69f638f5c30b6a2f35bf31ab6b3c4002e75b691ef8e219c8180bd53",
+    "bench/profile/server-profile-runner.mjs": "9e232aa74455f559f790f4d8fa15cff9489f629ea9efa116e37132bfd7d08827",
+    "bench/profile/server-thread-cpu-clock.mjs": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71",
+    "bench/profile/server-thread-cpu-clock.c": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0"
+  },
+  "startUtc": "2026-10-02T00:38:11.033140+00:00",
+  "wrapperCapSeconds": 75,
+  "existingTestTimeoutUnchangedMs": 30000,
+  "actualRegisteredTimingSamples": 0,
+  "exitCode": 0,
+  "timedOut": false,
+  "endUtc": "2026-10-02T00:38:49.375977+00:00",
+  "elapsedSeconds": 38.34283866100304,
+  "afterSourceHashes": {
+    "bench/profile/server-profile-registration.mjs": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87",
+    "bench/profile/server-profile-contract.mjs": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8",
+    "test/server-profile-contract.test.ts": "694bfdf8b75b4ee102cc05f9857312c531a39984bdc9ccf0c592bc94684f0991",
+    "docs/server-profile.md": "a67dc4eda69f638f5c30b6a2f35bf31ab6b3c4002e75b691ef8e219c8180bd53",
+    "bench/profile/server-profile-runner.mjs": "9e232aa74455f559f790f4d8fa15cff9489f629ea9efa116e37132bfd7d08827",
+    "bench/profile/server-thread-cpu-clock.mjs": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71",
+    "bench/profile/server-thread-cpu-clock.c": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0"
+  },
+  "affected-full.json": {
+    "bytes": 83334,
+    "sha256": "63d9519cf22ea314ee1cfa6007de31a9ba1ab538bfea6129b1afc0b0c6367473"
+  },
+  "affected-full.stdout.log": {
+    "bytes": 146,
+    "sha256": "ea834240acbb67972f5bd97ac02795351f1e1b8ffc7eadf115573d7670f299f0"
+  },
+  "affected-full.stderr.log": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

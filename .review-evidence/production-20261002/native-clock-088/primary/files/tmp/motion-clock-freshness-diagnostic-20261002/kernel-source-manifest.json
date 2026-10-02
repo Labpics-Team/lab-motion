@@ -1,0 +1,29 @@
+{
+  "createdAt": "2026-10-02T00:02:22.420192+00:00",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/cputime.c",
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--cputime.c",
+      "sha256": "eabd7ccf5bafd87ccd686829b1192e56dafb8c213f10f12aec619405246977a6",
+      "bytes": 27252
+    },
+    {
+      "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/core.c",
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--core.c",
+      "sha256": "5b510e027f1a6236165f26da4b1195530264dc0013ff8883bf49d03114ea26c2",
+      "bytes": 289670
+    },
+    {
+      "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/time/posix-cpu-timers.c",
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--time--posix-cpu-timers.c",
+      "sha256": "23255e35526f6582c00ad0c88438c378bfa45d49316019fa76cacd6be1983621",
+      "bytes": 49795
+    },
+    {
+      "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/clock.c",
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--clock.c",
+      "sha256": "043618ff56eb333bd7c3a243bc9597387f8e9bb7b240c7383712a4643d196118",
+      "bytes": 13050
+    }
+  ]
+}

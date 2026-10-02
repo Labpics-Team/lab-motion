@@ -1,0 +1,59 @@
+diff --git a/bench/profile/server-profile-registration.mjs b/bench/profile/server-profile-registration.mjs
+index 2de2c489..d9886314 100644
+--- a/bench/profile/server-profile-registration.mjs
++++ b/bench/profile/server-profile-registration.mjs
+@@ -68,8 +68,8 @@ export const SERVER_PROFILE = freeze({
+     engine: ['operationNs', 'meanFrameNs', 'cancelDrainNs'],
+     browser: ['startMs', 'cancelMs'],
+   },
+-  clock: { engine: 'process.threadCpuUsage (user + system), наносекунды', browser: 'realm-local performance.now, миллисекунды' },
+-  engineRawLineage: 'все actual user/system CPU fields и ordered scheduler/CSS traces сохраняются lossless; legacy16 endpoints, stockC2 endpoints + каждый фактический47-frame/endpoint100 исход; интервалы и denominator пересчитываются существующим owner',
++  clock: { engine: 'Linux CLOCK_THREAD_CPUTIME_ID: reported scheduled-runtime текущего потока, наносекунды', browser: 'realm-local performance.now, миллисекунды' },
++  engineRawLineage: 'все native CLOCK_THREAD_CPUTIME_ID seconds/nanoseconds/PID/TID и ordered scheduler/CSS traces сохраняются lossless; legacy16 endpoints, stockC2 endpoints + каждый фактический47-frame/endpoint100 исход; BigInt endpoints, интервалы и denominator пересчитываются существующим owner',
+   samplingUnit: 'средняя стоимость парного блока двух противоположных runs; повторы/кадры зависимы; p95 относится к распределению средних блоков',
+   denominator: 'стоимость полезного вызова с зарегистрированными targets: browser batch/32; positive64actualcalls; legacyengine unchanged; stockC batch/2000, positive4000actualcalls/2000 без деления на два',
+   stockCpuScope: 'штатный whole stockC macro main-entry MotionValue: factory+2×2000warmups внеCPU; clock/drain/construct/onChange/setTarget/destroy вCPU, preallocated per-operation last+getFrameCount recording вCPU одинаков обеимролям; RLE/oracle внеCPU. Не per-framep99/100channels.',
+@@ -82,7 +82,7 @@ export const SERVER_PROFILE = freeze({
+   resourcePolicy: 'весь cgroup: до/после каждого парного блока; affinity неизменна, nr_throttled/throttled_usec delta=0; все samples сохраняются, нарушение даёт UNPROVEN без post-hoc исключений',
+   browserOperationTimeoutMs: 30_000,
+   clockError: {
+-    id: 'linux-node24.19-chromium149-isolated',
++    id: 'linux-thread-scheduled-runtime-node24.19-chromium149-isolated',
+     kernelRelease: '6.18.44',
+     nodeVersion: 'v24.19.0',
+     nodeExecutableSha256: 'bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12',
+@@ -92,7 +92,16 @@ export const SERVER_PROFILE = freeze({
+     browserClampErrorPerTimestampMs: 0.005,
+     browserTickTruncationPerTimestampMs: 0.001,
+     monotonicCounterLimitMs: 2 ** 42,
+-    engineIntervalUncertaintyNs: 2_000,
++    engineClock: 'CLOCK_THREAD_CPUTIME_ID',
++    engineCounterOutwardPaddingNs: 2_000,
++    engineCounterScope: 'сообщённый Linux scheduled-runtime текущего main-thread; 2us — прежнее консервативное outward padding reported counter, без гарантии физической точности или выводов из nominal clock_getres; getter overhead не вычитается',
++    nativeSourceFiles: {
++      'bench/profile/server-thread-cpu-clock.c': '4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0',
++      'bench/profile/native-clock/include/js_native_api.h': '8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788',
++      'bench/profile/native-clock/include/js_native_api_types.h': '4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0',
++      'bench/profile/native-clock/include/node_api.h': '2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a',
++      'bench/profile/native-clock/include/node_api_types.h': 'a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00',
++    },
+     sources: {
+       timeClamper: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/timing/time_clamper.cc', sha256: '2491cb64f50a54ccd10f778c058f0960ad4d9fa0861e39212bc27b8343bd103c' },
+       timeClamperHeader: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/timing/time_clamper.h', sha256: 'f8065edb3ba8da66d58eb7042523fba44b6d515c04d482614670a5414a684944' },
+@@ -111,10 +120,14 @@ export const SERVER_PROFILE = freeze({
+       libuvLinux: { url: 'https://raw.githubusercontent.com/nodejs/node/v24.19.0/deps/uv/src/unix/linux.c', sha256: '215185d94697e05cd75ba9466bb9ea93076769a7767218d4183eaf0723ccf2d2' },
+       linuxRusage: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sys.c', sha256: '0b656f8809d781b7e684a1a4c4144d925684c69e9f6050c41c6374c5206d2c8d' },
+       linuxTimeval: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/time/time.c', sha256: 'e757e825d72489c929a273f22aba8fa31487c29738960aea2683ac0274a58e6a' },
++      linuxPosixCpuTimers: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/time/posix-cpu-timers.c', sha256: '23255e35526f6582c00ad0c88438c378bfa45d49316019fa76cacd6be1983621' },
++      linuxSchedulerCore: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/core.c', sha256: '5b510e027f1a6236165f26da4b1195530264dc0013ff8883bf49d03114ea26c2' },
++      linuxSchedulerCpuTime: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/cputime.c', sha256: 'eabd7ccf5bafd87ccd686829b1192e56dafb8c213f10f12aec619405246977a6' },
++      linuxSchedulerClock: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/clock.c', sha256: '043618ff56eb333bd7c3a243bc9597387f8e9bb7b240c7383712a4643d196118' },
+     },
+     documentFrame: 'Chromium149 PageAnimator coarsens frame TimeTicks тем же isolated TimeClamper; DocumentTimeline origin совпадает с навигацией; AnimationClock стабилен в rendering/task; CSS recalc обновляет animation timing этим clock. До/после onset API observed publication clock одинаков и связывает origin свежего движения; checkpoint clock одинаков до/после CSS и связан с observed rAF. Frame timestamp может предшествовать execution wall, wall chronology отдельна. Сопоставление frame/perf включает три coarsened timestamps(frame/now/origin): upward(1.5×прежний2-endpoint envelope), без изменения API-cost bounds. Нет qualification или clocks противоречат — отказ. Это clock публикации CSS, а не атрибуция внутреннего таймера JS/native API.',
+-    scope: 'Linux: два user/system counters с microsecond truncation; Chromium isolated TimeClamper может округлять в обе стороны на5us, TimeTicks truncates1us; обе clockreads и binary64 roundoff входят в pointwise bounds до CI, без shrink по repeats/N',
+-    assumption: 'закреплённые official browser/Node binaries и Linux6.18.44 исполняют указанную upstream clock model; Node hrtime и browser TimeTicks используют общий Linux CLOCK_MONOTONIC без namespace/clock override; observed quantum является control, а не сертификатом error; другие binary/model/небезопасные counters дают отказ',
++    scope: 'Linux CLOCK_THREAD_CPUTIME_ID: разность exact seconds/nanoseconds reported scheduled-runtime с прежним2us outward padding; Chromium isolated TimeClamper может округлять в обе стороны на5us, TimeTicks truncates1us; обе browser clockreads и binary64 roundoff входят в pointwise bounds до CI, без shrink по repeats/N',
++    assumption: 'закреплённые official browser/Node binaries, private native getter и Linux6.18.44 исполняют указанную upstream clock model; Node hrtime и browser TimeTicks используют общий Linux CLOCK_MONOTONIC без namespace/clock override; reported scheduled-runtime не является физическим elapsed временем, nominal resolution/observed quantum не являются сертификатами error; другие binary/model/небезопасные counters дают отказ',
+   },
+   browserCancellationWitness: { frames: 2, transformTolerancePx: 0.000001,
+     scope: 'attached targets после cancel: нет WAAPI, transform неизменен два rAF; sync cancelMs и elapsed cancel→drain раздельно; swallowed vendor exceptions нормализованного adapter не наблюдаются' },

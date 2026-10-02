@@ -1,0 +1,35 @@
+{
+  "start": "2026-10-02T00:30:08.781908+00:00",
+  "end": "2026-10-02T00:30:08.831332+00:00",
+  "wallSeconds": 0.04943132599873934,
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/tmp/motion-native-clock-api-smoke-20261002/smoke.mjs",
+    "/tmp/motion-native-clock-api-smoke-20261002"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "exit": 1,
+  "environment": {
+    "PATH": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null,
+    "CI": "true"
+  },
+  "files": {
+    "smoke.mjs": {
+      "bytes": 510,
+      "sha256": "788ee354014a90a8ebeb0ac7828c4778cc099b513febc818cc84ee5e3d29aaf2"
+    },
+    "stdout.json": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr.log": {
+      "bytes": 2093,
+      "sha256": "6346296f424f540872a4bdd6e6582c8f336bd58236081de3e61921224c8d61c5"
+    }
+  }
+}

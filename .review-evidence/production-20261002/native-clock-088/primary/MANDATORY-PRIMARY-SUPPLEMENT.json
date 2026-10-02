@@ -1,0 +1,91 @@
+{
+  "head": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "primaryManifestSha256": "80e5dd4b030bbb8287416eb4b1372af7164801eacde39ed642a14a9ea86fec4a",
+  "files": [
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/actual-package-conservation.json",
+      "bytes": 1464,
+      "sha256": "07930aaedd228febc8fed92bf1f29cf5bbf81e17a13d485a713a3699ff0e2150"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/candidate-pnpm.tgz",
+      "bytes": 562846,
+      "sha256": "46c9067832760159d35ccd2166b28e6486a57602b1e96d6d23e1c4c06804a402"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/docs-drift.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/docs-drift.stdout",
+      "bytes": 218,
+      "sha256": "4437b7385139583741ad88edbb67528fedc3fabce8beb61947a5bcc384bad4be"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/docs-facts.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/docs-facts.stdout",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 560840,
+      "sha256": "364f9ff8b505191965040eb17059a034e2cb39be5dd0b1468855ca7e9c61c524"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/npm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/npm-pack.stdout",
+      "bytes": 32706,
+      "sha256": "e58f4b564341b98e739ebb8cf483bfe38c42e5a151d74084276083ca0ca50a2f"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/pnpm-pack.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/pnpm-pack.stdout",
+      "bytes": 8070,
+      "sha256": "798e44d8d7ee5bd22a4db6c59432ef9abe1a5ec2fc8bf39876714bd42b4e3f7a"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/receipt.json",
+      "bytes": 5425,
+      "sha256": "1e57306120977cbae7be89b0c90fbbe475dbea226593dbddde48bf6197843f44"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/static.stderr",
+      "bytes": 396,
+      "sha256": "fb87992a36e0405ba8b299d10727870ce8bf9a5fc364397f334f6effcf58b720"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/static.stdout",
+      "bytes": 260,
+      "sha256": "69dd4cf2f42ba6787da569495b2ecfaa4289f3ff44f3db0252b7a15dd9d620c1"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/whole.json",
+      "bytes": 2137539,
+      "sha256": "bb03acb69fb734d9069720f5c359ce0ad4838de7fc81c4cbe75abfd9d2ef085d"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/whole.stderr",
+      "bytes": 359,
+      "sha256": "2976e9767d7b5be66eba90364f414761cc9d16d32ca86cc2cbe9457bf2f0df35"
+    },
+    {
+      "path": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/whole.stdout",
+      "bytes": 255,
+      "sha256": "04aa1af1536e49c4bf0cfc56e830d5ec8b36cc402970b14a92525f057c6f7b88"
+    }
+  ]
+}

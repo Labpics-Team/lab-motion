@@ -1,0 +1,325 @@
+{
+  "sourceRawSha256": "fda29e81d18c42ea0049e6aeb39057d9c4d3be9d603da4d595b0624fe5f73dc3",
+  "cases": [
+    {
+      "index": 0,
+      "order": "rusage-then-thread-clock",
+      "iterations": 1000,
+      "rusageNs": 520000,
+      "threadNs": 4216,
+      "wallNs": 2033,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 1,
+      "order": "rusage-then-thread-clock",
+      "iterations": 10000,
+      "rusageNs": 3000,
+      "threadNs": 16534,
+      "wallNs": 16494,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 2,
+      "order": "rusage-then-thread-clock",
+      "iterations": 100000,
+      "rusageNs": 1000,
+      "threadNs": 162652,
+      "wallNs": 162656,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 3,
+      "order": "rusage-then-thread-clock",
+      "iterations": 1000000,
+      "rusageNs": 1000,
+      "threadNs": 1763594,
+      "wallNs": 1763891,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 4,
+      "order": "thread-clock-then-rusage",
+      "iterations": 1000,
+      "rusageNs": 2000,
+      "threadNs": 1943,
+      "wallNs": 1873,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 5,
+      "order": "thread-clock-then-rusage",
+      "iterations": 10000,
+      "rusageNs": 17000,
+      "threadNs": 16455,
+      "wallNs": 16465,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 6,
+      "order": "thread-clock-then-rusage",
+      "iterations": 100000,
+      "rusageNs": 162000,
+      "threadNs": 162632,
+      "wallNs": 162635,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 7,
+      "order": "thread-clock-then-rusage",
+      "iterations": 1000000,
+      "rusageNs": 1684000,
+      "threadNs": 1683845,
+      "wallNs": 1684182,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 8,
+      "order": "rusage-then-thread-clock",
+      "iterations": 1000,
+      "rusageNs": 19000,
+      "threadNs": 2003,
+      "wallNs": 1943,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 9,
+      "order": "rusage-then-thread-clock",
+      "iterations": 10000,
+      "rusageNs": 1000,
+      "threadNs": 16504,
+      "wallNs": 16505,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 10,
+      "order": "rusage-then-thread-clock",
+      "iterations": 100000,
+      "rusageNs": 1000,
+      "threadNs": 162631,
+      "wallNs": 162765,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 11,
+      "order": "rusage-then-thread-clock",
+      "iterations": 1000000,
+      "rusageNs": 1000,
+      "threadNs": 1742462,
+      "wallNs": 1742639,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 12,
+      "order": "thread-clock-then-rusage",
+      "iterations": 1000,
+      "rusageNs": 2000,
+      "threadNs": 1893,
+      "wallNs": 1873,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 13,
+      "order": "thread-clock-then-rusage",
+      "iterations": 10000,
+      "rusageNs": 16000,
+      "threadNs": 16575,
+      "wallNs": 16615,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 14,
+      "order": "thread-clock-then-rusage",
+      "iterations": 100000,
+      "rusageNs": 359000,
+      "threadNs": 358333,
+      "wallNs": 358871,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 15,
+      "order": "thread-clock-then-rusage",
+      "iterations": 1000000,
+      "rusageNs": 1801000,
+      "threadNs": 1800789,
+      "wallNs": 1801568,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 16,
+      "order": "rusage-then-thread-clock",
+      "iterations": 1000,
+      "rusageNs": 3000,
+      "threadNs": 1963,
+      "wallNs": 1923,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 17,
+      "order": "rusage-then-thread-clock",
+      "iterations": 10000,
+      "rusageNs": 1000,
+      "threadNs": 16474,
+      "wallNs": 16474,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 18,
+      "order": "rusage-then-thread-clock",
+      "iterations": 100000,
+      "rusageNs": 1000,
+      "threadNs": 162622,
+      "wallNs": 162625,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 19,
+      "order": "rusage-then-thread-clock",
+      "iterations": 1000000,
+      "rusageNs": 1000,
+      "threadNs": 1713999,
+      "wallNs": 1714236,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 20,
+      "order": "thread-clock-then-rusage",
+      "iterations": 1000,
+      "rusageNs": 2000,
+      "threadNs": 1873,
+      "wallNs": 1853,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 21,
+      "order": "thread-clock-then-rusage",
+      "iterations": 10000,
+      "rusageNs": 16000,
+      "threadNs": 16495,
+      "wallNs": 16465,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 22,
+      "order": "thread-clock-then-rusage",
+      "iterations": 100000,
+      "rusageNs": 235000,
+      "threadNs": 234199,
+      "wallNs": 234674,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 23,
+      "order": "thread-clock-then-rusage",
+      "iterations": 1000000,
+      "rusageNs": 1693000,
+      "threadNs": 1692117,
+      "wallNs": 1692654,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 24,
+      "order": "rusage-then-thread-clock",
+      "iterations": 1000,
+      "rusageNs": 2000,
+      "threadNs": 1953,
+      "wallNs": 1923,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 25,
+      "order": "rusage-then-thread-clock",
+      "iterations": 10000,
+      "rusageNs": 1000,
+      "threadNs": 16475,
+      "wallNs": 16455,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 26,
+      "order": "rusage-then-thread-clock",
+      "iterations": 100000,
+      "rusageNs": 1000,
+      "threadNs": 162632,
+      "wallNs": 162636,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 27,
+      "order": "rusage-then-thread-clock",
+      "iterations": 1000000,
+      "rusageNs": 1000,
+      "threadNs": 1648963,
+      "wallNs": 1649208,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 28,
+      "order": "thread-clock-then-rusage",
+      "iterations": 1000,
+      "rusageNs": 2000,
+      "threadNs": 1873,
+      "wallNs": 1863,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 29,
+      "order": "thread-clock-then-rusage",
+      "iterations": 10000,
+      "rusageNs": 17000,
+      "threadNs": 16524,
+      "wallNs": 16485,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 30,
+      "order": "thread-clock-then-rusage",
+      "iterations": 100000,
+      "rusageNs": 162000,
+      "threadNs": 162642,
+      "wallNs": 162636,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    },
+    {
+      "index": 31,
+      "order": "thread-clock-then-rusage",
+      "iterations": 1000000,
+      "rusageNs": 1822000,
+      "threadNs": 1821940,
+      "wallNs": 1822540,
+      "voluntarySwitchDelta": 0,
+      "involuntarySwitchDelta": 0
+    }
+  ]
+}

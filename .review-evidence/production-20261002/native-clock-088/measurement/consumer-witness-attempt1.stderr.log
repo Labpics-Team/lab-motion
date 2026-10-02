@@ -1,0 +1,22 @@
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: healthy double work uses unchanged divisor
+
+true !== false
+
+    at check (file:///tmp/motion-native-clock-measurement-088-20261002/consumer-witness.mjs:37:10)
+    at file:///tmp/motion-native-clock-measurement-088-20261002/consumer-witness.mjs:40:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:643:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: true,
+  expected: false,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.19.0

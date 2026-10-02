@@ -1,0 +1,20 @@
+{
+  "actualUtc": "2026-10-02T01:13:49.480105+00:00",
+  "verdict": "PASS",
+  "scope": "SO only; no registered timing/admission or whole-suite claim",
+  "exit": 0,
+  "allEND": true,
+  "heavy": 0,
+  "queued": 0,
+  "runningOwnedProcesses": 0,
+  "affinity": [
+    2
+  ],
+  "probesReceipt": "PROBES.json",
+  "sourceMutations": 0,
+  "normMutations": 0,
+  "thresholdOrTestMutations": 0,
+  "finalSourceMatch": 639,
+  "primaryMatch": 93,
+  "instruction": "STOP after delivery"
+}

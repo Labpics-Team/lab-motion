@@ -1,0 +1,263 @@
+{
+  "source": "/tmp/motion-clock-freshness-diagnostic-20261002/diagnostic-raw.json",
+  "sha256": "fda29e81d18c42ea0049e6aeb39057d9c4d3be9d603da4d595b0624fe5f73dc3",
+  "note": "Existing diagnostic independently recomputed; no new timing observations",
+  "rows": [
+    {
+      "index": 0,
+      "order": "rusage-then-thread-clock",
+      "loops": 1000,
+      "rusageDeltaNs": 520000,
+      "threadDeltaNs": 4216,
+      "wallDeltaNs": 2033
+    },
+    {
+      "index": 1,
+      "order": "rusage-then-thread-clock",
+      "loops": 10000,
+      "rusageDeltaNs": 3000,
+      "threadDeltaNs": 16534,
+      "wallDeltaNs": 16494
+    },
+    {
+      "index": 2,
+      "order": "rusage-then-thread-clock",
+      "loops": 100000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 162652,
+      "wallDeltaNs": 162656
+    },
+    {
+      "index": 3,
+      "order": "rusage-then-thread-clock",
+      "loops": 1000000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 1763594,
+      "wallDeltaNs": 1763891
+    },
+    {
+      "index": 4,
+      "order": "thread-clock-then-rusage",
+      "loops": 1000,
+      "rusageDeltaNs": 2000,
+      "threadDeltaNs": 1943,
+      "wallDeltaNs": 1873
+    },
+    {
+      "index": 5,
+      "order": "thread-clock-then-rusage",
+      "loops": 10000,
+      "rusageDeltaNs": 17000,
+      "threadDeltaNs": 16455,
+      "wallDeltaNs": 16465
+    },
+    {
+      "index": 6,
+      "order": "thread-clock-then-rusage",
+      "loops": 100000,
+      "rusageDeltaNs": 162000,
+      "threadDeltaNs": 162632,
+      "wallDeltaNs": 162635
+    },
+    {
+      "index": 7,
+      "order": "thread-clock-then-rusage",
+      "loops": 1000000,
+      "rusageDeltaNs": 1684000,
+      "threadDeltaNs": 1683845,
+      "wallDeltaNs": 1684182
+    },
+    {
+      "index": 8,
+      "order": "rusage-then-thread-clock",
+      "loops": 1000,
+      "rusageDeltaNs": 19000,
+      "threadDeltaNs": 2003,
+      "wallDeltaNs": 1943
+    },
+    {
+      "index": 9,
+      "order": "rusage-then-thread-clock",
+      "loops": 10000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 16504,
+      "wallDeltaNs": 16505
+    },
+    {
+      "index": 10,
+      "order": "rusage-then-thread-clock",
+      "loops": 100000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 162631,
+      "wallDeltaNs": 162765
+    },
+    {
+      "index": 11,
+      "order": "rusage-then-thread-clock",
+      "loops": 1000000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 1742462,
+      "wallDeltaNs": 1742639
+    },
+    {
+      "index": 12,
+      "order": "thread-clock-then-rusage",
+      "loops": 1000,
+      "rusageDeltaNs": 2000,
+      "threadDeltaNs": 1893,
+      "wallDeltaNs": 1873
+    },
+    {
+      "index": 13,
+      "order": "thread-clock-then-rusage",
+      "loops": 10000,
+      "rusageDeltaNs": 16000,
+      "threadDeltaNs": 16575,
+      "wallDeltaNs": 16615
+    },
+    {
+      "index": 14,
+      "order": "thread-clock-then-rusage",
+      "loops": 100000,
+      "rusageDeltaNs": 359000,
+      "threadDeltaNs": 358333,
+      "wallDeltaNs": 358871
+    },
+    {
+      "index": 15,
+      "order": "thread-clock-then-rusage",
+      "loops": 1000000,
+      "rusageDeltaNs": 1801000,
+      "threadDeltaNs": 1800789,
+      "wallDeltaNs": 1801568
+    },
+    {
+      "index": 16,
+      "order": "rusage-then-thread-clock",
+      "loops": 1000,
+      "rusageDeltaNs": 3000,
+      "threadDeltaNs": 1963,
+      "wallDeltaNs": 1923
+    },
+    {
+      "index": 17,
+      "order": "rusage-then-thread-clock",
+      "loops": 10000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 16474,
+      "wallDeltaNs": 16474
+    },
+    {
+      "index": 18,
+      "order": "rusage-then-thread-clock",
+      "loops": 100000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 162622,
+      "wallDeltaNs": 162625
+    },
+    {
+      "index": 19,
+      "order": "rusage-then-thread-clock",
+      "loops": 1000000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 1713999,
+      "wallDeltaNs": 1714236
+    },
+    {
+      "index": 20,
+      "order": "thread-clock-then-rusage",
+      "loops": 1000,
+      "rusageDeltaNs": 2000,
+      "threadDeltaNs": 1873,
+      "wallDeltaNs": 1853
+    },
+    {
+      "index": 21,
+      "order": "thread-clock-then-rusage",
+      "loops": 10000,
+      "rusageDeltaNs": 16000,
+      "threadDeltaNs": 16495,
+      "wallDeltaNs": 16465
+    },
+    {
+      "index": 22,
+      "order": "thread-clock-then-rusage",
+      "loops": 100000,
+      "rusageDeltaNs": 235000,
+      "threadDeltaNs": 234199,
+      "wallDeltaNs": 234674
+    },
+    {
+      "index": 23,
+      "order": "thread-clock-then-rusage",
+      "loops": 1000000,
+      "rusageDeltaNs": 1693000,
+      "threadDeltaNs": 1692117,
+      "wallDeltaNs": 1692654
+    },
+    {
+      "index": 24,
+      "order": "rusage-then-thread-clock",
+      "loops": 1000,
+      "rusageDeltaNs": 2000,
+      "threadDeltaNs": 1953,
+      "wallDeltaNs": 1923
+    },
+    {
+      "index": 25,
+      "order": "rusage-then-thread-clock",
+      "loops": 10000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 16475,
+      "wallDeltaNs": 16455
+    },
+    {
+      "index": 26,
+      "order": "rusage-then-thread-clock",
+      "loops": 100000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 162632,
+      "wallDeltaNs": 162636
+    },
+    {
+      "index": 27,
+      "order": "rusage-then-thread-clock",
+      "loops": 1000000,
+      "rusageDeltaNs": 1000,
+      "threadDeltaNs": 1648963,
+      "wallDeltaNs": 1649208
+    },
+    {
+      "index": 28,
+      "order": "thread-clock-then-rusage",
+      "loops": 1000,
+      "rusageDeltaNs": 2000,
+      "threadDeltaNs": 1873,
+      "wallDeltaNs": 1863
+    },
+    {
+      "index": 29,
+      "order": "thread-clock-then-rusage",
+      "loops": 10000,
+      "rusageDeltaNs": 17000,
+      "threadDeltaNs": 16524,
+      "wallDeltaNs": 16485
+    },
+    {
+      "index": 30,
+      "order": "thread-clock-then-rusage",
+      "loops": 100000,
+      "rusageDeltaNs": 162000,
+      "threadDeltaNs": 162642,
+      "wallDeltaNs": 162636
+    },
+    {
+      "index": 31,
+      "order": "thread-clock-then-rusage",
+      "loops": 1000000,
+      "rusageDeltaNs": 1822000,
+      "threadDeltaNs": 1821940,
+      "wallDeltaNs": 1822540
+    }
+  ]
+}

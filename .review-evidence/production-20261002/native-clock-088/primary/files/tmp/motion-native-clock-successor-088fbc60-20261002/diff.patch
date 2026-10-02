@@ -1,0 +1,2518 @@
+diff --git a/bench/profile/native-clock/LICENSE b/bench/profile/native-clock/LICENSE
+new file mode 100644
+index 00000000..2873b3b2
+--- /dev/null
++++ b/bench/profile/native-clock/LICENSE
+@@ -0,0 +1,47 @@
++Node.js is licensed for use as follows:
++
++"""
++Copyright Node.js contributors. All rights reserved.
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to
++deal in the Software without restriction, including without limitation the
++rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
++sell copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in
++all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++IN THE SOFTWARE.
++"""
++
++This license applies to parts of Node.js originating from the
++https://github.com/joyent/node repository:
++
++"""
++Copyright Joyent, Inc. and other Node contributors. All rights reserved.
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to
++deal in the Software without restriction, including without limitation the
++rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
++sell copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in
++all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
++IN THE SOFTWARE.
++"""
+diff --git a/bench/profile/native-clock/README.md b/bench/profile/native-clock/README.md
+new file mode 100644
+index 00000000..3366ea76
+--- /dev/null
++++ b/bench/profile/native-clock/README.md
+@@ -0,0 +1,15 @@
++# Справочник: исходники частного CPU getter
++
++> Роль: справка (Diátaxis).
++
++`include/` содержит четыре неизменённых Node-API header из Node.js `v24.19.0`,
++[официальный каталог `src`](https://github.com/nodejs/node/tree/v24.19.0/src).
++Права Node.js contributors и Joyent сохранены в [LICENSE](./LICENSE).
++Это зависимости сборки частного `server-profile`; npm-пакет библиотеки их не включает.
++
++Владелец метода — [серверный профиль](../../../docs/server-profile.md).
++Exact SHA256 каждого header и C исходника закреплены в
++[`SERVER_PROFILE.clockError.nativeSourceFiles`](../server-profile-registration.mjs).
++Getter собирается до регистрации; actual binary, compiler, flags, libc и PID/TID
++сохраняются в `engineClock`. Номинальное разрешение `clock_getres` не доказывает
++физическую точность счётчика.
+diff --git a/bench/profile/native-clock/include/js_native_api.h b/bench/profile/native-clock/include/js_native_api.h
+new file mode 100644
+index 00000000..d2375ecd
+--- /dev/null
++++ b/bench/profile/native-clock/include/js_native_api.h
+@@ -0,0 +1,634 @@
++#ifndef SRC_JS_NATIVE_API_H_
++#define SRC_JS_NATIVE_API_H_
++
++// This file needs to be compatible with C compilers.
++#include <stdbool.h>  // NOLINT(modernize-deprecated-headers)
++#include <stddef.h>   // NOLINT(modernize-deprecated-headers)
++
++#include "js_native_api_types.h"
++
++// If you need __declspec(dllimport), either include <node_api.h> instead, or
++// define NAPI_EXTERN as __declspec(dllimport) on the compiler's command line.
++#ifndef NAPI_EXTERN
++#ifdef _WIN32
++#define NAPI_EXTERN __declspec(dllexport)
++#elif defined(__wasm__)
++#define NAPI_EXTERN                                                            \
++  __attribute__((visibility("default")))                                       \
++  __attribute__((__import_module__("napi")))
++#else
++#define NAPI_EXTERN __attribute__((visibility("default")))
++#endif
++#endif
++
++#define NAPI_AUTO_LENGTH SIZE_MAX
++
++#ifdef __cplusplus
++#define EXTERN_C_START extern "C" {
++#define EXTERN_C_END }
++#else
++#define EXTERN_C_START
++#define EXTERN_C_END
++#endif
++
++EXTERN_C_START
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_last_error_info(
++    node_api_basic_env env, const napi_extended_error_info** result);
++
++// Getters for defined singletons
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_undefined(napi_env env,
++                                                      napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_null(napi_env env,
++                                                 napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_global(napi_env env,
++                                                   napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_boolean(napi_env env,
++                                                    bool value,
++                                                    napi_value* result);
++
++// Methods to create Primitive types/Objects
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_object(napi_env env,
++                                                      napi_value* result);
++#ifdef NAPI_EXPERIMENTAL
++#define NODE_API_EXPERIMENTAL_HAS_CREATE_OBJECT_WITH_PROPERTIES
++NAPI_EXTERN napi_status NAPI_CDECL
++node_api_create_object_with_properties(napi_env env,
++                                       napi_value prototype_or_null,
++                                       napi_value* property_names,
++                                       napi_value* property_values,
++                                       size_t property_count,
++                                       napi_value* result);
++#endif  // NAPI_EXPERIMENTAL
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_array(napi_env env,
++                                                     napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_create_array_with_length(napi_env env, size_t length, napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_double(napi_env env,
++                                                      double value,
++                                                      napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_int32(napi_env env,
++                                                     int32_t value,
++                                                     napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_uint32(napi_env env,
++                                                      uint32_t value,
++                                                      napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_int64(napi_env env,
++                                                     int64_t value,
++                                                     napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_string_latin1(
++    napi_env env, const char* str, size_t length, napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_string_utf8(napi_env env,
++                                                           const char* str,
++                                                           size_t length,
++                                                           napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_string_utf16(napi_env env,
++                                                            const char16_t* str,
++                                                            size_t length,
++                                                            napi_value* result);
++#if NAPI_VERSION >= 10
++NAPI_EXTERN napi_status NAPI_CDECL node_api_create_external_string_latin1(
++    napi_env env,
++    char* str,
++    size_t length,
++    node_api_basic_finalize finalize_callback,
++    void* finalize_hint,
++    napi_value* result,
++    bool* copied);
++NAPI_EXTERN napi_status NAPI_CDECL
++node_api_create_external_string_utf16(napi_env env,
++                                      char16_t* str,
++                                      size_t length,
++                                      node_api_basic_finalize finalize_callback,
++                                      void* finalize_hint,
++                                      napi_value* result,
++                                      bool* copied);
++
++NAPI_EXTERN napi_status NAPI_CDECL node_api_create_property_key_latin1(
++    napi_env env, const char* str, size_t length, napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL node_api_create_property_key_utf8(
++    napi_env env, const char* str, size_t length, napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL node_api_create_property_key_utf16(
++    napi_env env, const char16_t* str, size_t length, napi_value* result);
++#endif  // NAPI_VERSION >= 10
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_symbol(napi_env env,
++                                                      napi_value description,
++                                                      napi_value* result);
++#if NAPI_VERSION >= 9
++NAPI_EXTERN napi_status NAPI_CDECL
++node_api_symbol_for(napi_env env,
++                    const char* utf8description,
++                    size_t length,
++                    napi_value* result);
++#endif  // NAPI_VERSION >= 9
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_function(napi_env env,
++                                                        const char* utf8name,
++                                                        size_t length,
++                                                        napi_callback cb,
++                                                        void* data,
++                                                        napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_error(napi_env env,
++                                                     napi_value code,
++                                                     napi_value msg,
++                                                     napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_type_error(napi_env env,
++                                                          napi_value code,
++                                                          napi_value msg,
++                                                          napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_range_error(napi_env env,
++                                                           napi_value code,
++                                                           napi_value msg,
++                                                           napi_value* result);
++#if NAPI_VERSION >= 9
++NAPI_EXTERN napi_status NAPI_CDECL node_api_create_syntax_error(
++    napi_env env, napi_value code, napi_value msg, napi_value* result);
++#endif  // NAPI_VERSION >= 9
++
++// Methods to get the native napi_value from Primitive type
++NAPI_EXTERN napi_status NAPI_CDECL napi_typeof(napi_env env,
++                                               napi_value value,
++                                               napi_valuetype* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_double(napi_env env,
++                                                         napi_value value,
++                                                         double* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_int32(napi_env env,
++                                                        napi_value value,
++                                                        int32_t* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_uint32(napi_env env,
++                                                         napi_value value,
++                                                         uint32_t* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_int64(napi_env env,
++                                                        napi_value value,
++                                                        int64_t* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_bool(napi_env env,
++                                                       napi_value value,
++                                                       bool* result);
++
++// Copies LATIN-1 encoded bytes from a string into a buffer.
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_string_latin1(
++    napi_env env, napi_value value, char* buf, size_t bufsize, size_t* result);
++
++// Copies UTF-8 encoded bytes from a string into a buffer.
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_string_utf8(
++    napi_env env, napi_value value, char* buf, size_t bufsize, size_t* result);
++
++// Copies UTF-16 encoded bytes from a string into a buffer.
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_string_utf16(napi_env env,
++                                                               napi_value value,
++                                                               char16_t* buf,
++                                                               size_t bufsize,
++                                                               size_t* result);
++
++// Methods to coerce values
++// These APIs may execute user scripts
++NAPI_EXTERN napi_status NAPI_CDECL napi_coerce_to_bool(napi_env env,
++                                                       napi_value value,
++                                                       napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_coerce_to_number(napi_env env,
++                                                         napi_value value,
++                                                         napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_coerce_to_object(napi_env env,
++                                                         napi_value value,
++                                                         napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_coerce_to_string(napi_env env,
++                                                         napi_value value,
++                                                         napi_value* result);
++
++// Methods to work with Objects
++#ifdef NAPI_EXPERIMENTAL
++#define NODE_API_EXPERIMENTAL_HAS_SET_PROTOTYPE
++NAPI_EXTERN napi_status NAPI_CDECL node_api_set_prototype(napi_env env,
++                                                          napi_value object,
++                                                          napi_value value);
++#endif
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_prototype(napi_env env,
++                                                      napi_value object,
++                                                      napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_property_names(napi_env env,
++                                                           napi_value object,
++                                                           napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_set_property(napi_env env,
++                                                     napi_value object,
++                                                     napi_value key,
++                                                     napi_value value);
++NAPI_EXTERN napi_status NAPI_CDECL napi_has_property(napi_env env,
++                                                     napi_value object,
++                                                     napi_value key,
++                                                     bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_property(napi_env env,
++                                                     napi_value object,
++                                                     napi_value key,
++                                                     napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_delete_property(napi_env env,
++                                                        napi_value object,
++                                                        napi_value key,
++                                                        bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_has_own_property(napi_env env,
++                                                         napi_value object,
++                                                         napi_value key,
++                                                         bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_set_named_property(napi_env env,
++                                                           napi_value object,
++                                                           const char* utf8name,
++                                                           napi_value value);
++NAPI_EXTERN napi_status NAPI_CDECL napi_has_named_property(napi_env env,
++                                                           napi_value object,
++                                                           const char* utf8name,
++                                                           bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_named_property(napi_env env,
++                                                           napi_value object,
++                                                           const char* utf8name,
++                                                           napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_set_element(napi_env env,
++                                                    napi_value object,
++                                                    uint32_t index,
++                                                    napi_value value);
++NAPI_EXTERN napi_status NAPI_CDECL napi_has_element(napi_env env,
++                                                    napi_value object,
++                                                    uint32_t index,
++                                                    bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_element(napi_env env,
++                                                    napi_value object,
++                                                    uint32_t index,
++                                                    napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_delete_element(napi_env env,
++                                                       napi_value object,
++                                                       uint32_t index,
++                                                       bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_define_properties(napi_env env,
++                       napi_value object,
++                       size_t property_count,
++                       const napi_property_descriptor* properties);
++
++// Methods to work with Arrays
++NAPI_EXTERN napi_status NAPI_CDECL napi_is_array(napi_env env,
++                                                 napi_value value,
++                                                 bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_array_length(napi_env env,
++                                                         napi_value value,
++                                                         uint32_t* result);
++
++// Methods to compare values
++NAPI_EXTERN napi_status NAPI_CDECL napi_strict_equals(napi_env env,
++                                                      napi_value lhs,
++                                                      napi_value rhs,
++                                                      bool* result);
++
++// Methods to work with Functions
++NAPI_EXTERN napi_status NAPI_CDECL napi_call_function(napi_env env,
++                                                      napi_value recv,
++                                                      napi_value func,
++                                                      size_t argc,
++                                                      const napi_value* argv,
++                                                      napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_new_instance(napi_env env,
++                                                     napi_value constructor,
++                                                     size_t argc,
++                                                     const napi_value* argv,
++                                                     napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_instanceof(napi_env env,
++                                                   napi_value object,
++                                                   napi_value constructor,
++                                                   bool* result);
++
++// Methods to work with napi_callbacks
++
++// Gets all callback info in a single call. (Ugly, but faster.)
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_cb_info(
++    napi_env env,               // [in] Node-API environment handle
++    napi_callback_info cbinfo,  // [in] Opaque callback-info handle
++    size_t* argc,      // [in-out] Specifies the size of the provided argv array
++                       // and receives the actual count of args.
++    napi_value* argv,  // [out] Array of values
++    napi_value* this_arg,  // [out] Receives the JS 'this' arg for the call
++    void** data);          // [out] Receives the data pointer for the callback.
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_new_target(
++    napi_env env, napi_callback_info cbinfo, napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_define_class(napi_env env,
++                  const char* utf8name,
++                  size_t length,
++                  napi_callback constructor,
++                  void* data,
++                  size_t property_count,
++                  const napi_property_descriptor* properties,
++                  napi_value* result);
++
++// Methods to work with external data objects
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_wrap(napi_env env,
++          napi_value js_object,
++          void* native_object,
++          node_api_basic_finalize finalize_cb,
++          void* finalize_hint,
++          napi_ref* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_unwrap(napi_env env,
++                                               napi_value js_object,
++                                               void** result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_remove_wrap(napi_env env,
++                                                    napi_value js_object,
++                                                    void** result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_create_external(napi_env env,
++                     void* data,
++                     node_api_basic_finalize finalize_cb,
++                     void* finalize_hint,
++                     napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_external(napi_env env,
++                                                           napi_value value,
++                                                           void** result);
++
++// Methods to control object lifespan
++
++// Set initial_refcount to 0 for a weak reference, >0 for a strong reference.
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_create_reference(napi_env env,
++                      napi_value value,
++                      uint32_t initial_refcount,
++                      napi_ref* result);
++
++// Deletes a reference. The referenced value is released, and may
++// be GC'd unless there are other references to it.
++NAPI_EXTERN napi_status NAPI_CDECL napi_delete_reference(node_api_basic_env env,
++                                                         napi_ref ref);
++
++// Increments the reference count, optionally returning the resulting count.
++// After this call the  reference will be a strong reference because its
++// refcount is >0, and the referenced object is effectively "pinned".
++// Calling this when the refcount is 0 and the object is unavailable
++// results in an error.
++NAPI_EXTERN napi_status NAPI_CDECL napi_reference_ref(napi_env env,
++                                                      napi_ref ref,
++                                                      uint32_t* result);
++
++// Decrements the reference count, optionally returning the resulting count.
++// If the result is 0 the reference is now weak and the object may be GC'd
++// at any time if there are no other references. Calling this when the
++// refcount is already 0 results in an error.
++NAPI_EXTERN napi_status NAPI_CDECL napi_reference_unref(napi_env env,
++                                                        napi_ref ref,
++                                                        uint32_t* result);
++
++// Attempts to get a referenced value. If the reference is weak,
++// the value might no longer be available, in that case the call
++// is still successful but the result is NULL.
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_reference_value(napi_env env,
++                                                            napi_ref ref,
++                                                            napi_value* result);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_open_handle_scope(napi_env env, napi_handle_scope* result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_close_handle_scope(napi_env env, napi_handle_scope scope);
++NAPI_EXTERN napi_status NAPI_CDECL napi_open_escapable_handle_scope(
++    napi_env env, napi_escapable_handle_scope* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_close_escapable_handle_scope(
++    napi_env env, napi_escapable_handle_scope scope);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_escape_handle(napi_env env,
++                   napi_escapable_handle_scope scope,
++                   napi_value escapee,
++                   napi_value* result);
++
++// Methods to support error handling
++NAPI_EXTERN napi_status NAPI_CDECL napi_throw(napi_env env, napi_value error);
++NAPI_EXTERN napi_status NAPI_CDECL napi_throw_error(napi_env env,
++                                                    const char* code,
++                                                    const char* msg);
++NAPI_EXTERN napi_status NAPI_CDECL napi_throw_type_error(napi_env env,
++                                                         const char* code,
++                                                         const char* msg);
++NAPI_EXTERN napi_status NAPI_CDECL napi_throw_range_error(napi_env env,
++                                                          const char* code,
++                                                          const char* msg);
++#if NAPI_VERSION >= 9
++NAPI_EXTERN napi_status NAPI_CDECL node_api_throw_syntax_error(napi_env env,
++                                                               const char* code,
++                                                               const char* msg);
++#endif  // NAPI_VERSION >= 9
++NAPI_EXTERN napi_status NAPI_CDECL napi_is_error(napi_env env,
++                                                 napi_value value,
++                                                 bool* result);
++
++// Methods to support catching exceptions
++NAPI_EXTERN napi_status NAPI_CDECL napi_is_exception_pending(napi_env env,
++                                                             bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_get_and_clear_last_exception(napi_env env, napi_value* result);
++
++// Methods to work with array buffers and typed arrays
++NAPI_EXTERN napi_status NAPI_CDECL napi_is_arraybuffer(napi_env env,
++                                                       napi_value value,
++                                                       bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_arraybuffer(napi_env env,
++                                                           size_t byte_length,
++                                                           void** data,
++                                                           napi_value* result);
++#ifndef NODE_API_NO_EXTERNAL_BUFFERS_ALLOWED
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_create_external_arraybuffer(napi_env env,
++                                 void* external_data,
++                                 size_t byte_length,
++                                 node_api_basic_finalize finalize_cb,
++                                 void* finalize_hint,
++                                 napi_value* result);
++#ifdef NAPI_EXPERIMENTAL
++#define NODE_API_EXPERIMENTAL_HAS_CREATE_EXTERNAL_SHAREDARRAYBUFFER
++NAPI_EXTERN napi_status NAPI_CDECL
++node_api_create_external_sharedarraybuffer(napi_env env,
++                                           void* external_data,
++                                           size_t byte_length,
++                                           node_api_noenv_finalize finalize_cb,
++                                           void* finalize_hint,
++                                           napi_value* result);
++#endif  // NAPI_EXPERIMENTAL
++#endif  // NODE_API_NO_EXTERNAL_BUFFERS_ALLOWED
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_arraybuffer_info(
++    napi_env env, napi_value arraybuffer, void** data, size_t* byte_length);
++NAPI_EXTERN napi_status NAPI_CDECL napi_is_typedarray(napi_env env,
++                                                      napi_value value,
++                                                      bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_create_typedarray(napi_env env,
++                       napi_typedarray_type type,
++                       size_t length,
++                       napi_value arraybuffer,
++                       size_t byte_offset,
++                       napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_get_typedarray_info(napi_env env,
++                         napi_value typedarray,
++                         napi_typedarray_type* type,
++                         size_t* length,
++                         void** data,
++                         napi_value* arraybuffer,
++                         size_t* byte_offset);
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_dataview(napi_env env,
++                                                        size_t length,
++                                                        napi_value arraybuffer,
++                                                        size_t byte_offset,
++                                                        napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_is_dataview(napi_env env,
++                                                    napi_value value,
++                                                    bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_get_dataview_info(napi_env env,
++                       napi_value dataview,
++                       size_t* bytelength,
++                       void** data,
++                       napi_value* arraybuffer,
++                       size_t* byte_offset);
++
++#ifdef NAPI_EXPERIMENTAL
++#define NODE_API_EXPERIMENTAL_HAS_SHAREDARRAYBUFFER
++NAPI_EXTERN napi_status NAPI_CDECL
++node_api_is_sharedarraybuffer(napi_env env, napi_value value, bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL node_api_create_sharedarraybuffer(
++    napi_env env, size_t byte_length, void** data, napi_value* result);
++#endif  // NAPI_EXPERIMENTAL
++
++// version management
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_version(node_api_basic_env env,
++                                                    uint32_t* result);
++
++// Promises
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_promise(napi_env env,
++                                                       napi_deferred* deferred,
++                                                       napi_value* promise);
++NAPI_EXTERN napi_status NAPI_CDECL napi_resolve_deferred(napi_env env,
++                                                         napi_deferred deferred,
++                                                         napi_value resolution);
++NAPI_EXTERN napi_status NAPI_CDECL napi_reject_deferred(napi_env env,
++                                                        napi_deferred deferred,
++                                                        napi_value rejection);
++NAPI_EXTERN napi_status NAPI_CDECL napi_is_promise(napi_env env,
++                                                   napi_value value,
++                                                   bool* is_promise);
++
++// Running a script
++NAPI_EXTERN napi_status NAPI_CDECL napi_run_script(napi_env env,
++                                                   napi_value script,
++                                                   napi_value* result);
++
++// Memory management
++NAPI_EXTERN napi_status NAPI_CDECL napi_adjust_external_memory(
++    node_api_basic_env env, int64_t change_in_bytes, int64_t* adjusted_value);
++
++#if NAPI_VERSION >= 5
++
++// Dates
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_date(napi_env env,
++                                                    double time,
++                                                    napi_value* result);
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_is_date(napi_env env,
++                                                napi_value value,
++                                                bool* is_date);
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_date_value(napi_env env,
++                                                       napi_value value,
++                                                       double* result);
++
++// Add finalizer for pointer
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_add_finalizer(napi_env env,
++                   napi_value js_object,
++                   void* finalize_data,
++                   node_api_basic_finalize finalize_cb,
++                   void* finalize_hint,
++                   napi_ref* result);
++
++#endif  // NAPI_VERSION >= 5
++
++#ifdef NAPI_EXPERIMENTAL
++#define NODE_API_EXPERIMENTAL_HAS_POST_FINALIZER
++
++NAPI_EXTERN napi_status NAPI_CDECL
++node_api_post_finalizer(node_api_basic_env env,
++                        napi_finalize finalize_cb,
++                        void* finalize_data,
++                        void* finalize_hint);
++
++#endif  // NAPI_EXPERIMENTAL
++
++#if NAPI_VERSION >= 6
++
++// BigInt
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_bigint_int64(napi_env env,
++                                                            int64_t value,
++                                                            napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_create_bigint_uint64(napi_env env, uint64_t value, napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_create_bigint_words(napi_env env,
++                         int sign_bit,
++                         size_t word_count,
++                         const uint64_t* words,
++                         napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_bigint_int64(napi_env env,
++                                                               napi_value value,
++                                                               int64_t* result,
++                                                               bool* lossless);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_value_bigint_uint64(
++    napi_env env, napi_value value, uint64_t* result, bool* lossless);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_get_value_bigint_words(napi_env env,
++                            napi_value value,
++                            int* sign_bit,
++                            size_t* word_count,
++                            uint64_t* words);
++
++// Object
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_get_all_property_names(napi_env env,
++                            napi_value object,
++                            napi_key_collection_mode key_mode,
++                            napi_key_filter key_filter,
++                            napi_key_conversion key_conversion,
++                            napi_value* result);
++
++// Instance data
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_set_instance_data(node_api_basic_env env,
++                       void* data,
++                       napi_finalize finalize_cb,
++                       void* finalize_hint);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_get_instance_data(node_api_basic_env env, void** data);
++#endif  // NAPI_VERSION >= 6
++
++#if NAPI_VERSION >= 7
++// ArrayBuffer detaching
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_detach_arraybuffer(napi_env env, napi_value arraybuffer);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_is_detached_arraybuffer(napi_env env, napi_value value, bool* result);
++#endif  // NAPI_VERSION >= 7
++
++#if NAPI_VERSION >= 8
++// Type tagging
++NAPI_EXTERN napi_status NAPI_CDECL napi_type_tag_object(
++    napi_env env, napi_value value, const napi_type_tag* type_tag);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_check_object_type_tag(napi_env env,
++                           napi_value value,
++                           const napi_type_tag* type_tag,
++                           bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_object_freeze(napi_env env,
++                                                      napi_value object);
++NAPI_EXTERN napi_status NAPI_CDECL napi_object_seal(napi_env env,
++                                                    napi_value object);
++#endif  // NAPI_VERSION >= 8
++
++EXTERN_C_END
++
++#endif  // SRC_JS_NATIVE_API_H_
+diff --git a/bench/profile/native-clock/include/js_native_api_types.h b/bench/profile/native-clock/include/js_native_api_types.h
+new file mode 100644
+index 00000000..ddbbb82e
+--- /dev/null
++++ b/bench/profile/native-clock/include/js_native_api_types.h
+@@ -0,0 +1,232 @@
++#ifndef SRC_JS_NATIVE_API_TYPES_H_
++#define SRC_JS_NATIVE_API_TYPES_H_
++
++// Use INT_MAX, this should only be consumed by the pre-processor anyway.
++#define NAPI_VERSION_EXPERIMENTAL 2147483647
++#ifndef NAPI_VERSION
++#ifdef NAPI_EXPERIMENTAL
++#define NAPI_VERSION NAPI_VERSION_EXPERIMENTAL
++#else
++// The baseline version for Node-API.
++// NAPI_VERSION controls which version is used by default when compiling
++// a native addon. If the addon developer wants to use functions from a
++// newer Node-API version not yet available in all LTS versions, they can
++// set NAPI_VERSION to explicitly depend on that version.
++#define NAPI_VERSION 8
++#endif
++#endif
++
++// This file needs to be compatible with C compilers.
++// This is a public include file, and these includes have essentially
++// become part of its API.
++#include <stddef.h>  // NOLINT(modernize-deprecated-headers)
++#include <stdint.h>  // NOLINT(modernize-deprecated-headers)
++
++#if !defined __cplusplus || (defined(_MSC_VER) && _MSC_VER < 1900)
++typedef uint16_t char16_t;
++#endif
++
++#ifndef NAPI_CDECL
++#ifdef _WIN32
++#define NAPI_CDECL __cdecl
++#else
++#define NAPI_CDECL
++#endif
++#endif
++
++// JSVM API types are all opaque pointers for ABI stability
++// typedef undefined structs instead of void* for compile time type safety
++typedef struct napi_env__* napi_env;
++
++// We need to mark APIs which can be called during garbage collection (GC),
++// meaning that they do not affect the state of the JS engine, and can
++// therefore be called synchronously from a finalizer that itself runs
++// synchronously during GC. Such APIs can receive either a `napi_env` or a
++// `node_api_basic_env` as their first parameter, because we should be able to
++// also call them during normal, non-garbage-collecting operations, whereas
++// APIs that affect the state of the JS engine can only receive a `napi_env` as
++// their first parameter, because we must not call them during GC. In lieu of
++// inheritance, we use the properties of the const qualifier to accomplish
++// this, because both a const and a non-const value can be passed to an API
++// expecting a const value, but only a non-const value can be passed to an API
++// expecting a non-const value.
++//
++// In conjunction with appropriate CFLAGS to warn us if we're passing a const
++// (basic) environment into an API that expects a non-const environment, and
++// the definition of basic finalizer function pointer types below, which
++// receive a basic environment as their first parameter, and can thus only call
++// basic APIs (unless the user explicitly casts the environment), we achieve
++// the ability to ensure at compile time that we do not call APIs that affect
++// the state of the JS engine from a synchronous (basic) finalizer.
++#if !defined(NAPI_EXPERIMENTAL) ||                                             \
++    (defined(NAPI_EXPERIMENTAL) &&                                             \
++     (defined(NODE_API_EXPERIMENTAL_NOGC_ENV_OPT_OUT) ||                       \
++      defined(NODE_API_EXPERIMENTAL_BASIC_ENV_OPT_OUT)))
++typedef struct napi_env__* node_api_nogc_env;
++#else
++typedef const struct napi_env__* node_api_nogc_env;
++#endif
++typedef node_api_nogc_env node_api_basic_env;
++
++typedef struct napi_value__* napi_value;
++typedef struct napi_ref__* napi_ref;
++typedef struct napi_handle_scope__* napi_handle_scope;
++typedef struct napi_escapable_handle_scope__* napi_escapable_handle_scope;
++typedef struct napi_callback_info__* napi_callback_info;
++typedef struct napi_deferred__* napi_deferred;
++
++typedef enum {
++  napi_default = 0,
++  napi_writable = 1 << 0,
++  napi_enumerable = 1 << 1,
++  napi_configurable = 1 << 2,
++
++  // Used with napi_define_class to distinguish static properties
++  // from instance properties. Ignored by napi_define_properties.
++  napi_static = 1 << 10,
++
++#if NAPI_VERSION >= 8
++  // Default for class methods.
++  napi_default_method = napi_writable | napi_configurable,
++
++  // Default for object properties, like in JS obj[prop].
++  napi_default_jsproperty = napi_writable | napi_enumerable | napi_configurable,
++#endif  // NAPI_VERSION >= 8
++} napi_property_attributes;
++
++typedef enum {
++  // ES6 types (corresponds to typeof)
++  napi_undefined,
++  napi_null,
++  napi_boolean,
++  napi_number,
++  napi_string,
++  napi_symbol,
++  napi_object,
++  napi_function,
++  napi_external,
++  napi_bigint,
++} napi_valuetype;
++
++typedef enum {
++  napi_int8_array,
++  napi_uint8_array,
++  napi_uint8_clamped_array,
++  napi_int16_array,
++  napi_uint16_array,
++  napi_int32_array,
++  napi_uint32_array,
++  napi_float32_array,
++  napi_float64_array,
++  napi_bigint64_array,
++  napi_biguint64_array,
++#define NODE_API_HAS_FLOAT16_ARRAY
++  napi_float16_array,
++} napi_typedarray_type;
++
++typedef enum {
++  napi_ok,
++  napi_invalid_arg,
++  napi_object_expected,
++  napi_string_expected,
++  napi_name_expected,
++  napi_function_expected,
++  napi_number_expected,
++  napi_boolean_expected,
++  napi_array_expected,
++  napi_generic_failure,
++  napi_pending_exception,
++  napi_cancelled,
++  napi_escape_called_twice,
++  napi_handle_scope_mismatch,
++  napi_callback_scope_mismatch,
++  napi_queue_full,
++  napi_closing,
++  napi_bigint_expected,
++  napi_date_expected,
++  napi_arraybuffer_expected,
++  napi_detachable_arraybuffer_expected,
++  napi_would_deadlock,  // unused
++  napi_no_external_buffers_allowed,
++  napi_cannot_run_js,
++} napi_status;
++// Note: when adding a new enum value to `napi_status`, please also update
++//   * `const int last_status` in the definition of `napi_get_last_error_info()'
++//     in file js_native_api_v8.cc.
++//   * `const char* error_messages[]` in file js_native_api_v8.cc with a brief
++//     message explaining the error.
++//   * the definition of `napi_status` in doc/api/n-api.md to reflect the newly
++//     added value(s).
++
++typedef napi_value(NAPI_CDECL* napi_callback)(napi_env env,
++                                              napi_callback_info info);
++typedef void(NAPI_CDECL* napi_finalize)(napi_env env,
++                                        void* finalize_data,
++                                        void* finalize_hint);
++
++#if !defined(NAPI_EXPERIMENTAL) ||                                             \
++    (defined(NAPI_EXPERIMENTAL) &&                                             \
++     (defined(NODE_API_EXPERIMENTAL_NOGC_ENV_OPT_OUT) ||                       \
++      defined(NODE_API_EXPERIMENTAL_BASIC_ENV_OPT_OUT)))
++typedef napi_finalize node_api_nogc_finalize;
++#else
++typedef void(NAPI_CDECL* node_api_nogc_finalize)(node_api_nogc_env env,
++                                                 void* finalize_data,
++                                                 void* finalize_hint);
++#endif
++typedef node_api_nogc_finalize node_api_basic_finalize;
++
++// A finalizer that can be called from any thread and at any time.
++typedef void(NAPI_CDECL* node_api_noenv_finalize)(void* finalize_data,
++                                                  void* finalize_hint);
++
++typedef struct {
++  // One of utf8name or name should be NULL.
++  const char* utf8name;
++  napi_value name;
++
++  napi_callback method;
++  napi_callback getter;
++  napi_callback setter;
++  napi_value value;
++
++  napi_property_attributes attributes;
++  void* data;
++} napi_property_descriptor;
++
++typedef struct {
++  const char* error_message;
++  void* engine_reserved;
++  uint32_t engine_error_code;
++  napi_status error_code;
++} napi_extended_error_info;
++
++#if NAPI_VERSION >= 6
++typedef enum {
++  napi_key_include_prototypes,
++  napi_key_own_only
++} napi_key_collection_mode;
++
++typedef enum {
++  napi_key_all_properties = 0,
++  napi_key_writable = 1,
++  napi_key_enumerable = 1 << 1,
++  napi_key_configurable = 1 << 2,
++  napi_key_skip_strings = 1 << 3,
++  napi_key_skip_symbols = 1 << 4
++} napi_key_filter;
++
++typedef enum {
++  napi_key_keep_numbers,
++  napi_key_numbers_to_strings
++} napi_key_conversion;
++#endif  // NAPI_VERSION >= 6
++
++#if NAPI_VERSION >= 8
++typedef struct {
++  uint64_t lower;
++  uint64_t upper;
++} napi_type_tag;
++#endif  // NAPI_VERSION >= 8
++
++#endif  // SRC_JS_NATIVE_API_TYPES_H_
+diff --git a/bench/profile/native-clock/include/node_api.h b/bench/profile/native-clock/include/node_api.h
+new file mode 100644
+index 00000000..46dbb02b
+--- /dev/null
++++ b/bench/profile/native-clock/include/node_api.h
+@@ -0,0 +1,265 @@
++#ifndef SRC_NODE_API_H_
++#define SRC_NODE_API_H_
++
++#if defined(BUILDING_NODE_EXTENSION) && !defined(NAPI_EXTERN)
++#ifdef _WIN32
++// Building native addon against node
++#define NAPI_EXTERN __declspec(dllimport)
++#elif defined(__wasm__)
++#define NAPI_EXTERN __attribute__((__import_module__("napi")))
++#endif
++#endif
++#include "js_native_api.h"
++#include "node_api_types.h"
++
++struct uv_loop_s;  // Forward declaration.
++
++#ifdef _WIN32
++#define NAPI_MODULE_EXPORT __declspec(dllexport)
++#else
++#ifdef __EMSCRIPTEN__
++#define NAPI_MODULE_EXPORT                                                     \
++  __attribute__((visibility("default"))) __attribute__((used))
++#else
++#define NAPI_MODULE_EXPORT __attribute__((visibility("default")))
++#endif
++#endif
++
++#if defined(__GNUC__)
++#define NAPI_NO_RETURN __attribute__((noreturn))
++#elif defined(_WIN32)
++#define NAPI_NO_RETURN __declspec(noreturn)
++#else
++#define NAPI_NO_RETURN
++#endif
++
++// Used by deprecated registration method napi_module_register.
++typedef struct napi_module {
++  int nm_version;
++  unsigned int nm_flags;
++  const char* nm_filename;
++  napi_addon_register_func nm_register_func;
++  const char* nm_modname;
++  void* nm_priv;
++  void* reserved[4];
++} napi_module;
++
++#define NAPI_MODULE_VERSION 1
++
++#define NAPI_MODULE_INITIALIZER_X(base, version)                               \
++  NAPI_MODULE_INITIALIZER_X_HELPER(base, version)
++#define NAPI_MODULE_INITIALIZER_X_HELPER(base, version) base##version
++
++#ifdef __wasm__
++#define NAPI_MODULE_INITIALIZER_BASE napi_register_wasm_v
++#else
++#define NAPI_MODULE_INITIALIZER_BASE napi_register_module_v
++#endif
++
++#define NODE_API_MODULE_GET_API_VERSION_BASE node_api_module_get_api_version_v
++
++#define NAPI_MODULE_INITIALIZER                                                \
++  NAPI_MODULE_INITIALIZER_X(NAPI_MODULE_INITIALIZER_BASE, NAPI_MODULE_VERSION)
++
++#define NODE_API_MODULE_GET_API_VERSION                                        \
++  NAPI_MODULE_INITIALIZER_X(NODE_API_MODULE_GET_API_VERSION_BASE,              \
++                            NAPI_MODULE_VERSION)
++
++#define NAPI_MODULE_INIT()                                                     \
++  EXTERN_C_START                                                               \
++  NAPI_MODULE_EXPORT int32_t NODE_API_MODULE_GET_API_VERSION(void) {           \
++    return NAPI_VERSION;                                                       \
++  }                                                                            \
++  NAPI_MODULE_EXPORT napi_value NAPI_MODULE_INITIALIZER(napi_env env,          \
++                                                        napi_value exports);   \
++  EXTERN_C_END                                                                 \
++  napi_value NAPI_MODULE_INITIALIZER(napi_env env, napi_value exports)
++
++#define NAPI_MODULE(modname, regfunc)                                          \
++  NAPI_MODULE_INIT() { return regfunc(env, exports); }
++
++// Deprecated. Use NAPI_MODULE.
++#define NAPI_MODULE_X(modname, regfunc, priv, flags)                           \
++  NAPI_MODULE(modname, regfunc)
++
++EXTERN_C_START
++
++// Deprecated. Replaced by symbol-based registration defined by NAPI_MODULE
++// and NAPI_MODULE_INIT macros.
++NAPI_EXTERN void NAPI_CDECL
++napi_module_register(napi_module* mod);
++
++NAPI_EXTERN NAPI_NO_RETURN void NAPI_CDECL
++napi_fatal_error(const char* location,
++                 size_t location_len,
++                 const char* message,
++                 size_t message_len);
++
++// Methods for custom handling of async operations
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_async_init(napi_env env,
++                napi_value async_resource,
++                napi_value async_resource_name,
++                napi_async_context* result);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_async_destroy(napi_env env, napi_async_context async_context);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_make_callback(napi_env env,
++                   napi_async_context async_context,
++                   napi_value recv,
++                   napi_value func,
++                   size_t argc,
++                   const napi_value* argv,
++                   napi_value* result);
++
++// Methods to provide node::Buffer functionality with napi types
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_buffer(napi_env env,
++                                                      size_t length,
++                                                      void** data,
++                                                      napi_value* result);
++#ifndef NODE_API_NO_EXTERNAL_BUFFERS_ALLOWED
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_create_external_buffer(napi_env env,
++                            size_t length,
++                            void* data,
++                            node_api_basic_finalize finalize_cb,
++                            void* finalize_hint,
++                            napi_value* result);
++#endif  // NODE_API_NO_EXTERNAL_BUFFERS_ALLOWED
++
++#if NAPI_VERSION >= 10
++
++NAPI_EXTERN napi_status NAPI_CDECL
++node_api_create_buffer_from_arraybuffer(napi_env env,
++                                        napi_value arraybuffer,
++                                        size_t byte_offset,
++                                        size_t byte_length,
++                                        napi_value* result);
++#endif  // NAPI_VERSION >= 10
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_create_buffer_copy(napi_env env,
++                                                           size_t length,
++                                                           const void* data,
++                                                           void** result_data,
++                                                           napi_value* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_is_buffer(napi_env env,
++                                                  napi_value value,
++                                                  bool* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_buffer_info(napi_env env,
++                                                        napi_value value,
++                                                        void** data,
++                                                        size_t* length);
++
++// Methods to manage simple async operations
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_create_async_work(napi_env env,
++                       napi_value async_resource,
++                       napi_value async_resource_name,
++                       napi_async_execute_callback execute,
++                       napi_async_complete_callback complete,
++                       void* data,
++                       napi_async_work* result);
++NAPI_EXTERN napi_status NAPI_CDECL napi_delete_async_work(napi_env env,
++                                                          napi_async_work work);
++NAPI_EXTERN napi_status NAPI_CDECL napi_queue_async_work(node_api_basic_env env,
++                                                         napi_async_work work);
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_cancel_async_work(node_api_basic_env env, napi_async_work work);
++
++// version management
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_node_version(
++    node_api_basic_env env, const napi_node_version** version);
++
++#if NAPI_VERSION >= 2
++
++// Return the current libuv event loop for a given environment
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_get_uv_event_loop(node_api_basic_env env, struct uv_loop_s** loop);
++
++#endif  // NAPI_VERSION >= 2
++
++#if NAPI_VERSION >= 3
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_fatal_exception(napi_env env,
++                                                        napi_value err);
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_add_env_cleanup_hook(
++    node_api_basic_env env, napi_cleanup_hook fun, void* arg);
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_remove_env_cleanup_hook(
++    node_api_basic_env env, napi_cleanup_hook fun, void* arg);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_open_callback_scope(napi_env env,
++                         napi_value resource_object,
++                         napi_async_context context,
++                         napi_callback_scope* result);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_close_callback_scope(napi_env env, napi_callback_scope scope);
++
++#endif  // NAPI_VERSION >= 3
++
++#if NAPI_VERSION >= 4
++
++// Calling into JS from other threads
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_create_threadsafe_function(napi_env env,
++                                napi_value func,
++                                napi_value async_resource,
++                                napi_value async_resource_name,
++                                size_t max_queue_size,
++                                size_t initial_thread_count,
++                                void* thread_finalize_data,
++                                napi_finalize thread_finalize_cb,
++                                void* context,
++                                napi_threadsafe_function_call_js call_js_cb,
++                                napi_threadsafe_function* result);
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_get_threadsafe_function_context(
++    napi_threadsafe_function func, void** result);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_call_threadsafe_function(napi_threadsafe_function func,
++                              void* data,
++                              napi_threadsafe_function_call_mode is_blocking);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_acquire_threadsafe_function(napi_threadsafe_function func);
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_release_threadsafe_function(
++    napi_threadsafe_function func, napi_threadsafe_function_release_mode mode);
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_unref_threadsafe_function(
++    node_api_basic_env env, napi_threadsafe_function func);
++
++NAPI_EXTERN napi_status NAPI_CDECL napi_ref_threadsafe_function(
++    node_api_basic_env env, napi_threadsafe_function func);
++
++#endif  // NAPI_VERSION >= 4
++
++#if NAPI_VERSION >= 8
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_add_async_cleanup_hook(node_api_basic_env env,
++                            napi_async_cleanup_hook hook,
++                            void* arg,
++                            napi_async_cleanup_hook_handle* remove_handle);
++
++NAPI_EXTERN napi_status NAPI_CDECL
++napi_remove_async_cleanup_hook(napi_async_cleanup_hook_handle remove_handle);
++
++#endif  // NAPI_VERSION >= 8
++
++#if NAPI_VERSION >= 9
++
++NAPI_EXTERN napi_status NAPI_CDECL
++node_api_get_module_file_name(node_api_basic_env env, const char** result);
++
++#endif  // NAPI_VERSION >= 9
++
++EXTERN_C_END
++
++#endif  // SRC_NODE_API_H_
+diff --git a/bench/profile/native-clock/include/node_api_types.h b/bench/profile/native-clock/include/node_api_types.h
+new file mode 100644
+index 00000000..79123f04
+--- /dev/null
++++ b/bench/profile/native-clock/include/node_api_types.h
+@@ -0,0 +1,58 @@
++#ifndef SRC_NODE_API_TYPES_H_
++#define SRC_NODE_API_TYPES_H_
++
++#include "js_native_api_types.h"
++
++typedef napi_value(NAPI_CDECL* napi_addon_register_func)(napi_env env,
++                                                         napi_value exports);
++// False positive: https://github.com/cpplint/cpplint/issues/409
++// NOLINTNEXTLINE (readability/casting)
++typedef int32_t(NAPI_CDECL* node_api_addon_get_api_version_func)(void);
++
++typedef struct napi_callback_scope__* napi_callback_scope;
++typedef struct napi_async_context__* napi_async_context;
++typedef struct napi_async_work__* napi_async_work;
++
++#if NAPI_VERSION >= 3
++typedef void(NAPI_CDECL* napi_cleanup_hook)(void* arg);
++#endif  // NAPI_VERSION >= 3
++
++#if NAPI_VERSION >= 4
++typedef struct napi_threadsafe_function__* napi_threadsafe_function;
++#endif  // NAPI_VERSION >= 4
++
++#if NAPI_VERSION >= 4
++typedef enum {
++  napi_tsfn_release,
++  napi_tsfn_abort
++} napi_threadsafe_function_release_mode;
++
++typedef enum {
++  napi_tsfn_nonblocking,
++  napi_tsfn_blocking
++} napi_threadsafe_function_call_mode;
++#endif  // NAPI_VERSION >= 4
++
++typedef void(NAPI_CDECL* napi_async_execute_callback)(napi_env env, void* data);
++typedef void(NAPI_CDECL* napi_async_complete_callback)(napi_env env,
++                                                       napi_status status,
++                                                       void* data);
++#if NAPI_VERSION >= 4
++typedef void(NAPI_CDECL* napi_threadsafe_function_call_js)(
++    napi_env env, napi_value js_callback, void* context, void* data);
++#endif  // NAPI_VERSION >= 4
++
++typedef struct {
++  uint32_t major;
++  uint32_t minor;
++  uint32_t patch;
++  const char* release;
++} napi_node_version;
++
++#if NAPI_VERSION >= 8
++typedef struct napi_async_cleanup_hook_handle__* napi_async_cleanup_hook_handle;
++typedef void(NAPI_CDECL* napi_async_cleanup_hook)(
++    napi_async_cleanup_hook_handle handle, void* data);
++#endif  // NAPI_VERSION >= 8
++
++#endif  // SRC_NODE_API_TYPES_H_
+diff --git a/bench/profile/server-profile-contract.mjs b/bench/profile/server-profile-contract.mjs
+index 4ee04f2f..e6c090c5 100644
+--- a/bench/profile/server-profile-contract.mjs
++++ b/bench/profile/server-profile-contract.mjs
+@@ -156,6 +156,27 @@ export function verifyServerClockRegistration(registration) {
+     'Node binary/platform не сертифицированы clock model');
+   for (const provenance of Object.values(registration.provenance ?? {})) invariant(provenance.environment?.node === model.nodeVersion &&
+     provenance.environment.nodeExecutableSha256 === model.nodeExecutableSha256, 'source toolchain не совпадает с clock model');
++  const clock = registration.engineClock;
++  verifyThreadCpuIdentity(clock);
++  invariant(clock.schema === 1 && clock.napiVersion === 8 && clock.node?.version === model.nodeVersion &&
++    clock.node.executableSha256 === model.nodeExecutableSha256, 'native CPU clock не соответствует Node/NAPI');
++  invariant(isDeepStrictEqual(clock.nativeSources, model.nativeSourceFiles) &&
++    clock.nativeSourceDigest === serverProfileDigest(Object.fromEntries(Object.entries(clock.nativeSources).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))),
++  'native CPU clock source/header qualification не совпадает с регистрацией');
++  invariant(typeof clock.nativeBinary?.path === 'string' && clock.nativeBinary.path.length > 0 &&
++    Number.isSafeInteger(clock.nativeBinary.bytes) && clock.nativeBinary.bytes > 0 && SHA256.test(clock.nativeBinary.sha256),
++  'неполное native CPU binary qualification');
++  invariant(typeof clock.compiler?.path === 'string' && clock.compiler.path.length > 0 &&
++    typeof clock.compiler.version === 'string' && clock.compiler.version.length > 0 && SHA256.test(clock.compiler.binarySha256) &&
++    Array.isArray(clock.compiler.flags) && clock.compiler.flags.length > 0 && clock.compiler.flags.every((flag) => typeof flag === 'string' && flag.length > 0) &&
++    typeof clock.libc?.path === 'string' && clock.libc.path.length > 0 && SHA256.test(clock.libc.sha256), 'неполное native CPU compiler/libc qualification');
++  invariant(typeof clock.nominalResolutionNs === 'string' && /^[1-9]\d*$/.test(clock.nominalResolutionNs) &&
++    clock.nominalResolutionIsNotErrorCertificate === true, 'nominal CPU resolution ошибочно выдана за error certificate');
++}
++
++function verifyThreadCpuIdentity(identity) {
++  invariant(identity?.clock === SERVER_PROFILE.clockError.engineClock && Number.isSafeInteger(identity.pid) && identity.pid > 0 &&
++    Number.isSafeInteger(identity.tid) && identity.tid === identity.pid, 'невалидная native CPU clock main-thread identity');
+ }
+ 
+ export function serverOrders(runs, seed = SERVER_PROFILE.seed) {
+@@ -173,8 +194,9 @@ export function serverMetricCells() {
+ 
+ // Кадры/повторы остаются в raw. Admission использует один нормированный batch
+ // на run; независимая порядковая статистика использует среднее двух runs блока.
+-export function serverCellPairs(stage, runs, expectedStage) {
++export function serverCellPairs(stage, runs, expectedStage, registeredClock) {
+   invariant(['warmup', 'pilot', 'aa', 'positive', 'ab'].includes(expectedStage) && stage?.name === expectedStage, 'имя стадии не соответствует владельцу artifact');
++  if (registeredClock !== undefined) verifyThreadCpuIdentity(registeredClock);
+   invariant(stage?.rows?.length === runs * (SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length), 'неполная серия измерений');
+   const expectedOrders = serverOrders(runs);
+   const seen = new Set();
+@@ -193,13 +215,13 @@ export function serverCellPairs(stage, runs, expectedStage) {
+     invariant(rows.length === runs, 'потеряна сцена');
+     invariant(rows.every((row) => row.kind === cell.kind), 'подменён вид сцены');
+     const read = Object.fromEntries(IDS.map((id) => [id, rows.map((row) => readServerSample(row.samples[id], cell,
+-      expectedStage === 'positive' && id === 'right' ? 2 : 1, validationCache, validateTransform))]));
++      expectedStage === 'positive' && id === 'right' ? 2 : 1, validationCache, validateTransform, registeredClock))]));
+     return { ...cell, left: read.left.map((row) => row.value), right: read.right.map((row) => row.value),
+       leftBounds: read.left.map((row) => row.bounds), rightBounds: read.right.map((row) => row.bounds) };
+   });
+ }
+ 
+-function readServerSample(sample, cell, workMultiplier, validationCache = new WeakMap(), validateTransform = validateTransformLifecycleSample) {
++function readServerSample(sample, cell, workMultiplier, validationCache = new WeakMap(), validateTransform = validateTransformLifecycleSample, registeredClock) {
+       const stockScene = cell.kind === 'engine' && SERVER_PROFILE.engineScenes.find((scene) => scene.id === cell.scene && scene.workload === 'stock-c');
+       invariant(sample?.semantic === true && positive(sample[cell.metric]), `${cell.id}: неверный sample или semantics`);
+       invariant(sample.workMultiplier === workMultiplier, 'подменён знаменатель положительного контроля');
+@@ -208,7 +230,11 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
+       const validationKey = `${cell.kind}:${cell.scene}:${workMultiplier}`;
+       if (!validationCache.get(sample)?.has(validationKey)) {
+       if (cell.kind === 'engine') {
++        verifyThreadCpuIdentity(sample.cpuClock);
++        if (registeredClock) invariant(sample.cpuClock.clock === registeredClock.clock && sample.cpuClock.pid === registeredClock.pid &&
++          sample.cpuClock.tid === registeredClock.tid, 'native CPU sample не связан с зарегистрированным main-thread');
+         const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.id === cell.scene);
++        let previousCpuNs = -1n;
+         if (stockScene) {
+           invariant(sample.cpuScope === SERVER_PROFILE.stockCpuScope && Array.isArray(sample.warmup) && sample.warmup.length === scene.warmupBatches,
+             'stock C потерял canonical warmup или CPU scope');
+@@ -217,14 +243,14 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
+         for (const raw of sample.raw) {
+           if (stockScene) {
+             validateStockMotionValueBatch(raw, scene, workMultiplier);
+-            validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads);
++            previousCpuNs = validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads, sample.cpuClock, previousCpuNs);
+             continue;
+           }
+           invariant(Array.isArray(raw.frameNs) && raw.frameNs.length === TRANSFORM_PAIR_PROFILE.frameOffsetsMs.length &&
+             raw.frameNs.every((x) => Number.isSafeInteger(x) && x >= 0) && Number.isSafeInteger(raw.operationNs) && raw.operationNs >= 0 &&
+             Number.isSafeInteger(raw.cancelDrainNs) && raw.cancelDrainNs >= 0, 'потеряны frame samples или safe CPU counter');
+           validateTransform(raw, scene);
+-          validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads);
++          previousCpuNs = validateThreadCpuFields(raw.raw.cpuReads, raw.raw.clockReads, sample.cpuClock, previousCpuNs);
+           const semantic = raw.semantic;
+           invariant(semantic?.valid === true && semantic.targets === scene.count && semantic.frames === raw.frameNs.length &&
+             semantic.finished === true && semantic.pending === 0 && semantic.onCompleteCalls === 0 &&
+@@ -262,28 +288,31 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
+       const pointwise = sample.raw.map((raw) => {
+         if (stockScene) {
+           const durationNs = Number(BigInt(raw.raw.clockReads[1].valueNs) - BigInt(raw.raw.clockReads[0].valueNs));
+-          return meanBounds([errorBounds(durationNs, SERVER_PROFILE.clockError.engineIntervalUncertaintyNs)], stockScene.callsPerRepetition);
++          return meanBounds([errorBounds(durationNs, SERVER_PROFILE.clockError.engineCounterOutwardPaddingNs)], stockScene.callsPerRepetition);
+         }
+         if (cell.kind === 'engine') return cell.metric === 'meanFrameNs'
+-          ? meanBounds(raw.frameNs.map((value) => errorBounds(value, SERVER_PROFILE.clockError.engineIntervalUncertaintyNs)), raw.frameNs.length)
+-          : errorBounds(raw[cell.metric], SERVER_PROFILE.clockError.engineIntervalUncertaintyNs);
++          ? meanBounds(raw.frameNs.map((value) => errorBounds(value, SERVER_PROFILE.clockError.engineCounterOutwardPaddingNs)), raw.frameNs.length)
++          : errorBounds(raw[cell.metric], SERVER_PROFILE.clockError.engineCounterOutwardPaddingNs);
+         const interval = serverBrowserClockBounds(cell.metric === 'startMs' ? raw.startClock : raw.cancelClock, sample.monotonicHostUpperNs);
+         return meanBounds([interval], SERVER_PROFILE.browserBatchCalls);
+       });
+       return { value: sample[cell.metric], bounds: meanBounds(pointwise, sample.repetitions) };
+ }
+ 
+-function validateThreadCpuFields(cpuReads, clockReads) {
++function validateThreadCpuFields(cpuReads, clockReads, identity, previous = -1n) {
+   invariant(Array.isArray(cpuReads) && cpuReads.length === clockReads.length, 'потеряны actual thread CPU fields');
+   for (let sequence = 0; sequence < cpuReads.length; sequence++) {
+     const read = cpuReads[sequence];
+-    invariant(read?.sequence === sequence && Number.isSafeInteger(read.userUs) && read.userUs >= 0 &&
+-      Number.isSafeInteger(read.systemUs) && read.systemUs >= 0, 'невалидные user/system CPU fields');
+-    const valueNs = String((BigInt(read.userUs) + BigInt(read.systemUs)) * 1000n);
+-    invariant(read.valueNs === valueNs && clockReads[sequence].valueNs === valueNs, 'CPU endpoint не пересчитывается из user/system');
+-    if (sequence > 0) invariant(read.userUs >= cpuReads[sequence - 1].userUs && read.systemUs >= cpuReads[sequence - 1].systemUs,
+-      'user/system CPU fields идут назад');
++    invariant(read?.sequence === sequence && read.clock === identity.clock && read.pid === identity.pid && read.tid === identity.tid &&
++      typeof read.seconds === 'string' && /^(0|[1-9]\d*)$/.test(read.seconds) && read.seconds.length <= 19 &&
++      BigInt(read.seconds) <= 9_223_372_036_854_775_807n && Number.isSafeInteger(read.nanoseconds) && read.nanoseconds >= 0 && !Object.is(read.nanoseconds, -0) &&
++      read.nanoseconds < 1_000_000_000, 'невалидные native CPU timespec/identity/sequence fields');
++    const valueNs = BigInt(read.seconds) * 1_000_000_000n + BigInt(read.nanoseconds);
++    invariant(read.valueNs === String(valueNs) && clockReads[sequence].valueNs === read.valueNs, 'native CPU endpoint не пересчитывается из timespec');
++    invariant(valueNs >= previous, 'native CPU endpoints идут назад');
++    previous = valueNs;
+   }
++  return previous;
+ }
+ 
+ export function validateServerBrowserSample(sample, scene, workMultiplier = 1) {
+@@ -533,6 +562,15 @@ export function validateServerArtifact(artifact) {
+   invariant(SHA256.test(artifact.registration.browserTree?.sha256) && Number.isSafeInteger(artifact.registration.browserTree?.files) &&
+     artifact.registration.browserTree.files > 0, 'потерян browser tree hash');
+   verifyServerClockRegistration(artifact.registration);
++  // Привязка identity охватывает также завершённый префикс отказавшей стадии.
++  for (const name of ['warmup', 'pilot', 'aa', 'positive', 'ab']) for (const row of artifact[name]?.rows ?? []) {
++    if (row.kind !== 'engine') continue;
++    for (const sample of Object.values(row.samples ?? {})) {
++      verifyThreadCpuIdentity(sample.cpuClock);
++      invariant(sample.cpuClock.clock === artifact.registration.engineClock.clock && sample.cpuClock.pid === artifact.registration.engineClock.pid &&
++        sample.cpuClock.tid === artifact.registration.engineClock.tid, 'native CPU stage sample не связан с зарегистрированным main-thread');
++    }
++  }
+   invariant(Object.keys(artifact.registration.harness ?? {}).length >= 6 && Object.values(artifact.registration.harness).every((x) => SHA256.test(x.sha256)), 'неполное harness provenance');
+   for (const id of SERVER_PROFILE.comparators.filter((id) => !id.startsWith('waapi'))) invariant(SHA256.test(artifact.registration.packages[id]?.treeSha256) &&
+     SHA256.test(artifact.registration.packages[id]?.tarballSha256), 'потерян comparator package');
+@@ -554,11 +592,11 @@ export function validateServerArtifact(artifact) {
+       Math.abs(control.reduced.x - SERVER_PROFILE.toPx) <= 2 && control.reduced.rafRequests === 0 && control.reduced.activeWaapi === 0,
+     'потерян raw no-motion/reduced-motion control');
+   }
+-  const pilotPairs = serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot');
++  const pilotPairs = serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock);
+   invariant(isDeepStrictEqual(artifact.samplePlan, planServerSampleSize(pilotPairs)), 'N не воспроизводится из baseline-only pilot');
+   invariant(artifact.frozenPlanDigest === serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan }), 'не закреплён N до A/A и A/B');
+-  const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, artifact.samplePlan.runs, 'aa'));
+-  const positiveControl = serverFamilyIntervals(serverCellPairs(artifact.positive, artifact.samplePlan.runs, 'positive'));
++  const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, artifact.samplePlan.runs, 'aa', artifact.registration.engineClock));
++  const positiveControl = serverFamilyIntervals(serverCellPairs(artifact.positive, artifact.samplePlan.runs, 'positive', artifact.registration.engineClock));
+   const calibration = serverCalibrationVerdict(aa, positiveControl, artifact.samplePlan);
+   calibration.reasons.push(...serverResourceReasons([artifact.warmup, artifact.pilot, artifact.aa, artifact.positive], artifact.registration.machine.identity));
+   calibration.verdict = calibration.reasons.length ? 'UNPROVEN' : 'PASS';
+@@ -577,7 +615,7 @@ export function validateServerArtifact(artifact) {
+     invariant(artifact.verdict === 'UNPROVEN', 'частичный A/B объявлен успехом');
+     return { verification: 'partial-samples-refused', verdict: 'UNPROVEN' };
+   }
+-  const ab = serverFamilyIntervals(serverCellPairs(artifact.ab, artifact.samplePlan.runs, 'ab'));
++  const ab = serverFamilyIntervals(serverCellPairs(artifact.ab, artifact.samplePlan.runs, 'ab', artifact.registration.engineClock));
+   const resourceReasons = serverResourceReasons([artifact.ab], artifact.registration.machine.identity);
+   invariant(resourceReasons.length === 0 || (artifact.verdict === 'UNPROVEN' && artifact.failures.length > 0), 'условия A/B нарушены, отказ потерян');
+   if (artifact.failures.length > 0) {
+diff --git a/bench/profile/server-profile-registration.mjs b/bench/profile/server-profile-registration.mjs
+index 2de2c489..d9886314 100644
+--- a/bench/profile/server-profile-registration.mjs
++++ b/bench/profile/server-profile-registration.mjs
+@@ -68,8 +68,8 @@ export const SERVER_PROFILE = freeze({
+     engine: ['operationNs', 'meanFrameNs', 'cancelDrainNs'],
+     browser: ['startMs', 'cancelMs'],
+   },
+-  clock: { engine: 'process.threadCpuUsage (user + system), наносекунды', browser: 'realm-local performance.now, миллисекунды' },
+-  engineRawLineage: 'все actual user/system CPU fields и ordered scheduler/CSS traces сохраняются lossless; legacy16 endpoints, stockC2 endpoints + каждый фактический47-frame/endpoint100 исход; интервалы и denominator пересчитываются существующим owner',
++  clock: { engine: 'Linux CLOCK_THREAD_CPUTIME_ID: reported scheduled-runtime текущего потока, наносекунды', browser: 'realm-local performance.now, миллисекунды' },
++  engineRawLineage: 'все native CLOCK_THREAD_CPUTIME_ID seconds/nanoseconds/PID/TID и ordered scheduler/CSS traces сохраняются lossless; legacy16 endpoints, stockC2 endpoints + каждый фактический47-frame/endpoint100 исход; BigInt endpoints, интервалы и denominator пересчитываются существующим owner',
+   samplingUnit: 'средняя стоимость парного блока двух противоположных runs; повторы/кадры зависимы; p95 относится к распределению средних блоков',
+   denominator: 'стоимость полезного вызова с зарегистрированными targets: browser batch/32; positive64actualcalls; legacyengine unchanged; stockC batch/2000, positive4000actualcalls/2000 без деления на два',
+   stockCpuScope: 'штатный whole stockC macro main-entry MotionValue: factory+2×2000warmups внеCPU; clock/drain/construct/onChange/setTarget/destroy вCPU, preallocated per-operation last+getFrameCount recording вCPU одинаков обеимролям; RLE/oracle внеCPU. Не per-framep99/100channels.',
+@@ -82,7 +82,7 @@ export const SERVER_PROFILE = freeze({
+   resourcePolicy: 'весь cgroup: до/после каждого парного блока; affinity неизменна, nr_throttled/throttled_usec delta=0; все samples сохраняются, нарушение даёт UNPROVEN без post-hoc исключений',
+   browserOperationTimeoutMs: 30_000,
+   clockError: {
+-    id: 'linux-node24.19-chromium149-isolated',
++    id: 'linux-thread-scheduled-runtime-node24.19-chromium149-isolated',
+     kernelRelease: '6.18.44',
+     nodeVersion: 'v24.19.0',
+     nodeExecutableSha256: 'bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12',
+@@ -92,7 +92,16 @@ export const SERVER_PROFILE = freeze({
+     browserClampErrorPerTimestampMs: 0.005,
+     browserTickTruncationPerTimestampMs: 0.001,
+     monotonicCounterLimitMs: 2 ** 42,
+-    engineIntervalUncertaintyNs: 2_000,
++    engineClock: 'CLOCK_THREAD_CPUTIME_ID',
++    engineCounterOutwardPaddingNs: 2_000,
++    engineCounterScope: 'сообщённый Linux scheduled-runtime текущего main-thread; 2us — прежнее консервативное outward padding reported counter, без гарантии физической точности или выводов из nominal clock_getres; getter overhead не вычитается',
++    nativeSourceFiles: {
++      'bench/profile/server-thread-cpu-clock.c': '4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0',
++      'bench/profile/native-clock/include/js_native_api.h': '8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788',
++      'bench/profile/native-clock/include/js_native_api_types.h': '4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0',
++      'bench/profile/native-clock/include/node_api.h': '2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a',
++      'bench/profile/native-clock/include/node_api_types.h': 'a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00',
++    },
+     sources: {
+       timeClamper: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/timing/time_clamper.cc', sha256: '2491cb64f50a54ccd10f778c058f0960ad4d9fa0861e39212bc27b8343bd103c' },
+       timeClamperHeader: { url: 'https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/timing/time_clamper.h', sha256: 'f8065edb3ba8da66d58eb7042523fba44b6d515c04d482614670a5414a684944' },
+@@ -111,10 +120,14 @@ export const SERVER_PROFILE = freeze({
+       libuvLinux: { url: 'https://raw.githubusercontent.com/nodejs/node/v24.19.0/deps/uv/src/unix/linux.c', sha256: '215185d94697e05cd75ba9466bb9ea93076769a7767218d4183eaf0723ccf2d2' },
+       linuxRusage: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sys.c', sha256: '0b656f8809d781b7e684a1a4c4144d925684c69e9f6050c41c6374c5206d2c8d' },
+       linuxTimeval: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/time/time.c', sha256: 'e757e825d72489c929a273f22aba8fa31487c29738960aea2683ac0274a58e6a' },
++      linuxPosixCpuTimers: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/time/posix-cpu-timers.c', sha256: '23255e35526f6582c00ad0c88438c378bfa45d49316019fa76cacd6be1983621' },
++      linuxSchedulerCore: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/core.c', sha256: '5b510e027f1a6236165f26da4b1195530264dc0013ff8883bf49d03114ea26c2' },
++      linuxSchedulerCpuTime: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/cputime.c', sha256: 'eabd7ccf5bafd87ccd686829b1192e56dafb8c213f10f12aec619405246977a6' },
++      linuxSchedulerClock: { url: 'https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/clock.c', sha256: '043618ff56eb333bd7c3a243bc9597387f8e9bb7b240c7383712a4643d196118' },
+     },
+     documentFrame: 'Chromium149 PageAnimator coarsens frame TimeTicks тем же isolated TimeClamper; DocumentTimeline origin совпадает с навигацией; AnimationClock стабилен в rendering/task; CSS recalc обновляет animation timing этим clock. До/после onset API observed publication clock одинаков и связывает origin свежего движения; checkpoint clock одинаков до/после CSS и связан с observed rAF. Frame timestamp может предшествовать execution wall, wall chronology отдельна. Сопоставление frame/perf включает три coarsened timestamps(frame/now/origin): upward(1.5×прежний2-endpoint envelope), без изменения API-cost bounds. Нет qualification или clocks противоречат — отказ. Это clock публикации CSS, а не атрибуция внутреннего таймера JS/native API.',
+-    scope: 'Linux: два user/system counters с microsecond truncation; Chromium isolated TimeClamper может округлять в обе стороны на5us, TimeTicks truncates1us; обе clockreads и binary64 roundoff входят в pointwise bounds до CI, без shrink по repeats/N',
+-    assumption: 'закреплённые official browser/Node binaries и Linux6.18.44 исполняют указанную upstream clock model; Node hrtime и browser TimeTicks используют общий Linux CLOCK_MONOTONIC без namespace/clock override; observed quantum является control, а не сертификатом error; другие binary/model/небезопасные counters дают отказ',
++    scope: 'Linux CLOCK_THREAD_CPUTIME_ID: разность exact seconds/nanoseconds reported scheduled-runtime с прежним2us outward padding; Chromium isolated TimeClamper может округлять в обе стороны на5us, TimeTicks truncates1us; обе browser clockreads и binary64 roundoff входят в pointwise bounds до CI, без shrink по repeats/N',
++    assumption: 'закреплённые official browser/Node binaries, private native getter и Linux6.18.44 исполняют указанную upstream clock model; Node hrtime и browser TimeTicks используют общий Linux CLOCK_MONOTONIC без namespace/clock override; reported scheduled-runtime не является физическим elapsed временем, nominal resolution/observed quantum не являются сертификатами error; другие binary/model/небезопасные counters дают отказ',
+   },
+   browserCancellationWitness: { frames: 2, transformTolerancePx: 0.000001,
+     scope: 'attached targets после cancel: нет WAAPI, transform неизменен два rAF; sync cancelMs и elapsed cancel→drain раздельно; swallowed vendor exceptions нормализованного adapter не наблюдаются' },
+diff --git a/bench/profile/server-profile-runner.mjs b/bench/profile/server-profile-runner.mjs
+index 6a1ceaea..ea54a7ed 100644
+--- a/bench/profile/server-profile-runner.mjs
++++ b/bench/profile/server-profile-runner.mjs
+@@ -14,6 +14,7 @@ import { compactStockMotionValueOutcomes, deriveRealmTimerStep, PRODUCTION_ADAPT
+ import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged,
+   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
+ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
++import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './server-thread-cpu-clock.mjs';
+ import { compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
+   serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
+ 
+@@ -22,6 +23,7 @@ const BENCH = path.join(ROOT, 'bench/compare');
+ const requireBench = createRequire(path.join(BENCH, 'package.json'));
+ const HARNESS_FILES = ['bench/profile/server-profile-registration.mjs', 'bench/profile/server-profile-contract.mjs',
+   'bench/profile/server-profile-runner.mjs', 'bench/profile/server-profile-retention.mjs',
++  'bench/profile/server-thread-cpu-clock.mjs', ...Object.keys(SERVER_PROFILE.clockError.nativeSourceFiles),
+   'scripts/bench-transform-support.mjs', 'scripts/bench-support.mjs', 'scripts/bench.mjs', 'bench/compare/bench.mjs',
+   'bench/compare/methodology.mjs', 'bench/compare/provenance.mjs'];
+ const ENTRIES = ['lab', ...SERVER_PROFILE.comparators];
+@@ -35,7 +37,9 @@ function preserveRawNumbers(value) {
+ }
+ 
+ function errorRecord(error) {
++  const code = error == null ? undefined : Object.getOwnPropertyDescriptor(error, 'code')?.value;
+   return { name: error?.name ?? typeof error, message: String(error?.message ?? error),
++    ...(typeof code === 'string' ? { code } : {}),
+     ...(error?.errors ? { errors: error.errors.map(errorRecord) } : {}),
+     ...(error?.raw ? { raw: preserveRawNumbers(error.raw) } : {}), ...(error?.timerEvidence ? { timerEvidence: preserveRawNumbers(error.timerEvidence) } : {}) };
+ }
+@@ -151,17 +155,24 @@ function buildAdapter(id, consumerRoot, esbuild, out) {
+ }
+ 
+ function threadCpuNs(reads) {
+-  const usage = process.threadCpuUsage();
+-  const acquired = { sequence: reads.length, userUs: usage.user, systemUs: usage.system, valueNs: null };
++  const endpoint = readServerThreadCpuEndpoint();
++  const acquired = { sequence: reads.length, ...endpoint };
+   reads.push(acquired);
+-  if (![usage.user, usage.system].every((value) => Number.isSafeInteger(value) && value >= 0)) {
+-    throw new Error('server profile: unsafe thread CPU counter вне clock model');
++  if (acquired.clock !== 'CLOCK_THREAD_CPUTIME_ID' || acquired.pid !== process.pid || acquired.tid !== process.pid ||
++      typeof acquired.seconds !== 'string' || !/^(0|[1-9]\d*)$/.test(acquired.seconds) ||
++      !Number.isSafeInteger(acquired.nanoseconds) || acquired.nanoseconds < 0 || acquired.nanoseconds >= 1_000_000_000) {
++    throw Object.assign(new Error('server profile: unsafe native scheduled CPU endpoint вне clock model'), { raw: acquired });
+   }
+-  const valueNs = (BigInt(usage.user) + BigInt(usage.system)) * 1000n;
+-  acquired.valueNs = String(valueNs);
++  const valueNs = BigInt(acquired.seconds) * 1_000_000_000n + BigInt(acquired.nanoseconds);
++  if (acquired.valueNs !== String(valueNs)) throw Object.assign(new Error('server profile: native CPU value не пересчитывается из sec/nsec'), { raw: acquired });
+   return valueNs;
+ }
+ 
++function sampleCpuClock(raw) {
++  const endpoint = raw[0]?.raw?.cpuReads?.[0];
++  return { clock: endpoint?.clock, pid: endpoint?.pid, tid: endpoint?.tid };
++}
++
+ export async function measureServerEngine(animate, scene, workMultiplier = 1) {
+   if (scene.workload === 'stock-c') return measureServerStockC(animate, scene, workMultiplier);
+   const raw = [];
+@@ -186,6 +197,7 @@ export async function measureServerEngine(animate, scene, workMultiplier = 1) {
+       meanFrameNs: aggregate((sample) => sample.frameNs.reduce((a, b) => a + b, 0) / sample.frameNs.length),
+       cancelDrainNs: aggregate((sample) => sample.cancelDrainNs), semantic: raw.every((sample) => sample.semantic.valid),
+       repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
++      cpuClock: sampleCpuClock(raw),
+       contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; timing использует только CPU текущего потока' },
+       allocationObservation: { before, after: process.memoryUsage(), scope: 'пакет + независимый oracle + harness; allocator/GC не разложены' }, raw };
+     validateServerEngineSample(sampleResult, scene, workMultiplier);
+@@ -242,6 +254,7 @@ export async function measureServerStockC(MotionValue, scene, workMultiplier = 1
+     sampleResult = { operationNs: raw.reduce((sum, result) => sum + result.operationNs, 0) / SERVER_PROFILE.repetitions,
+       semantic: true, repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
+       cpuScope: SERVER_PROFILE.stockCpuScope, warmup, raw,
++      cpuClock: sampleCpuClock(raw),
+       contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; CPU только текущего потока' },
+       allocationObservation: { before, after: process.memoryUsage(), scope: 'whole macro + recorder + oracle + harness; retained отдельно' } };
+     validateServerEngineSample(sampleResult, scene, workMultiplier);
+@@ -476,9 +489,10 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
+   const artifact = { schema: 1, protocol: SERVER_PROFILE, registration: null, registrationDigest: null,
+     verdict: 'UNPROVEN', failures: [], warmup: [], gc: [], stages: [],
+     jitObservation: { status: 'UNPROVEN', reason: 'GC events наблюдаются; точная JIT attribution требует отдельного intrusive trace и не подменяется гипотезой' } };
+-  let browser, origin, observer;
++  let browser, origin, observer, engineClock;
+   let prepared = {}, roots = {}, harness = {}, packages = {};
+   const verify = () => {
++    engineClock?.assertUnchanged();
+     if (artifact.registration) {
+       const current = captureServerLoad(), registered = artifact.registration.machine.identity;
+       if (current.affinity !== registered.affinity || current.cpuMax !== registered.cgroupCpuMax) {
+@@ -501,6 +515,8 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
+     if (browserName !== SERVER_PROFILE.clockError.browser) throw new Error('server profile: clock model этого browser пока UNPROVEN');
+     roots = { baseline: realpathSync(baseline), candidate: realpathSync(candidate) };
+     if (roots.baseline === roots.candidate) throw new Error('server profile: baseline/candidate требуют разных checkout');
++    engineClock = prepareServerThreadCpuClock({ directory: out });
++    artifact.engineClockPreparation = engineClock.metadata;
+     const machine = captureServerMachine();
+     const esbuild = requireBench('esbuild'); const playwright = requireBench('playwright');
+     const browserType = playwright[browserName];
+@@ -530,7 +546,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
+       candidateSamplesObservedScope: SERVER_PROFILE.candidateSamplesObservedScope,
+       clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError),
+       registeredAt: new Date().toISOString(), browser: browserName, browserVersion: browser.version(), browserExecutableSha256, browserTree,
+-      machine, provenance: prepared, packages, transitivePackages: Object.fromEntries(closure), harness,
++      machine, engineClock: engineClock.metadata, provenance: prepared, packages, transitivePackages: Object.fromEntries(closure), harness,
+       allocationScope: 'observational heap + GC; retained отдельным процессом после timing' };
+     verifyServerClockRegistration(artifact.registration);
+     artifact.registrationDigest = serverProfileDigest(artifact.registration);
+@@ -588,15 +604,15 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
+     };
+     artifact.warmup = await runStage('warmup', SERVER_PROFILE.warmupRuns);
+     artifact.pilot = await runStage('pilot', SERVER_PROFILE.pilotRuns);
+-    artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot'));
++    artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock));
+     artifact.frozenPlanDigest = serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan });
+     journal('N-frozen-before-calibration-and-AB', { samplePlan: artifact.samplePlan, digest: artifact.frozenPlanDigest });
+     // При N выше ресурсного предела A/A и 2×work всё равно сохраняются как
+     // диагностика. Admission останется UNPROVEN из-за недостаточной мощности.
+     artifact.aa = await runStage('aa', artifact.samplePlan.runs);
+     artifact.positive = await runStage('positive', artifact.samplePlan.runs);
+-    const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, artifact.samplePlan.runs, 'aa'));
+-    const positiveControl = serverFamilyIntervals(serverCellPairs(artifact.positive, artifact.samplePlan.runs, 'positive'));
++    const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, artifact.samplePlan.runs, 'aa', artifact.registration.engineClock));
++    const positiveControl = serverFamilyIntervals(serverCellPairs(artifact.positive, artifact.samplePlan.runs, 'positive', artifact.registration.engineClock));
+     const calibrated = serverCalibrationVerdict(aa, positiveControl, artifact.samplePlan);
+     calibrated.reasons.push(...serverResourceReasons([artifact.warmup, artifact.pilot, artifact.aa, artifact.positive], artifact.registration.machine.identity));
+     calibrated.verdict = calibrated.reasons.length ? 'UNPROVEN' : 'PASS';
+@@ -608,7 +624,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
+     artifact.rawControls.candidate = await measureBrowserRawControls(browser, origin, adapters.candidate, out, 'candidate');
+     journal('raw-controls-candidate-after-calibration', artifact.rawControls.candidate);
+     artifact.ab = await runStage('ab', artifact.samplePlan.runs);
+-    artifact.comparison = serverFamilyIntervals(serverCellPairs(artifact.ab, artifact.samplePlan.runs, 'ab'));
++    artifact.comparison = serverFamilyIntervals(serverCellPairs(artifact.ab, artifact.samplePlan.runs, 'ab', artifact.registration.engineClock));
+     const abResourceReasons = serverResourceReasons([artifact.ab], artifact.registration.machine.identity);
+     if (abResourceReasons.length) throw new Error(`server profile: условия A/B нарушены: ${abResourceReasons.join('; ')}`);
+     artifact.comparators = [];
+diff --git a/bench/profile/server-thread-cpu-clock.c b/bench/profile/server-thread-cpu-clock.c
+new file mode 100644
+index 00000000..8a6aa76e
+--- /dev/null
++++ b/bench/profile/server-thread-cpu-clock.c
+@@ -0,0 +1,78 @@
++#define _GNU_SOURCE
++#include "node_api.h"
++#include <errno.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <string.h>
++#include <sys/syscall.h>
++#include <time.h>
++#include <unistd.h>
++
++/* Частный getter стенда: счётчик scheduler текущего Linux-потока.
++ * CLOCK_THREAD_CPUTIME_ID обновляет pending runtime, в отличие от stale
++ * RUSAGE_THREAD на CPU без active vtime. Номинальный clock_getres не
++ * является сертификатом физической точности. Getter overhead не вычитается. */
++static napi_value fail(napi_env env, const char *code, const char *message) {
++  napi_throw_error(env, code, message);
++  return NULL;
++}
++
++static int field(napi_env env, napi_value object, const char *name, napi_value value) {
++  return napi_set_named_property(env, object, name, value) == napi_ok;
++}
++
++static int integer_field(napi_env env, napi_value object, const char *name, int64_t number) {
++  napi_value value;
++  return napi_create_int64(env, number, &value) == napi_ok && field(env, object, name, value);
++}
++
++static int string_field(napi_env env, napi_value object, const char *name, const char *text) {
++  napi_value value;
++  return napi_create_string_utf8(env, text, NAPI_AUTO_LENGTH, &value) == napi_ok && field(env, object, name, value);
++}
++
++static napi_value read_thread_cpu(napi_env env, napi_callback_info info) {
++  (void)info;
++  const pid_t pid = getpid();
++  const long tid = syscall(SYS_gettid);
++  struct timespec value;
++  if (pid <= 0 || tid <= 0) return fail(env, "CLOCK_IDENTITY", "Недопустимый PID/TID CPU getter");
++  if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &value) != 0) return fail(env, "CLOCK_READ", strerror(errno));
++  if (value.tv_sec < 0 || value.tv_nsec < 0 || value.tv_nsec >= 1000000000L) return fail(env, "CLOCK_VALUE", "Недопустимый timespec CPU getter");
++  char seconds[32];
++  if (snprintf(seconds, sizeof(seconds), "%lld", (long long)value.tv_sec) <= 0) return fail(env, "CLOCK_VALUE", "Не удалось записать секунды CPU getter");
++  napi_value result;
++  if (napi_create_object(env, &result) != napi_ok ||
++      !string_field(env, result, "seconds", seconds) ||
++      !integer_field(env, result, "nanoseconds", value.tv_nsec) ||
++      !integer_field(env, result, "pid", pid) || !integer_field(env, result, "tid", tid)) {
++    return fail(env, "CLOCK_NAPI", "Не удалось сохранить acquired CPU endpoint");
++  }
++  return result;
++}
++
++static napi_value clock_info(napi_env env, napi_callback_info info) {
++  (void)info;
++  struct timespec resolution;
++  if (clock_getres(CLOCK_THREAD_CPUTIME_ID, &resolution) != 0) return fail(env, "CLOCK_RESOLUTION", strerror(errno));
++  if (resolution.tv_sec < 0 || resolution.tv_nsec < 0 || resolution.tv_nsec >= 1000000000L ||
++      (resolution.tv_sec == 0 && resolution.tv_nsec == 0)) return fail(env, "CLOCK_RESOLUTION", "Недопустимое номинальное clock_getres");
++  char nominal[40];
++  const uint64_t value = (uint64_t)resolution.tv_sec * UINT64_C(1000000000) + (uint64_t)resolution.tv_nsec;
++  if (snprintf(nominal, sizeof(nominal), "%llu", (unsigned long long)value) <= 0) return fail(env, "CLOCK_RESOLUTION", "Не удалось записать номинальное clock_getres");
++  napi_value result;
++  if (napi_create_object(env, &result) != napi_ok ||
++      !integer_field(env, result, "pid", getpid()) || !integer_field(env, result, "tid", syscall(SYS_gettid)) ||
++      !string_field(env, result, "nominalResolutionNs", nominal)) return fail(env, "CLOCK_NAPI", "Не удалось сохранить CPU clock identity");
++  return result;
++}
++
++NAPI_MODULE_INIT() {
++  napi_value read, info;
++  if (napi_create_function(env, "read", NAPI_AUTO_LENGTH, read_thread_cpu, NULL, &read) != napi_ok ||
++      napi_create_function(env, "info", NAPI_AUTO_LENGTH, clock_info, NULL, &info) != napi_ok ||
++      !field(env, exports, "read", read) || !field(env, exports, "info", info)) {
++    return fail(env, "CLOCK_NAPI", "Не удалось инициализировать частный CPU getter");
++  }
++  return exports;
++}
+diff --git a/bench/profile/server-thread-cpu-clock.mjs b/bench/profile/server-thread-cpu-clock.mjs
+new file mode 100644
+index 00000000..7057fd7f
+--- /dev/null
++++ b/bench/profile/server-thread-cpu-clock.mjs
+@@ -0,0 +1,121 @@
++/** Частный CPU clock владельца server-profile; пакет библиотеки его не включает. */
++import { execFileSync } from 'node:child_process';
++import { createRequire } from 'node:module';
++import { accessSync, constants, existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
++import path from 'node:path';
++import { fileURLToPath } from 'node:url';
++import { isMainThread } from 'node:worker_threads';
++import { isDeepStrictEqual } from 'node:util';
++import { sha256File } from '../compare/provenance.mjs';
++import { SERVER_PROFILE, serverProfileDigest } from './server-profile-registration.mjs';
++
++const ROOT = fileURLToPath(new URL('../..', import.meta.url));
++const CLOCK = 'CLOCK_THREAD_CPUTIME_ID';
++const SOURCE_FILES = [
++  'bench/profile/server-thread-cpu-clock.c',
++  'bench/profile/native-clock/include/js_native_api.h',
++  'bench/profile/native-clock/include/js_native_api_types.h',
++  'bench/profile/native-clock/include/node_api.h',
++  'bench/profile/native-clock/include/node_api_types.h',
++];
++const FLAGS = ['-std=c11', '-O2', '-Wall', '-Wextra', '-Werror', '-shared', '-fPIC', '-fvisibility=hidden', '-DNAPI_VERSION=8'];
++let prepared;
++
++function refuse(message, raw) {
++  return Object.assign(new Error(`server CPU clock: ${message}`), { raw });
++}
++
++function sourceHashes() {
++  return Object.fromEntries(SOURCE_FILES.map((name) => [name, sha256File(path.join(ROOT, name))]).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
++}
++
++function compilerPath() {
++  for (const directory of (process.env.PATH ?? '').split(path.delimiter)) {
++    if (!directory) continue;
++    const file = path.join(directory, 'cc');
++    try { accessSync(file, constants.X_OK); return realpathSync(file); } catch { /* Следующий конкретный PATH entry. */ }
++  }
++  throw refuse('нет C compiler для частного getter', { path: process.env.PATH });
++}
++
++function libcPath() {
++  const lines = readFileSync('/proc/self/maps', 'utf8').split('\n');
++  const names = new Set(lines.flatMap((line) => {
++    const match = /\s(\/[^\n]*\/libc\.so\.6)$/.exec(line);
++    return match ? [realpathSync(match[1])] : [];
++  }));
++  if (names.size !== 1) throw refuse('не удалось связать одну фактическую libc', { libraries: [...names] });
++  return [...names][0];
++}
++
++/** Подготавливает бинарный getter до регистрации и любых SUT samples. */
++export function prepareServerThreadCpuClock({ directory }) {
++  if (prepared) throw refuse('getter уже подготовлен; повторная registration в том же процессе запрещена');
++  if (process.platform !== 'linux' || process.arch !== 'x64' || !isMainThread || process.version !== SERVER_PROFILE.clockError.nodeVersion) {
++    throw refuse('нужны зарегистрированные Linux x64/main-thread/Node', { platform: process.platform, arch: process.arch, isMainThread, node: process.version });
++  }
++  const nativeSources = sourceHashes();
++  if (!isDeepStrictEqual(nativeSources, SERVER_PROFILE.clockError.nativeSourceFiles)) {
++    throw refuse('native source/header bytes не совпадают с clock model', { observed: nativeSources, registered: SERVER_PROFILE.clockError.nativeSourceFiles });
++  }
++  const nativeDirectory = path.join(directory, 'native-clock');
++  mkdirSync(nativeDirectory, { recursive: true });
++  const binary = path.join(nativeDirectory, 'thread-cpu-clock.node');
++  if (existsSync(binary)) throw refuse('native binary уже существует; stale/replay запрещён', { binary });
++  const compiler = compilerPath();
++  const compilerVersion = execFileSync(compiler, ['--version'], { encoding: 'utf8', timeout: 10_000 }).trim();
++  const binarySha256 = sha256File(compiler);
++  const flags = [...FLAGS, '-I', path.join(ROOT, 'bench/profile/native-clock/include'), '-o', binary, path.join(ROOT, SOURCE_FILES[0])];
++  try { execFileSync(compiler, flags, { encoding: 'utf8', timeout: 30_000 }); } catch (error) {
++    throw refuse('сборка native getter отказала', { compiler, flags, status: error.status, signal: error.signal,
++      stdout: error.stdout?.toString(), stderr: error.stderr?.toString() });
++  }
++  const native = createRequire(import.meta.url)(binary);
++  if (typeof native.read !== 'function' || typeof native.info !== 'function') throw refuse('native getter не содержит зарегистрированный ABI');
++  const info = native.info();
++  if (!Number.isSafeInteger(info.pid) || info.pid !== process.pid || info.tid !== info.pid || !/^[1-9]\d*$/.test(info.nominalResolutionNs)) {
++    throw refuse('native getter не связан с текущим main thread', info);
++  }
++  const libc = libcPath();
++  const metadata = { schema: 1, clock: CLOCK, pid: info.pid, tid: info.tid, napiVersion: 8,
++    node: { version: process.version, executableSha256: sha256File(process.execPath) },
++    nativeBinary: { path: binary, bytes: readFileSync(binary).length, sha256: sha256File(binary) },
++    nativeSources, nativeSourceDigest: serverProfileDigest(nativeSources),
++    compiler: { path: compiler, version: compilerVersion, binarySha256, flags },
++    libc: { path: libc, sha256: sha256File(libc) }, nominalResolutionNs: info.nominalResolutionNs,
++    nominalResolutionIsNotErrorCertificate: true };
++  const binaryRead = native.read;
++  let previous;
++  const read = () => {
++    const acquired = binaryRead();
++    const raw = { clock: CLOCK, pid: acquired.pid, tid: acquired.tid, seconds: acquired.seconds,
++      nanoseconds: acquired.nanoseconds, valueNs: null };
++    if (!isMainThread || raw.pid !== process.pid || raw.pid !== metadata.pid || raw.tid !== metadata.tid ||
++        typeof raw.seconds !== 'string' || !/^(0|[1-9]\d*)$/.test(raw.seconds) ||
++        !Number.isSafeInteger(raw.nanoseconds) || raw.nanoseconds < 0 || raw.nanoseconds >= 1_000_000_000) {
++      throw refuse('недопустимый actual native endpoint/worker/fork', raw);
++    }
++    const value = BigInt(raw.seconds) * 1_000_000_000n + BigInt(raw.nanoseconds);
++    raw.valueNs = String(value);
++    if (previous !== undefined && value < previous) throw refuse('native CPU counter пошёл назад', { acquired: raw, previous: String(previous) });
++    previous = value;
++    return raw;
++  };
++  const assertUnchanged = () => {
++    const currentSources = sourceHashes();
++    if (!isMainThread || process.pid !== metadata.pid ||
++        serverProfileDigest(currentSources) !== metadata.nativeSourceDigest ||
++        sha256File(binary) !== metadata.nativeBinary.sha256 || sha256File(compiler) !== metadata.compiler.binarySha256 ||
++        sha256File(libc) !== metadata.libc.sha256 || sha256File(process.execPath) !== metadata.node.executableSha256) {
++      throw refuse('native getter/source/compiler/libc/runtime identity изменились', { metadata });
++    }
++  };
++  prepared = { metadata, read, assertUnchanged };
++  return { metadata, assertUnchanged };
++}
++
++/** Pure import не требует compiler/native binary; actual read без подготовки запрещён. */
++export function readServerThreadCpuEndpoint() {
++  if (!prepared) throw refuse('actual getter не подготовлен до регистрации');
++  return prepared.read();
++}
+diff --git a/docs/server-profile.md b/docs/server-profile.md
+index b114d51d..ec693900 100644
+--- a/docs/server-profile.md
++++ b/docs/server-profile.md
+@@ -1,19 +1,19 @@
+ # Серверная клетка PROFILE-01
+ 
+-Профиль даёт воспроизводимое измерение CPU потока Node и публичного API браузера
+-на закреплённом Linux-сервере. Он дополняет существующий `bench/compare`, использует
+-его production-адаптеры, изолированный origin, provenance и парные порядки.
+-Физические Android/iOS, энергия, GPU и экран 60/120 Гц остаются `UNPROVEN`.
++Роль: справка (Diátaxis).
+ 
+-## Запуск
++Профиль измеряет сообщённое Linux время исполнения потока Node и стоимость
++публичного API браузера. Он использует существующие владельцы `bench/compare`.
++Физические Android/iOS, экран60/120Гц, GPU и энергия остаются `UNPROVEN`.
+ 
+-Нужны закреплённые Node 24.19.0, Linux 6.18.44, Chromium 149.0.7827.55 и
+-фактический `pnpm@11.11.0` в `PATH`, зависимости root и `bench/compare` из
+-frozen lock. SHA256 executable входят в зарегистрированную clock model.
+-Иная версия или binary дают отказ до samples. Clock model Firefox/WebKit здесь
+-`UNPROVEN`; функциональные проверки этих движков независимы. Baseline — clean checkout
+-`0b6f537e148b7dadadfb9e3ce7c446d014975958`; candidate также должен быть clean.
+-Хост на время pilot, A/A, positive и A/B освобождается от параллельных suites.
++## Подготовка и запуск
++
++Нужны Linux6.18.44/x64, Node24.19.0, Chromium149.0.7827.55 и `pnpm@11.11.0`
++первым в `PATH`, зависимости root и `bench/compare` из frozen lock, C11 compiler
++и Linux libc. Binary и source hashes проверяются до samples. Firefox/WebKit
++здесь не имеют зарегистрированной clock model; их функциональные проверки отдельны.
++Baseline — clean `0b6f537e148b7dadadfb9e3ce7c446d014975958`, candidate также clean.
++Во время pilot, A/A, positive и A/B на хосте не запускают параллельные suites.
+ 
+ ```sh
+ taskset -c 0 node bench/profile/server-profile-runner.mjs \
+@@ -21,241 +21,96 @@ taskset -c 0 node bench/profile/server-profile-runner.mjs \
+   --browser chromium --out /outside/checkout/server-chromium-registration-1
+ ```
+ 
+-Каталог результата должен отсутствовать. Заново использовать его нельзя.
+-Смена условий или метода требует новой регистрации с сохранением старого отказа;
+-повтор той же серии ради зелёного результата запрещён.
+-
+-Пакеты baseline, candidate и vendor dependency closure сначала упаковываются с
+-отключёнными publish scripts. Адаптеры и engine импортируют извлечённые consumer
+-архивы. В регистрацию до samples входят exact source SHA, package/lock inputs,
+-runtime, harness/adapter hashes, весь browser tree, toolchain, CPU affinity,
+-ядро ОС, лимиты cgroup, viewport/DPR и все знаменатели. Регистрируются три engine
+-сцены: 100 scalar live retarget, 1000 targets × 7 transform channels fresh и одна
+-whole-stock-C `MotionValue` cell через существующий `scripts/bench-support.mjs`.
+-Первые две используют `animate`, stock C импортирует `MotionValue` из actual packed
+-main entry. Одна stock C операция содержит constructor0, default bounded spring
+-{mass:1, stiffness:170, damping:26}, onChange, setTarget100, прежний synchronous
+-drain47, destroy и return100. Factory и две исходные warmup batches по2000 операций
+-находятся вне CPU. Затем восемь зарегистрированных reps содержат2000 actual calls
+-каждая; positive содержит4000, но divisor остаётся2000. Сохраняются последние
+-значения и frame counts каждой операции; mean47 или checksum100 не являются oracle.
+-Preallocated stores и `getFrameCount` внутри CPU одинаковы обеим ролям; RLE и
+-проверка outcomes идут после CPU. Это whole macro с минимальным recorder overhead,
+-без per-frame p99 или100-channel заявления. Две legacy engine сцены не упрощаются.
+-
+-Новая stock C регистрация возникла после exploratory штатного wall benchmark:
+-1 октября 14:53/14:54 UTC опубликованные baseline median7.2k ns и candidate8.3k ns уже известны.
+-Это причина включить ранее непокрытый default bounded hot loop, не registered CPU
+-приёмка. Оба исходных stdout/command/execution сохранены, а SHA stdout и helper
+-semantic receipt закреплены в `exploratoryPrehistory`. `candidateSamplesObserved:false`
+-относится только к моменту регистрации текущего CPU/API protocol epoch; оно не
+-утверждает, что candidate раньше вообще не наблюдался. Новые N и CI выводятся до
+-candidate CPU data из baseline-only pilot; порог1.05, MDE5% и power0.8 неизменны.
+-Browser S2/S3 измеряют start/cancel общего transform API; они не доказывают
+-семантику reorder/list или две продуктовые семьи M-05. Длительность этого нового
+-узкого API-профиля — 128 мс, 100/200 targets, stagger 0/5 мс. Его числа не
+-подменяют прежние canonical 1200 мс или их guards; стоимость генерации артефакта
+-может зависеть от duration. Все участники получают одинаковые параметры.
+-
+-Перед timing существующий `runSemanticStartCheck` снимает три промежуточных CSS
+-матрицы одного нормального вызова с теми же targets/duration/stagger/to и
+-проверяет всю топологию через общий oracle. Серверная registration дополнительно
+-требует fresh0→300: перед каждым API start наблюдаются CSS координаты всех
+-fresh targets, сразу после возврата — те же targets; обе границы каждого окна
+-и acquired prefixes сохраняются даже при отказе. До API все позиции должны
+-соответствовать0 в прежнем CSS допуске. Общая фаза не может отрабатывать distance
+-до document publication clock, наблюдаемого при API start, с учётом clock/CSS errors. Поэтому мгновенный
+-скачок0→75px с последующим tween225px/96мс не подменяет полный300px/128мс.
+-Сразу после onset вызывается один rAF существующего владельца: сохраняются
+-его timestamp, полное CSS окно и document clock первой публикации всех targets.
+-Она обязана сохранять fresh0 в прежнем0,5px допуске; acquired zero frame связывает
+-нижнюю границу общей фазы. Старый document clock и поздний slope сами по себе
+-не различают первый quarter jump. Если первая публикация уже ненулевая,
+-неполна или не разрешает этот origin — отказ, без подбора phase margin.
+-Та же фаза связывает первую публикацию с тремя прежними checkpoints;
+-дополнительное наблюдение находится за границами timed API costs.
+-Канонические1200мс сохраняют прежний относительный phase oracle; дополнительный
+-контроль свежего начала относится к явно зарегистрированному серверному control.
+-Каждая onset/checkpoint группа сохраняет обе границы CSS read window и
+-document timeline до/после чтения; checkpoint также сохраняет actual rAF timestamp.
+-В Chromium149 PageAnimator закрепляет document AnimationClock на кадре;
+-AnimationClock сохраняет его в одном rendering/task; CSS recalc использует
+-этот clock для animation timing. Каждая группа обязана наблюдать одно и то же
+-значение document clock до/после CSS, согласованное с perf chronology, а в
+-checkpoint — также с rAF. Сразу после API CSS может сохранять публикацию
+-предшествующего кадра: wall chronology доказывает порядок API/чтений, а
+-phase constraint этой позиции использует приобретённый clock публикации.
+-Иначе ноль, который ещё не обновился в первом кадре, ошибочно требует новую
+-фазу от времени исполнения getter. Document clock до/после синхронного API
+-в одном task обязан совпадать; с ним связан origin свежего движения. Timestamp
+-первого rAF может предшествовать wall времени API, когда callback исполняется
+-позже начала кадра. Числа этих двух domains не подменяют друг друга.
+-Perf interval сокращает общий origin; сопоставление document frame с API perf
+-включает три coarsened timestamps: frame, now и origin. Его semantic envelope
+-выводится как округлённые вверх 1,5 прежнего двухточечного clock envelope,
+-включая консервативные девять ULP. API-cost bounds сохраняют прежнюю формулу.
+-Нет clock qualification, значение изменилось или clocks противоречат друг другу — отказ.
+-Все позиции связывает одна фаза
+-линейного движения с зарегистрированной duration; нулевые и завершённые позиции
+-дают односторонние ограничения той же фазы. Для каждого S2 target, а в S3 для
+-leading target, нужна разрешающая пара промежуточных наблюдений: весь диапазон
+-возможного перемещения между наблюдаемыми стабильными document frames обязан лежать внутри наблюдаемой
+-разности координат ± прежние 2 × 0,5 px. Пересечения широких диапазонов
+-недостаточно. Общая постоянная фаза сокращается; прежняя stagger topology также
+-проверяется. Controls различают duration 64/128/256 мс и нелинейную форму; три
+-конечных checkpoints не доказывают все возможные функции между наблюдениями.
+-S2 checkpoints назначаются на 0,25/0,5/0,625 duration, S3 — на 0,2/0,5/0,8
+-меньшего из duration и delay span. Поздний завершённый checkpoint допускается
+-после разрешающей пары. Единственная промежуточная позиция, насыщение всех
+-checkpoints или широкие окна, не разрешившие скорость, дают UNPROVEN/отказ,
+-включая случаи здорового движения. Допуск не расширяется из-за неопределённости.
+-Время исполнения CSS getter сохраняется как chronology и не выдаётся за
+-продвижение опубликованного состояния кадра. Этот oracle проверяет видимое CSS;
+-он не приписывает JS API внутренний native clock или GPU выполнение. Канонические
+-1200мс сохраняют прежний oracle по perf/read окнам. Endpoint300 без промежуточного
+-движения не принимается. Каждая timed серия содержит восемь batches:
+-32 настоящих вызова под одной парой clock reads для start и другой для cancel.
+-Positive выполняет 64 вызова; знаменатель остаётся 32. DOM allocation и наблюдения
+-находятся за границами этих интервалов; стоимость цикла и управления owners
+-включена. После start сохраняются первые targets всех owners до отмены: окно
+-чтения обязано предшествовать линейному endpoint с учётом clock uncertainty.
+-Позиции ограничены displacement от свежего нуля за верхнюю границу этого
+-сохранённого clock интервала и прежним CSS допуском. Это обнаруживает также
+-stateful snap и начальный скачок в timed path. Полный normal-motion trace
+-относится к отдельному контрольному вызову; конечный набор controls не доказывает
+-все возможные stateful поведения. После cancel наблюдаются все 32/64 группы.
+-
+-## Разрешимость и допуск
+-
+-Baseline-only pilot содержит восемь runs. Единственной независимой единицей
+-является блок двух противоположных порядков; восемь внутренних повторов и кадры
+-не увеличивают число независимых наблюдений. До калибровки сохраняется N из
+-парного log-contrast, MDE 5% и мощности 0,8. Tail заранее задаёт минимум 292 runs
+-(146 независимых блоков). При N выше ресурсного предела 1024
+-диагностические controls сохраняются, а admission остаётся `UNPROVEN`.
+-Эта приближённая формула планирует средний контраст и не обещает мощности tail.
+-
+-Одна A/A серия того же build должна удержать двустороннюю полосу
+-`1/1.05…1.05`; deliberate 2×actual work должен дать нижнюю границу p50 >1,5.
+-Порядковые интервалы строятся из средних двух runs каждого блока. p50/p95 относятся
+-к распределению этой средней стоимости блока, а не кадров или отдельных API-вызовов.
+-Точная биномиальная масса считается в BigInt для q=1/2,19/20. Bonferroni по
+-11 клеткам × 2 квантилям × 2 участникам × 2 tails даёт alpha каждого tail=1/1760.
+-При145 блоках upper p95 ещё не ограничен;146 — первый допустимый размер.
+-Семейное 95% покрытие условно на независимые одинаково распределённые блоки
+-закреплённой клетки. Protected p95 upper остаётся ≤1,05.
+-Негодная calibration сохраняет `UNPROVEN` и не запускает A/B.
+-
+-До/после каждого парного блока сохраняются настоящие affinity, cpu.max, loadavg,
+-cpu.stat и его DELTA. Cumulative историческое throttling не считается текущим.
+-Изменение affinity/quota или ненулевая delta nr_throttled/throttled_usec запрещает
+-admission. Каждый snapshot сравнивается с identity зарегистрированной machine,
+-в том числе при стабильной смене CPU/quota между блоками; final provenance также
+-проверяет эти условия. Все samples сохраняются, post-hoc удаления и добора нет. Пять разрешённых
+-CPU не означают пять доступных полных ядер при cgroup quota четырёх CPU.
+-
+-Engine clock — `process.threadCpuUsage`: user+system CPU текущего потока,
+-с отдельными start/retarget, средним frame и cancel/drain. В timing остаются
+-микрозадачи исполнителя; самостоятельная проверка oracle находится за границей
+-этих интервалов. Переключения потоков и ожидание не выдаются за engine CPU.
+-Browser clock — изолированный realm-local `performance.now`; возвращаемые
+-интервалы — elapsed API, они включают вмешательство scheduler/GC. Холодный import,
+-warm start, endpoint и cancel сохраняются раздельно. После normal-motion control
+-следующий endpoint-вызов называется `control`, а не холодным start.
+-
+-Observed quantum из before/after probes является control, а не доказательством
+-погрешности. В pinned Chromium isolated TimeClamper округляет как вверх, так и
+-вниз в пределах 5us; Linux TimeTicks сначала отбрасывает меньше 1us. Интервал
+-получает консервативную погрешность двух endpoints `2×(5+1)=12us`. В raw остаются
+-обе timestamp reads, а не только их разность. Дополнительно учитываются
+-binary64 conversions(now/origin), обе subtraction для reads и subtraction
+-интервала. Общий Linux CLOCK_MONOTONIC upper bound снимается Node hrtime после
+-browser reads; counters≥2^42ms и несовместимые readings запрещены. Модель
+-предполагает общий monotonic clock без namespace/clock overrides и соответствие
+-закреплённых binaries приведённому upstream source.
+-
+-Linux `getrusage(RUSAGE_THREAD)` отбрасывает дробную microsecond отдельно для
+-user/system; ошибка разности их суммы ограничена 2us. Node поля должны быть safe
+-integers и переводятся в BigInt по отдельности. Эти engine интервалы, включая
+-каждый frame, получают pointwise bounds. Browser interval делится только на
+-base 32. Усреднение repeats/runs не уменьшает worst-case clock error как
+-независимый noise: наружное округление распространяется через все суммы,
+-деления, средние блока и ratios. Exact order-statistics owner берёт lower ranks
+-из pointwise lower observations, upper ranks из upper observations. Нулевой
+-lower bound не даёт ограниченного ratio. A/A, 2×work и NI используют уже эти
+-границы; при недостаточном разрешении остаётся честный отказ. p95 относится к
+-распределению средней цены двух runs, каждый из восьми batches/32, а не
+-индивидуальному вызову, frame p99 или FPS.
+-
+-Первичные clock sources с версиями и SHA256 закреплены в
+-`SERVER_PROFILE.clockError.sources`: Chromium149 `time_clamper.{cc,h}`,
+-`performance.cc`, `time_now_posix.cc`; Node24.19 `node_process_methods.cc` и
+-vendored libuv; Linux6.18.44 `kernel/sys.c`, `kernel/time/time.c`.
+-
+-После каждого browser cancel attached targets остаются в DOM для самостоятельной
+-проверки: нет WAAPI и transform каждого target неизменен два последующих rAF.
+-`cancelMs` измеряет синхронный API; `cancelDrainMs` сохраняет наблюдаемый elapsed
+-до этого checkpoint, включая два rAF, DOM oracle и harness callback. Он не
+-приписывается чистому CPU пакета. Успешный return без этой неподвижности даёт отказ.
+-Нормализованные existing adapters уже ловят vendor cancel exceptions. Профиль
+-сохраняет ошибки measurement и наблюдаемое нарушение семантики; он не может
+-восстановить уже swallowed underlying exceptions или доказать отсутствие эффекта
+-после более долгого незарегистрированного окна.
+-
+-Heap/GC — наблюдения пакета, oracle и harness, без ложной точной атрибуции.
+-Forced GC применяется только после timing в отдельном retention-процессе.
+-Перед обоими heap snapshots процесс завершает текущий host turn через
+-`setImmediate`, затем выполняет два GC: один Promise checkpoint в pinned Node
+-сохраняет temporary WeakRef keepalive и не доказывает retained heap. Actual packed
+-stock C control сохранил все 64 полезных исхода 47 frames/endpoint 100; у candidate
+-64 targets были живы в том же job и 0 после host turn. Это уточнение границы
+-наблюдения, а не точная атрибуция памяти или стоимость GC внутри CPU interval.
+-Отрицательные retained heap delta сохраняются; отношения с нулевым/отрицательным
+-знаменателем не вычисляются. Статические byte и численные guards принадлежат
+-прежним владельцам и этим профилем не ослабляются.
+-
+-## Проверка и хранение результата
+-
+-Все warmup/pilot/control/A/B samples, ошибки и частичные отказы сохраняются в
+-`journal.ndjson` с цепью digest; итог — `server-profile.json` и внешний
+-`server-profile.sha256`. Журнал проверяет фактический порядок регистрации,
+-замораживания N, завершения controls, фактического порядка и допуска A/B. Имя
+-positive привязано к владельцу artifact, одиночная работа не заменяет 2×work.
+-Failure union и финальный digest связываются с журналом. Успешный engine raw
+-хранит все 16 clock endpoints вместе с actual user/system полями, ordered
+-scheduler times и lossless target CSS/write traces. Существующий lifecycle owner
+-пересчитывает интервалы из BigInt endpoints, координаты из independent linear
+-oracle и trace hashes из сохранённых строк. Микросекундные user/system fields
+-связываются с каждым endpoint по sequence; невозможный ns interval не допускается.
+-Engine failure хранит точный приобретённый prefix тех же данных, все
+-operation/frame интервалы, открытую границу cancel, семантику до и после cleanup
+-и original causes. Browser failure сохраняет
+-acquired batch clocks, начатых/отменённых owners и partial semantic checkpoints;
+-нечисловые приобретённые значения отмечаются явно. Cleanup failure не заменяет
+-первую ошибку. Итоговые метрики пересчитываются из raw; пропущенный
+-участник, смена знаменателя, invalid oracle или clock evidence отвергаются.
+-Одинаковые target trace hashes упаковываются lossless как count+hash; расширенная
+-длина обязана совпадать с числом targets сцены. То же lossless count+value применяется
+-к одинаковым CSS координатам cancel witness. Остальные координаты и normal-motion
+-позиции сохраняются lossless RLE; expanded длина каждой группы проверяется до
+-прежнего semantic oracle. Timing samples не сокращаются. Итоговый compact JSON
+-пишется по элементам массивов с потоковым digest: полный raw не обязан помещаться
+-в одну строку V8. В верхних `rows` элемент содержит один run; элемент `comparators`
+-содержит всю серию своего comparator и должен целиком помещаться в строку V8.
+-Зарегистрированный формат проверен отдельным carrier-контролем при N = 1024;
+-он не даёт общей гарантии для произвольно больших элементов массива.
+-Журнал и внешний digest связывают точные записанные bytes.
+-Consumer также разбирает JSON по полным values и journal по records; общий
+-artifact или journal не преобразуется в одну строку V8. Native JSON.parse
+-сохраняет значения каждого chunk, Unicode/escapes и численное округление.
++Каталог результата должен отсутствовать. Повтор серии ради GREEN запрещён.
++Смена метода требует новой регистрации с сохранением старого raw и отказа.
++Пакеты baseline/candidate, comparators и их dependency closure сначала упаковываются;
++потребители используют actual tarballs, а не исходники или workspace imports.
++
++## Сцены и знаменатели
++
++Семейство содержит11 клеток: две legacy engine сцены ×3 метрики, stock C ×1,
++две browser сцены ×2. Полные параметры задаёт `SERVER_PROFILE` в
++[server-profile-registration.mjs](../bench/profile/server-profile-registration.mjs).
++
++| Сцена | Полезная работа | Знаменатель |
++| --- | --- | --- |
++| `scalar-live-100` |100 живых scalar retargets; start/frame/cancel-drain |8 повторов |
++| `transform-fresh-1000` |1000 свежих targets ×7 transform channels |8 повторов |
++| `motion-value-default-stock-c` |штатные constructor0/onChange/setTarget100/drain47/destroy/return100 |8 batches по2000 операций |
++| S2/S3 |start/cancel:100/200 targets, stagger0/5ms, duration128ms, endpoint300px |8 batches по32 вызова |
++
++Stock C использует main-entry `MotionValue`, прежнюю default bounded spring
++`{mass:1,stiffness:170,damping:26}` и существующий `scripts/bench-support.mjs`.
++Factory и две warmup batches по2000 находятся вне CPU. Каждая операция сохраняет
++свои47 frames и endpoint100; среднее47 или checksum100 не заменяет oracle.
++Positive делает4000 stock C операций или64 browser вызова; divisor остаётся2000/32.
++Recorder включён одинаково обеим ролям; RLE и oracle выполняются после CPU.
++Канонические1200ms guards независимы; S2/S3 не доказывают reorder/list и семьиM-05.
++
++## Регистрация и допуск
++
++До первого sample закрепляются source/package/toolchain/browser/harness identity,
++CPU affinity/quota, native getter, clocks, workload и правила остановки.
++Один baseline-only pilot планирует N до candidate samples. A/A и настоящая2×work
++проверяют разрешимость; A/B начинается только после PASS calibration.
++N292…1024 содержит146…512 независимых paired blocks противоположного порядка.
++p50/p95 относятся к среднему блока, а не отдельному вызову, frame p99 или FPS.
++Точные биномиальные интервалы используют family-wise95% и alpha-per-tail1/1760.
++Protected p95 upper≤1.05, MDE5%, power0.8, counts, seed и старые budgets сохраняются.
++Неразрешимость, ошибка или превышение ресурса дают `UNPROVEN`, без добора к GREEN.
++
++Resource controls снимают все6 safe counters `cpu.stat` и `cpu.max` до samples,
++затем до/после каждого блока. Affinity/quota связаны с зарегистрированной machine;
++throttling delta должна быть0. Исторические counters не принимаются за текущую delta.
++Ранее известный exploratory stock wall7.2k→8.3k ns указан в `exploratoryPrehistory`;
++`candidateSamplesObserved:false` относится только к текущему protocol epoch.
++
++## Часы и полезный исход
++
++Engine использует частный NAPI getter `CLOCK_THREAD_CPUTIME_ID`: Linux-reported
++scheduled-runtime main-thread. Сохраняются seconds строкой, nanoseconds∈[0,10^9),
++sequence, PID/TID и valueNs. Потребитель заново выводит `seconds*10^9+nanoseconds`
++через BigInt, сверяет clockReads, identity и отсутствие обратного счётчика.
++Native C/четыре официальных NAPI header, binary, Node, compiler/version/flags и libc
++регистрируются до работы. Pure import не требует compiler/native binary.
++
++Прежние2µs остаются консервативным наружным расширением reported counter;
++это не физическая точность и не вывод из nominal `clock_getres`.
++Getter overhead включён и не вычитается. Прежний RUSAGE/Node clock дал устаревший
++runtime на известной работе; его исходники, warmup plateaus и отказ сохранены.
++Актуальная Linux цепь — `cpu_clock_sample(CPUCLOCK_SCHED)`→`task_sched_runtime`;
++source pins находятся в `SERVER_PROFILE.clockError`.
++
++Browser использует isolated realm-local `performance.now`: elapsed API с scheduler/GC.
++Обе clock reads и binary64 погрешность входят в pointwise bounds до CI;
++усреднение не уменьшает worst-case clock envelope. DOM allocation вне start,
++start/retarget/frame/cancel-drain и heap наблюдаются в своих областях.
++Normal-motion control сохраняет fresh0→300 onset, первую CSS0 публикацию,
++три checkpoints, terminal и document/rAF/perf chronology. Неопределённое окно
++не доказывает правильную длительность. После cancel все attached targets
++неподвижны и без WAAPI два rAF. Swallowed vendor exceptions adapter не наблюдает.
++Подробные oracles принадлежат [methodology.mjs](../bench/compare/methodology.mjs)
++и [bench-transform-support.mjs](../scripts/bench-transform-support.mjs).
++
++## Результат и независимая проверка
++
++Каталог хранит `server-profile.json`, внешний `server-profile.sha256`,
++`journal.ndjson`, raw controls, packages, adapters и native qualification.
++Все samples и приобретённые failure prefixes сохраняются; нет pruning по исходу.
++Журнал связывает preregistration→N→calibration→A/B, порядок участников и failure union.
++Декодер поддерживает max-N carrier; lossless RLE/gzip не меняют расширенные данные.
+ 
+ ```sh
+ node bench/profile/server-profile-contract.mjs \
+   --raw /outside/checkout/server-chromium-registration-1/server-profile.json \
+-  --digest <sha256-из-независимой-квитанции> \
++  --digest '<64 hex из независимо сохранённого server-profile.sha256>' \
+   --journal /outside/checkout/server-chromium-registration-1/journal.ndjson
+ ```
+ 
+-Архив результата хранит JSON, журнал, consumer tarballs и собранные адаптеры.
+-Срок жизни временного CI artifact не считается durable retention. При сохранённом
+-отказе валидатор сообщает проверку отказа; это не admission и не product GO.
++Admission принадлежит [server-profile-contract.mjs](../bench/profile/server-profile-contract.mjs).
++Forced GC разрешён только отдельному retention child после timing: host turn через
++`setImmediate`, затем два GC у каждого heap snapshot; stock C делает2×2000 warmups
++и8×2000 проверенных операций. Отрицательные heap deltas сохраняются. Это наблюдение
++пакета/oracle/harness, не точная атрибуция утечки или стоимость GC внутри CPU.
++Исторические версии протокола и все FAIL epochs остаются в исходных архивах;
++новые результаты не распространяются на другой method/source/package tuple.
+diff --git a/test/server-profile-contract.test.ts b/test/server-profile-contract.test.ts
+index 33abf595..0a654395 100644
+--- a/test/server-profile-contract.test.ts
++++ b/test/server-profile-contract.test.ts
+@@ -7,12 +7,21 @@ import { createHash } from 'node:crypto';
+ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from '../bench/profile/server-profile-registration.mjs';
+ import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
+   compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
+-  parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
++  parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal,
++  verifyServerClockRegistration, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
+ import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
+ import { measureServerBrowser, measureServerEngine } from '../bench/profile/server-profile-runner.mjs';
++import * as threadCpuClock from '../bench/profile/server-thread-cpu-clock.mjs';
+ 
+ const hash = 'a'.repeat(64);
+ const clone = <T>(value: T): T => structuredClone(value);
++const syntheticCpuIdentity = { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 12345, tid: 12345 };
++function syntheticNativeEndpoint(ns: bigint, identity = syntheticCpuIdentity) {
++  return { ...identity, seconds: String(ns / 1_000_000_000n), nanoseconds: Number(ns % 1_000_000_000n), valueNs: String(ns) };
++}
++function nativeCpuEndpoint(read: any, identity = syntheticCpuIdentity) {
++  return { sequence: read.sequence, ...syntheticNativeEndpoint(BigInt(read.valueNs), identity) };
++}
+ function pairs(runs = SERVER_PROFILE.minRuns, ratio = 1) {
+   return serverMetricCells().map(({ id }) => ({ id, left: Array(runs).fill(100), right: Array(runs).fill(100 * ratio),
+     leftBounds: Array.from({ length: runs }, () => ({ low: 100, high: 100 })),
+@@ -35,7 +44,7 @@ function normalMotion(scene: any) {
+ }
+ 
+ // Независимые explicit linear vectors, не solver/formatter/expectedValues SUT.
+-function engineRaw(scene: any) {
++function engineRaw(scene: any, repetition = 0) {
+   const render = ([x, y, scaleX, scaleY, rotate, skewX, skewY]: number[]) =>
+     `translate(${x}px, ${y}px) scaleX(${scaleX}) scaleY(${scaleY}) rotate(${rotate}deg) skew(${skewX}deg, ${skewY}deg)`;
+   const live = scene.lifecycle === 'live';
+@@ -57,10 +66,10 @@ function engineRaw(scene: any) {
+   const clockReads = [{ metric: 'operationNs', frame: null }, ...offsets.map((_, frame) => ({ metric: 'frameNs', frame })),
+     { metric: 'cancelDrainNs', frame: null }].flatMap(({ metric, frame }, interval) => ['before', 'after'].map((edge, half) => ({
+       sequence: interval * 2 + half, metric, frame, edge,
+-      valueNs: String(10_000_000 + interval * 2_000_000 + (half ? metric === 'cancelDrainNs' ? 500_000 : 1_000_000 : 0)) })));
++      valueNs: String(10_000_000 + repetition * 100_000_000 + interval * 2_000_000 + (half ? metric === 'cancelDrainNs' ? 500_000 : 1_000_000 : 0)) })));
+   return { operationNs: 1_000_000, frameNs: Array(6).fill(1_000_000), cancelDrainNs: 500_000,
+     raw: { schemaVersion: 1, case: { count: scene.count, lifecycle: scene.lifecycle, channels: scene.channels }, clockReads,
+-      cpuReads: clockReads.map((read) => ({ sequence: read.sequence, userUs: Number(read.valueNs) / 1000, systemUs: 0, valueNs: read.valueNs })),
++      cpuReads: clockReads.map((read) => nativeCpuEndpoint(read)),
+       timeline: { clockOriginMs: 1_000_000, setupOffsetsMs: setupOffsets, frameOffsetsMs: offsets, successorBaseMs: base, steps },
+       targetTraces: { encoding: 'runs', count: scene.count, runs: [{ from: 0, count: scene.count,
+         trace: { value: values.at(-1), setup, setupWrites: setup.map(() => 1), values, writes: values.map(() => 1), outsideWrites: 0, events } }] } },
+@@ -69,13 +78,14 @@ function engineRaw(scene: any) {
+       targetTraceHashes: { encoding: 'repeat', count: scene.count, value: createHash('sha256').update(JSON.stringify(values)).digest('hex') } } };
+ }
+ 
+-function stockRaw(scene: any, multiplier = 1, timed = true) {
++function stockRaw(scene: any, multiplier = 1, timed = true, repetition = 0) {
+   const calls = scene.callsPerRepetition * multiplier;
+   const clockReads = timed ? ['before', 'after'].map((edge, sequence) => ({ sequence, metric: 'operationNs', frame: null, edge,
+-    valueNs: String(10_000_000 + sequence * scene.callsPerRepetition * multiplier * 1_000_000) })) : [];
++    valueNs: String(10_000_000 + repetition * (10_000_000 + scene.callsPerRepetition * multiplier * 1_000_000) +
++      sequence * scene.callsPerRepetition * multiplier * 1_000_000) })) : [];
+   return { operationNs: timed ? 1_000_000 * multiplier : null, raw: { schemaVersion: 1, scene: scene.id,
+     phase: timed ? 'timed' : 'warmup', calls, completed: calls, denominator: scene.callsPerRepetition,
+-    clockReads, cpuReads: clockReads.map((read) => ({ sequence: read.sequence, userUs: Number(read.valueNs) / 1000, systemUs: 0, valueNs: read.valueNs })),
++    clockReads, cpuReads: clockReads.map((read) => nativeCpuEndpoint(read)),
+     outcomes: { encoding: 'runs', count: calls, runs: [{ from: 0, count: calls, value: 100, frames: 47 }] } } };
+ }
+ 
+@@ -90,11 +100,11 @@ function stage(name = 'aa', runs = 2) {
+         let extra: any = {};
+         if (kind === 'engine') {
+           if ((scene as any).workload === 'stock-c') {
+-            raw = Array.from({ length: SERVER_PROFILE.repetitions }, () => stockRaw(scene, multiplier));
++            raw = Array.from({ length: SERVER_PROFILE.repetitions }, (_, repetition) => stockRaw(scene, multiplier, true, repetition));
+             extra = { operationNs: 1_000_000 * multiplier, cpuScope: SERVER_PROFILE.stockCpuScope,
+               warmup: Array.from({ length: (scene as any).warmupBatches }, () => stockRaw(scene, 1, false)) };
+           } else {
+-            raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, () => engineRaw(scene));
++            raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, (_, repetition) => engineRaw(scene, repetition));
+             extra = { operationNs: 1_000_000 * multiplier, meanFrameNs: 1_000_000 * multiplier, cancelDrainNs: 500_000 * multiplier };
+           }
+         } else {
+@@ -119,7 +129,8 @@ function stage(name = 'aa', runs = 2) {
+             endpoints: Array(count).fill(SERVER_PROFILE.toPx), controlCancelMs: 0.5, controlCancelWitness: cancellation(count), warmup: [raw[0]],
+             semanticEvidence: normalMotion(scene), monotonicHostUpperNs: '1000000000000', clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError) };
+         }
+-        samples[id] = { raw, ...extra, semantic: true, workMultiplier: multiplier, repetitions: SERVER_PROFILE.repetitions, denominator: SERVER_PROFILE.denominator };
++        samples[id] = { raw, ...extra, semantic: true, workMultiplier: multiplier, repetitions: SERVER_PROFILE.repetitions, denominator: SERVER_PROFILE.denominator,
++          ...(kind === 'engine' ? { cpuClock: { ...syntheticCpuIdentity } } : {}) };
+       }
+       rows.push({ kind, scene: scene.id, run, order: serverOrders(runs)[run], samples });
+     }
+@@ -148,6 +159,12 @@ function registeredRefusal() {
+     clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError), browserTree: { sha256: hash, files: 1 },
+     provenance: { baseline: provenance, candidate: { ...provenance, revision: 'b'.repeat(40) } },
+     machine: { identity: machineIdentity, sha256: serverProfileDigest(machineIdentity) },
++    engineClock: { schema: 1, ...syntheticCpuIdentity, napiVersion: 8,
++      node: { version: SERVER_PROFILE.clockError.nodeVersion, executableSha256: SERVER_PROFILE.clockError.nodeExecutableSha256 },
++      nativeBinary: { path: '/synthetic/thread-cpu.node', bytes: 1, sha256: hash }, nativeSources: clone(SERVER_PROFILE.clockError.nativeSourceFiles),
++      nativeSourceDigest: serverProfileDigest(Object.fromEntries(Object.entries(SERVER_PROFILE.clockError.nativeSourceFiles).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))),
++      compiler: { path: '/synthetic/cc', version: 'synthetic compiler', binarySha256: hash, flags: ['-shared', '-fPIC', '-DNAPI_VERSION=8'] },
++      libc: { path: '/synthetic/libc.so', sha256: hash }, nominalResolutionNs: '1', nominalResolutionIsNotErrorCertificate: true },
+     harness: Object.fromEntries(Array.from({ length: 6 }, (_, i) => [String(i), { sha256: hash }])),
+     packages: Object.fromEntries(['baseline', 'candidate', ...SERVER_PROFILE.comparators.filter((x) => x !== 'waapi-ctl')].map((name) => [name, clone(consumer)])),
+     transitivePackages: { one: consumer, two: consumer, three: consumer } };
+@@ -337,7 +354,7 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
+     expect(saved.runs.map((run: any) => run.from)).toEqual([0, 2, 3, 4, 5, 6]);
+   });
+   it.each(['mixed-frames', 'mixed-endpoints', 'missing-operation', 'wrong-divisor', 'missing-warmup', 'missing-cpu-read',
+-    'coherent-off-grid-cpu', 'aggregate-only-drift'])('stock C raw отвергает %s с правильными aggregates', (fault) => {
++    'coherent-timespec-mismatch', 'aggregate-only-drift'])('stock C raw отвергает %s с правильными aggregates', (fault) => {
+     const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.workload === 'stock-c')!;
+     const sample = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
+     validateServerEngineSample(sample, scene);
+@@ -348,7 +365,7 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
+     if (fault === 'wrong-divisor') raw.raw.denominator = 4000;
+     if (fault === 'missing-warmup') sample.warmup.pop();
+     if (fault === 'missing-cpu-read') raw.raw.cpuReads.pop();
+-    if (fault === 'coherent-off-grid-cpu') {
++    if (fault === 'coherent-timespec-mismatch') {
+       raw.raw.clockReads[1].valueNs = String(BigInt(raw.raw.clockReads[1].valueNs) + 1n);
+       raw.raw.cpuReads[1].valueNs = raw.raw.clockReads[1].valueNs;
+       raw.operationNs += 1 / 2000;
+@@ -359,8 +376,9 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
+   });
+   it('stock C producer делает2warmups, actual2×work и сохраняет поздний prefix без выдуманного CPU endpoint', async () => {
+     const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.workload === 'stock-c')!;
+-    let constructors = 0, destroys = 0, failAt = Infinity, userUs = 0;
+-    const cpu = vi.spyOn(process, 'threadCpuUsage').mockImplementation(() => ({ user: userUs += 2_000_000, system: 0 }));
++    let constructors = 0, destroys = 0, failAt = Infinity, cpuNs = 0n;
++    const cpu = vi.spyOn(threadCpuClock, 'readServerThreadCpuEndpoint').mockImplementation(() =>
++      syntheticNativeEndpoint(cpuNs += 2_000_000_000n, { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: process.pid, tid: process.pid }));
+     class ObservedMotionValue {
+       private readonly options: any;
+       private changed: (value: number) => unknown = () => {};
+@@ -425,8 +443,9 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
+   });
+   it('настоящий engine owner сохраняет controlled CPU endpoints на успехе и позднем отказе', async () => {
+     const { animate } = await import('../src/animate/index.js');
+-    let userUs = 0;
+-    const cpu = vi.spyOn(process, 'threadCpuUsage').mockImplementation(() => ({ user: userUs += 1000, system: 0 }));
++    let cpuNs = 0n;
++    const cpu = vi.spyOn(threadCpuClock, 'readServerThreadCpuEndpoint').mockImplementation(() =>
++      syntheticNativeEndpoint(cpuNs += 1_000_000n, { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: process.pid, tid: process.pid }));
+     const scene = SERVER_PROFILE.engineScenes[1];
+     try {
+       const success = await measureServerEngine(animate, scene);
+@@ -435,7 +454,7 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
+         expect(measured.raw.clockReads).toHaveLength(16); expect(measured.raw.cpuReads).toHaveLength(16);
+         measured.raw.clockReads.forEach((read: any, sequence: number) => {
+           expect(measured.raw.cpuReads[sequence].valueNs).toBe(read.valueNs);
+-          expect(String((BigInt(measured.raw.cpuReads[sequence].userUs) + BigInt(measured.raw.cpuReads[sequence].systemUs)) * 1000n)).toBe(read.valueNs);
++          expect(String(BigInt(measured.raw.cpuReads[sequence].seconds) * 1_000_000_000n + BigInt(measured.raw.cpuReads[sequence].nanoseconds))).toBe(read.valueNs);
+         });
+       }
+       validateServerEngineSample(success, scene);
+@@ -458,7 +477,7 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
+       expect(cpu).toHaveBeenCalledTimes(15);
+     } finally { cpu.mockRestore(); }
+   });
+-  it.each(['missing-read', 'read-order', 'impossible-ns', 'coherent-impossible-ns', 'missing-cpu-field', 'backward-cpu-component',
++  it.each(['missing-read', 'read-order', 'impossible-ns', 'coherent-impossible-ns', 'missing-cpu-field', 'backward-native-counter',
+     'last-target-coordinate', 'missing-target-identity', 'hash-only-drift'])('engine raw lineage отвергает %s при semantic:true', (fault) => {
+     const scene = SERVER_PROFILE.engineScenes[1];
+     const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
+@@ -474,10 +493,12 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
+       }
+       sample.operationNs = sample.raw.reduce((sum: number, raw: any) => sum + raw.operationNs, 0) / sample.repetitions;
+     }
+-    if (fault === 'missing-cpu-field') delete lineage.cpuReads[1].userUs;
+-    if (fault === 'backward-cpu-component') {
+-      lineage.cpuReads[1].userUs = lineage.cpuReads[0].userUs - 1;
+-      lineage.cpuReads[1].systemUs = Number(lineage.cpuReads[1].valueNs) / 1000 - lineage.cpuReads[1].userUs;
++    if (fault === 'missing-cpu-field') delete lineage.cpuReads[1].seconds;
++    if (fault === 'backward-native-counter') {
++      lineage.clockReads[2].valueNs = String(BigInt(lineage.clockReads[1].valueNs) - 1n);
++      lineage.cpuReads[2] = nativeCpuEndpoint(lineage.clockReads[2]);
++      measured.frameNs[0] = Number(BigInt(lineage.clockReads[3].valueNs) - BigInt(lineage.clockReads[2].valueNs));
++      sample.meanFrameNs = sample.raw.reduce((sum: number, raw: any) => sum + raw.frameNs.reduce((a: number, b: number) => a + b, 0) / raw.frameNs.length, 0) / sample.repetitions;
+     }
+     if (fault === 'last-target-coordinate') {
+       const first = lineage.targetTraces.runs[0], last = clone(first.trace);
+@@ -1119,3 +1140,110 @@ describe('PROFILE: ресурсный контракт проверяется д
+       expect(fixture.hashBinary).not.toHaveBeenCalled();
+     });
+ });
++
++describe('серверный PROFILE: native scheduled CPU endpoints', () => {
++  const scene = SERVER_PROFILE.engineScenes[1];
++  const nativeSample = () => {
++    const sample: any = stage().rows.find((row) => row.scene === scene.id)!.samples.left;
++    sample.cpuClock = { ...syntheticCpuIdentity };
++    for (const measured of sample.raw) measured.raw.cpuReads = measured.raw.clockReads.map((read: any) => nativeCpuEndpoint(read));
++    return sample;
++  };
++  it('принимает полные native timespec и main-thread IDs без user/system fields', () => {
++    const sample = nativeSample();
++    expect(() => validateServerEngineSample(sample, scene)).not.toThrow();
++  });
++  it('старые Node user/system counters не становятся native clock после переименования', () => {
++    const sample = nativeSample();
++    for (const measured of sample.raw) measured.raw.cpuReads = measured.raw.clockReads.map((read: any) => ({
++      sequence: read.sequence, ...syntheticCpuIdentity, userUs: Number(read.valueNs) / 1000, systemUs: 0, valueNs: read.valueNs }));
++    expect(() => validateServerEngineSample(sample, scene)).toThrow(/CPU|native|timespec/);
++  });
++  it.each(['missing-sample-identity', 'wrong-clock', 'wrong-endpoint-clock', 'missing-seconds', 'negative-seconds', 'noncanonical-seconds', 'overflow-seconds',
++    'fractional-nanoseconds', 'negative-nanoseconds', 'negative-zero-nanoseconds', 'overflow-nanoseconds', 'missing-native-read', 'value-mismatch',
++    'clock-read-mismatch', 'wrong-sequence', 'wrong-pid', 'wrong-tid', 'worker-thread', 'later-repetition-identity', 'later-repetition-backwards'])
++  ('отвергает %s при coherent semantic:true', (fault) => {
++    const sample = nativeSample(), lineage = sample.raw[0].raw, read = lineage.cpuReads[1];
++    expect(() => validateServerEngineSample(sample, scene)).not.toThrow();
++    if (fault === 'missing-sample-identity') delete sample.cpuClock;
++    if (fault === 'wrong-clock') sample.cpuClock.clock = 'process.threadCpuUsage';
++    if (fault === 'wrong-endpoint-clock') read.clock = 'CLOCK_PROCESS_CPUTIME_ID';
++    if (fault === 'missing-seconds') delete read.seconds;
++    if (fault === 'negative-seconds') read.seconds = '-1';
++    if (fault === 'noncanonical-seconds') read.seconds = '00';
++    if (fault === 'overflow-seconds') read.seconds = '9223372036854775808';
++    if (fault === 'fractional-nanoseconds') read.nanoseconds += 0.5;
++    if (fault === 'negative-nanoseconds') read.nanoseconds = -1;
++    if (fault === 'negative-zero-nanoseconds') read.nanoseconds = -0;
++    if (fault === 'overflow-nanoseconds') read.nanoseconds = 1_000_000_000;
++    if (fault === 'missing-native-read') lineage.cpuReads.pop();
++    if (fault === 'value-mismatch') read.valueNs = String(BigInt(read.valueNs) + 1n);
++    if (fault === 'clock-read-mismatch') lineage.clockReads[1].valueNs = String(BigInt(read.valueNs) + 1n);
++    if (fault === 'wrong-sequence') read.sequence = 0;
++    if (fault === 'wrong-pid') read.pid++;
++    if (fault === 'wrong-tid') read.tid++;
++    if (fault === 'worker-thread') {
++      sample.cpuClock.tid++;
++      for (const measured of sample.raw) for (const value of measured.raw.cpuReads) value.tid = sample.cpuClock.tid;
++    }
++    if (fault === 'later-repetition-identity') for (const value of sample.raw[1].raw.cpuReads) { value.pid++; value.tid++; }
++    if (fault === 'later-repetition-backwards') {
++      const later = sample.raw[1].raw;
++      for (const value of later.clockReads) value.valueNs = String(BigInt(value.valueNs) - 100_000_000n);
++      later.cpuReads = later.clockReads.map((value: any) => nativeCpuEndpoint(value));
++    }
++    expect(() => validateServerEngineSample(sample, scene)).toThrow(/CPU|native|timespec|lineage/);
++  });
++  it('exact seconds выше2^53 не проходят через Number', () => {
++    const sample = nativeSample(), shift = 9_007_199_254_740_993n * 1_000_000_000n;
++    for (const measured of sample.raw) {
++      for (const value of measured.raw.clockReads) value.valueNs = String(BigInt(value.valueNs) + shift);
++      measured.raw.cpuReads = measured.raw.clockReads.map((value: any) => nativeCpuEndpoint(value));
++    }
++    expect(sample.raw[0].raw.cpuReads[0].seconds).toBe('9007199254740993');
++    expect(() => validateServerEngineSample(sample, scene)).not.toThrow();
++  });
++  it('native1ns timespec изменение сохраняется и не требует старой user/system grid', () => {
++    const sample = nativeSample(), measured = sample.raw[0];
++    measured.raw.clockReads[1].valueNs = '11000001';
++    measured.raw.cpuReads[1] = nativeCpuEndpoint(measured.raw.clockReads[1]);
++    measured.operationNs = 1_000_001;
++    sample.operationNs = 1_000_000.125;
++    expect(() => validateServerEngineSample(sample, scene)).not.toThrow();
++    expect(SERVER_PROFILE.clockError.engineCounterOutwardPaddingNs).toBe(2000);
++  });
++  it('same-object mutation main-thread metadata проверяется заново', () => {
++    const current = stage();
++    const cell = serverCellPairs(current, 2, 'aa', syntheticCpuIdentity).find((cell) => cell.scene === scene.id)!;
++    expect(cell.left[0]).toBe(1_000_000);
++    const sample = current.rows.find((row) => row.scene === scene.id)!.samples.left;
++    sample.cpuClock.pid++; sample.cpuClock.tid++;
++    for (const measured of sample.raw) for (const value of measured.raw.cpuReads) { value.pid++; value.tid++; }
++    expect(() => serverCellPairs(current, 2, 'aa', syntheticCpuIdentity)).toThrow(/зарегистрированным main-thread/);
++  });
++  it.each(['missing-clock', 'wrong-clock', 'worker-thread', 'node', 'napi', 'source', 'header', 'source-digest',
++    'native-binary', 'compiler', 'compiler-flags', 'libc', 'missing-nominal', 'physical-certificate'])
++  ('native registration отвергает %s до samples', (fault) => {
++    const registration: any = registeredRefusal().registration;
++    expect(() => verifyServerClockRegistration(registration)).not.toThrow();
++    const clock = registration.engineClock;
++    if (fault === 'missing-clock') delete registration.engineClock;
++    if (fault === 'wrong-clock') clock.clock = 'process.threadCpuUsage';
++    if (fault === 'worker-thread') clock.tid++;
++    if (fault === 'node') clock.node.executableSha256 = hash;
++    if (fault === 'napi') clock.napiVersion = 9;
++    if (fault === 'source' || fault === 'header') {
++      const key = fault === 'source' ? 'bench/profile/server-thread-cpu-clock.c' : 'bench/profile/native-clock/include/node_api.h';
++      clock.nativeSources[key] = hash;
++      clock.nativeSourceDigest = serverProfileDigest(Object.fromEntries(Object.entries(clock.nativeSources).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)));
++    }
++    if (fault === 'source-digest') clock.nativeSourceDigest = hash;
++    if (fault === 'native-binary') delete clock.nativeBinary.sha256;
++    if (fault === 'compiler') delete clock.compiler.binarySha256;
++    if (fault === 'compiler-flags') clock.compiler.flags = [];
++    if (fault === 'libc') delete clock.libc.sha256;
++    if (fault === 'missing-nominal') delete clock.nominalResolutionNs;
++    if (fault === 'physical-certificate') clock.nominalResolutionIsNotErrorCertificate = false;
++    expect(() => verifyServerClockRegistration(registration)).toThrow(/CPU|native/);
++  });
++});
