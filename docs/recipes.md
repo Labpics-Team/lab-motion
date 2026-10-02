@@ -385,7 +385,8 @@ const toProgress = pipe(clamp(0, 300), (x) => x / 300); // композиция 
 
 ## Bottom sheet (behaviors, DOM-адаптер)
 
-Runnable DOM-адаптер: transform из headless-состояния `createBottomSheet`.
+Совместимый пример ранее опубликованного `createBottomSheet`.
+Для нового компонента используйте [универсальный follow](#прямой-ввод-панель-и-карусель).
 
 ```ts
 import { createBottomSheet } from '@labpics/motion/behaviors';
@@ -412,6 +413,143 @@ el.addEventListener('pointercancel', () => sheet.pointerCancel());
 // программно раскрыть до верхнего snap (единый clock, C¹ из текущей скорости):
 document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(2));
 ```
+
+## Прямой ввод: панель и карусель
+
+В этих двух UI-рецептах пружина владеет скоростью и исполнением. Приложение
+выбирает snap/страницу, привязывает pointer-события, управляет фокусом и очищает
+свои listeners. Один вызов mount возвращает одну функцию очистки.
+
+Панель содержит `[data-panel]` с `[data-handle]` и `[data-close]`, а рядом
+находится кнопка `[data-open]`. Это немодальная панель: размеры и snap-точки
+фиксированы при mount. Карусель содержит `[data-viewport]` шириной одной страницы,
+`[data-track]` с тремя страницами, кнопки `[data-previous]`, `[data-next]` и
+`[data-page-status]` с `role="status"`. После изменения размеров выполняйте remount.
+Задайте handle `touch-action:none`, а track — `touch-action:pan-y`.
+
+<!-- compositor-follow-recipes:start -->
+```typescript
+import { createCompositorFollow, type CompositorFollow } from '@labpics/motion/compositor/follow';
+
+function pointerInput(
+  handle: HTMLElement, motion: CompositorFollow, axis: 'clientX' | 'clientY',
+  limit: (value: number) => number,
+  release: (value: number, t: number, cancelled: boolean) => void,
+) {
+  const events = new AbortController();
+  let active: { id: number; coordinate: number; origin: number } | undefined;
+  const cancel = () => {
+    const id = active?.id;
+    active = undefined;
+    if (id !== undefined && handle.hasPointerCapture(id)) handle.releasePointerCapture(id);
+  };
+  const valueAt = (e: PointerEvent) => limit(active!.origin + e[axis] - active!.coordinate);
+  handle.addEventListener('pointerdown', (e) => {
+    if (active || !e.isPrimary || e.button !== 0) return;
+    active = { id: e.pointerId, coordinate: e[axis], origin: motion.beginFollow(e.timeStamp / 1000) };
+    handle.setPointerCapture(e.pointerId);
+  }, { signal: events.signal });
+  // Нативный drag не должен забирать поток у принятого pointer-жеста.
+  handle.addEventListener('dragstart', (e) => {
+    if (active) e.preventDefault();
+  }, { signal: events.signal });
+  handle.ownerDocument.addEventListener('pointermove', (e) => {
+    if (e.pointerId === active?.id) motion.follow(valueAt(e), e.timeStamp / 1000);
+  }, { signal: events.signal });
+  const finish = (e: PointerEvent) => {
+    if (e.pointerId !== active?.id) return;
+    const value = valueAt(e);
+    motion.follow(value, e.timeStamp / 1000);
+    cancel();
+    release(value, e.timeStamp / 1000, e.type !== 'pointerup');
+  };
+  handle.ownerDocument.addEventListener('pointerup', finish, { signal: events.signal });
+  handle.ownerDocument.addEventListener('pointercancel', finish, { signal: events.signal });
+  handle.addEventListener('lostpointercapture', (e) => {
+    if (e.pointerId !== active?.id) return;
+    active = undefined;
+    release(motion.value, e.timeStamp / 1000, true);
+  }, { signal: events.signal });
+  return { cancel, destroy() { events.abort(); cancel(); motion.destroy(); } };
+}
+
+export function mountSnapPanel(root: HTMLElement): () => void {
+  const panel = root.querySelector<HTMLElement>('[data-panel]')!;
+  const open = root.querySelector<HTMLButtonElement>('[data-open]')!;
+  const close = root.querySelector<HTMLButtonElement>('[data-close]')!;
+  const handle = root.querySelector<HTMLElement>('[data-handle]')!;
+  const events = new AbortController();
+  const snaps = [0, 160, 320];
+  let target = 320;
+  panel.style.transform = 'translateY(320px)';
+  const motion = createCompositorFollow({
+    spring: { mass: 1, stiffness: 170, damping: 26 },
+    property: 'transform', from: target, to: target, target: panel,
+    format: (y) => `translateY(${y}px)`,
+    apply: (value) => { panel.style.transform = String(value); },
+  });
+  const present = (next: number) => {
+    target = next;
+    root.dataset.snap = String(next);
+    open.setAttribute('aria-expanded', String(next < 320));
+    if (next === 320 && panel.contains(document.activeElement)) open.focus();
+    panel.inert = next === 320;
+  };
+  present(target);
+  const input = pointerInput(handle, motion, 'clientY', (y) => Math.max(0, Math.min(320, y)),
+    (value, t, cancelled) => {
+      const next = cancelled ? target : snaps.reduce((a, b) => Math.abs(b - value) < Math.abs(a - value) ? b : a);
+      present(next);
+      motion.settle(next, t);
+    });
+  open.addEventListener('click', () => {
+    input.cancel(); present(0); motion.retarget(0); close.focus();
+  }, { signal: events.signal });
+  close.addEventListener('click', () => {
+    input.cancel(); present(320); motion.retarget(320);
+  }, { signal: events.signal });
+  return () => { events.abort(); input.destroy(); };
+}
+
+export function mountPagedCarousel(root: HTMLElement): () => void {
+  const viewport = root.querySelector<HTMLElement>('[data-viewport]')!;
+  const track = root.querySelector<HTMLElement>('[data-track]')!;
+  const previous = root.querySelector<HTMLButtonElement>('[data-previous]')!;
+  const next = root.querySelector<HTMLButtonElement>('[data-next]')!;
+  const status = root.querySelector<HTMLElement>('[data-page-status]')!;
+  const events = new AbortController();
+  const width = viewport.clientWidth;
+  const count = track.children.length;
+  let page = 0;
+  const bounded = (index: number) => Math.max(0, Math.min(count - 1, index));
+  const motion = createCompositorFollow({
+    spring: { mass: 1, stiffness: 170, damping: 26 },
+    property: 'transform', from: 0, to: 0, target: track,
+    format: (x) => `translateX(${x}px)`,
+    apply: (value) => { track.style.transform = String(value); },
+  });
+  const present = (index: number) => {
+    page = bounded(index); root.dataset.page = String(page);
+    status.textContent = `Страница ${page + 1} из ${count}`;
+    previous.disabled = page === 0; next.disabled = page === count - 1;
+  };
+  present(0);
+  const input = pointerInput(track, motion, 'clientX', (x) => Math.max(-(count - 1) * width, Math.min(0, x)),
+    (value, t, cancelled) => {
+      present(cancelled ? page : Math.round(-value / width));
+      motion.settle(-page * width, t);
+    });
+  const go = (index: number) => { input.cancel(); present(index); motion.retarget(-page * width); };
+  previous.addEventListener('click', () => go(page - 1), { signal: events.signal });
+  next.addEventListener('click', () => go(page + 1), { signal: events.signal });
+  return () => { events.abort(); input.destroy(); };
+}
+```
+<!-- compositor-follow-recipes:end -->
+
+Тесты собирают буквальный код блока и проходят оба сценария в браузере.
+В приложении вызывайте `mountSnapPanel(root)` или `mountPagedCarousel(root)`;
+сохранённую функцию очистки вызовите при удалении компонента.
 
 ## Анимации, принадлежащие компоненту
 

@@ -38,6 +38,7 @@
  */
 
 import { MotionParamError } from '../errors.js';
+import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
 import { readSpringUnchecked } from '../internal/read-spring.js';
 import {
   type SpringParams,
@@ -436,50 +437,57 @@ type HostOwner = CompositorAnimation | (() => void) | null | undefined;
  * трогает DOM/часы; native time читается только при прерывании.
  */
 export class CompositorSpring {
-  private readonly _spring: SpringParams;
+  private _spring: SpringParams;
   private readonly _property: string;
   private readonly _tolerance: number;
   private readonly _fill: 'none' | 'forwards' | 'backwards' | 'both';
   private readonly _composite: 'replace' | 'add' | 'accumulate';
   private _format: ((v: number) => string | number) | undefined;
   private _target: WaapiAnimatable | undefined;
-  private _apply: ((value: string | number) => void) | undefined;
-  /** Часы — lifetime-capability: destroy снимает её до любого host cleanup. */
-  private _now: (() => number) | undefined;
+  /** @internal */
+  protected _apply: ((value: string | number) => void) | undefined;
+  /** @internal Часы — lifetime-capability: destroy снимает её до любого host cleanup. */
+  protected _now: (() => number) | undefined;
   private _requestFrame: RequestFrameFn | undefined;
   private readonly _delay: number;
   private _setTimer: SetTimerFn | undefined;
-  private readonly _tier: CompositorTierCode;
+  /** @internal */
+  protected readonly _tier: CompositorTierCode;
 
-  private _from: number;
-  private _to: number;
+  /** @internal */
+  protected _from: number;
+  /** @internal */
+  protected _to: number;
   private _v0Norm = 0;
   private _startTime!: number;
   /** Задержка ТЕКУЩЕГО прогона (мс): _delay на первичном start, 0 на retarget/handoff. */
   private _startDelay!: number;
-  /** Единственный host-owner; null резервирует незавершённый setTimer. */
-  private _host: HostOwner;
+  /** @internal Единственный host-owner; null резервирует незавершённый setTimer. */
+  protected _host: HostOwner;
   /** Один artifact — SSOT samples и duration текущего compositor-owner. */
   private _artifact: SpringExecutionArtifactTuple | undefined;
   private readonly _sample = { value: 0, velocity: 0 };
-  private _mv: MotionValue | undefined;
-  /** Монотонный identity-token текущего owner/continuation. */
-  private _epoch = 0;
-  /** Host cleanup блокирует мутации, пока current-owner continuation не выдаст capability. */
-  private _cleaning?: true;
+  /** @internal */
+  protected _mv: MotionValue | undefined;
+  /** @internal Монотонный identity-token текущего owner/continuation. */
+  protected _epoch = 0;
+  /** @internal Host cleanup блокирует мутации, пока current-owner continuation не выдаст capability. */
+  protected _cleaning?: true;
 
-  /**
+  /** @internal
    * Единый мост «кадр живой пружины → внутреннее значение + apply». Один экземпляр
    * на контроллер, переиспользуется всеми живыми путями (_ensureFallback,
    * compositor→live хендофф, reduced-хендофф) — DRY: правило распространения
    * значения живёт в ОДНОМ месте (иначе тройной дубль тихо расходится). Читает
    * _apply/_format в момент ВЫЗОВА (после конструктора), поэтому bound-поле безопасно.
    */
-  private readonly _onLiveFrame = (v: number): void => {
+  protected readonly _onLiveFrame = (v: number): boolean => {
     const epoch = this._epoch;
     this._from = v;
     const value = this._apply && this._format!(v);
-    if (this._epoch === epoch) this._apply?.(value!);
+    if (this._epoch !== epoch || !this._apply) return false;
+    this._apply(value!);
+    return true;
   };
 
   constructor(opts: CompositorSpringOptions) {
@@ -637,14 +645,19 @@ export class CompositorSpring {
     // В полёте: читаем фактическое effect-состояние в момент прерывания (без layout).
     const read = this._snapshot(generation);
     if (!read) return;
-    const range = newTarget - read.value;
+    this._retargetFrom(read.value, read.velocity, newTarget, generation);
+  }
+
+  /** @internal Продолжение из уже захваченного состояния того же owner. */
+  protected _retargetFrom(value: number, velocity: number, newTarget: number, generation: number): void {
+    const range = newTarget - value;
     const v0Norm = Math.abs(range) > RANGE_EPSILON
-      ? read.velocity / range
-      : read.velocity === 0
+      ? velocity / range
+      : velocity === 0
         ? 0
         : Infinity; // normalized curve cannot represent absolute impulse at zero range
     validateSpringForFrameLoop(this._spring);
-    const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
+    const artifact = this._tier === 0 && tryCompileSpringExecutionArtifactTupleUnchecked(
       this._spring,
       v0Norm,
       this._tolerance,
@@ -660,14 +673,14 @@ export class CompositorSpring {
           this._tolerance,
         );
       }
-      const mv = this._liveCandidate(read.value, read.velocity, generation);
+      const mv = this._liveCandidate(value, velocity, generation);
       // Новый owner уже активен: отказ hostile host-cancel не должен откатить
       // хендофф или оставить ссылку на прежний Animation.
       this._adoptLive(mv, newTarget, generation);
       return;
     }
     // Donor остаётся owner до успешного возврата successor из animate().
-    this._emitCompositor(read.value, newTarget, v0Norm, artifact, generation);
+    this._emitCompositor(value, newTarget, v0Norm, artifact, generation);
   }
 
   /**
@@ -758,6 +771,8 @@ export class CompositorSpring {
     if (!this._now) return;
     const mv = this._mv;
     this._mv = undefined;
+    // Инертный handoff не читает пользовательские параметры и не удерживает их метаданные.
+    this._spring = DEFAULT_SPRING;
     // Permanent terminal и retention-разрыв публикуются до недоверенного cleanup.
     this._epoch++;
     this._artifact = this._format = this._setTimer = this._now =
@@ -789,8 +804,8 @@ export class CompositorSpring {
     }
   }
 
-  /** Слот снимается до первого недоверенного host-вызова. */
-  private _releaseHost(): void {
+  /** @internal Слот снимается до первого недоверенного host-вызова. */
+  protected _releaseHost(): void {
     const host = this._host;
     this._host = undefined;
     this._cancelHost(host);
@@ -829,8 +844,8 @@ export class CompositorSpring {
     }
   }
 
-  /** Фактический piecewise-снимок без style/layout-read. */
-  private _snapshot(generation: number): { value: number; velocity: number } | undefined {
+  /** @internal Фактический piecewise-снимок без style/layout-read. */
+  protected _snapshot(generation: number): { value: number; velocity: number } | undefined {
     const now = this._now!();
     if (this._epoch !== generation) return undefined;
     const currentTime = animationTimeOrFallback(
@@ -904,11 +919,12 @@ export class CompositorSpring {
     this._startDelay = delayMs;
     this._startTime = now;
     this._artifact = artifact;
+    this._commitOwner();
     if (donor !== host) this._cancelHost(donor);
   }
 
-  /** Строит live-кандидата; ошибка не меняет metadata действующего donor. */
-  private _liveCandidate(
+  /** @internal Строит live-кандидата; ошибка не меняет metadata действующего donor. */
+  protected _liveCandidate(
     value: number,
     velocity: number,
     generation: number,
@@ -936,8 +952,8 @@ export class CompositorSpring {
     }
   }
 
-  /** CAS-публикация live-owner; stale-кандидат оплачивается здесь же. */
-  private _adoptLive(
+  /** @internal CAS-публикация live-owner; stale-кандидат оплачивается здесь же. */
+  protected _adoptLive(
     mv: MotionValue,
     target: number,
     generation: number,
@@ -947,6 +963,7 @@ export class CompositorSpring {
       if (this._epoch === generation) {
         this._to = target;
         this._mv = mv;
+        this._commitOwner();
         // Commit заканчивается до scheduler-IO: после cancel donor откат уже
         // воскрешал бы чужой owner, поэтому ошибка запуска оставляет mv повторяемым.
         mv.setTarget(target);
@@ -970,6 +987,9 @@ export class CompositorSpring {
     mv.destroy();
     return false;
   }
+
+  /** @internal Commit заканчивается до callback нового владельца исполнения. */
+  protected _commitOwner(): void {}
 }
 
 /** Часы по умолчанию: performance.now при наличии, иначе Date.now (SSR-safe). */

@@ -38,9 +38,9 @@ function prefersReducedMotion(): boolean {
  */
 export interface SpringStore {
   /**
-   * Svelte store subscription. Receives every animated frame value.
-   * Calls `run` immediately with the current value on subscribe.
-   * Returns an unsubscribe function (Svelte auto-unsubscribes with `$` syntax).
+   * Подписка Svelte: каждый вызов сразу доставляет run текущее значение.
+   * Повторная подписка с тем же run использует текущую активную регистрацию.
+   * Любая её отписка отзывает регистрацию; повтор отписки не затрагивает преемника.
    */
   subscribe(run: (value: number) => void): () => void;
 
@@ -96,24 +96,35 @@ export function springStore(
 ): SpringStore {
   const mv = createBoundValue({ initial, spring, requestFrame });
 
-  // Subscriber registry (mirrors Svelte store contract).
-  const subscribers = new Set<(value: number) => void>();
+  // Callback владеет одной активной регистрацией и общей функцией её отзыва.
+  const subscribers = new Map<(value: number) => void, () => void>();
 
   // Listen to MotionValue changes and broadcast to all Svelte subscribers.
   mv.onChange((v) => {
-    for (const run of subscribers) {
+    for (const run of subscribers.keys()) {
       run(v);
     }
   });
 
   return {
     subscribe(run) {
-      subscribers.add(run);
-      // Emit current value immediately (Svelte store contract).
-      run(mv.value);
-      return () => {
-        subscribers.delete(run);
+      const existing = subscribers.get(run);
+      if (existing) {
+        run(mv.value);
+        return existing;
+      }
+      let registry: typeof subscribers | null = subscribers;
+      let callback: typeof run | null = run;
+      const off = () => {
+        if (callback === null) return;
+        registry?.delete(callback);
+        registry = null;
+        callback = null;
       };
+      subscribers.set(run, off);
+      // Немедленная доставка и её прежняя ошибка остаются частью subscribe.
+      run(mv.value);
+      return off;
     },
 
     set(target, modeOverride) {
@@ -130,7 +141,7 @@ export function springStore(
 
     destroy() {
       mv.destroy();
-      subscribers.clear();
+      subscribers.forEach((off) => off());
     },
   };
 }
