@@ -822,9 +822,8 @@ describe('paired comparative benchmark report', () => {
     })).toThrow(/motion conformance/i);
   });
 
-  it('accepts a clean paired report whose summaries and freeze evidence recompute', () => {
-    expect(() => validateBenchmarkReportPair(fixture())).not.toThrow();
-    expect(() => validateBenchmarkReportPair(fixture(40))).not.toThrow();
+  it.each([20, 40])('accepts a clean paired report whose summaries and freeze evidence recompute (%i runs)', (startRuns) => {
+    expect(() => validateBenchmarkReportPair(fixture(startRuns))).not.toThrow();
   });
 
   it('rejects a fully self-consistent report when any start topology is unproved', () => {
