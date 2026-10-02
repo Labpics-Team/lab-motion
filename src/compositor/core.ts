@@ -38,6 +38,7 @@
  */
 
 import { MotionParamError } from '../errors.js';
+import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
 import { readSpringUnchecked } from '../internal/read-spring.js';
 import {
   type SpringParams,
@@ -436,7 +437,7 @@ type HostOwner = CompositorAnimation | (() => void) | null | undefined;
  * трогает DOM/часы; native time читается только при прерывании.
  */
 export class CompositorSpring {
-  private readonly _spring: SpringParams;
+  private _spring: SpringParams;
   private readonly _property: string;
   private readonly _tolerance: number;
   private readonly _fill: 'none' | 'forwards' | 'backwards' | 'both';
@@ -770,6 +771,8 @@ export class CompositorSpring {
     if (!this._now) return;
     const mv = this._mv;
     this._mv = undefined;
+    // Инертный handoff не читает пользовательские параметры и не удерживает их метаданные.
+    this._spring = DEFAULT_SPRING;
     // Permanent terminal и retention-разрыв публикуются до недоверенного cleanup.
     this._epoch++;
     this._artifact = this._format = this._setTimer = this._now =

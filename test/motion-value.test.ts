@@ -26,7 +26,7 @@
  *                   zero-DOM import test fails.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MotionValue, type MotionValueOptions } from '../src/index.js';
 import { MotionParamError } from '../src/index.js';
 
@@ -186,6 +186,51 @@ describe('MotionValue setTarget validation', () => {
 // ─── Suite A: destroy ────────────────────────────────────────────────────────
 
 describe('MotionValue destroy', () => {
+  it('живой владелец наблюдает изменение исходных spring-параметров', () => {
+    const params = { mass: 1, stiffness: 200, damping: 20 };
+    const actualClock = makeVirtualClock();
+    const actual = new MotionValue({ initial: 0, spring: params, requestFrame: actualClock.requestFrame });
+    params.stiffness = 300;
+    const expectedClock = makeVirtualClock();
+    const expected = new MotionValue({ initial: 0, spring: { ...params }, requestFrame: expectedClock.requestFrame });
+    actual.setTarget(100);
+    expected.setTarget(100);
+    actualClock.drain(5);
+    expectedClock.drain(5);
+
+    expect(actual.value).toBe(expected.value);
+    expect(actual.velocity).toBe(expected.velocity);
+    actual.destroy();
+    expected.destroy();
+  });
+
+  it('destroy не читает spring getters и сохраняет последний value/velocity', () => {
+    let closed = false;
+    const params = {
+      get mass() {
+        if (closed) throw new Error('terminal spring read');
+        return 2;
+      },
+      stiffness: 240,
+      damping: 30,
+    };
+    const clock = makeVirtualClock();
+    const value = new MotionValue({ initial: 5, spring: params, requestFrame: clock.requestFrame });
+    value.setTarget(100);
+    clock.drain(5);
+    const terminalValue = value.value;
+    const terminalVelocity = value.velocity;
+    closed = true;
+
+    expect(() => value.destroy()).not.toThrow();
+    expect(() => clock.drainAll()).not.toThrow();
+    value.setTarget(12);
+    value.snapTo(9);
+    expect(value.value).toBe(terminalValue);
+    expect(value.velocity).toBe(terminalVelocity);
+    expect(clock.queueLength()).toBe(0);
+  });
+
   it('stops the animation loop after destroy()', () => {
     const clock = makeVirtualClock();
     const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: clock.requestFrame });
@@ -206,10 +251,209 @@ describe('MotionValue destroy', () => {
     expect(() => mv.setTarget(100)).not.toThrow();
   });
 
-  it('onChange after destroy does not throw', () => {
-    const mv = new MotionValue({ initial: 0, spring: STD_SPRING });
+  it('onChange после destroy не доставляет значение и возвращает инертную отписку', () => {
+    const mv = new MotionValue({ initial: 5, spring: STD_SPRING });
     mv.destroy();
-    expect(() => mv.onChange(() => {})).not.toThrow();
+    const callback = vi.fn(() => { throw new Error('terminal callback'); });
+    let off: (() => void) | undefined;
+
+    expect(() => { off = mv.onChange(callback); }).not.toThrow();
+    expect(callback).not.toHaveBeenCalled();
+    expect(typeof off).toBe('function');
+    expect(() => { off?.(); off?.(); }).not.toThrow();
+    mv.setTarget(10);
+    mv.snapTo(9);
+    expect(callback).not.toHaveBeenCalled();
+    expect(mv.value).toBe(5);
+  });
+
+  it.each(['mass', 'stiffness', 'damping'] as const)(
+    'destroy из spring getter %s сохраняет последний value/velocity',
+    (field) => {
+      const clock = makeVirtualClock();
+      const params = { ...STD_SPRING };
+      const parameter = params[field];
+      let armed = false;
+      let destroyed = 0;
+      let mv: MotionValue;
+      Object.defineProperty(params, field, {
+        get() {
+          if (armed) {
+            armed = false;
+            destroyed++;
+            mv.destroy();
+          }
+          return parameter;
+        },
+      });
+      mv = new MotionValue({ initial: 5, spring: params, requestFrame: clock.requestFrame });
+      const received: number[] = [];
+      mv.onChange((value) => received.push(value));
+      mv.setTarget(100);
+      clock.drain(5);
+      const terminalValue = mv.value;
+      const terminalVelocity = mv.velocity;
+      const delivered = received.length;
+      armed = true;
+
+      clock.drainAll();
+
+      expect(destroyed).toBe(1);
+      expect(mv.value).toBe(terminalValue);
+      expect(mv.velocity).toBe(terminalVelocity);
+      expect(received).toHaveLength(delivered);
+      expect(clock.queueLength()).toBe(0);
+    },
+  );
+
+  it.each([
+    ['handle=0', false, 0],
+    ['sync callback', true, 1],
+    ['sync callback и handle=0', true, 0],
+  ] as const)('destroy из requestFrame: %s не создаёт motion-owned timeout', (_, sync, handle) => {
+    vi.useFakeTimers();
+    try {
+      let requests = 0;
+      let lateFrame: ((timestamp?: number) => void) | undefined;
+      const mv = new MotionValue({
+        initial: 5,
+        initialVelocity: 2,
+        spring: STD_SPRING,
+        requestFrame: (callback) => {
+          requests++;
+          lateFrame = callback;
+          mv.destroy();
+          if (sync) callback(1);
+          return handle;
+        },
+      });
+      const received: number[] = [];
+      mv.onChange((value) => received.push(value));
+
+      mv.setTarget(100);
+
+      expect(requests).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
+      lateFrame?.(2);
+      expect(mv.value).toBe(5);
+      expect(mv.velocity).toBe(2);
+      expect(received).toEqual([5]);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.clearAllTimers();
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('MotionValue: отозванные отписки', () => {
+  it.each([undefined, null, false, 0, '', new Error('first')])(
+    'сохраняет первый throw %s и доставляет значение соседям',
+    (failure) => {
+      const value = new MotionValue({ initial: 0, spring: STD_SPRING });
+      const received: number[] = [];
+      value.onChange((v) => { if (v !== 0) throw failure; });
+      value.onChange((v) => { if (v !== 0) throw new Error('second'); });
+      value.onChange((v) => received.push(v));
+      let threw = false;
+      let actual: unknown;
+      try {
+        value.snapTo(10);
+      } catch (error) {
+        threw = true;
+        actual = error;
+      }
+      expect(threw).toBe(true);
+      expect(actual).toBe(failure);
+      expect(received).toEqual([0, 10]);
+      expect(() => value.snapTo(20)).not.toThrow();
+      expect(received).toEqual([0, 10, 20]);
+      value.destroy();
+    },
+  );
+
+  it.each([undefined, null])('не сохраняет ошибочную регистрацию callback=%s после TypeError', (callback) => {
+    const value = new MotionValue({ initial: 0, spring: STD_SPRING });
+    expect(() => value.onChange(callback as unknown as (v: number) => void)).toThrow(TypeError);
+    expect(() => value.snapTo(10)).not.toThrow();
+    value.destroy();
+  });
+
+  it('ошибка прежнего callback не отзывает его реентрантного преемника', () => {
+    const value = new MotionValue({ initial: 0, spring: STD_SPRING });
+    const failure = new Error('retired listener failure');
+    const received: number[] = [];
+    let armed = true;
+    let off = () => {};
+    const callback = (v: number) => {
+      received.push(v);
+      if (v === 10 && armed) {
+        armed = false;
+        off();
+        off = value.onChange(callback);
+        throw failure;
+      }
+    };
+    off = value.onChange(callback);
+    expect(() => value.snapTo(10)).toThrow(failure);
+    value.snapTo(20);
+    expect(received).toContain(20);
+    off();
+    value.destroy();
+  });
+
+  it('повторная старая отписка не удаляет новую регистрацию того же callback', () => {
+    const value = new MotionValue({ initial: 0, spring: STD_SPRING });
+    const received: number[] = [];
+    const callback = (v: number) => received.push(v);
+    const oldOff = value.onChange(callback);
+    oldOff();
+    oldOff();
+    const currentOff = value.onChange(callback);
+    oldOff();
+    value.snapTo(10);
+    expect(received).toEqual([0, 0, 10]);
+    currentOff();
+    value.snapTo(20);
+    expect(received).toEqual([0, 0, 10]);
+    value.destroy();
+  });
+
+  it('дублирующая подписка доставляется один раз и снимается любым своим handle', () => {
+    const value = new MotionValue({ initial: 0, spring: STD_SPRING });
+    const received: number[] = [];
+    const callback = (v: number) => received.push(v);
+    const first = value.onChange(callback);
+    const second = value.onChange(callback);
+    value.snapTo(10);
+    expect(received).toEqual([0, 0, 10]);
+    second();
+    first();
+    value.snapTo(20);
+    expect(received).toEqual([0, 0, 10]);
+    value.destroy();
+  });
+
+  it('реентрантная отписка не пропускает соседа; destroy отзывает оставшийся handle', () => {
+    const value = new MotionValue({ initial: 0, spring: STD_SPRING });
+    const firstValues: number[] = [];
+    const secondValues: number[] = [];
+    let firstOff = () => {};
+    firstOff = value.onChange((v) => {
+      firstValues.push(v);
+      if (v === 10) firstOff();
+    });
+    const secondOff = value.onChange((v) => {
+      secondValues.push(v);
+      if (v === 20) value.destroy();
+    });
+    value.snapTo(10);
+    value.snapTo(20);
+    secondOff();
+    secondOff();
+    value.snapTo(30);
+    expect(firstValues).toEqual([0, 10]);
+    expect(secondValues).toEqual([0, 10, 20]);
   });
 });
 
@@ -379,17 +623,51 @@ describe('MotionValue animation correctness', () => {
     mv.destroy();
   });
 
+  it('при handle=0 настоящий таймер вызывает асинхронный тик', async () => {
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: () => 0 });
+    const values: number[] = [];
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const firstTick = new Promise<number>((resolve, reject) => {
+        deadline = setTimeout(() => reject(new Error('настоящий таймер не вызвал тик')), 3000);
+        mv.onChange((value) => {
+          values.push(value);
+          if (value !== 0) resolve(value);
+        });
+      });
+      mv.setTarget(50);
+      expect(values).toEqual([0]);
+      const value = await firstTick;
+      expect(value).toBeGreaterThan(0);
+      expect(value).toBeLessThan(50);
+    } finally {
+      clearTimeout(deadline);
+      mv.destroy();
+    }
+  });
+
   it('works with handle=0 non-draining clock via setTimeout fallback', async () => {
     // requestFrame returns 0 without invoking cb. MotionValue installs setTimeout(0) fallback.
     const nonDraining = (_cb: (ts?: number) => void): number => 0;
-    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: nonDraining });
-    const values: number[] = [];
-    mv.onChange((v) => values.push(v));
-    mv.setTarget(50);
-    // Wait for the setTimeout fallback chain to run to completion.
-    await new Promise<void>((resolve) => setTimeout(resolve, 3000));
-    mv.destroy();
-    expect(values[values.length - 1]).toBe(50);
+    let mv: MotionValue | undefined;
+    try {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: nonDraining });
+      const values: number[] = [];
+      mv.onChange((v) => values.push(v));
+      mv.setTarget(50);
+      // Исполняем весь исходный интервал в 3 секунды. Каждый callback
+      // сдвигает физику на FIXED_DT_S независимо от настенных часов.
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(values[values.length - 1]).toBe(50);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      try {
+        mv?.destroy();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
   }, 10_000);
 });
 

@@ -93,6 +93,9 @@ const EPSILON = 1e-10;
 /** Синхронный output-сcratch солвера: _tick копирует оба числа до callback-границы. */
 const solverSample = { value: 0, velocity: 0 };
 
+/** Терминальная отписка не удерживает экземпляр или callback новой подписки. */
+const noopUnsubscribe = () => {};
+
 /**
  * Единый fail-fast страж конечности публичных числовых входов MotionValue:
  * NaN/±Infinity → MotionParamError синхронно (до Promise и до единого кадра).
@@ -129,17 +132,17 @@ export class MotionValue {
    */
   declare private _velocity: number;
 
-  /** Active spring params. */
-  declare private readonly _spring: SpringParams;
+  /** Пользовательские параметры; null означает необратимо завершённого владельца. */
+  declare private _spring: SpringParams | null;
 
   /** Клэмп-режим: true = легаси CSS-safe; false — честная пружина (overshoot эмитится). */
   declare private readonly _clamp: boolean;
 
-  /** Injected frame scheduler. */
-  declare private readonly _requestFrame: RequestFrameFn;
+  /** Планировщик живого владельца; null после destroy(). */
+  declare private _requestFrame: RequestFrameFn | null;
 
-  /** Registered onChange subscribers. */
-  private readonly _listeners: Set<(value: number) => void> = new Set();
+  /** Реестр callback и его единственной функции отзыва. */
+  private readonly _listeners = new Map<(value: number) => void, () => void>();
 
   // ── Animation run state (reset on each setTarget) ───────────────────────
 
@@ -156,10 +159,13 @@ export class MotionValue {
   /** Начало текущей траектории в timestamp-координате инжектированного клока. */
   declare private _startTs: number | undefined;
 
-  /** Whether a frame loop is currently active. */
-  private _running: boolean = false;
-  /** Whether destroy() has been called. */
-  private _destroyed: boolean = false;
+  /**
+   * Объект принадлежит одному активному циклу; null означает покой.
+   * Только setTarget создаёт его после проверки живого владельца, поэтому
+   * активный цикл всегда имеет spring и scheduler. Отзыв перед очисткой
+   * отсекает уже выданные host callbacks, даже после следующего запуска.
+   */
+  private _run: object | null = null;
   /** Single-flight re-entrancy guard for the tick body. */
   private _tickActive: boolean = false;
   /** Whether to use setTimeout fallback (handle=0 path). */
@@ -167,19 +173,6 @@ export class MotionValue {
 
   /** Frame counter for the current run. */
   declare private _frameCount: number;
-  /**
-   * Bumped by stop()/snapTo() to invalidate any frame already handed to the
-   * injected requestFrame seam. The seam contract (RequestFrameFn) has no
-   * cancel handle, so a frame scheduled before a stop()/snapTo() cannot be
-   * pulled back out of the queue — instead each scheduled tick closure
-   * captures the generation it was born into, and _tick() no-ops (does not
-   * emit, does not reschedule) if that generation is stale. Without this,
-   * stop() followed by a resuming setTarget() (or snapTo()) leaves the old
-   * frame alive alongside the new one: both re-schedule themselves forever,
-   * doubling the effective tick rate every frame (Lit hostDisconnected/
-   * hostConnected churn, and reduced-motion mid-flight snaps, both do this).
-   */
-  private _generation: number = 0;
 
   // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -227,20 +220,29 @@ export class MotionValue {
    * Returns an unsubscribe function.
   */
   onChange(cb: (value: number) => void): () => void {
-    const added = !this._listeners.has(cb);
-    this._listeners.add(cb);
-    // Подписка становится видимой только вместе с успешной первичной доставкой:
-    // иначе бросивший callback навсегда отравляет каждый следующий кадр.
+    if (!this._spring) return noopUnsubscribe;
+    let listeners: typeof this._listeners | null = this._listeners;
+    const existing = listeners.get(cb);
+    if (existing) {
+      // Повторная доставка не владеет существующей подпиской.
+      cb(this._value);
+      return existing;
+    }
+    const off = () => {
+      // Отзыв освобождает оба захвата; старый handle не удаляет новую подписку.
+      listeners?.delete(cb);
+      listeners = null;
+      cb = noopUnsubscribe;
+    };
+    listeners.set(cb, off);
+    // Подписка становится видимой только вместе с успешной первичной доставкой.
     try {
       cb(this._value);
     } catch (error) {
-      // Повторный onChange того же callback не владеет старой Set-записью.
-      if (added) this._listeners.delete(cb);
+      off();
       throw error;
     }
-    return () => {
-      this._listeners.delete(cb);
-    };
+    return off;
   }
 
   /**
@@ -258,12 +260,12 @@ export class MotionValue {
    * @param target - Finite target value.
    */
   setTarget(target: number): void {
-    if (this._destroyed) return;
+    if (!this._spring) return;
     assertFinite(target);
 
     // Повтор цели сохраняет подготовленную траекторию и её часы. Проверка
-    // running важна: stop() не запрещает снова двигаться к той же цели.
-    if (this._running && target === this._target) return;
+    // активного цикла важна: stop() не запрещает снова двигаться к той же цели.
+    if (this._run && target === this._target) return;
 
     if (target === this._value && Math.abs(this._velocity) < EPSILON) {
       this._target = target;
@@ -294,17 +296,19 @@ export class MotionValue {
     // Новый origin принадлежит последнему опубликованному snapshot, а не
     // будущему callback. Иначе поток setTarget перед каждым кадром навсегда
     // держит elapsed=0. Глобальные часы не читаются; до первого кадра epoch нет.
-    this._startTs = this._running && this._startTs !== undefined
+    this._startTs = this._run && this._startTs !== undefined
       ? this._startTs + this._elapsed * 1000
       : undefined;
     this._elapsed = 0;
     this._frameCount = 0;
 
     // ── Start frame loop (idempotent: only one loop runs at a time) ──────
-    if (!this._running) {
+    if (!this._run) {
       this._useTimeoutFallback = false;
-      this._running = true;
-      this._schedule(this._generation);
+      // Новый цикл не наследует guard отозванного tick, ещё исполняющего getter/listener.
+      this._tickActive = false;
+      this._run = {};
+      this._schedule(this._run);
     }
     // If already running, the active loop will pick up the new _target/_from/_v0Normalized
     // on its next tick (because it re-reads these fields). The loop is already scheduled.
@@ -315,23 +319,22 @@ export class MotionValue {
    * After destroy(), setTarget() and onChange() are no-ops.
    */
   destroy(): void {
-    this._destroyed = true;
-    this._running = false;
-    this._listeners.clear();
+    this._run = null;
+    // Параметры могут содержать ссылки на компонент; terminal больше не исполняет физику.
+    this._spring = this._requestFrame = null;
+    this._listeners.forEach((off) => off());
   }
 
   /**
-   * Halt the running frame loop without destroying the instance: no further
-   * ticks fire, but `_destroyed` stays false and listeners are kept — unlike
-   * destroy(), a later setTarget() resumes animating normally. For consumers
-   * whose host can disconnect and reconnect (e.g. Lit hostDisconnected/
-   * hostConnected) without permanently killing the value.
+   * Останавливает текущий цикл, сохраняя параметры пружины и подписки.
+   * Следующий setTarget возобновляет движение. Подходит для временного
+   * отключения хоста (например, Lit hostDisconnected/hostConnected);
+   * необратимое завершение остаётся за destroy().
    */
   stop(): void {
-    this._running = false;
+    this._run = null;
     // Не сбрасываем неактивную траекторию: следующий setTarget — её единственный
-    // инициализатор. Поколение отсекает callback до любого чтения её полей.
-    this._generation++; // invalidate any frame already scheduled by this run
+    // инициализатор. Отозванный объект отсекает callback до чтения её полей.
   }
 
   /**
@@ -348,14 +351,13 @@ export class MotionValue {
    * форсированный re-render — штатный путь для этого host.requestUpdate().
    */
   snapTo(target: number): void {
-    if (this._destroyed) return;
+    if (!this._spring) return;
     assertFinite(target);
     // Идемпотентность: уже покоимся ровно в target → нечего менять и незачем
     // эмитить (лишний requestUpdate у Lit-хоста). Живой ран в тот же target —
     // НЕ no-op: его надо прервать и снапнуть.
-    if (!this._running && this._value === target && this._target === target) return;
-    this._generation++; // invalidate any frame scheduled by the run being replaced
-    this._running = false;
+    if (!this._run && this._value === target && this._target === target) return;
+    this._run = null;
     this._value = target;
     this._target = target;
     this._velocity = 0;
@@ -369,46 +371,46 @@ export class MotionValue {
    * бывшие две копии, ужим под гейт ядра): handle=0 = non-draining step-clock
    * (конвенция repo) → setTimeout(0)-fallback, дальше цикл живёт на нём.
    */
-  private _schedule(gen: number): void {
+  private _schedule(run: object): void {
+    // Единственный вход в host IO принадлежит только текущему живому циклу.
+    if (run !== this._run) return;
     let sync = true;
     let called = false;
     let timestamp: number | undefined;
     try {
-      if (this._useTimeoutFallback) {
-        setTimeout(() => this._tick(undefined, gen), 0);
-        return;
-      }
-      const handle = this._requestFrame((ts) => {
-        if (sync) {
-          called = true;
-          timestamp = ts;
-        } else if (!this._useTimeoutFallback) {
-          this._tick(ts, gen);
-        }
-      });
-      sync = false;
-      if (called || handle === 0) {
+      if (!this._useTimeoutFallback) {
+        const handle = this._requestFrame!((ts) => {
+          if (sync) {
+            called = true;
+            timestamp = ts;
+          } else if (!this._useTimeoutFallback) {
+            this._tick(ts, run);
+          }
+        });
+        sync = false;
+        // Host мог завершить владельца до возврата handle или синхронного callback.
+        if (run !== this._run) return;
+        if (!called && handle !== 0) return;
         // Синхронный host и handle=0 сходятся в один trampoline; callback host-а
         // после возврата уже не может создать второй живой тик.
         this._useTimeoutFallback = true;
-        setTimeout(() => this._tick(timestamp, gen), 0);
       }
+      // Первый fallback сохраняет timestamp host-а; последующие используют FIXED_DT.
+      setTimeout(() => this._tick(timestamp, run), 0);
     } catch (error) {
-      if (gen === this._generation) {
-        // Host мог поставить callback перед throw: новое поколение делает его
-        // инертным, а running=false позволяет следующему setTarget повторить выдачу.
+      if (run === this._run) {
+        // Host мог поставить callback перед throw: отзыв делает его инертным
+        // и позволяет следующему setTarget повторить выдачу.
         this.stop();
       }
       throw error;
     }
   }
 
-  private _tick(ts: number | undefined, gen: number): void {
-    // A frame scheduled by a run that was since stop()/snapTo()-ed away is
-    // stale: it must not emit and must not reschedule (see _generation doc).
-    if (gen !== this._generation) return;
-    if (!this._running) return;
-    if (this._tickActive) return;
+  private _tick(ts: number | undefined, run: object): void {
+    // Отозванный цикл не публикует кадры и не ставит новые, даже если
+    // setTarget уже начал другой цикл на том же экземпляре.
+    if (run !== this._run || this._tickActive) return;
     this._tickActive = true;
     try {
       // Advance elapsed time.
@@ -426,7 +428,9 @@ export class MotionValue {
 
       // Общий солвер (internal/solver.ts) + стражи этого модуля инлайн
       // (value→1, velocity→0 — политика отличается от clampFinite spring.ts).
-      const raw = solveSpring(this._spring, this._elapsed, this._v0Normalized, solverSample);
+      const raw = solveSpring(this._spring!, this._elapsed, this._v0Normalized, solverSample);
+      // Getter мог завершить владельца или сменить цикл внутри solver.
+      if (run !== this._run) return;
       const normPos = Number.isFinite(raw.value) ? raw.value : 1;
       const normVel = Number.isFinite(raw.velocity) ? raw.velocity : 0;
 
@@ -464,10 +468,7 @@ export class MotionValue {
       if (converged || !Number.isFinite(clampedValue) || !Number.isFinite(rawVelocity)) {
         this._value = this._target;
         this._velocity = 0;
-        this._running = false;
-        // Сохраняет прежнюю reentrant-семантику финального emit: синхронный
-        // scheduler нового setTarget не должен увидеть guard старого рана.
-        this._tickActive = false;
+        this._run = null;
         this._emit(this._target);
         return;
       }
@@ -479,12 +480,10 @@ export class MotionValue {
       } catch (primaryError) {
         // Сначала сохраняем живой ран; transactional _schedule сам сделает его
         // retryable при host-ошибке. Вторичная ошибка не маскирует listener RCA.
-        if (gen === this._generation && this._running) {
-          try { this._schedule(gen); } catch { /* первична listener-ошибка */ }
-        }
+        try { this._schedule(run); } catch { /* первична listener-ошибка */ }
         throw primaryError;
       }
-      if (gen === this._generation && this._running) this._schedule(gen);
+      this._schedule(run);
     } finally {
       this._tickActive = false;
     }
@@ -493,19 +492,18 @@ export class MotionValue {
   private _emit(value: number): void {
     let failed = false;
     let firstError: unknown;
-    for (const cb of this._listeners) {
+    this._listeners.forEach((off, cb) => {
       try {
         cb(value);
       } catch (error) {
-        // Set допускает удаление текущего элемента без snapshot-массива: соседям
-        // всё ещё доставляется этот кадр, а дефектный callback больше не вызывается.
-        this._listeners.delete(cb);
+        // Map передал исходную отписку до callback; преемник не отзывается.
+        off();
         if (!failed) {
           failed = true;
           firstError = error;
         }
       }
-    }
+    });
     if (failed) throw firstError;
   }
 }

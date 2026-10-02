@@ -186,7 +186,7 @@ const compositorCase = (mod, label, terminal) => {
   return ref;
 };
 
-const followCase = (mod, label, terminal, pickup) => {
+const followCase = (mod, label, terminal, pickup, springOwnsTarget = false) => {
   let animateCalls = 0;
   let cancelCalls = 0;
   let effectRef;
@@ -202,7 +202,7 @@ const followCase = (mod, label, terminal, pickup) => {
   const targetRef = new WeakRef(target);
   const captured = target;
   const controller = mod.createCompositorFollow({
-    spring: { mass: 1, stiffness: 170, damping: 26 },
+    spring: { mass: 1, stiffness: 170, damping: 26, ...(springOwnsTarget ? { owner: captured } : {}) },
     property: 'opacity',
     from: 0,
     to: 1,
@@ -249,6 +249,63 @@ for (const [mod, format] of [[followEsm, 'esm'], [followCjs, 'cjs']]) {
     (pickup ? dropped : live).push(active.effect);
   }
 }
+const motionValueCase = (mod, label, springOwnsTarget) => {
+  let target = { marker: label };
+  const ref = new WeakRef(target);
+  const value = mod.handoffToLive({
+    spring: { mass: 1, stiffness: 170, damping: 26, ...(springOwnsTarget ? { owner: target } : {}) },
+    value: 0,
+    velocity: 0,
+    requestFrame: () => 1,
+  });
+  value.destroy();
+  retainedOwners.push(value);
+  target = undefined;
+  return { label, ref };
+};
+
+const motionValueTargets = [];
+const motionValueNeighbors = [];
+for (const [mod, format] of [[compositorEsm, 'esm'], [compositorCjs, 'cjs']]) {
+  motionValueTargets.push(motionValueCase(mod, 'motion-value-' + format + '-spring-owner-dropped', true));
+  motionValueNeighbors.push(motionValueCase(mod, 'motion-value-' + format + '-plain-spring-dropped', false));
+}
+
+const motionValueCallbackCase = (mod, label, kind, terminal) => {
+  let target = { marker: label };
+  const ref = new WeakRef(target);
+  const captureFrame = (owner) => () => { void owner.marker; return 1; };
+  const captureListener = (owner) => () => { void owner.marker; };
+  const value = mod.handoffToLive({
+    spring: { mass: 1, stiffness: 170, damping: 26 },
+    value: 0,
+    velocity: 0,
+    requestFrame: kind === 'requestFrame' ? captureFrame(target) : () => 1,
+  });
+  if (kind === 'pre-listener') retainedOwners.push(value.onChange(captureListener(target)));
+  if (terminal) value.destroy();
+  if (kind === 'listener') retainedOwners.push(value.onChange(captureListener(target)));
+  retainedOwners.push(value);
+  target = undefined;
+  return { label, ref };
+};
+const motionValueCallbackTargets = [];
+const motionValueCallbackLive = [];
+for (const [mod, format] of [[compositorEsm, 'esm'], [compositorCjs, 'cjs']]) {
+  for (const kind of ['requestFrame', 'listener', 'pre-listener']) {
+    motionValueCallbackTargets.push(motionValueCallbackCase(mod, 'motion-value-' + format + '-' + kind + '-dropped', kind, true));
+    motionValueCallbackLive.push(motionValueCallbackCase(mod, 'motion-value-' + format + '-' + kind + '-live', kind, false));
+  }
+  motionValueCallbackTargets.push(motionValueCallbackCase(mod, 'motion-value-' + format + '-plain-callback-dropped', 'plain', true));
+}
+
+const springTargets = [];
+for (const [mod, format] of [[followEsm, 'esm'], [followCjs, 'cjs']]) {
+  const label = 'follow-' + format + '-spring-owner-dropped';
+  const terminal = followCase(mod, label, true, true, true);
+  springTargets.push({ label, ref: terminal.target });
+  dropped.push(terminal.effect);
+}
 let deliberate = { id: 'deliberate-retention' };
 const deliberateRef = new WeakRef(deliberate);
 retainedOwners.push(deliberate);
@@ -266,6 +323,24 @@ for (const ref of live) {
   assert.notEqual(ref.deref(), undefined, 'live-owner control собран слишком рано');
 }
 assert.notEqual(deliberateRef.deref(), undefined, 'deliberate-retention control не различает strong owner');
+const retainedSpringTargets = springTargets
+  .filter(({ ref }) => ref.deref() !== undefined)
+  .map(({ label }) => label);
+assert.deepEqual(retainedSpringTargets, [], 'terminal owner удерживает component через spring metadata');
+for (const { ref } of motionValueNeighbors) {
+  assert.equal(ref.deref(), undefined, 'MotionValue без spring metadata удерживает marker');
+}
+const retainedMotionValueTargets = motionValueTargets
+  .filter(({ ref }) => ref.deref() !== undefined)
+  .map(({ label }) => label);
+assert.deepEqual(retainedMotionValueTargets, [], 'terminal MotionValue удерживает component через spring metadata');
+for (const { label, ref } of motionValueCallbackLive) {
+  assert.notEqual(ref.deref(), undefined, label + ': live callback owner собран слишком рано');
+}
+const retainedCallbackTargets = motionValueCallbackTargets
+  .filter(({ ref }) => ref.deref() !== undefined)
+  .map(({ label }) => label);
+assert.deepEqual(retainedCallbackTargets, [], 'terminal MotionValue удерживает callback owner');
 console.log('resource-installed-package-retention: PASS');
 `;
 
