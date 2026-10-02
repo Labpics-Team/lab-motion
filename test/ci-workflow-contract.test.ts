@@ -96,6 +96,7 @@ const testCommands = [
   'pnpm build',
   vitestCommand,
   'pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts',
+  'node test/fixtures/server-thread-cpu-clock-check.mjs',
 ];
 const mutationCommands = [
   activatePnpm,
@@ -236,6 +237,14 @@ const requiredActions = {
         "path": "vitest.log",
         "if-no-files-found": "error",
         "retention-days": 7
+      }
+    },
+    {
+      "index": 8,
+      "name": "Setup registered native-clock Node",
+      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "with": {
+        "node-version": "24.19.0"
       }
     }
   ],
