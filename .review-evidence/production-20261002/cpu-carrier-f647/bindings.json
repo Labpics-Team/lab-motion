@@ -15242,6 +15242,34 @@
       "bytes": 24425,
       "sha256": "104463921cb70208d74b0c9432ccbe7eba8aac4f317e3707a7a61818fbdd179f",
       "depotPath": ".review-evidence/production-20261002/cpu-carrier-f647/files/tmp/motion-f647-current-full-cr-root-observation-20261002.md"
+    },
+    {
+      "original": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/bench/profile/server-profile-contract.mjs",
+      "bytes": 73913,
+      "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+      "archiveDepotPath": ".review-evidence/production-20261002/cpu-carrier-f647/files/tmp/motion-native-cpu-rle-final-20261002/source.tar.gz",
+      "archiveMember": "bench/profile/server-profile-contract.mjs"
+    },
+    {
+      "original": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/bench/profile/server-profile-registration.mjs",
+      "bytes": 18998,
+      "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+      "archiveDepotPath": ".review-evidence/production-20261002/cpu-carrier-f647/files/tmp/motion-native-cpu-rle-final-20261002/source.tar.gz",
+      "archiveMember": "bench/profile/server-profile-registration.mjs"
+    },
+    {
+      "original": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/bench/profile/server-profile-runner.mjs",
+      "bytes": 51648,
+      "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+      "archiveDepotPath": ".review-evidence/production-20261002/cpu-carrier-f647/files/tmp/motion-native-cpu-rle-final-20261002/source.tar.gz",
+      "archiveMember": "bench/profile/server-profile-runner.mjs"
+    },
+    {
+      "original": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/test/server-profile-contract.test.ts",
+      "bytes": 97980,
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+      "archiveDepotPath": ".review-evidence/production-20261002/cpu-carrier-f647/files/tmp/motion-native-cpu-rle-final-20261002/source.tar.gz",
+      "archiveMember": "test/server-profile-contract.test.ts"
     }
   ],
   "sourceArchives": [
@@ -24876,7 +24904,7 @@
     "reviewMerge": "c80fdbf0cfb5b5a23aa5b2449cc33702e6e4d7b0",
     "rerun": false
   },
-  "lastAppendedAtUtc": "2026-10-02T03:10:34.761489+00:00",
+  "lastAppendedAtUtc": "2026-10-02T03:25:04.874793+00:00",
   "currentSubstantiveCodeRabbit": {
     "head": "f6476ae990254f606faf97f80afe41965bec2fb2",
     "commentId": 5936940453,
@@ -24891,5 +24919,9 @@
       "private tool documentation canon"
     ],
     "scope": "Full review verdict retained; independent scoped PASS is not product GO."
+  },
+  "portableAliasCorrection": {
+    "oldHead": "629eaa4486bbd834456a80c4ff25253fe1dbaa36",
+    "reason": "Four capacity source aliases were present by exact bytes in existing SOURCE archives but missing explicit original-path mapping; added only locator rows, no new payload/retest."
   }
 }
