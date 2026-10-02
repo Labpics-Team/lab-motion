@@ -13,7 +13,7 @@ function freeze(value) {
 
 export const SERVER_PROFILE = freeze({
   schema: 1,
-  rawEncoding: 'compact-json-stream-v1; every sample preserved; external digest and journal bind exact file bytes',
+  rawEncoding: 'compact-json-stream-v1/native-cpu-rle-v1; every sample and exact reconstructed CPU field preserved; external digest and journal bind exact file bytes',
   id: 'PROFILE-01-server',
   baselineRevision: '0b6f537e148b7dadadfb9e3ce7c446d014975958',
   candidateSamplesObservedScope: 'на момент регистрации ещё нет registered CPU/API cost samples текущего protocol epoch; historical exploratory stock wall и semantic/memory controls candidate уже известны',

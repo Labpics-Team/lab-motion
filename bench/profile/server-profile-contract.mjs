@@ -1,4 +1,4 @@
-import { isDeepStrictEqual } from 'node:util';
+import { isDeepStrictEqual, types } from 'node:util';
 import { closeSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -179,6 +179,72 @@ function verifyThreadCpuIdentity(identity) {
     Number.isSafeInteger(identity.tid) && identity.tid === identity.pid, 'невалидная native CPU clock main-thread identity');
 }
 
+const CPU_FIELDS = ['sequence', 'clock', 'pid', 'tid', 'seconds', 'nanoseconds', 'valueNs'];
+
+/** Метаданные объединяются в run; каждый приобретённый timespec остаётся отдельным. */
+export function compactServerCpuEvidence(reads) {
+  invariant(Array.isArray(reads) && !types.isProxy(reads), 'невалидный native CPU source array');
+  if (reads.length === 0) return reads;
+  const keys = Reflect.ownKeys(reads);
+  invariant(Object.getPrototypeOf(reads) === Array.prototype && keys.length === reads.length + 1 && keys.at(-1) === 'length',
+    'native CPU source array содержит лишние поля/prototype');
+  const runs = [];
+  for (let sequence = 0; sequence < reads.length; sequence++) {
+    const descriptor = Object.getOwnPropertyDescriptor(reads, String(sequence));
+    invariant(descriptor && Object.hasOwn(descriptor, 'value'), 'native CPU source потерял endpoint');
+    const read = descriptor.value;
+    invariant(read && typeof read === 'object' && !types.isProxy(read) &&
+      Object.getPrototypeOf(read) === Object.prototype &&
+      isDeepStrictEqual(Reflect.ownKeys(read), CPU_FIELDS), 'неполные canonical native CPU fields');
+    const fields = Object.getOwnPropertyDescriptors(read);
+    invariant(CPU_FIELDS.every((key) => Object.hasOwn(fields[key], 'value') && fields[key].enumerable), 'native CPU source содержит accessor/скрытое поле');
+    invariant(read.sequence === sequence && !Object.is(read.sequence, -0) && read.clock === SERVER_PROFILE.clockError.engineClock &&
+      Number.isSafeInteger(read.pid) && read.pid > 0 && read.tid === read.pid &&
+      typeof read.seconds === 'string' && /^(0|[1-9]\d*)$/.test(read.seconds) && read.seconds.length <= 19 &&
+      BigInt(read.seconds) <= 9_223_372_036_854_775_807n && Number.isSafeInteger(read.nanoseconds) &&
+      read.nanoseconds >= 0 && !Object.is(read.nanoseconds, -0) && read.nanoseconds < 1_000_000_000,
+    'невалидные canonical native CPU endpoint fields');
+    // Производные поля проверяются до сжатия: ошибочный ordinal/valueNs не исправляется.
+    invariant(read.valueNs === String(BigInt(read.seconds) * 1_000_000_000n + BigInt(read.nanoseconds)),
+      'native CPU source value не пересчитывается из timespec');
+    let run = runs.at(-1);
+    if (!run || run.clock !== read.clock || run.pid !== read.pid || run.tid !== read.tid) {
+      run = { from: sequence, count: 0, clock: read.clock, pid: read.pid, tid: read.tid, values: [] };
+      runs.push(run);
+    }
+    run.count++; run.values.push([read.seconds, read.nanoseconds]);
+  }
+  return { encoding: 'native-cpu-rle-v1', count: reads.length, runs };
+}
+
+/** Legacy arrays сохраняются; RLE восстанавливает все семь полей без Number conversion. */
+export function expandServerCpuEvidence(value, expectedCount) {
+  if (Array.isArray(value)) return value;
+  invariant(value?.encoding === 'native-cpu-rle-v1' && value.count === expectedCount &&
+    Number.isSafeInteger(value.count) && value.count > 0 && Array.isArray(value.runs) &&
+    isDeepStrictEqual(Object.keys(value).sort(), ['count', 'encoding', 'runs']), 'неполный native CPU RLE');
+  const reads = [];
+  let previous;
+  for (const run of value.runs) {
+    invariant(run?.from === reads.length && !Object.is(run.from, -0) && Number.isSafeInteger(run.count) && run.count > 0 &&
+      run.count <= expectedCount - reads.length && Array.isArray(run.values) && run.values.length === run.count &&
+      isDeepStrictEqual(Object.keys(run).sort(), ['clock', 'count', 'from', 'pid', 'tid', 'values']), 'native CPU RLE потерял endpoint/run');
+    invariant(!previous || previous.clock !== run.clock || previous.pid !== run.pid || previous.tid !== run.tid,
+      'native CPU RLE содержит соседние дубликаты run');
+    for (const fields of run.values) {
+      invariant(Array.isArray(fields) && fields.length === 2 && Object.hasOwn(fields, 0) && Object.hasOwn(fields, 1) &&
+        typeof fields[0] === 'string' && /^(0|[1-9]\d*)$/.test(fields[0]) && fields[0].length <= 19 &&
+        BigInt(fields[0]) <= 9_223_372_036_854_775_807n && Number.isSafeInteger(fields[1]) && fields[1] >= 0 &&
+        !Object.is(fields[1], -0) && fields[1] < 1_000_000_000, 'native CPU RLE потерял canonical timespec tuple');
+      reads.push({ sequence: reads.length, clock: run.clock, pid: run.pid, tid: run.tid,
+        seconds: fields[0], nanoseconds: fields[1], valueNs: String(BigInt(fields[0]) * 1_000_000_000n + BigInt(fields[1])) });
+    }
+    previous = run;
+  }
+  invariant(reads.length === expectedCount, 'native CPU RLE потерял acquired suffix');
+  return reads;
+}
+
 export function serverOrders(runs, seed = SERVER_PROFILE.seed) {
   const orders = makeRoundRobinOrders(IDS, runs, seed);
   assertBalancedRunBlocks('server profile', orders, IDS);
@@ -300,6 +366,7 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
 }
 
 function validateThreadCpuFields(cpuReads, clockReads, identity, previous = -1n) {
+  cpuReads = expandServerCpuEvidence(cpuReads, clockReads.length);
   invariant(Array.isArray(cpuReads) && cpuReads.length === clockReads.length, 'потеряны actual thread CPU fields');
   for (let sequence = 0; sequence < cpuReads.length; sequence++) {
     const read = cpuReads[sequence];

@@ -6,7 +6,7 @@ import { createContext, runInContext } from 'node:vm';
 import { createHash } from 'node:crypto';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from '../bench/profile/server-profile-registration.mjs';
 import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
-  compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
+  compactServerCpuEvidence, compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
   parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal,
   verifyServerClockRegistration, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
@@ -239,7 +239,15 @@ function chain(events: any[], shared?: { events: any[]; records: any[] }) {
 let sharedAdmission: { artifact: any; events: any[]; records: any[] } | undefined;
 function admissionHistory() {
   if (!sharedAdmission) {
-    const artifact = healthyAdmission(), events = admissionEvents(artifact);
+    const artifact = healthyAdmission();
+    // Полные независимые vectors переходят в зарегистрированный carrier до events/hash.
+    // N, поля наблюдений и четыре контрпримера остаются прежними; legacy fault fixtures не меняются.
+    for (const name of ['warmup', 'pilot', 'aa', 'positive', 'ab']) for (const row of artifact[name].rows) {
+      if (row.kind === 'engine') for (const sample of Object.values(row.samples) as any[]) {
+        for (const measured of sample.raw) measured.raw.cpuReads = compactServerCpuEvidence(measured.raw.cpuReads);
+      }
+    }
+    const events = admissionEvents(artifact);
     sharedAdmission = { artifact, events, records: chain(events) };
   }
   return sharedAdmission;

@@ -15,7 +15,7 @@ import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPack
   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
 import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './server-thread-cpu-clock.mjs';
-import { compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
+import { compactServerCpuEvidence, compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
   serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -171,6 +171,14 @@ function threadCpuNs(reads) {
 function sampleCpuClock(raw) {
   const endpoint = raw[0]?.raw?.cpuReads?.[0];
   return { clock: endpoint?.clock, pid: endpoint?.pid, tid: endpoint?.tid };
+}
+
+function compactSampleCpuEvidence(sample) {
+  // Никакой частичной замены при отказе encoder: исходные массивы остаются в error.raw.
+  let encoded;
+  try { encoded = sample.raw.map((measured) => compactServerCpuEvidence(measured.raw.cpuReads)); }
+  catch (error) { throw Object.assign(new AggregateError([error], 'server profile: native CPU carrier не завершён'), { raw: sample }); }
+  for (let index = 0; index < sample.raw.length; index++) sample.raw[index].raw.cpuReads = encoded[index];
 }
 
 export async function measureServerEngine(animate, scene, workMultiplier = 1) {
@@ -581,8 +589,10 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
               const build = name === 'ab' && id === 'right' ? 'candidate' : 'baseline';
               const multiplier = name === 'positive' && id === 'right' ? SERVER_PROFILE.positiveWorkMultiplier : 1;
               try {
-                current.samples[id] = kind === 'engine' ? await engineMeasure(implementations[scene.workload === 'stock-c' ? `${build}:stock-c` : build], scene, multiplier)
+                const sample = kind === 'engine' ? await engineMeasure(implementations[scene.workload === 'stock-c' ? `${build}:stock-c` : build], scene, multiplier)
                   : await browserMeasure(browser, origin, adapters[build], scene, multiplier);
+                if (kind === 'engine') compactSampleCpuEvidence(sample);
+                current.samples[id] = sample;
                 journal('sample', { stage: name, kind, scene: scene.id, run, participant: id, build, value: current.samples[id] });
               } catch (error) {
                 journal('failed-sample', { stage: name, kind, scene: scene.id, run, participant: id, build, error: errorRecord(error),
