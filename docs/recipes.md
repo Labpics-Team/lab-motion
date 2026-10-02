@@ -1,8 +1,8 @@
 # Рецепты @labpics/motion
 
-> Роль: практика — runnable-рецепты интеграции: связка с DOM-событиями и
-> композиция субпутей. Концепты и контракты каждого пути — в
-> [справочнике API](api.md) и топик-доках ([compositor.md](compositor.md),
+> Роль: практика — исполняемые примеры интеграции с DOM и композиции субпутей.
+> Контракты — в [справочнике API](api.md) и тематических документах
+> ([compositor.md](compositor.md),
 > [projection.md](projection.md), [smart.md](smart.md),
 > [behaviors.md](behaviors.md)).
 
@@ -43,6 +43,7 @@ function dispose() {
 приведите координаты указателя к исходной позиции карточки один раз на границе
 измерения; не вызывайте `getBoundingClientRect()` на каждом событии без необходимости.
 `destroy()` останавливает эффект, но не отменяет внешние CSS-изменения приложения.
+
 ## Карточка загрузки: одна модель, разные движения
 
 Приложение владеет `status`, `progress` и `pressed`, а не фазами твинов. Три
@@ -216,6 +217,7 @@ fl.play(first, el.getBoundingClientRect()); // элемент «доезжает
 при размонтировании нужен `binding.destroy()`. Повторное открытие во время ухода
 не сбрасывает позу и не позволяет старому завершению закрыть диалог.
 
+<!-- recipe:presence-dialog -->
 ```typescript
 import { animate } from '@labpics/motion/animate';
 import { createPresenceTransition } from '@labpics/motion/presence';
@@ -385,7 +387,7 @@ const toProgress = pipe(clamp(0, 300), (x) => x / 300); // композиция 
 
 ## Bottom sheet (behaviors, DOM-адаптер)
 
-Runnable DOM-адаптер: transform из headless-состояния `createBottomSheet`.
+DOM-адаптер задаёт transform по состоянию `createBottomSheet`.
 
 ```ts
 import { createBottomSheet } from '@labpics/motion/behaviors';
@@ -413,17 +415,310 @@ el.addEventListener('pointercancel', () => sheet.pointerCancel());
 document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(2));
 ```
 
+## Sheet: живая фаза и автономный snap
+
+Нужны панель `[data-sheet-panel]`, кнопка `[data-sheet-handle]` с
+`touch-action: none` и необязательные кнопки `[data-sheet-snap="0"]` и т. д.
+Точки остановки — конечные возрастающие смещения по Y; обновляйте их при смене
+высоты или содержимого. Поля ввода внутри панели сохраняют обычное поведение.
+`CompositorSpring` принимает текущую позу и скорость при захвате; после отпускания
+`createDecay().rest` помогает выбрать остановку, а контроллер переносит импульс.
+
+<!-- recipe:compositor-sheet -->
+```typescript
+import { CompositorSpring } from '@labpics/motion/compositor';
+import { createDecay } from '@labpics/motion/decay';
+
+export function mountCompositorSheet(root: HTMLElement, options: {
+  snapPoints: readonly number[];
+  motion?: 'auto' | 'none';
+  onSelect?: (index: number) => void;
+  requestFrame?: (callback: (time?: number) => void) => number;
+}) {
+  const panel = root.querySelector<HTMLElement>('[data-sheet-panel]');
+  const handle = root.querySelector<HTMLButtonElement>('[data-sheet-handle]');
+  if (!panel || !handle) throw new Error('Нужны panel и button handle');
+  const check = (points: readonly number[]) => {
+    const copy = [...points];
+    if (!copy.length || copy.some((v, i) => !Number.isFinite(v) || (i > 0 && v <= copy[i - 1]!))) {
+      throw new RangeError('Snap points должны быть конечными и строго возрастающими');
+    }
+    return copy;
+  };
+  let points = check(options.snapPoints), selected = 0, paused = false;
+  let pointer: number | undefined, anchor = 0, coordinate = 0;
+  let live: ReturnType<CompositorSpring['handoffToLive']> | undefined;
+  const events = new AbortController();
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const quiet = () => options.motion === 'none' || reduced.matches;
+  const originalTransform = panel.style.getPropertyValue('transform');
+  const originalTransformPriority = panel.style.getPropertyPriority('transform');
+  const focused = () => {
+    let tree = root.getRootNode() as Document | ShadowRoot;
+    let active = tree.activeElement;
+    // Доступный предок может быть closed: ищем его через host, не shadowRoot.
+    while (!active && 'host' in tree) {
+      tree = tree.host.getRootNode() as Document | ShadowRoot;
+      active = tree.activeElement;
+    }
+    active ??= root.ownerDocument.activeElement;
+    while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+    return active as HTMLElement | null;
+  };
+  const previousFocus = focused();
+  const format = (value: number) => `translateY(${value}px)`;
+  panel.style.transform = format(points[0]!);
+  const motion = new CompositorSpring({
+    spring: { mass: 1, stiffness: 240, damping: 28 },
+    property: 'transform', from: points[0]!, to: points[0]!, target: panel,
+    format, apply: value => { panel.style.transform = String(value); },
+    matchMedia: () => ({ matches: quiet() }), requestFrame: options.requestFrame,
+  });
+  const bounded = (value: number) => Math.max(points[0]!, Math.min(points.at(-1)!, value));
+  const releaseCapture = () => {
+    const id = pointer; pointer = undefined;
+    if (id !== undefined && handle.hasPointerCapture(id)) handle.releasePointerCapture(id);
+  };
+  const select = (index: number) => {
+    if (events.signal.aborted) return;
+    if (!Number.isInteger(index) || index < 0 || index >= points.length) throw new RangeError('Нет такого snap');
+    releaseCapture(); live = undefined; selected = index;
+    if (!paused) {
+      if (quiet()) motion.handoffToLive(points[index]!).snapTo(points[index]!);
+      else motion.handoffToCompositor(points[index]!);
+    }
+    const onSelect = options.onSelect;
+    if (!events.signal.aborted && selected === index && onSelect != null) Reflect.apply(onSelect, options, [index]);
+  };
+  const follow = (event: PointerEvent) => {
+    if (pointer !== event.pointerId || !live) return;
+    coordinate = event.clientY;
+    const goal = bounded(anchor + coordinate);
+    if (quiet()) live.snapTo(goal); else live.setTarget(goal);
+  };
+  const finish = (event: PointerEvent, cancelled: boolean) => {
+    if (pointer !== event.pointerId || !live) return;
+    if (!cancelled) follow(event);
+    const rest = createDecay({ from: live.value, velocity: live.velocity }).rest;
+    const next = cancelled ? selected : points.reduce((best, value, index) =>
+      Math.abs(value - rest) < Math.abs(points[best]! - rest) ? index : best, 0);
+    select(next);
+  };
+  handle.addEventListener('pointerdown', event => {
+    if (paused || pointer !== undefined || !event.isPrimary || event.button !== 0) return;
+    event.preventDefault(); handle.focus({ preventScroll: true });
+    live = motion.handoffToLive();
+    coordinate = event.clientY; anchor = live.value - coordinate; pointer = event.pointerId;
+    handle.setPointerCapture(event.pointerId);
+  }, { signal: events.signal });
+  handle.addEventListener('pointermove', follow, { signal: events.signal });
+  handle.addEventListener('pointerup', event => finish(event, false), { signal: events.signal });
+  handle.addEventListener('pointercancel', event => finish(event, true), { signal: events.signal });
+  handle.addEventListener('lostpointercapture', event => finish(event, true), { signal: events.signal });
+  handle.addEventListener('keydown', event => {
+    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? points.length - 1
+      : event.key === 'ArrowUp' ? selected - 1 : event.key === 'ArrowDown' ? selected + 1 : undefined;
+    if (next !== undefined) { event.preventDefault(); select(Math.max(0, Math.min(points.length - 1, next))); }
+  }, { signal: events.signal });
+  root.addEventListener('click', event => {
+    const button = (event.target as Element).closest<HTMLButtonElement>('button[data-sheet-snap]');
+    if (button && root.contains(button)) select(Number(button.dataset.sheetSnap));
+  }, { signal: events.signal });
+  reduced.addEventListener('change', () => {
+    if (live && pointer !== undefined) live.snapTo(bounded(anchor + coordinate));
+    else select(selected);
+  }, { signal: events.signal });
+  return {
+    motion, select, get selected() { return selected; },
+    resize(next: readonly number[]) {
+      if (events.signal.aborted) return;
+      points = check(next); selected = Math.min(selected, points.length - 1);
+      if (pointer !== undefined && live) {
+        anchor = live.value - coordinate;
+        const goal = bounded(live.value);
+        if (quiet()) live.snapTo(goal); else live.setTarget(goal);
+      } else select(selected);
+    },
+    pause() { if (!events.signal.aborted) { releaseCapture(); paused = true; (live ?? motion.handoffToLive()).stop(); live = undefined; } },
+    resume() { if (!events.signal.aborted) { paused = false; select(selected); } },
+    destroy() {
+      if (events.signal.aborted) return;
+      events.abort(); releaseCapture(); live = undefined; motion.destroy();
+      if (originalTransform) panel.style.setProperty('transform', originalTransform, originalTransformPriority);
+      else panel.style.removeProperty('transform');
+      let active: Element | null = focused();
+      while (active && active !== root) active = active.parentElement ?? (active.getRootNode() as ShadowRoot).host ?? null;
+      if (active && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    },
+  };
+}
+```
+
+Кнопка захвата поддерживает Home/End и стрелки, кнопки остановок — обычный клик.
+Через `onSelect` обновляйте текст, `aria-expanded` и выбранное состояние; модальность
+и удержание фокуса остаются у компонента. `pause()` сохраняет позу, `resume()`
+продолжает движение. `motion: 'none'` и системное уменьшенное движение применяют
+цель сразу. При размонтировании вызовите `destroy()` для очистки и возврата фокуса.
+Очистка возвращает исходное inline-значение `transform` вместе с приоритетом;
+если свойство отсутствовало, оно удаляется.
+
+## Pager: страницы и RTL принадлежат компоненту
+
+Нужны `[data-pager-viewport]` с `overflow: hidden`, вложенный `[data-pager-track]`
+с `display: flex`, прямые дети `[data-page]` с `flex: 0 0 100%` и кнопка
+`[data-pager-handle]` с `touch-action: none`. Кнопки `[data-page-index="0"]`
+и т. д. выбирают страницы. Текст и поля ввода сохраняют выделение и обычный ввод.
+После смены размера, родителя, числа страниц или CSS `direction` вызовите `resize()`.
+Индекс страницы принадлежит компоненту; контроллер управляет физической осью X.
+
+<!-- recipe:compositor-pager -->
+```typescript
+import { CompositorSpring } from '@labpics/motion/compositor';
+import { createDecay } from '@labpics/motion/decay';
+
+export function mountCompositorPager(root: HTMLElement, options: {
+  motion?: 'auto' | 'none';
+  onSelect?: (index: number) => void;
+  requestFrame?: (callback: (time?: number) => void) => number;
+} = {}) {
+  const viewport = root.querySelector<HTMLElement>('[data-pager-viewport]');
+  const track = root.querySelector<HTMLElement>('[data-pager-track]');
+  const handle = root.querySelector<HTMLButtonElement>('[data-pager-handle]');
+  if (!viewport || !track || !handle) throw new Error('Нужны viewport, track и button handle');
+  const measure = () => {
+    const width = viewport.clientWidth;
+    const count = Array.from(track.children).filter(page => page.hasAttribute('data-page')).length;
+    if (!Number.isFinite(width) || width <= 0 || count < 1) throw new RangeError('Pager должен быть видимым и иметь страницы');
+    return { width, count, sign: getComputedStyle(viewport).direction === 'rtl' ? 1 : -1 };
+  };
+  let geometry = measure(), selected = 0, paused = false;
+  let pointer: number | undefined, anchor = 0, coordinate = 0;
+  let live: ReturnType<CompositorSpring['handoffToLive']> | undefined;
+  const events = new AbortController();
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const quiet = () => options.motion === 'none' || reduced.matches;
+  const originalTransform = track.style.getPropertyValue('transform');
+  const originalTransformPriority = track.style.getPropertyPriority('transform');
+  const focused = () => {
+    let tree = root.getRootNode() as Document | ShadowRoot;
+    let active = tree.activeElement;
+    // Доступный предок может быть closed: ищем его через host, не shadowRoot.
+    while (!active && 'host' in tree) {
+      tree = tree.host.getRootNode() as Document | ShadowRoot;
+      active = tree.activeElement;
+    }
+    active ??= root.ownerDocument.activeElement;
+    while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+    return active as HTMLElement | null;
+  };
+  const previousFocus = focused();
+  const offset = (index: number) => geometry.sign * geometry.width * index;
+  const bounded = (value: number) => Math.max(Math.min(0, offset(geometry.count - 1)),
+    Math.min(Math.max(0, offset(geometry.count - 1)), value));
+  const format = (value: number) => `translateX(${value}px)`;
+  track.style.transform = format(0);
+  const motion = new CompositorSpring({
+    spring: { mass: 1, stiffness: 240, damping: 28 },
+    property: 'transform', from: 0, to: 0, target: track,
+    format, apply: value => { track.style.transform = String(value); },
+    matchMedia: () => ({ matches: quiet() }), requestFrame: options.requestFrame,
+  });
+  const releaseCapture = () => {
+    const id = pointer; pointer = undefined;
+    if (id !== undefined && handle.hasPointerCapture(id)) handle.releasePointerCapture(id);
+  };
+  const select = (index: number) => {
+    if (events.signal.aborted) return;
+    if (!Number.isInteger(index) || index < 0 || index >= geometry.count) throw new RangeError('Нет такой страницы');
+    releaseCapture(); live = undefined; selected = index;
+    if (!paused) {
+      if (quiet()) motion.handoffToLive(offset(index)).snapTo(offset(index));
+      else motion.handoffToCompositor(offset(index));
+    }
+    const onSelect = options.onSelect;
+    if (!events.signal.aborted && selected === index && onSelect != null) Reflect.apply(onSelect, options, [index]);
+  };
+  const follow = (event: PointerEvent) => {
+    if (pointer !== event.pointerId || !live) return;
+    coordinate = event.clientX;
+    const goal = bounded(anchor + coordinate);
+    if (quiet()) live.snapTo(goal); else live.setTarget(goal);
+  };
+  const finish = (event: PointerEvent, cancelled: boolean) => {
+    if (pointer !== event.pointerId || !live) return;
+    if (!cancelled) follow(event);
+    const rest = createDecay({ from: live.value, velocity: live.velocity }).rest;
+    select(cancelled ? selected : Math.max(0, Math.min(geometry.count - 1,
+      Math.round(rest / (geometry.sign * geometry.width)))));
+  };
+  handle.addEventListener('pointerdown', event => {
+    if (paused || pointer !== undefined || !event.isPrimary || event.button !== 0) return;
+    event.preventDefault(); handle.focus({ preventScroll: true });
+    live = motion.handoffToLive();
+    coordinate = event.clientX; anchor = live.value - coordinate; pointer = event.pointerId;
+    handle.setPointerCapture(event.pointerId);
+  }, { signal: events.signal });
+  handle.addEventListener('pointermove', follow, { signal: events.signal });
+  handle.addEventListener('pointerup', event => finish(event, false), { signal: events.signal });
+  handle.addEventListener('pointercancel', event => finish(event, true), { signal: events.signal });
+  handle.addEventListener('lostpointercapture', event => finish(event, true), { signal: events.signal });
+  handle.addEventListener('keydown', event => {
+    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) return;
+    const step = event.key === 'ArrowRight' ? -geometry.sign : event.key === 'ArrowLeft' ? geometry.sign
+      : event.key === 'PageDown' ? 1 : event.key === 'PageUp' ? -1 : undefined;
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? geometry.count - 1
+      : step === undefined ? undefined : selected + step;
+    if (next !== undefined) { event.preventDefault(); select(Math.max(0, Math.min(geometry.count - 1, next))); }
+  }, { signal: events.signal });
+  root.addEventListener('click', event => {
+    const button = (event.target as Element).closest<HTMLButtonElement>('button[data-page-index]');
+    if (button && root.contains(button)) select(Number(button.dataset.pageIndex));
+  }, { signal: events.signal });
+  reduced.addEventListener('change', () => {
+    if (live && pointer !== undefined) live.snapTo(bounded(anchor + coordinate));
+    else select(selected);
+  }, { signal: events.signal });
+  return {
+    motion, select, get selected() { return selected; },
+    resize() {
+      if (events.signal.aborted) return;
+      geometry = measure(); selected = Math.min(selected, geometry.count - 1);
+      if (pointer !== undefined && live) {
+        anchor = live.value - coordinate;
+        const goal = bounded(live.value);
+        if (quiet()) live.snapTo(goal); else live.setTarget(goal);
+      } else select(selected);
+    },
+    pause() { if (!events.signal.aborted) { releaseCapture(); paused = true; (live ?? motion.handoffToLive()).stop(); live = undefined; } },
+    resume() { if (!events.signal.aborted) { paused = false; select(selected); } },
+    destroy() {
+      if (events.signal.aborted) return;
+      events.abort(); releaseCapture(); live = undefined; motion.destroy();
+      if (originalTransform) track.style.setProperty('transform', originalTransform, originalTransformPriority);
+      else track.style.removeProperty('transform');
+      let active: Element | null = focused();
+      while (active && active !== root) active = active.parentElement ?? (active.getRootNode() as ShadowRoot).host ?? null;
+      if (active && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    },
+  };
+}
+```
+
+`onSelect` обновляет состояние страниц и `aria-current`; недоступные страницы
+скрывает компонент. Home/End, PageUp/PageDown и стрелки работают на кнопке захвата;
+горизонтальные стрелки учитывают RTL. Ввод в полях сохраняется. Пауза, очистка и
+`motion: 'none'` работают как у панели выше.
+`motion.mode` сообщает фактическое исполнение: резервный живой путь не является
+исполнением через композитор браузера.
+
 ## Анимации, принадлежащие компоненту
 
-`createAnimateScope` из `./animate` связывает локальные селекторы с одной уборкой.
-Каждый mount создаёт свою область. Строки выбирают потомков root, включая новые
-узлы при следующем вызове; для самого root передайте элемент явно. Переданный
-напрямую внешний элемент тоже допустим — область не является песочницей DOM.
-
-В примере компонент содержит кнопку `[data-replay]` и элемент `.motion-target`.
-Сохраните общий код в `card-motion.ts`. Нативная кнопка даёт мышь, touch и клавиатуру
-без отдельной реализации распознавания ввода. `prefers-reduced-motion` проверяется
-существующим `animate` при каждом запуске.
+При каждом монтировании создавайте `createAnimateScope` из `./animate`.
+Селекторы выбирают текущих потомков корня; сам корень или внешний элемент передавайте
+явно. В примере нужны кнопка `[data-replay]` и `.motion-target`.
+Сохраните общий код в `card-motion.ts`; `animate` проверяет `prefers-reduced-motion`
+при каждом запуске.
 
 <!-- recipe:animate-scope-vanilla -->
 ```typescript
@@ -451,15 +746,13 @@ export function mountCardMotion(root: HTMLElement): () => void {
 }
 ```
 
-Для обычного DOM вызовите `const dispose = mountCardMotion(root)` после создания
-разметки, а перед удалением компонента — `dispose()`. Область учитывает анимации,
-но не произвольные listeners: их снимает владелец компонента, как в примере выше.
+После создания DOM вызовите `const dispose = mountCardMotion(root)`, перед удалением —
+`dispose()`. Обработчики снимает компонент; область учитывает только свои анимации.
 
-### React: cleanup эффекта, а не render на каждый кадр
+### React: очистка эффекта
 
-`react-card.ts` использует тот же общий `card-motion.ts`. Область создаётся внутри
-эффекта: повторный setup в StrictMode получает новый lifecycle, а не уничтоженный
-объект из прошлого setup. Изменение DOM выполняет движок, React state на кадре нет.
+`react-card.ts` использует общий `card-motion.ts`. Создавайте новую область внутри
+эффекта, включая повторный запуск StrictMode; покадровый React state не требуется.
 
 <!-- recipe:animate-scope-react -->
 ```typescript
@@ -476,11 +769,10 @@ export function ScopedCard() {
 }
 ```
 
-### Solid: область живёт столько же, сколько owner
+### Solid: область принадлежит компоненту
 
-`solid-card.ts` также импортирует `card-motion.ts`. Этот вариант без JSX возвращает
-обычный DOM-узел; компонент монтируется стандартным `render` из `solid-js/web`.
-Создание области откладывается до `onMount`, cleanup регистрируется у owner.
+`solid-card.ts` импортирует `card-motion.ts` и возвращает DOM-узел для `render` из
+`solid-js/web`. Создание области откладывается до `onMount`, очистка — в `onCleanup`.
 
 <!-- recipe:animate-scope-solid -->
 ```typescript
@@ -499,29 +791,21 @@ export function SolidScopedCard(): HTMLElement {
 }
 ```
 
-Для SSR используйте разметку компонента/JSX своего framework; эта конкретная
-Solid-фабрика создаёт DOM и вызывается только на клиенте. Импорт `./animate`
-сам по себе не читает DOM. React-пример допускает server render: эффект там
-не запускается.
+Solid-фабрика вызывается только на клиенте; для SSR нужна разметка вашего компонента.
+React-пример допускает серверный рендеринг: эффект там не запускается.
+Импорт `./animate` сам по себе не читает DOM.
 
 ### Границы уборки
 
-`destroy()` сразу запрещает новые вызовы через эту область и пытается отменить
-все её незавершённые анимации, включая paused и delayed. Поздний handler получает
-завершённый no-op controls без чтения его входов. Естественно завершённые handles
-удаляются из учёта после `finished`; область не копит историю переходов.
+`destroy()` запрещает новые запуски и пытается отменить незавершённые анимации,
+включая паузу и задержку. Поздний вызов получает завершённый неактивный контроллер. Очистка
+сохраняет текущую позу и не отменяет переход, которым уже владеет другая область.
+Для нового монтирования создайте новую область.
+Синхронные ошибки очистки выбрасываются; ошибки финального прохода сообщаются через
+`globalThis.reportError` при его наличии. При неисправном окружении отмена не гарантирует откат.
+Порядок очистки и точные исходы — в
+[контракте `createAnimateScope`](api.md#область-анимаций-компонента).
 
-Если destroy вызван внутри синхронной host-транзакции, один финальный проход в
-микрозадаче повторяет отмену после снятия reservation. Кадровый цикл не добавляется.
-Для ожидания конкретного завершения используйте исходный `controls.finished`.
-Одна синхронная ошибка cleanup выбрасывается без замены, несколько — `AggregateError`;
-ошибки финального прохода сообщаются через доступный `globalThis.reportError`.
-У постоянно неисправного host отмена остаётся best-effort, а не обещанием отката.
-
-Cleanup **сохраняет текущую позу**, не восстанавливает стили до анимации. Это не
-`revert`. Он также не отменяет новый переход, который другой scope или прямой
-`animate` уже сделал владельцем тех же свойств. После destroy создайте новую
-область для нового mount; не переиспользуйте старую.
 ## Каскад состояний взаимодействия без гонок
 
 Наведение, нажатие и перетаскивание задают слои; масштабом управляет один
@@ -695,6 +979,7 @@ export function mountReorder(root: HTMLElement, status: HTMLElement): () => void
     finish(); state.update(measure()); dirty = false;
     session = state.start(node.dataset.key!);
     if (!session) return;
+    e.preventDefault();
     const r = node.getBoundingClientRect(); startX = r.x + r.width / 2; startY = r.y + r.height / 2;
     pointer = e.pointerId; root.setPointerCapture(pointer); pan.pointerDown(point(e));
     node.querySelector<HTMLElement>('[data-grip]')!.focus({ preventScroll: true });
@@ -721,8 +1006,11 @@ export function mountReorder(root: HTMLElement, status: HTMLElement): () => void
     else if (session?.active && directions[e.key]) { e.preventDefault(); refresh(); session.step(directions[e.key]!); }
   });
   listen<MouseEvent>('click', e => {
-    const node = slotFor(e), action = (e.target as Element).closest<HTMLElement>('[data-move]')?.dataset.move;
-    if (!node || (action !== 'previous' && action !== 'next')) return;
+    const node = slotFor(e), button = (e.target as Element).closest<HTMLElement>('[data-move]');
+    if (!node || !button || !node.contains(button)) return;
+    const action = button.dataset.move;
+    if (action !== 'previous' && action !== 'next') return;
+    button.focus({ preventScroll: true });
     pan.pointerCancel(); finish(); state.update(measure()); dirty = false;
     session = state.start(node.dataset.key!); session?.step(action); finish();
   });

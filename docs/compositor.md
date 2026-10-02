@@ -62,7 +62,33 @@ panel.retarget(120);
 // значение — follow-фаза). Снимок → живая rAF-пружина продолжает без разрыва.
 const live = panel.handoffToLive();      // продолжить к текущей цели, ИЛИ
 const live2 = panel.handoffToLive(300);  // сразу к новой цели с сохранённой скоростью
+
+// Follow обновляет уже выданное live-значение; анимации WAAPI на вводе не создаются.
+live2.setTarget(260);
+// На release та же пара value/velocity возвращается в автономный путь.
+panel.handoffToCompositor(240);
+// Старый live2 после успешной передачи инертен. Уборка всего движения одна:
+panel.destroy();
 ```
+
+`handoffToCompositor(target?)` завершает live/follow-фазу. Контроллер читает
+позицию и скорость существующего `MotionValue`, создаёт один native successor
+и лишь после принятия этого эффекта уничтожает live donor. Старый выданный
+`MotionValue` затем не записывает значения и не планирует новые кадры.
+Если host отвергнет successor до commit, live donor остаётся управляемым.
+Реентрантный новый intent отзывает возвращающийся stale effect.
+
+Путь выбирается по прежнему capability-контракту. В RAF/reduced-среде и при
+невыразимом serialized impulse движение продолжает тот же live-owner; `.mode`
+показывает фактическое представление. Native release не вызывает собственных
+покадровых callbacks. Ранее выданный RAF callback исполняется один раз как
+инертный stale callback: `RequestFrameFn` не предоставляет cancel handle.
+Pending native `currentTime:null` сохраняет исходную пару handoff до первого
+видимого времени, вместо чтения удобного JS clock.
+
+Sheet snap-points, pager index, bounds и keyboard-правила принадлежат
+потребителю. Обратный handoff не добавляет их в generic compositor API и не
+меняет четыре опубликованных headless behavior-контроллера.
 
 Число raw diagnostic-узлов выводится из бюджета реконструкции (допуск
 `DEFAULT_TOLERANCE`, адаптивная сетка + упрощение): жёстче пружина — короче
@@ -117,6 +143,10 @@ list.start();                                 // каскад: N Element.animate
 (character-switch, не hard-off).
 
 ## Fallback-матрица
+
+Матрица предполагает поддержанную JavaScript-среду ES2022 со встроенным
+`WeakRef`. Выбор запасного пути компенсирует отсутствие WAAPI или CSS
+`linear()`, но не отсутствие обязательных возможностей JavaScript.
 
 `CompositorSpring` прозрачно деградирует: публичный API один, точная
 effect-space гарантия ограничена условиями выше — меняется движок под капотом.

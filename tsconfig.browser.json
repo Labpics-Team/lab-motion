@@ -15,7 +15,8 @@
     // работать в 7.0. Ключи paths резолвятся относительно самого tsconfig,
     // поэтому маппинг ниже от его удаления не зависит.
     "paths": {
-      "/dist/*": ["./src/*"]
+      "/dist/*": ["./src/*"],
+      "/browser/.artifacts/scope-recipes.js": ["./browser/fixtures/packed-recipes.d.ts"]
     }
   },
   "include": ["browser", "playwright.config.ts"]

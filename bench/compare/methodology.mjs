@@ -16,6 +16,58 @@ export const BENCHMARK_TIMER_ISOLATION_POLICY = Object.freeze({
   originAgentCluster: '?1',
 });
 
+/** Упорядоченные исходы stock C без потерь; RLE строится после CPU интервала. */
+export function compactStockMotionValueOutcomes(values, frames) {
+  if (!Array.isArray(values) || !Array.isArray(frames) || values.length !== frames.length) {
+    throw new Error('stock C: потеряны приобретённые outcomes');
+  }
+  const runs = [];
+  const preserve = (value) => value === undefined ? { type: 'undefined' }
+    : Object.is(value, -0) ? { number: '-0' }
+      : typeof value === 'number' && !Number.isFinite(value) ? { nonfinite: String(value) } : value;
+  for (let index = 0; index < values.length; index++) {
+    const previous = runs.at(-1);
+    if (previous && Object.is(values[index - 1], values[index]) && Object.is(frames[index - 1], frames[index])) previous.count++;
+    else runs.push({ from: index, count: 1, value: preserve(values[index]), frames: preserve(frames[index]) });
+  }
+  return { encoding: 'runs', count: values.length, runs };
+}
+
+/** Каждый whole macro должен завершить47frames и endpoint100; среднее не является oracle. */
+export function validateStockMotionValueBatch(batch, scene, workMultiplier = 1, timed = true) {
+  const require = (condition, message) => { if (!condition) throw new Error(`stock C: ${message}`); };
+  const expectedCalls = scene.callsPerRepetition * workMultiplier;
+  require(batch?.raw?.schemaVersion === 1 && batch.raw.scene === scene.id && batch.raw.phase === (timed ? 'timed' : 'warmup') &&
+    batch.raw.calls === expectedCalls && batch.raw.completed === expectedCalls && batch.raw.denominator === scene.callsPerRepetition,
+  'неполный whole macro или изменённый знаменатель');
+  const outcomes = batch.raw.outcomes;
+  require(outcomes?.encoding === 'runs' && outcomes.count === expectedCalls && Array.isArray(outcomes.runs), 'потеряны per-operation outcomes');
+  let next = 0;
+  for (const run of outcomes.runs) {
+    require(run?.from === next && Number.isSafeInteger(run.count) && run.count > 0 && run.count <= expectedCalls - next,
+      'RLE потерял или повторил operation identity');
+    require(run.value === scene.target && run.frames === scene.expectedFrames, 'отдельная операция не завершила полезный47-frame/100 результат');
+    next += run.count;
+  }
+  require(next === expectedCalls, 'потерян acquired suffix');
+  if (!timed) {
+    require(batch.operationNs === null && batch.raw.clockReads.length === 0 && batch.raw.cpuReads.length === 0, 'warmup превратился в timing');
+    return { operationNs: null };
+  }
+  const reads = batch.raw.clockReads;
+  require(Array.isArray(reads) && reads.length === 2, 'потеряны CPU interval endpoints');
+  const endpoints = reads.map((read, sequence) => {
+    require(read?.sequence === sequence && read.metric === 'operationNs' && read.frame === null &&
+      read.edge === ['before', 'after'][sequence] && typeof read.valueNs === 'string' && /^(?:0|[1-9]\d*)$/.test(read.valueNs), 'нарушен CPU clock order/grid');
+    return BigInt(read.valueNs);
+  });
+  const duration = endpoints[1] - endpoints[0];
+  require(duration >= 0n && duration <= BigInt(Number.MAX_SAFE_INTEGER), 'CPU interval вне safe range');
+  const operationNs = Number(duration) / scene.callsPerRepetition;
+  require(batch.operationNs === operationNs, 'metric не пересчитывается из raw/2000');
+  return { operationNs, batchNs: Number(duration) };
+}
+
 /** Warm-floor использует шаг моды; superiority-порог — максимум всех дельт. */
 export const WARM_TIMER_CALIBRATION_POLICY = Object.freeze({
   practicalRelativeThreshold: 0.05,
@@ -247,20 +299,63 @@ export function deriveTimerStep(values) {
   return stepUpper;
 }
 
-function nextUp(value) {
+// Операция синхронна, не отдаёт view наружу и сохраняет только примитивный
+// результат. Один scratch word устраняет allocation на каждом округлении.
+const binary64Scratch = new DataView(new ArrayBuffer(8));
+
+export function nextUp(value) {
   if (Number.isNaN(value) || value === Infinity) return value;
   if (value === 0) return Number.MIN_VALUE;
-  const buffer = new ArrayBuffer(8);
-  const view = new DataView(buffer);
-  view.setFloat64(0, value);
-  const bits = view.getBigUint64(0);
-  view.setBigUint64(0, bits + (value > 0 ? 1n : -1n));
-  return view.getFloat64(0);
+  binary64Scratch.setFloat64(0, value);
+  const bits = binary64Scratch.getBigUint64(0);
+  binary64Scratch.setBigUint64(0, bits + (value > 0 ? 1n : -1n));
+  return binary64Scratch.getFloat64(0);
 }
 
-function binary64Ulp(value) {
+export function nextDown(value) {
+  return -nextUp(-value);
+}
+
+export function binary64Ulp(value) {
   const magnitude = Math.abs(value);
   return nextUp(magnitude) - magnitude;
+}
+
+// Точная биномиальная масса для рациональных q/alpha. Наблюдаемая единица,
+// семейство и admission принадлежат регистрации потребителя, не этому helper.
+export function exactBinomialOrderStatisticBounds(values, probabilityFraction, alphaFraction) {
+  if (!Array.isArray(values) || values.length === 0 || values.some((x) => !Number.isFinite(x) || x < 0)) {
+    throw new Error('exact order statistics: невалидные observations');
+  }
+  const [numerator, denominator] = probabilityFraction.map(BigInt);
+  const [alphaNumerator, alphaDenominator] = alphaFraction.map(BigInt);
+  if (numerator <= 0n || numerator >= denominator || alphaNumerator <= 0n || alphaNumerator * 2n >= alphaDenominator) {
+    throw new Error('exact order statistics: невалидные rational probabilities');
+  }
+  const sorted = [...values].sort((a, b) => a - b), n = sorted.length;
+  const populationDenominator = denominator ** BigInt(n), pmf = [];
+  let mass = (denominator - numerator) ** BigInt(n);
+  for (let count = 0; count <= n; count++) {
+    pmf.push(mass);
+    if (count < n) mass = mass * BigInt(n - count) * numerator / (BigInt(count + 1) * (denominator - numerator));
+  }
+  const cumulative = [], survival = [];
+  let total = 0n;
+  for (let i = 0; i <= n; i++) { total += pmf[i]; cumulative[i] = total; }
+  if (total !== populationDenominator) throw new Error('exact order statistics: биномиальная масса повреждена');
+  total = 0n;
+  for (let i = n; i >= 0; i--) { total += pmf[i]; survival[i] = total; }
+  let lowRank = 0, highRank = null;
+  for (let rank = 1; rank <= n; rank++) {
+    if (cumulative[rank - 1] * alphaDenominator <= populationDenominator * alphaNumerator) lowRank = rank;
+    if (highRank === null && survival[rank] * alphaDenominator <= populationDenominator * alphaNumerator) highRank = rank;
+  }
+  const probability = Number(numerator) / Number(denominator), alphaPerTail = Number(alphaNumerator) / Number(alphaDenominator);
+  const estimateRank = Number((BigInt(n) * numerator + denominator - 1n) / denominator);
+  return { estimate: sorted[Math.min(n - 1, estimateRank - 1)],
+    low: lowRank === 0 ? 0 : sorted[lowRank - 1], high: highRank === null ? null : sorted[highRank - 1],
+    lowRank, highRank, observations: n, probability, alphaPerTail,
+    minimumFiniteUpperBlocks: Math.ceil(Math.log(alphaPerTail) / Math.log(probability)), noTailObservationProbability: probability ** n };
 }
 
 function deriveRealmTimerBounds(name, evidence) {
@@ -558,14 +653,14 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
     !Array.isArray(evidence.callStartedAtMs) ||
     evidence.callStartedAtMs.length !== calls ||
     evidence.callStartedAtMs.some((value) => !Number.isFinite(value) || value < 0) ||
-    !Array.isArray(evidence.checkpoints) || evidence.checkpoints.length === 0 ||
+    !Array.isArray(evidence.checkpoints) || evidence.checkpoints.length < 2 ||
     !Array.isArray(evidence.terminal) || evidence.terminal.length !== calls
   ) return false;
 
   const shape = (positions) => (
     Array.isArray(positions) &&
     positions.length === expected.targetsPerCall &&
-    positions.every(Number.isFinite)
+    Array.from(positions).every(Number.isFinite)
   );
   const terminalValid = evidence.terminal.every((positions) => (
     shape(positions) && positions.every((value) => (
@@ -575,6 +670,71 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
   if (!terminalValid) return false;
 
   let provedPartialStagger = expected.staggerGapMs === 0;
+  const observations = Array.from({ length: calls }, () => []);
+  const phases = Array.from({ length: calls }, () => ({ low: -Infinity, high: Infinity }));
+  const resolved = Array.from({ length: calls }, () => Array(expected.targetsPerCall).fill(false));
+  const clockErrorMs = expected.semanticClockErrorMs ?? 0;
+  if (!Number.isFinite(clockErrorMs) || clockErrorMs < 0 ||
+      !Number.isFinite(expected.durationMs) || expected.durationMs <= 0) return false;
+  const slope = expected.toPx / expected.durationMs;
+  const coordinateError = 2 * expected.movementThresholdPx;
+  const interior = (value) => value >= expected.movementThresholdPx && value < expected.toPx - expected.finalTolerancePx;
+  const publicationFrameValid = (group) => Number.isFinite(group.documentFrame?.beforeMs) &&
+    group.documentFrame.beforeMs === group.documentFrame.afterMs &&
+    group.documentFrame.beforeMs <= group.readStartedMs + clockErrorMs &&
+    group.documentFrame.afterMs <= group.readEndedMs + clockErrorMs;
+  const includePositions = (phase, group, observationStartedMs, observationEndedMs = group.readEndedMs) => {
+    for (let target = 0; target < group.positions.length; target++) {
+      const value = group.positions[target], delay = target * expected.staggerGapMs;
+      if (value < -expected.movementThresholdPx || value > expected.toPx + expected.finalTolerancePx) return false;
+      if (expected.staggerGapMs === 0 && target > 0 && value === group.positions[target - 1]) continue;
+      // Clamp и interior связывает одна фаза на весь вызов и все observations.
+      if (value < expected.toPx - expected.finalTolerancePx) phase.low = Math.max(phase.low,
+        nextDown(nextDown(observationStartedMs - clockErrorMs - delay) - nextUp((value + expected.movementThresholdPx) / slope)));
+      if (value >= expected.movementThresholdPx) phase.high = Math.min(phase.high,
+        nextUp(nextUp(observationEndedMs + clockErrorMs - delay) - nextDown((value -
+          (interior(value) ? expected.movementThresholdPx : expected.finalTolerancePx)) / slope)));
+      if (phase.low > phase.high) return false;
+    }
+    return true;
+  };
+  if (expected.requireFreshStart) {
+    const onset = evidence.onset;
+    if (expected.fromPx !== 0 || !Array.isArray(onset?.before) || !Array.isArray(onset?.after) ||
+        onset.before.length !== calls || onset.after.length !== calls) return false;
+    for (let call = 0; call < calls; call++) {
+      const before = onset.before[call], after = onset.after[call], startedMs = evidence.callStartedAtMs[call];
+      if (![before, after].every((group) => Number.isFinite(group?.readStartedMs) && Number.isFinite(group?.readEndedMs) &&
+          group.readStartedMs >= 0 && group.readEndedMs >= group.readStartedMs && shape(group.positions)) ||
+          before.readEndedMs > startedMs + clockErrorMs || after.readStartedMs < startedMs - clockErrorMs ||
+          before.positions.some((value) => Math.abs(value - expected.fromPx) > expected.movementThresholdPx)) return false;
+      // API chronology и CSS publication используют разные clock domains.
+      // До API наблюдается ноль; phase не предшествует его publication origin.
+      // Прежний perf oracle сохраняет свой start clock без смены контракта.
+      if (expected.requireDocumentFrame) {
+        // В одном task document clock одинаков до/после синхронного API;
+        // timestamp следующего rAF может предшествовать его execution wall.
+        if (!publicationFrameValid(before) || !publicationFrameValid(after) ||
+            after.documentFrame.beforeMs !== before.documentFrame.beforeMs) return false;
+        phases[call].low = nextDown(before.documentFrame.beforeMs - clockErrorMs - nextUp(expected.movementThresholdPx / slope));
+        if (!includePositions(phases[call], after, after.documentFrame.beforeMs, after.documentFrame.afterMs)) return false;
+        const first = onset.firstFrame, group = first?.groups?.[call];
+        // Старый document clock и поздний slope не различают первый quarter
+        // jump. Первая acquired публикация обязана сохранить весь fresh ноль;
+        // с её frame clock начинается полезная полная траектория.
+        if (!Number.isFinite(first?.frameTimestampMs) || !Array.isArray(first.groups) || first.groups.length !== calls ||
+            !Number.isFinite(group?.readStartedMs) || !Number.isFinite(group.readEndedMs) ||
+            group.readStartedMs < after.readEndedMs - clockErrorMs || group.readEndedMs < group.readStartedMs ||
+            !shape(group.positions) || group.positions.some((value) => Math.abs(value - expected.fromPx) > expected.movementThresholdPx) ||
+            !publicationFrameValid(group) || Math.abs(group.documentFrame.beforeMs - first.frameTimestampMs) > clockErrorMs ||
+            group.documentFrame.beforeMs < after.documentFrame.beforeMs - clockErrorMs) return false;
+        if (!includePositions(phases[call], group, group.documentFrame.beforeMs, group.documentFrame.afterMs)) return false;
+      } else {
+        phases[call].low = nextDown(startedMs - clockErrorMs - nextUp(expected.movementThresholdPx / slope));
+        if (!includePositions(phases[call], after, after.readStartedMs)) return false;
+      }
+    }
+  }
   for (const checkpoint of evidence.checkpoints) {
     if (!Array.isArray(checkpoint?.groups) || checkpoint.groups.length !== calls) return false;
     for (let call = 0; call < calls; call++) {
@@ -586,13 +746,47 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
         group.readEndedMs < group.readStartedMs ||
         !shape(group.positions)
       ) return false;
-      if (expected.staggerGapMs === 0) {
-        if (group.positions.some((value) => (
-          value < expected.movementThresholdPx ||
-          value >= expected.toPx - expected.finalTolerancePx
-        ))) return false;
-        continue;
+      let observationStartedMs = checkpoint.frameTimestampMs ?? group.readStartedMs;
+      let observationEndedMs = group.readEndedMs;
+      if (!Number.isFinite(observationStartedMs) || observationStartedMs < evidence.callStartedAtMs[call] - clockErrorMs ||
+          observationStartedMs > group.readStartedMs + clockErrorMs) return false;
+      if (expected.requireFreshStart && group.readStartedMs < evidence.onset.after[call].readEndedMs - clockErrorMs) return false;
+      if (expected.requireDocumentFrame) {
+        const frame = group.documentFrame;
+        // DocumentTimeline фиксирован в одном rendering/task; CSS чтение не
+        // превращает время исполнения getter в elapsed движения. Связь с rAF
+        // проверяется по обоим clocks, без свободного смещения новой фазы.
+        if (!publicationFrameValid(group) || Math.abs(frame.beforeMs - checkpoint.frameTimestampMs) > clockErrorMs) return false;
+        observationStartedMs = frame.beforeMs; observationEndedMs = frame.afterMs;
       }
+      const history = observations[call];
+      if (history.length && observationStartedMs <= history.at(-1).startedMs) return false;
+      for (const prior of history) {
+        const elapsedLow = Math.max(0, nextDown(observationStartedMs - prior.endedMs - 2 * clockErrorMs));
+        const elapsedHigh = nextUp(observationEndedMs - prior.startedMs + 2 * clockErrorMs);
+        const displacementLow = nextDown(slope * elapsedLow);
+        const displacementHigh = nextUp(slope * elapsedHigh);
+        let previousDelta = NaN, withinTolerance = false;
+        for (let target = 0; target < group.positions.length; target++) {
+          const before = prior.positions[target], after = group.positions[target];
+          // Пересечение широкого интервала не доказывает скорость. Полный
+          // диапазон перемещения должен укладываться в прежний CSS допуск.
+          if (interior(before) && interior(after) && elapsedLow > 0) {
+            const delta = after - before;
+            // Совпавший скаляр задаёт то же неравенство; raw identity и обе
+            // координаты каждого target всё равно проходят общий обход.
+            if (delta !== previousDelta) {
+              previousDelta = delta;
+              withinTolerance = displacementLow >= nextDown(delta - coordinateError) &&
+                displacementHigh <= nextUp(delta + coordinateError);
+            }
+            if (withinTolerance) resolved[call][target] = true;
+          }
+        }
+      }
+      history.push({ startedMs: observationStartedMs, endedMs: observationEndedMs, positions: group.positions });
+      if (!includePositions(phases[call], group, observationStartedMs, observationEndedMs)) return false;
+      if (expected.staggerGapMs === 0) continue;
 
       for (let target = 1; target < group.positions.length; target++) {
         if (group.positions[target] > group.positions[target - 1] + expected.movementThresholdPx) {
@@ -600,18 +794,16 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
         }
       }
       const leadingPosition = group.positions[0];
-      if (
-        leadingPosition < expected.movementThresholdPx ||
-        leadingPosition >= expected.toPx - expected.finalTolerancePx
-      ) return false;
       const staggerStepPx = (
         expected.toPx * expected.staggerGapMs / expected.durationMs
       );
-      for (let target = 1; target < group.positions.length; target++) {
-        const relativeExpected = Math.max(0, leadingPosition - staggerStepPx * target);
-        if (
-          Math.abs(group.positions[target] - relativeExpected) > expected.movementThresholdPx
-        ) return false;
+      if (interior(leadingPosition)) {
+        for (let target = 1; target < group.positions.length; target++) {
+          const relativeExpected = Math.max(0, leadingPosition - staggerStepPx * target);
+          if (
+            Math.abs(group.positions[target] - relativeExpected) > expected.movementThresholdPx
+          ) return false;
+        }
       }
       let lastMoved = -1;
       for (let target = 0; target < group.positions.length; target++) {
@@ -620,7 +812,8 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
       if (lastMoved >= 0 && lastMoved < expected.targetsPerCall - 1) provedPartialStagger = true;
     }
   }
-  return provedPartialStagger;
+  return provedPartialStagger && resolved.every((targets) => expected.staggerGapMs === 0
+    ? targets.every(Boolean) : targets[0]);
 }
 
 /** Publish-run не имеет права сохранять sample с недоказанной топологией. */
