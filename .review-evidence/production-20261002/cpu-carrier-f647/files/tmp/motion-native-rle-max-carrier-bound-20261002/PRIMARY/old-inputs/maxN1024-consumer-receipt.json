@@ -1,0 +1,45 @@
+{
+  "synthetic": true,
+  "actualTimingSamplesObserved": 0,
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "--raw",
+    "/tmp/motion-server-stock-c-profile-20261001T1610Z/maxN1024.json",
+    "--digest",
+    "2be950db00f2ed062b85b55e7261da336040e5e2a9fac860fb2e99220dee65cc",
+    "--journal",
+    "/tmp/motion-server-stock-c-profile-20261001T1610Z/maxN1024.ndjson"
+  ],
+  "protocolDigest": "7016c19aa7a763fee68687327ef489abb119acd2a43d397b8485ca56e4cea15f",
+  "runs": 1024,
+  "requiredRuns": 1024,
+  "feasible": true,
+  "stageRows": {
+    "aa": 5120,
+    "positive": 5120,
+    "ab": 5120
+  },
+  "raw": {
+    "sha256": "2be950db00f2ed062b85b55e7261da336040e5e2a9fac860fb2e99220dee65cc",
+    "bytes": 963959689
+  },
+  "journal": {
+    "sha256": "6d5dcb789e790d628ed37858260dd37a9badd22c29abd4148382598ee0bb1df7",
+    "bytes": 974479628
+  },
+  "status": 0,
+  "signal": null,
+  "stdout": "{\"verification\":\"server-cell-only\",\"verdict\":\"PASS\",\"unproven\":[\"mobile Android/iOS\",\"physical 60/120 Hz\",\"whole-page energy\",\"GPU\",\"M-04 physical-device envelope\",\"M-05 product scene families\"],\"journalFinalDigest\":\"e42931d69d8057eee77e9c7f6bcc23791d893689625fab398a88f86200e4714e\"}\n",
+  "stderr": "",
+  "error": null,
+  "matched": true,
+  "rawCompressed": {
+    "sha256": "c01d880069c69b97b99d38b45dc8264b0ad88771fe42c7bfe0553f68d7d14b38",
+    "bytes": 43955429
+  },
+  "journalCompressed": {
+    "sha256": "6c813aaf0855fa4cebc1a056e8dd1cc6e51c923cedf0d0cef5b04ca1422dc7ae",
+    "bytes": 47879950
+  }
+}

@@ -1,0 +1,122 @@
+[
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/legacy-native-controls-new.ts",
+    "bytes": 4889,
+    "sha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/legacy-native-controls-old.ts",
+    "bytes": 4889,
+    "sha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/callback-new.ts",
+    "bytes": 1701,
+    "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/callback-old.ts",
+    "bytes": 1701,
+    "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/source.tar",
+    "bytes": 7424000,
+    "sha256": "de9d2501a5391527a252da1428ee031d15e187fdc5224f7bcb2df60a95656797",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/patch.diff",
+    "bytes": 50173,
+    "sha256": "39d46a3c4c20633f4a29e1df26b4891d3fae94772d364088ecc810da688c4db6",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/source/test/server-profile-contract.test.ts",
+    "bytes": 97980,
+    "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/source/docs/server-profile.md",
+    "bytes": 5987,
+    "sha256": "fbef20828a855c6f289de8a1c7d6049738fefec6c4d73f0ce57a68640c4557f7",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/source/docs/recipes.md",
+    "bytes": 57377,
+    "sha256": "0808d2bde83cdd6d3af74c0e3bd4dd4996d469ff29c56c4937dae05ecccef8f3",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-runner.mjs",
+    "bytes": 51648,
+    "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-registration.mjs",
+    "bytes": 18998,
+    "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-contract.mjs",
+    "bytes": 73913,
+    "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/native-clock/README.md",
+    "bytes": 1385,
+    "sha256": "209fe23d861255eb9c83ac37f00b68168aeb6c4f30bb485f57eb5bbed92ebcf1",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-parity-20261002/probe.mjs",
+    "bytes": 6393,
+    "sha256": "e3d6b7f8ef6553ca594e4445881da0d0990f27a59537e1f35ee7227628a4c516",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-parity-20261002/fixtures.mjs",
+    "bytes": 20556,
+    "sha256": "4bd7aeaa744cd221439407be93a88afc551c19a578833d4ba68fe6790fe7c76d",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-parity-20261002/result.json",
+    "bytes": 971357,
+    "sha256": "852f2410f83f599920baffed2229f5ad03fd2ecfe4cab1a5c6ca3e63b927d368",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-parity-20261002/probe.log",
+    "bytes": 101,
+    "sha256": "6e2f8cad2c738a2c50c007c6a7ff1326ba71eca0be355a3b1762c97661096f3c",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-native-cpu-rle-successor-20261002/PRIMARY-PACKET.json",
+    "bytes": 5370,
+    "sha256": "56bbdab8fb90c587fe0c013f9a60dbf4d2791447d0b74ef4cd4ae0a61a4e69d7",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-profile-doc-prose-088-20261002/PRIMARY/PRIMARY-PACKET.json",
+    "bytes": 1045,
+    "sha256": "aae7a37c7dcd6ce0a10d47b6fc99efe22f1259cbb1a766735f56a28fa00d8ceb",
+    "matches": true
+  },
+  {
+    "path": "/tmp/motion-ci-088fbc60-failure-20261002/connector-primary-receipt.json",
+    "bytes": 1002,
+    "sha256": "7ab68879d7fd8ef66b6c5de79445b996476aa65aa6aae7c79ec71ff6a1341e85",
+    "matches": true
+  }
+]

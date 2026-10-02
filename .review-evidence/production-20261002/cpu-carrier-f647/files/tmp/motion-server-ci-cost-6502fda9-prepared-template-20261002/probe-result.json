@@ -1,0 +1,120 @@
+{
+  "sourceSha256": "4976454599362b938e4e9737574e0593387f4885d83897841809e1a33696d007",
+  "callbackSha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+  "qualification": "Exact existing full-four callback and preparation helpers. Prefix ends before new Vitest RLE regression registration; no helper/callback truncation. Vitest expect replaced by node assert equivalents; one process, no default-worker/gate timeout claim. Diagnostic CPU timing is not package performance data.",
+  "elapsedMs": 20280.494240999997,
+  "node": "v24.19.0",
+  "esbuild": "0.28.2",
+  "steps": [
+    {
+      "name": "fixture/admissionHistory",
+      "elapsedMs": 9129.534764,
+      "cpuUs": {
+        "user": 8488421,
+        "system": 636930
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerArtifact",
+      "elapsedMs": 1949.7499040000002,
+      "cpuUs": {
+        "user": 1896011,
+        "system": 53315
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerJournal",
+      "elapsedMs": 3740.8537699999997,
+      "cpuUs": {
+        "user": 3534630,
+        "system": 204204
+      },
+      "status": "returned"
+    },
+    {
+      "name": "fixture/chain",
+      "elapsedMs": 1810.3494569999984,
+      "cpuUs": {
+        "user": 1741609,
+        "system": 68297
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerJournal",
+      "elapsedMs": 2.9271539999972447,
+      "cpuUs": {
+        "user": 2935,
+        "system": 0
+      },
+      "status": "threw"
+    },
+    {
+      "name": "fixture/chain",
+      "elapsedMs": 1730.9036339999984,
+      "cpuUs": {
+        "user": 1674568,
+        "system": 55657
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerJournal",
+      "elapsedMs": 2.789237000000867,
+      "cpuUs": {
+        "user": 2793,
+        "system": 0
+      },
+      "status": "threw"
+    },
+    {
+      "name": "fixture/chain",
+      "elapsedMs": 0.17952100000184146,
+      "cpuUs": {
+        "user": 180,
+        "system": 0
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerJournal",
+      "elapsedMs": 56.42673099999956,
+      "cpuUs": {
+        "user": 56441,
+        "system": 0
+      },
+      "status": "threw"
+    },
+    {
+      "name": "validateServerArtifact",
+      "elapsedMs": 8.721901999997499,
+      "cpuUs": {
+        "user": 8731,
+        "system": 0
+      },
+      "status": "threw"
+    },
+    {
+      "name": "fixture/chain",
+      "elapsedMs": 1.3447479999995267,
+      "cpuUs": {
+        "user": 1347,
+        "system": 0
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerJournal",
+      "elapsedMs": 1842.380846,
+      "cpuUs": {
+        "user": 1658322,
+        "system": 182695
+      },
+      "status": "threw"
+    }
+  ],
+  "failure": null,
+  "actualRegisteredPerformanceSamples": 0
+}

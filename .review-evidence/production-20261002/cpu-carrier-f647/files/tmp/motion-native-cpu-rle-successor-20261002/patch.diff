@@ -1,0 +1,583 @@
+diff --git a/bench/profile/native-clock/README.md b/bench/profile/native-clock/README.md
+index 3366ea76..2a720345 100644
+--- a/bench/profile/native-clock/README.md
++++ b/bench/profile/native-clock/README.md
+@@ -1,15 +1,17 @@
+-# Справочник: исходники частного CPU getter
++# Исходники частного CPU-счётчика
+ 
+-> Роль: справка (Diátaxis).
++Роль: справка (Diátaxis).
+ 
+-`include/` содержит четыре неизменённых Node-API header из Node.js `v24.19.0`,
++`include/` содержит четыре неизменённых заголовка Node-API из Node.js `v24.19.0`,
+ [официальный каталог `src`](https://github.com/nodejs/node/tree/v24.19.0/src).
+-Права Node.js contributors и Joyent сохранены в [LICENSE](./LICENSE).
+-Это зависимости сборки частного `server-profile`; npm-пакет библиотеки их не включает.
++Уведомление об авторских правах участников Node.js и Joyent сохранено в
++[LICENSE](./LICENSE). Заголовки нужны для сборки частного инструмента измерения;
++npm-пакет библиотеки их не включает.
+ 
+-Владелец метода — [серверный профиль](../../../docs/server-profile.md).
+-Exact SHA256 каждого header и C исходника закреплены в
++Команды запуска — в [справочнике инструмента](../../../docs/server-profile.md).
++SHA-256 каждого заголовка и исходника C закреплён в
+ [`SERVER_PROFILE.clockError.nativeSourceFiles`](../server-profile-registration.mjs).
+-Getter собирается до регистрации; actual binary, compiler, flags, libc и PID/TID
+-сохраняются в `engineClock`. Номинальное разрешение `clock_getres` не доказывает
+-физическую точность счётчика.
++Счётчик собирается до регистрации. Сведения о полученном бинарном файле,
++компиляторе, флагах, libc и PID/TID сохраняются в `engineClock`.
++Обычный импорт модуля не требует компилятора. Номинальное разрешение `clock_getres`
++не удостоверяет физическую точность счётчика.
+diff --git a/bench/profile/server-profile-contract.mjs b/bench/profile/server-profile-contract.mjs
+index e6c090c5..69e14c8f 100644
+--- a/bench/profile/server-profile-contract.mjs
++++ b/bench/profile/server-profile-contract.mjs
+@@ -1,4 +1,4 @@
+-import { isDeepStrictEqual } from 'node:util';
++import { isDeepStrictEqual, types } from 'node:util';
+ import { closeSync, openSync, readFileSync, writeSync } from 'node:fs';
+ import { createHash } from 'node:crypto';
+ import path from 'node:path';
+@@ -179,6 +179,72 @@ function verifyThreadCpuIdentity(identity) {
+     Number.isSafeInteger(identity.tid) && identity.tid === identity.pid, 'невалидная native CPU clock main-thread identity');
+ }
+ 
++const CPU_FIELDS = ['sequence', 'clock', 'pid', 'tid', 'seconds', 'nanoseconds', 'valueNs'];
++
++/** Метаданные объединяются в run; каждый приобретённый timespec остаётся отдельным. */
++export function compactServerCpuEvidence(reads) {
++  invariant(Array.isArray(reads) && !types.isProxy(reads), 'невалидный native CPU source array');
++  if (reads.length === 0) return reads;
++  const keys = Reflect.ownKeys(reads);
++  invariant(Object.getPrototypeOf(reads) === Array.prototype && keys.length === reads.length + 1 && keys.at(-1) === 'length',
++    'native CPU source array содержит лишние поля/prototype');
++  const runs = [];
++  for (let sequence = 0; sequence < reads.length; sequence++) {
++    const descriptor = Object.getOwnPropertyDescriptor(reads, String(sequence));
++    invariant(descriptor && Object.hasOwn(descriptor, 'value'), 'native CPU source потерял endpoint');
++    const read = descriptor.value;
++    invariant(read && typeof read === 'object' && !types.isProxy(read) &&
++      Object.getPrototypeOf(read) === Object.prototype &&
++      isDeepStrictEqual(Reflect.ownKeys(read), CPU_FIELDS), 'неполные canonical native CPU fields');
++    const fields = Object.getOwnPropertyDescriptors(read);
++    invariant(CPU_FIELDS.every((key) => Object.hasOwn(fields[key], 'value') && fields[key].enumerable), 'native CPU source содержит accessor/скрытое поле');
++    invariant(read.sequence === sequence && !Object.is(read.sequence, -0) && read.clock === SERVER_PROFILE.clockError.engineClock &&
++      Number.isSafeInteger(read.pid) && read.pid > 0 && read.tid === read.pid &&
++      typeof read.seconds === 'string' && /^(0|[1-9]\d*)$/.test(read.seconds) && read.seconds.length <= 19 &&
++      BigInt(read.seconds) <= 9_223_372_036_854_775_807n && Number.isSafeInteger(read.nanoseconds) &&
++      read.nanoseconds >= 0 && !Object.is(read.nanoseconds, -0) && read.nanoseconds < 1_000_000_000,
++    'невалидные canonical native CPU endpoint fields');
++    // Производные поля проверяются до сжатия: ошибочный ordinal/valueNs не исправляется.
++    invariant(read.valueNs === String(BigInt(read.seconds) * 1_000_000_000n + BigInt(read.nanoseconds)),
++      'native CPU source value не пересчитывается из timespec');
++    let run = runs.at(-1);
++    if (!run || run.clock !== read.clock || run.pid !== read.pid || run.tid !== read.tid) {
++      run = { from: sequence, count: 0, clock: read.clock, pid: read.pid, tid: read.tid, values: [] };
++      runs.push(run);
++    }
++    run.count++; run.values.push([read.seconds, read.nanoseconds]);
++  }
++  return { encoding: 'native-cpu-rle-v1', count: reads.length, runs };
++}
++
++/** Legacy arrays сохраняются; RLE восстанавливает все семь полей без Number conversion. */
++export function expandServerCpuEvidence(value, expectedCount) {
++  if (Array.isArray(value)) return value;
++  invariant(value?.encoding === 'native-cpu-rle-v1' && value.count === expectedCount &&
++    Number.isSafeInteger(value.count) && value.count > 0 && Array.isArray(value.runs) &&
++    isDeepStrictEqual(Object.keys(value).sort(), ['count', 'encoding', 'runs']), 'неполный native CPU RLE');
++  const reads = [];
++  let previous;
++  for (const run of value.runs) {
++    invariant(run?.from === reads.length && !Object.is(run.from, -0) && Number.isSafeInteger(run.count) && run.count > 0 &&
++      run.count <= expectedCount - reads.length && Array.isArray(run.values) && run.values.length === run.count &&
++      isDeepStrictEqual(Object.keys(run).sort(), ['clock', 'count', 'from', 'pid', 'tid', 'values']), 'native CPU RLE потерял endpoint/run');
++    invariant(!previous || previous.clock !== run.clock || previous.pid !== run.pid || previous.tid !== run.tid,
++      'native CPU RLE содержит соседние дубликаты run');
++    for (const fields of run.values) {
++      invariant(Array.isArray(fields) && fields.length === 2 && Object.hasOwn(fields, 0) && Object.hasOwn(fields, 1) &&
++        typeof fields[0] === 'string' && /^(0|[1-9]\d*)$/.test(fields[0]) && fields[0].length <= 19 &&
++        BigInt(fields[0]) <= 9_223_372_036_854_775_807n && Number.isSafeInteger(fields[1]) && fields[1] >= 0 &&
++        !Object.is(fields[1], -0) && fields[1] < 1_000_000_000, 'native CPU RLE потерял canonical timespec tuple');
++      reads.push({ sequence: reads.length, clock: run.clock, pid: run.pid, tid: run.tid,
++        seconds: fields[0], nanoseconds: fields[1], valueNs: String(BigInt(fields[0]) * 1_000_000_000n + BigInt(fields[1])) });
++    }
++    previous = run;
++  }
++  invariant(reads.length === expectedCount, 'native CPU RLE потерял acquired suffix');
++  return reads;
++}
++
+ export function serverOrders(runs, seed = SERVER_PROFILE.seed) {
+   const orders = makeRoundRobinOrders(IDS, runs, seed);
+   assertBalancedRunBlocks('server profile', orders, IDS);
+@@ -300,6 +366,7 @@ function readServerSample(sample, cell, workMultiplier, validationCache = new We
+ }
+ 
+ function validateThreadCpuFields(cpuReads, clockReads, identity, previous = -1n) {
++  cpuReads = expandServerCpuEvidence(cpuReads, clockReads.length);
+   invariant(Array.isArray(cpuReads) && cpuReads.length === clockReads.length, 'потеряны actual thread CPU fields');
+   for (let sequence = 0; sequence < cpuReads.length; sequence++) {
+     const read = cpuReads[sequence];
+diff --git a/bench/profile/server-profile-registration.mjs b/bench/profile/server-profile-registration.mjs
+index d9886314..48e9672e 100644
+--- a/bench/profile/server-profile-registration.mjs
++++ b/bench/profile/server-profile-registration.mjs
+@@ -13,7 +13,7 @@ function freeze(value) {
+ 
+ export const SERVER_PROFILE = freeze({
+   schema: 1,
+-  rawEncoding: 'compact-json-stream-v1; every sample preserved; external digest and journal bind exact file bytes',
++  rawEncoding: 'compact-json-stream-v1/native-cpu-rle-v1; every sample and exact reconstructed CPU field preserved; external digest and journal bind exact file bytes',
+   id: 'PROFILE-01-server',
+   baselineRevision: '0b6f537e148b7dadadfb9e3ce7c446d014975958',
+   candidateSamplesObservedScope: 'на момент регистрации ещё нет registered CPU/API cost samples текущего protocol epoch; historical exploratory stock wall и semantic/memory controls candidate уже известны',
+diff --git a/bench/profile/server-profile-runner.mjs b/bench/profile/server-profile-runner.mjs
+index ea54a7ed..c88a82db 100644
+--- a/bench/profile/server-profile-runner.mjs
++++ b/bench/profile/server-profile-runner.mjs
+@@ -15,7 +15,7 @@ import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPack
+   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
+ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
+ import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './server-thread-cpu-clock.mjs';
+-import { compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
++import { compactServerCpuEvidence, compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
+   serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
+ 
+ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+@@ -173,6 +173,14 @@ function sampleCpuClock(raw) {
+   return { clock: endpoint?.clock, pid: endpoint?.pid, tid: endpoint?.tid };
+ }
+ 
++function compactSampleCpuEvidence(sample) {
++  // Никакой частичной замены при отказе encoder: исходные массивы остаются в error.raw.
++  let encoded;
++  try { encoded = sample.raw.map((measured) => compactServerCpuEvidence(measured.raw.cpuReads)); }
++  catch (error) { throw Object.assign(new AggregateError([error], 'server profile: native CPU carrier не завершён'), { raw: sample }); }
++  for (let index = 0; index < sample.raw.length; index++) sample.raw[index].raw.cpuReads = encoded[index];
++}
++
+ export async function measureServerEngine(animate, scene, workMultiplier = 1) {
+   if (scene.workload === 'stock-c') return measureServerStockC(animate, scene, workMultiplier);
+   const raw = [];
+@@ -581,8 +589,10 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
+               const build = name === 'ab' && id === 'right' ? 'candidate' : 'baseline';
+               const multiplier = name === 'positive' && id === 'right' ? SERVER_PROFILE.positiveWorkMultiplier : 1;
+               try {
+-                current.samples[id] = kind === 'engine' ? await engineMeasure(implementations[scene.workload === 'stock-c' ? `${build}:stock-c` : build], scene, multiplier)
++                const sample = kind === 'engine' ? await engineMeasure(implementations[scene.workload === 'stock-c' ? `${build}:stock-c` : build], scene, multiplier)
+                   : await browserMeasure(browser, origin, adapters[build], scene, multiplier);
++                if (kind === 'engine') compactSampleCpuEvidence(sample);
++                current.samples[id] = sample;
+                 journal('sample', { stage: name, kind, scene: scene.id, run, participant: id, build, value: current.samples[id] });
+               } catch (error) {
+                 journal('failed-sample', { stage: name, kind, scene: scene.id, run, participant: id, build, error: errorRecord(error),
+diff --git a/docs/recipes.md b/docs/recipes.md
+index 3a10d81a..b7d40ef9 100644
+--- a/docs/recipes.md
++++ b/docs/recipes.md
+@@ -1,8 +1,8 @@
+ # Рецепты @labpics/motion
+ 
+-> Роль: практика — runnable-рецепты интеграции: связка с DOM-событиями и
+-> композиция субпутей. Концепты и контракты каждого пути — в
+-> [справочнике API](api.md) и топик-доках ([compositor.md](compositor.md),
++> Роль: практика — исполняемые примеры интеграции с DOM и композиции субпутей.
++> Контракты — в [справочнике API](api.md) и тематических документах
++> ([compositor.md](compositor.md),
+ > [projection.md](projection.md), [smart.md](smart.md),
+ > [behaviors.md](behaviors.md)).
+ 
+@@ -43,6 +43,7 @@ function dispose() {
+ приведите координаты указателя к исходной позиции карточки один раз на границе
+ измерения; не вызывайте `getBoundingClientRect()` на каждом событии без необходимости.
+ `destroy()` останавливает эффект, но не отменяет внешние CSS-изменения приложения.
++
+ ## Карточка загрузки: одна модель, разные движения
+ 
+ Приложение владеет `status`, `progress` и `pressed`, а не фазами твинов. Три
+@@ -386,7 +387,7 @@ const toProgress = pipe(clamp(0, 300), (x) => x / 300); // композиция
+ 
+ ## Bottom sheet (behaviors, DOM-адаптер)
+ 
+-Runnable DOM-адаптер: transform из headless-состояния `createBottomSheet`.
++DOM-адаптер задаёт transform по состоянию `createBottomSheet`.
+ 
+ ```ts
+ import { createBottomSheet } from '@labpics/motion/behaviors';
+@@ -416,16 +417,12 @@ document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(
+ 
+ ## Sheet: живая фаза и автономный snap
+ 
+-Компонент содержит `[data-sheet-panel]`, нативную кнопку `[data-sheet-handle]`
+-и необязательные кнопки `[data-sheet-snap="0"]`, `[data-sheet-snap="1"]` и т. д.
+-У handle задайте `touch-action: none`; текст и поля ввода внутри panel остаются
+-обычными интерактивными элементами. Snap points — конечные возрастающие физические
+-смещения по Y. Приложение обновляет их после изменения высоты или содержимого.
+-
+-Один `CompositorSpring` владеет поверхностью. Pointerdown снимает native position
+-и velocity; follow меняет цель выданного live-значения. На release чистый
+-`createDecay().rest` помогает выбрать snap, а скорость в новый native effect
+-переносит сам контроллер. Это не второй драйвер decay и не ручная копия velocity.
++Нужны панель `[data-sheet-panel]`, кнопка `[data-sheet-handle]` с
++`touch-action: none` и необязательные кнопки `[data-sheet-snap="0"]` и т. д.
++Точки остановки — конечные возрастающие смещения по Y; обновляйте их при смене
++высоты или содержимого. Поля ввода внутри панели сохраняют обычное поведение.
++`CompositorSpring` принимает текущую позу и скорость при захвате; после отпускания
++`createDecay().rest` помогает выбрать остановку, а контроллер переносит импульс.
+ 
+ <!-- recipe:compositor-sheet -->
+ ```typescript
+@@ -555,26 +552,20 @@ export function mountCompositorSheet(root: HTMLElement, options: {
+ }
+ ```
+ 
+-Для клавиатуры handle принимает Home/End и стрелки; кнопки snap используют обычный
+-click. `onSelect` обновляет собственные `aria-expanded`, текст и выбранное состояние
+-компонента. Он не заменяет модальный `<dialog>` или focus trap. `pause()` сохраняет
+-текущую позу, `resume()` продолжает к выбранному snap. В режиме `motion: 'none'`
+-и при reduced-motion цели применяются сразу; смена системного предпочтения также
+-обрабатывается компонентом. `destroy()` снимает listeners/capture, движение и
+-возвращает фокус, если он ещё внутри компонента.
++Кнопка захвата поддерживает Home/End и стрелки, кнопки остановок — обычный клик.
++Через `onSelect` обновляйте текст, `aria-expanded` и выбранное состояние; модальность
++и удержание фокуса остаются у компонента. `pause()` сохраняет позу, `resume()`
++продолжает движение. `motion: 'none'` и системное уменьшенное движение применяют
++цель сразу. При размонтировании вызовите `destroy()` для очистки и возврата фокуса.
+ 
+ ## Pager: страницы и RTL принадлежат компоненту
+ 
+-Компонент содержит `[data-pager-viewport]`, его `[data-pager-track]` с прямыми
+-детьми `[data-page]`, отдельную кнопку `[data-pager-handle]` и кнопки
+-`[data-page-index="0"]` и т. д. Viewport имеет `overflow: hidden`, track —
+-`display: flex`, страницы — `flex: 0 0 100%`; у handle `touch-action: none`.
+-Направление задаётся обычным CSS `direction`. Драгать текст и поля ввода не нужно:
+-они сохраняют выделение, IME и привычные focus/click-события.
+-
+-После resize, reparent, изменения числа страниц или direction вызовите `resize()`.
+-Измерение ширины происходит на этой границе, а не на каждом pointermove. Индекс
+-страницы остаётся в компоненте; общий контроллер знает только физическую ось X.
++Нужны `[data-pager-viewport]` с `overflow: hidden`, вложенный `[data-pager-track]`
++с `display: flex`, прямые дети `[data-page]` с `flex: 0 0 100%` и кнопка
++`[data-pager-handle]` с `touch-action: none`. Кнопки `[data-page-index="0"]`
++и т. д. выбирают страницы. Текст и поля ввода сохраняют выделение и обычный ввод.
++После смены размера, родителя, числа страниц или CSS `direction` вызовите `resize()`.
++Индекс страницы принадлежит компоненту; контроллер управляет физической осью X.
+ 
+ <!-- recipe:compositor-pager -->
+ ```typescript
+@@ -706,24 +697,20 @@ export function mountCompositorPager(root: HTMLElement, options: {
+ }
+ ```
+ 
+-Свяжите `onSelect` с существующим состоянием страниц и `aria-current` кнопок;
+-недоступные для чтения страницы скрывайте по семантике своего компонента. Home/End,
+-PageUp/PageDown и стрелки на handle дают альтернативу перетаскиванию; горизонтальные
+-стрелки учитывают RTL. Они не перехватывают клавиатуру полей ввода. Lifecycle,
+-pause и `motion: 'none'` совпадают с sheet. Диагностика `motion.mode` показывает
+-фактический native/live исход; fallback не объявляется compositor-исполнением.
++`onSelect` обновляет состояние страниц и `aria-current`; недоступные страницы
++скрывает компонент. Home/End, PageUp/PageDown и стрелки работают на кнопке захвата;
++горизонтальные стрелки учитывают RTL. Ввод в полях сохраняется. Пауза, очистка и
++`motion: 'none'` работают как у панели выше.
++`motion.mode` сообщает фактическое исполнение: резервный живой путь не является
++исполнением через композитор браузера.
+ 
+ ## Анимации, принадлежащие компоненту
+ 
+-`createAnimateScope` из `./animate` связывает локальные селекторы с одной уборкой.
+-Каждый mount создаёт свою область. Строки выбирают потомков root, включая новые
+-узлы при следующем вызове; для самого root передайте элемент явно. Переданный
+-напрямую внешний элемент тоже допустим — область не является песочницей DOM.
+-
+-В примере компонент содержит кнопку `[data-replay]` и элемент `.motion-target`.
+-Сохраните общий код в `card-motion.ts`. Нативная кнопка даёт мышь, touch и клавиатуру
+-без отдельной реализации распознавания ввода. `prefers-reduced-motion` проверяется
+-существующим `animate` при каждом запуске.
++При каждом монтировании создавайте `createAnimateScope` из `./animate`.
++Селекторы выбирают текущих потомков корня; сам корень или внешний элемент передавайте
++явно. В примере нужны кнопка `[data-replay]` и `.motion-target`.
++Сохраните общий код в `card-motion.ts`; `animate` проверяет `prefers-reduced-motion`
++при каждом запуске.
+ 
+ <!-- recipe:animate-scope-vanilla -->
+ ```typescript
+@@ -751,15 +738,13 @@ export function mountCardMotion(root: HTMLElement): () => void {
+ }
+ ```
+ 
+-Для обычного DOM вызовите `const dispose = mountCardMotion(root)` после создания
+-разметки, а перед удалением компонента — `dispose()`. Область учитывает анимации,
+-но не произвольные listeners: их снимает владелец компонента, как в примере выше.
++После создания DOM вызовите `const dispose = mountCardMotion(root)`, перед удалением —
++`dispose()`. Обработчики снимает компонент; область учитывает только свои анимации.
+ 
+-### React: cleanup эффекта, а не render на каждый кадр
++### React: очистка эффекта
+ 
+-`react-card.ts` использует тот же общий `card-motion.ts`. Область создаётся внутри
+-эффекта: повторный setup в StrictMode получает новый lifecycle, а не уничтоженный
+-объект из прошлого setup. Изменение DOM выполняет движок, React state на кадре нет.
++`react-card.ts` использует общий `card-motion.ts`. Создавайте новую область внутри
++эффекта, включая повторный запуск StrictMode; покадровый React state не требуется.
+ 
+ <!-- recipe:animate-scope-react -->
+ ```typescript
+@@ -776,11 +761,10 @@ export function ScopedCard() {
+ }
+ ```
+ 
+-### Solid: область живёт столько же, сколько owner
++### Solid: область принадлежит компоненту
+ 
+-`solid-card.ts` также импортирует `card-motion.ts`. Этот вариант без JSX возвращает
+-обычный DOM-узел; компонент монтируется стандартным `render` из `solid-js/web`.
+-Создание области откладывается до `onMount`, cleanup регистрируется у owner.
++`solid-card.ts` импортирует `card-motion.ts` и возвращает DOM-узел для `render` из
++`solid-js/web`. Создание области откладывается до `onMount`, очистка — в `onCleanup`.
+ 
+ <!-- recipe:animate-scope-solid -->
+ ```typescript
+@@ -799,29 +783,21 @@ export function SolidScopedCard(): HTMLElement {
+ }
+ ```
+ 
+-Для SSR используйте разметку компонента/JSX своего framework; эта конкретная
+-Solid-фабрика создаёт DOM и вызывается только на клиенте. Импорт `./animate`
+-сам по себе не читает DOM. React-пример допускает server render: эффект там
+-не запускается.
++Solid-фабрика вызывается только на клиенте; для SSR нужна разметка вашего компонента.
++React-пример допускает серверный рендеринг: эффект там не запускается.
++Импорт `./animate` сам по себе не читает DOM.
+ 
+ ### Границы уборки
+ 
+-`destroy()` сразу запрещает новые вызовы через эту область и пытается отменить
+-все её незавершённые анимации, включая paused и delayed. Поздний handler получает
+-завершённый no-op controls без чтения его входов. Естественно завершённые handles
+-удаляются из учёта после `finished`; область не копит историю переходов.
+-
+-Если destroy вызван внутри синхронной host-транзакции, один финальный проход в
+-микрозадаче повторяет отмену после снятия reservation. Кадровый цикл не добавляется.
+-Для ожидания конкретного завершения используйте исходный `controls.finished`.
+-Одна синхронная ошибка cleanup выбрасывается без замены, несколько — `AggregateError`;
+-ошибки финального прохода сообщаются через доступный `globalThis.reportError`.
+-У постоянно неисправного host отмена остаётся best-effort, а не обещанием отката.
+-
+-Cleanup **сохраняет текущую позу**, не восстанавливает стили до анимации. Это не
+-`revert`. Он также не отменяет новый переход, который другой scope или прямой
+-`animate` уже сделал владельцем тех же свойств. После destroy создайте новую
+-область для нового mount; не переиспользуйте старую.
++`destroy()` запрещает новые запуски и пытается отменить незавершённые анимации,
++включая паузу и задержку. Поздний вызов получает завершённый неактивный контроллер. Очистка
++сохраняет текущую позу и не отменяет переход, которым уже владеет другая область.
++Для нового монтирования создайте новую область.
++Синхронные ошибки очистки выбрасываются; ошибки финального прохода сообщаются через
++`globalThis.reportError` при его наличии. При неисправном окружении отмена не гарантирует откат.
++Порядок очистки и точные исходы — в
++[контракте `createAnimateScope`](api.md#область-анимаций-компонента).
++
+ ## Каскад состояний взаимодействия без гонок
+ 
+ Наведение, нажатие и перетаскивание задают слои; масштабом управляет один
+diff --git a/docs/server-profile.md b/docs/server-profile.md
+index ec693900..c880df55 100644
+--- a/docs/server-profile.md
++++ b/docs/server-profile.md
+@@ -1,19 +1,17 @@
+-# Серверная клетка PROFILE-01
++# Серверный профиль PROFILE-01
+ 
+ Роль: справка (Diátaxis).
+ 
+-Профиль измеряет сообщённое Linux время исполнения потока Node и стоимость
+-публичного API браузера. Он использует существующие владельцы `bench/compare`.
+-Физические Android/iOS, экран60/120Гц, GPU и энергия остаются `UNPROVEN`.
++Справочник частного инструмента для измерения времени исполнения потока Node,
++сообщаемого Linux, и стоимости публичного API в браузере.
+ 
+ ## Подготовка и запуск
+ 
+-Нужны Linux6.18.44/x64, Node24.19.0, Chromium149.0.7827.55 и `pnpm@11.11.0`
+-первым в `PATH`, зависимости root и `bench/compare` из frozen lock, C11 compiler
+-и Linux libc. Binary и source hashes проверяются до samples. Firefox/WebKit
+-здесь не имеют зарегистрированной clock model; их функциональные проверки отдельны.
+-Baseline — clean `0b6f537e148b7dadadfb9e3ce7c446d014975958`, candidate также clean.
+-Во время pilot, A/A, positive и A/B на хосте не запускают параллельные suites.
++Платформу, версии инструментов и исходный checkout задаёт
++[`SERVER_PROFILE`](../bench/profile/server-profile-registration.mjs).
++Установите зависимости корня и `bench/compare` по зафиксированным lock-файлам;
++указанные Node и pnpm должны быть первыми в `PATH`. Нужны компилятор C11 и Linux libc.
++Оба checkout должны быть чистыми. На время измерений освободите хост от других проверок.
+ 
+ ```sh
+ taskset -c 0 node bench/profile/server-profile-runner.mjs \
+@@ -21,84 +19,46 @@ taskset -c 0 node bench/profile/server-profile-runner.mjs \
+   --browser chromium --out /outside/checkout/server-chromium-registration-1
+ ```
+ 
+-Каталог результата должен отсутствовать. Повтор серии ради GREEN запрещён.
+-Смена метода требует новой регистрации с сохранением старого raw и отказа.
+-Пакеты baseline/candidate, comparators и их dependency closure сначала упаковываются;
+-потребители используют actual tarballs, а не исходники или workspace imports.
+-
+-## Сцены и знаменатели
+-
+-Семейство содержит11 клеток: две legacy engine сцены ×3 метрики, stock C ×1,
+-две browser сцены ×2. Полные параметры задаёт `SERVER_PROFILE` в
+-[server-profile-registration.mjs](../bench/profile/server-profile-registration.mjs).
+-
+-| Сцена | Полезная работа | Знаменатель |
+-| --- | --- | --- |
+-| `scalar-live-100` |100 живых scalar retargets; start/frame/cancel-drain |8 повторов |
+-| `transform-fresh-1000` |1000 свежих targets ×7 transform channels |8 повторов |
+-| `motion-value-default-stock-c` |штатные constructor0/onChange/setTarget100/drain47/destroy/return100 |8 batches по2000 операций |
+-| S2/S3 |start/cancel:100/200 targets, stagger0/5ms, duration128ms, endpoint300px |8 batches по32 вызова |
+-
+-Stock C использует main-entry `MotionValue`, прежнюю default bounded spring
+-`{mass:1,stiffness:170,damping:26}` и существующий `scripts/bench-support.mjs`.
+-Factory и две warmup batches по2000 находятся вне CPU. Каждая операция сохраняет
+-свои47 frames и endpoint100; среднее47 или checksum100 не заменяет oracle.
+-Positive делает4000 stock C операций или64 browser вызова; divisor остаётся2000/32.
+-Recorder включён одинаково обеим ролям; RLE и oracle выполняются после CPU.
+-Канонические1200ms guards независимы; S2/S3 не доказывают reorder/list и семьиM-05.
+-
+-## Регистрация и допуск
+-
+-До первого sample закрепляются source/package/toolchain/browser/harness identity,
+-CPU affinity/quota, native getter, clocks, workload и правила остановки.
+-Один baseline-only pilot планирует N до candidate samples. A/A и настоящая2×work
+-проверяют разрешимость; A/B начинается только после PASS calibration.
+-N292…1024 содержит146…512 независимых paired blocks противоположного порядка.
+-p50/p95 относятся к среднему блока, а не отдельному вызову, frame p99 или FPS.
+-Точные биномиальные интервалы используют family-wise95% и alpha-per-tail1/1760.
+-Protected p95 upper≤1.05, MDE5%, power0.8, counts, seed и старые budgets сохраняются.
+-Неразрешимость, ошибка или превышение ресурса дают `UNPROVEN`, без добора к GREEN.
+-
+-Resource controls снимают все6 safe counters `cpu.stat` и `cpu.max` до samples,
+-затем до/после каждого блока. Affinity/quota связаны с зарегистрированной machine;
+-throttling delta должна быть0. Исторические counters не принимаются за текущую delta.
+-Ранее известный exploratory stock wall7.2k→8.3k ns указан в `exploratoryPrehistory`;
+-`candidateSamplesObserved:false` относится только к текущему protocol epoch.
+-
+-## Часы и полезный исход
+-
+-Engine использует частный NAPI getter `CLOCK_THREAD_CPUTIME_ID`: Linux-reported
+-scheduled-runtime main-thread. Сохраняются seconds строкой, nanoseconds∈[0,10^9),
+-sequence, PID/TID и valueNs. Потребитель заново выводит `seconds*10^9+nanoseconds`
+-через BigInt, сверяет clockReads, identity и отсутствие обратного счётчика.
+-Native C/четыре официальных NAPI header, binary, Node, compiler/version/flags и libc
+-регистрируются до работы. Pure import не требует compiler/native binary.
+-
+-Прежние2µs остаются консервативным наружным расширением reported counter;
+-это не физическая точность и не вывод из nominal `clock_getres`.
+-Getter overhead включён и не вычитается. Прежний RUSAGE/Node clock дал устаревший
+-runtime на известной работе; его исходники, warmup plateaus и отказ сохранены.
+-Актуальная Linux цепь — `cpu_clock_sample(CPUCLOCK_SCHED)`→`task_sched_runtime`;
+-source pins находятся в `SERVER_PROFILE.clockError`.
+-
+-Browser использует isolated realm-local `performance.now`: elapsed API с scheduler/GC.
+-Обе clock reads и binary64 погрешность входят в pointwise bounds до CI;
+-усреднение не уменьшает worst-case clock envelope. DOM allocation вне start,
+-start/retarget/frame/cancel-drain и heap наблюдаются в своих областях.
+-Normal-motion control сохраняет fresh0→300 onset, первую CSS0 публикацию,
+-три checkpoints, terminal и document/rAF/perf chronology. Неопределённое окно
+-не доказывает правильную длительность. После cancel все attached targets
+-неподвижны и без WAAPI два rAF. Swallowed vendor exceptions adapter не наблюдает.
+-Подробные oracles принадлежат [methodology.mjs](../bench/compare/methodology.mjs)
+-и [bench-transform-support.mjs](../scripts/bench-transform-support.mjs).
++Каталог результата должен отсутствовать и находиться вне checkout. До измерений
++инструмент проверяет ресурсы хоста, исходники, часы и собранные пакеты участников.
++Потребители используют упакованные пакеты. Повтор серии ради успешного исхода запрещён:
++смена метода требует новой регистрации с сохранением прежних данных и отказов.
++
++## Параметры и границы результата
++
++Числовые параметры и правила допуска принадлежат исходникам:
++
++- [`SERVER_PROFILE`](../bench/profile/server-profile-registration.mjs) — сцены,
++  объём работы, модель часов, выборка и условия остановки.
++- [Контракт профиля](../bench/profile/server-profile-contract.mjs) — проверка данных,
++  происхождения результата, последовательности этапов и статистических границ.
++- [Методология сравнения](../bench/compare/methodology.mjs) и
++  [владелец измерения](../scripts/bench-transform-support.mjs) — независимая проверка
++  полезного движения, завершения и отмены.
++
++`CLOCK_THREAD_CPUTIME_ID` наблюдает сообщённое ядром время исполнения главного потока.
++Наружное расширение счётчика учитывается при допуске; оно не удостоверяет физическую
++точность часов. Номинальное разрешение `clock_getres` также не задаёт точность.
++Накладные расходы чтения включены. Требования к сборке и происхождению счётчика —
++в [справочнике его исходников](../bench/profile/native-clock/README.md).
++
++Браузерное измерение наблюдает истекшее время вызова API через `performance.now`,
++включая влияние планировщика и сборки мусора. Результат относится к агрегату блока;
++он не доказывает задержку отдельного вызова, кадровую частоту, стоимость GPU,
++энергопотребление или поведение физических Android/iOS. Функциональные проверки
++Firefox/WebKit не заменяют измерение с зарегистрированной моделью часов.
++
++Неразрешимое наблюдение, ошибка или нарушение ресурсных условий дают `UNPROVEN`.
++Подавленные адаптером исключения внешнего исполнителя наблюдать невозможно.
++Принудительная сборка мусора применяется только в отдельной проверке оставшейся
++памяти после измерений; её стоимость не включается в измеренный интервал CPU.
+ 
+ ## Результат и независимая проверка
+ 
+-Каталог хранит `server-profile.json`, внешний `server-profile.sha256`,
+-`journal.ndjson`, raw controls, packages, adapters и native qualification.
+-Все samples и приобретённые failure prefixes сохраняются; нет pruning по исходу.
+-Журнал связывает preregistration→N→calibration→A/B, порядок участников и failure union.
+-Декодер поддерживает max-N carrier; lossless RLE/gzip не меняют расширенные данные.
++Каталог содержит `server-profile.json`, `server-profile.sha256`, `journal.ndjson`,
++исходные контрольные данные, пакеты и сведения о сборке счётчика. Все приобретённые
++наблюдения и частичные результаты ошибок сохраняются. Для независимой проверки
++передайте отдельно сохранённый digest и журнал:
+ 
+ ```sh
+ node bench/profile/server-profile-contract.mjs \
+@@ -107,10 +67,7 @@ node bench/profile/server-profile-contract.mjs \
+   --journal /outside/checkout/server-chromium-registration-1/journal.ndjson
+ ```
+ 
+-Admission принадлежит [server-profile-contract.mjs](../bench/profile/server-profile-contract.mjs).
+-Forced GC разрешён только отдельному retention child после timing: host turn через
+-`setImmediate`, затем два GC у каждого heap snapshot; stock C делает2×2000 warmups
+-и8×2000 проверенных операций. Отрицательные heap deltas сохраняются. Это наблюдение
+-пакета/oracle/harness, не точная атрибуция утечки или стоимость GC внутри CPU.
+-Исторические версии протокола и все FAIL epochs остаются в исходных архивах;
+-новые результаты не распространяются на другой method/source/package tuple.
++Допущенный результат действует только для зарегистрированного набора исходников,
++пакетов, инструментов и метода. Планы исполнения находятся в
++[agents-config](https://github.com/Labpics-Team/agents-config/tree/main/plans/lab-motion-production);
++справочник не заменяет регистрацию и исходные данные серии.
+diff --git a/test/server-profile-contract.test.ts b/test/server-profile-contract.test.ts
+index 0a654395..fcaf9cc2 100644
+--- a/test/server-profile-contract.test.ts
++++ b/test/server-profile-contract.test.ts
+@@ -6,7 +6,7 @@ import { createContext, runInContext } from 'node:vm';
+ import { createHash } from 'node:crypto';
+ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from '../bench/profile/server-profile-registration.mjs';
+ import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
+-  compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
++  compactServerCpuEvidence, compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
+   parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal,
+   verifyServerClockRegistration, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
+ import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
+@@ -239,7 +239,15 @@ function chain(events: any[], shared?: { events: any[]; records: any[] }) {
+ let sharedAdmission: { artifact: any; events: any[]; records: any[] } | undefined;
+ function admissionHistory() {
+   if (!sharedAdmission) {
+-    const artifact = healthyAdmission(), events = admissionEvents(artifact);
++    const artifact = healthyAdmission();
++    // Полные независимые vectors переходят в зарегистрированный carrier до events/hash.
++    // N, поля наблюдений и четыре контрпримера остаются прежними; legacy fault fixtures не меняются.
++    for (const name of ['warmup', 'pilot', 'aa', 'positive', 'ab']) for (const row of artifact[name].rows) {
++      if (row.kind === 'engine') for (const sample of Object.values(row.samples) as any[]) {
++        for (const measured of sample.raw) measured.raw.cpuReads = compactServerCpuEvidence(measured.raw.cpuReads);
++      }
++    }
++    const events = admissionEvents(artifact);
+     sharedAdmission = { artifact, events, records: chain(events) };
+   }
+   return sharedAdmission;

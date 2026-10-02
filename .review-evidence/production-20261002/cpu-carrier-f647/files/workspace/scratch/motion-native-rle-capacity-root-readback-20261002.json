@@ -1,0 +1,15 @@
+{
+  "at": "2026-10-02T02:46:01.812070+00:00",
+  "head": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "all15PrimaryFileBindingsMatch": true,
+  "sixVectorStageMultiplicityAndAdditionArithmeticIndependentlyRecomputed": true,
+  "endpointCountEachCarrier": 1939840,
+  "nativeReplacementDeltaEachCarrierBytes": 8201512,
+  "combinedSyntheticUpperBytes": 1954891521,
+  "withReserveBytes": 3028633345,
+  "source": "Existing synthetic successful carrier shape and widening model; realtrace/error/path width notcertified",
+  "readerCorrection": "Первый арифметический reader ошибочно прибавил sampleidentity второй раз к stage delta, который уже его содержит, и отказал до результата. Исправлено через независимую агрегацию6 vectors ×stages; source/SUT неизменны.",
+  "primarySha256": "e65e1e39c11990504cd9ea2bd2ae3a01971c1675eb89040ff70c917e41994b03",
+  "manifestSha256": "c7ced50ef8a590eb62f834f288626c3d5094a3eb3d5bb05e64f3b5eecd200ebc",
+  "resultSha256": "5bbbdecbc516f31c676275f3506048185d744ee8de85661131c3f68d1708ad01"
+}

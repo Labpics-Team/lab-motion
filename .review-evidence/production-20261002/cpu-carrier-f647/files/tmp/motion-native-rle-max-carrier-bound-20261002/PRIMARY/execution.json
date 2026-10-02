@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/tmp/motion-native-rle-max-carrier-bound-20261002/capacity-metadata.mjs"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "startedAt": "2026-10-02T02:30:43.085545+00:00",
+  "endedAt": "2026-10-02T02:30:43.200471+00:00",
+  "durationSeconds": 0.11494164098985493,
+  "exitCode": 0,
+  "error": null,
+  "unsetEnvironment": [
+    "NODE_PATH",
+    "NODE_OPTIONS"
+  ],
+  "metadataOnly": true
+}

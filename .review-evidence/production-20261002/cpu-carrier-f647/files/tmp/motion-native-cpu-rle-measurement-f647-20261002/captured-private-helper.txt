@@ -1,0 +1,7 @@
+function compactSampleCpuEvidence(sample) {
+  // Никакой частичной замены при отказе encoder: исходные массивы остаются в error.raw.
+  let encoded;
+  try { encoded = sample.raw.map((measured) => compactServerCpuEvidence(measured.raw.cpuReads)); }
+  catch (error) { throw Object.assign(new AggregateError([error], 'server profile: native CPU carrier не завершён'), { raw: sample }); }
+  for (let index = 0; index < sample.raw.length; index++) sample.raw[index].raw.cpuReads = encoded[index];
+}

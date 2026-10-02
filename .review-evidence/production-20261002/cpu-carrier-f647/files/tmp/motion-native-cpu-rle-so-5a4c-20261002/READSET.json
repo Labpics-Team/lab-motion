@@ -1,0 +1,692 @@
+{
+  "capturedAtUtc": "2026-10-02T02:48:00.165477+00:00",
+  "axis": "Independent second-order CPU evidence representation/docs review only",
+  "head": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "tree": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "base": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "entries": [
+    {
+      "path": "/workspace/agents-config/AGENTS.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "scope": "Рабочие нормы; фокус 103–145 и 199, область и полномочия; current direct reread103–150 and187–207",
+      "transfer": "9/9 unchanged normative bytes against own088 READSET; applied scope preserved"
+    },
+    {
+      "path": "/workspace/agents-config/plans/SPEC.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "scope": "Вся спецификация 1–368; authoritative/lifecycle/draft/grants/evidence",
+      "transfer": "9/9 unchanged normative bytes against own088 READSET; applied scope preserved"
+    },
+    {
+      "path": "/workspace/agents-config/plans/TEMPLATE.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e",
+      "scope": "Весь template; выбранный подход/alternatives/cost/evidence",
+      "transfer": "9/9 unchanged normative bytes against own088 READSET; applied scope preserved"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/ACTIVE.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731",
+      "scope": "Полный файл: r11 active",
+      "transfer": "9/9 unchanged normative bytes against own088 READSET; applied scope preserved"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/CLAIM.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8",
+      "scope": "Полный файл: r11 PROFILE-01",
+      "transfer": "9/9 unchanged normative bytes against own088 READSET; applied scope preserved"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/ACTIVATION.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908",
+      "scope": "Полный файл: r11 grant",
+      "transfer": "9/9 unchanged normative bytes against own088 READSET; applied scope preserved"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/r11.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "scope": "Scoped: original objective; M-04/M-05; ASM/INV; PROFILE 339–351; G-PERF 435–456; статусы/Unknowns. Не весь файл semantic-audited.",
+      "transfer": "9/9 unchanged normative bytes against own088 READSET; applied scope preserved"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/r12.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622",
+      "scope": "Подготовленный successor; сохранение области, objective, ASM/INV, PROFILE, gates/Unknowns. Не treated as active.",
+      "transfer": "9/9 unchanged normative bytes against own088 READSET; applied scope preserved"
+    },
+    {
+      "path": "/workspace/agents-config/skills/architecture/references/composition.md",
+      "kind": "normative-own-read-transfer",
+      "sha256": "9297e36749db27c85b57aa65048faa72f656d23a68c49f3f4459c0269ce55d03",
+      "scope": "Нормативная процедура при изменении эксплуатационной границы; scope/consumer/budget/alternatives. Tool output частично truncates middle; не заявляется полный semantic audit.",
+      "transfer": "9/9 unchanged normative bytes against own088 READSET; applied scope preserved"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-contract.mjs",
+      "archiveMember": "bench/profile/server-profile-contract.mjs",
+      "kind": "immutable-source-scoped-content",
+      "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+      "bytes": 73913,
+      "scope": "imports + codec 182–245 + validateThreadCpuFields 368–382; source delta fully scoped; carrier/digest/parser/journal/CLI suffix verified byte-identical, not newly runtime-tested",
+      "finalTreeBinding": "40fbe427bbd750e9423feb71b6b6238080300022"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-runner.mjs",
+      "archiveMember": "bench/profile/server-profile-runner.mjs",
+      "kind": "immutable-source-scoped-content",
+      "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+      "bytes": 51648,
+      "scope": "164–187; 550–645 and diff owner changes; compactSampleCpuEvidence and sample publication/failure ownership; current production repetitions/cpuClock/warmup source180–345 targeted string scan",
+      "finalTreeBinding": "40fbe427bbd750e9423feb71b6b6238080300022"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-registration.mjs",
+      "archiveMember": "bench/profile/server-profile-registration.mjs",
+      "kind": "immutable-source-scoped-content",
+      "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+      "bytes": 18998,
+      "scope": "rawEncoding delta; 1–150 current reading partially truncated, clock/model/threshold lineage carried from own088 unchanged regions; strict protocol verification",
+      "finalTreeBinding": "40fbe427bbd750e9423feb71b6b6238080300022"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/native-clock/README.md",
+      "archiveMember": "bench/profile/native-clock/README.md",
+      "kind": "immutable-source-scoped-content",
+      "sha256": "209fe23d861255eb9c83ac37f00b68168aeb6c4f30bb485f57eb5bbed92ebcf1",
+      "bytes": 1385,
+      "scope": "whole 1–17; role/provenance/license/package/clock claims",
+      "finalTreeBinding": "40fbe427bbd750e9423feb71b6b6238080300022"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/docs/server-profile.md",
+      "archiveMember": "docs/server-profile.md",
+      "kind": "immutable-source-scoped-content",
+      "sha256": "fbef20828a855c6f289de8a1c7d6049738fefec6c4d73f0ce57a68640c4557f7",
+      "bytes": 5987,
+      "scope": "whole 1–73 plus document diff; reference owner/launch/failure/boundary/replay claims",
+      "finalTreeBinding": "40fbe427bbd750e9423feb71b6b6238080300022"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/docs/recipes.md",
+      "archiveMember": "docs/recipes.md",
+      "kind": "immutable-source-scoped-content",
+      "sha256": "0808d2bde83cdd6d3af74c0e3bd4dd4996d469ff29c56c4937dae05ecccef8f3",
+      "bytes": 57377,
+      "scope": "all prose changes in diff; targeted source searches (some output truncated); 24 code fences compared byte-for-byte, no new example execution",
+      "finalTreeBinding": "40fbe427bbd750e9423feb71b6b6238080300022"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/test/server-profile-contract.test.ts",
+      "archiveMember": "test/server-profile-contract.test.ts",
+      "kind": "immutable-source-scoped-content",
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+      "bytes": 97980,
+      "scope": "whole diff554–EOF; admissionHistory changes, literal codec controls; legacy fault controls and four-case full admission callback independently bound by old/new primary bytes; no suite run",
+      "finalTreeBinding": "40fbe427bbd750e9423feb71b6b6238080300022"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/docs/api.md",
+      "archiveMember": "docs/api.md",
+      "kind": "immutable-source-unchanged-reference",
+      "sha256": "2f570ca964fb3135d172670805a6bc2912e18d5557cdd5b8a0df9e102b5a0c05",
+      "bytes": 24730,
+      "scope": "28–59 exact AnimateScope anchor and cleanup contract; same archive bytes as own088"
+    },
+    {
+      "path": "/tmp/motion-profile-f647-final-20261002/commit.raw",
+      "kind": "literal-primary-content",
+      "sha256": "1fa6cd250f87f75d9ebec228c5c9460fc2c630bd04360004598e714961fa041d",
+      "bytes": 344,
+      "scope": "Git object bytes/header; independent SHA1(commit header+bytes), final tree header"
+    },
+    {
+      "path": "/tmp/motion-profile-f647-final-20261002/tree.raw",
+      "kind": "literal-primary-content",
+      "sha256": "9f40fafa814871a848794ce301976fa31760ab149a8d530c4289b114fab0b429",
+      "bytes": 1192,
+      "scope": "raw Git tree bytes; independent SHA1(tree header+bytes), compare root rebuilt from all639 source blobs"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-parity-20261002/probe.mjs",
+      "kind": "literal-primary-content-scoped",
+      "sha256": "e3d6b7f8ef6553ca594e4445881da0d0990f27a59537e1f35ee7227628a4c516",
+      "bytes": 6393,
+      "scope": "whole primary computation source read, not executed; event/parity and raw-vector capture logic only"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-parity-20261002/result.json",
+      "kind": "literal-primary-content-scoped",
+      "sha256": "852f2410f83f599920baffed2229f5ad03fd2ecfe4cab1a5c6ca3e63b927d368",
+      "bytes": 971357,
+      "scope": "135 retained raw vector shapes; own compactJSON byte counts; author success/failures not oracle"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/REPORT.md",
+      "kind": "own-previous-proof",
+      "sha256": "5fbb05adae73e09b3544829a1a4b895cba8456baa9a00f6873c42403dd7386f7",
+      "bytes": 14185,
+      "scope": "own earlier scoped review only; unchanged getter/package/model/header/toolchain boundaries transferred by source byte identity"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/READSET.json",
+      "kind": "own-previous-proof",
+      "sha256": "fab090e5217b3e19e73edf2e4166a257e8b8cbd626c45aa3295d789480947646",
+      "bytes": 19512,
+      "scope": "own previous exact read scopes and norms; transfer anchor"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/MANIFEST.json",
+      "kind": "own-previous-proof",
+      "sha256": "8396794c4fe1a3b3101f56b15d131c00cc2f9e88161797fa1b776c82c2f9813b",
+      "bytes": 8741,
+      "scope": "own previous evidence custody identity"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/TERMINAL.json",
+      "kind": "own-previous-proof",
+      "sha256": "93ff62ed126c6756344dccd18af176ebf443db46a6b72fb7d5ad30361780c62b",
+      "bytes": 469,
+      "scope": "own previous actual execution END; no fresh f647 runtime claim"
+    },
+    {
+      "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/capacity-metadata.mjs",
+      "kind": "literal-capacity-primary",
+      "sha256": "a18a04cb1bf121c2ff5d39879674858f112fedc9e7e9c9ced56e1f3bf0f66377",
+      "bytes": 10388,
+      "scope": "whole source, independently inspected fixed-width vector replacements, stage counts, static additions and snapshot scope; not executed by reviewer"
+    },
+    {
+      "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/capacity-result.json",
+      "kind": "literal-capacity-primary",
+      "sha256": "5bbbdecbc516f31c676275f3506048185d744ee8de85661131c3f68d1708ad01",
+      "bytes": 6501,
+      "scope": "whole literal data/model; source bindings and stages arithmetic independently checked; roundtrip/author success flags not semantic oracle"
+    },
+    {
+      "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/execution.json",
+      "kind": "literal-capacity-primary",
+      "sha256": "971d01bb21bce7299fe139b6f83d41a6fb72a781d639cdc5bb0c7a2cbb52b2ad",
+      "bytes": 473,
+      "scope": "whole literal command/metadataOnly/actual start-end/exit; not own runtime execution"
+    },
+    {
+      "path": "/tmp/motion-server-stock-c-profile-20261001T1610Z/max-format-fixtures.mjs",
+      "kind": "old-primary-model-input",
+      "sha256": "70c5a15e822e779983c9bd05bdd1de4ae733382de9c7bc8aca57dc952d3873ef",
+      "bytes": 24482,
+      "scope": "engineRaw and stockRaw whole 61–152; stage 153–177 plus targeted searches of remaining builder/events; baseline geometry, synthetic traces and repetitions"
+    },
+    {
+      "path": "/tmp/motion-server-stock-c-profile-20261001T1610Z/max-format-consumer-probe.mjs",
+      "kind": "old-primary-model-input",
+      "sha256": "adcfc4ea87953ebd44845643b7c21e977fb22c774360a2ba8de50f2d956c3661",
+      "bytes": 9041,
+      "scope": "15–106 targeted source reading; pilot field mutation, source fixture acquisition, maxN expansion, raw/journal byte producer and gzip retention; matched/PASS not oracle"
+    },
+    {
+      "path": "/tmp/motion-server-stock-c-profile-20261001T1610Z/maxN1024-consumer-receipt.json",
+      "kind": "old-primary-model-input",
+      "sha256": "66e93dc4257595c2b0cb73ca21734d8d8822df0c6b25b30e5e9f6d1c64c58404",
+      "bytes": 1633,
+      "scope": "literal byte counts, paths, pins, synthetic flag, zero timingSamples and stage geometry; semantic status/stdout/matched not oracle"
+    },
+    {
+      "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/old-inputs/registration-6eae.mjs",
+      "kind": "old-primary-source-scoped",
+      "sha256": "98e162c114ef1329c99ac9b5bd8f24ab5a2df3d2e95da4b9d8caf5c69378079a",
+      "bytes": 16518,
+      "scope": "stockCpuScope single-quoted literal; independently compared both UTF8 byte lengths 301/301, growth0"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/patch.diff",
+      "kind": "immutable-diff-content-scoped",
+      "sha256": "39d46a3c4c20633f4a29e1df26b4891d3fae94772d364088ecc810da688c4db6",
+      "bytes": 50173,
+      "scope": "whole source/code delta1–176, recipes prose177–384, final test554–EOF; profile doc diff partially read and current complete doc1–73 used; no whole test correctness review"
+    }
+  ],
+  "identityOnlySets": [
+    {
+      "path": "/tmp/motion-profile-f647-final-20261002/PRIMARY-PACKET.json",
+      "sha256": "e0d911564aae5890a75788c33347e01299993c2b7b1c643edfb69e94863e2961",
+      "refs": [
+        {
+          "path": "/tmp/motion-profile-f647-final-20261002/commit.raw",
+          "sha256": "1fa6cd250f87f75d9ebec228c5c9460fc2c630bd04360004598e714961fa041d",
+          "expectedSha256": "1fa6cd250f87f75d9ebec228c5c9460fc2c630bd04360004598e714961fa041d",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-profile-f647-final-20261002/tree.raw",
+          "sha256": "9f40fafa814871a848794ce301976fa31760ab149a8d530c4289b114fab0b429",
+          "expectedSha256": "9f40fafa814871a848794ce301976fa31760ab149a8d530c4289b114fab0b429",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/PRIMARY-PACKET.json",
+          "sha256": "e749209ac077ed25373d9f1b9b963177ed603c48468f55f221b750d5744fa992",
+          "expectedSha256": "e749209ac077ed25373d9f1b9b963177ed603c48468f55f221b750d5744fa992",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/source.tar",
+          "sha256": "de9d2501a5391527a252da1428ee031d15e187fdc5224f7bcb2df60a95656797",
+          "expectedSha256": "de9d2501a5391527a252da1428ee031d15e187fdc5224f7bcb2df60a95656797",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/patch.diff",
+          "sha256": "39d46a3c4c20633f4a29e1df26b4891d3fae94772d364088ecc810da688c4db6",
+          "expectedSha256": "39d46a3c4c20633f4a29e1df26b4891d3fae94772d364088ecc810da688c4db6",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/execution.json",
+          "sha256": "5dc2138e858bfe886717dd22e7204781d1bd738831e71006ba5a374fcbbbffee",
+          "expectedSha256": "5dc2138e858bfe886717dd22e7204781d1bd738831e71006ba5a374fcbbbffee",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/probe-result.json",
+          "sha256": "378acaa2769be5429b7dbb1120a2a4eab9ae5b0a6e5530ea2b438cf318ea619d",
+          "expectedSha256": "378acaa2769be5429b7dbb1120a2a4eab9ae5b0a6e5530ea2b438cf318ea619d",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/after-rle.cpuprofile",
+          "sha256": "bb2a3daf72cc5d59385d6694f2d606b1523e4d5169858eb6853137573da07701",
+          "expectedSha256": "bb2a3daf72cc5d59385d6694f2d606b1523e4d5169858eb6853137573da07701",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/acquired-steps.ndjson",
+          "sha256": "bfd44257e6a0ffee4d0f8efb55de95ed0863d19b5f8a520ba8050c59404fea62",
+          "expectedSha256": "bfd44257e6a0ffee4d0f8efb55de95ed0863d19b5f8a520ba8050c59404fea62",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/profile-top.json",
+          "sha256": "10ad4101d830339a64bc71caf9dcc3fd485bb2c06d9bffe864112509f39b6d76",
+          "expectedSha256": "10ad4101d830339a64bc71caf9dcc3fd485bb2c06d9bffe864112509f39b6d76",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/execution.json",
+          "sha256": "f5b2eb72c7de37758562c817197ae619128ea8a617d3e97a2cf8f5a53f343a1f",
+          "expectedSha256": "f5b2eb72c7de37758562c817197ae619128ea8a617d3e97a2cf8f5a53f343a1f",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/probe-result.json",
+          "sha256": "8f39d756b88660f1da5e4587f255ecbdb4657f618de0cbbd8dbe0296371aa3c4",
+          "expectedSha256": "8f39d756b88660f1da5e4587f255ecbdb4657f618de0cbbd8dbe0296371aa3c4",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/after-template.cpuprofile",
+          "sha256": "40ed9913df79cb80ede2431a411050023990c8361f267a3c936be58785b1c4e0",
+          "expectedSha256": "40ed9913df79cb80ede2431a411050023990c8361f267a3c936be58785b1c4e0",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/acquired-steps.ndjson",
+          "sha256": "bb0878efaefe8d3038195d038088cd451fd05090966aa6148509c53e7fe090b4",
+          "expectedSha256": "bb0878efaefe8d3038195d038088cd451fd05090966aa6148509c53e7fe090b4",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/profile-top.json",
+          "sha256": "b4345513e86e21df01aeb50e9cbd7bd27b539f4a8194cd0b800cc75202855ead",
+          "expectedSha256": "b4345513e86e21df01aeb50e9cbd7bd27b539f4a8194cd0b800cc75202855ead",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        },
+        {
+          "path": "/tmp/motion-admission-template-final-20261002/PRIMARY-PACKET.json",
+          "sha256": "6ae51a8e8e922cfd05ba984290393bd08941a5526d0274297a2e9219ecff08d9",
+          "expectedSha256": "6ae51a8e8e922cfd05ba984290393bd08941a5526d0274297a2e9219ecff08d9",
+          "matches": true,
+          "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+        }
+      ],
+      "meaning": "16/16 exact identity; cost/control/profile interpretations opaque, not semantic oracle unless separate content entry"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/PRIMARY-PACKET.json",
+      "sha256": "e749209ac077ed25373d9f1b9b963177ed603c48468f55f221b750d5744fa992",
+      "refs": [
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/legacy-native-controls-new.ts",
+          "sha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc",
+          "expectedSha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/legacy-native-controls-old.ts",
+          "sha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc",
+          "expectedSha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/callback-new.ts",
+          "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+          "expectedSha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/callback-old.ts",
+          "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+          "expectedSha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/source.tar",
+          "sha256": "de9d2501a5391527a252da1428ee031d15e187fdc5224f7bcb2df60a95656797",
+          "expectedSha256": "de9d2501a5391527a252da1428ee031d15e187fdc5224f7bcb2df60a95656797",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/patch.diff",
+          "sha256": "39d46a3c4c20633f4a29e1df26b4891d3fae94772d364088ecc810da688c4db6",
+          "expectedSha256": "39d46a3c4c20633f4a29e1df26b4891d3fae94772d364088ecc810da688c4db6",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/source/test/server-profile-contract.test.ts",
+          "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+          "expectedSha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/source/docs/server-profile.md",
+          "sha256": "fbef20828a855c6f289de8a1c7d6049738fefec6c4d73f0ce57a68640c4557f7",
+          "expectedSha256": "fbef20828a855c6f289de8a1c7d6049738fefec6c4d73f0ce57a68640c4557f7",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/source/docs/recipes.md",
+          "sha256": "0808d2bde83cdd6d3af74c0e3bd4dd4996d469ff29c56c4937dae05ecccef8f3",
+          "expectedSha256": "0808d2bde83cdd6d3af74c0e3bd4dd4996d469ff29c56c4937dae05ecccef8f3",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-runner.mjs",
+          "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+          "expectedSha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-registration.mjs",
+          "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+          "expectedSha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-contract.mjs",
+          "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+          "expectedSha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/native-clock/README.md",
+          "sha256": "209fe23d861255eb9c83ac37f00b68168aeb6c4f30bb485f57eb5bbed92ebcf1",
+          "expectedSha256": "209fe23d861255eb9c83ac37f00b68168aeb6c4f30bb485f57eb5bbed92ebcf1",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-parity-20261002/probe.mjs",
+          "sha256": "e3d6b7f8ef6553ca594e4445881da0d0990f27a59537e1f35ee7227628a4c516",
+          "expectedSha256": "e3d6b7f8ef6553ca594e4445881da0d0990f27a59537e1f35ee7227628a4c516",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-parity-20261002/fixtures.mjs",
+          "sha256": "4bd7aeaa744cd221439407be93a88afc551c19a578833d4ba68fe6790fe7c76d",
+          "expectedSha256": "4bd7aeaa744cd221439407be93a88afc551c19a578833d4ba68fe6790fe7c76d",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-parity-20261002/result.json",
+          "sha256": "852f2410f83f599920baffed2229f5ad03fd2ecfe4cab1a5c6ca3e63b927d368",
+          "expectedSha256": "852f2410f83f599920baffed2229f5ad03fd2ecfe4cab1a5c6ca3e63b927d368",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-parity-20261002/probe.log",
+          "sha256": "6e2f8cad2c738a2c50c007c6a7ff1326ba71eca0be355a3b1762c97661096f3c",
+          "expectedSha256": "6e2f8cad2c738a2c50c007c6a7ff1326ba71eca0be355a3b1762c97661096f3c",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-native-cpu-rle-successor-20261002/PRIMARY-PACKET.json",
+          "sha256": "56bbdab8fb90c587fe0c013f9a60dbf4d2791447d0b74ef4cd4ae0a61a4e69d7",
+          "expectedSha256": "56bbdab8fb90c587fe0c013f9a60dbf4d2791447d0b74ef4cd4ae0a61a4e69d7",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-profile-doc-prose-088-20261002/PRIMARY/PRIMARY-PACKET.json",
+          "sha256": "aae7a37c7dcd6ce0a10d47b6fc99efe22f1259cbb1a766735f56a28fa00d8ceb",
+          "expectedSha256": "aae7a37c7dcd6ce0a10d47b6fc99efe22f1259cbb1a766735f56a28fa00d8ceb",
+          "matches": true
+        },
+        {
+          "path": "/tmp/motion-ci-088fbc60-failure-20261002/connector-primary-receipt.json",
+          "sha256": "7ab68879d7fd8ef66b6c5de79445b996476aa65aa6aae7c79ec71ff6a1341e85",
+          "expectedSha256": "7ab68879d7fd8ef66b6c5de79445b996476aa65aa6aae7c79ec71ff6a1341e85",
+          "matches": true
+        }
+      ],
+      "meaning": "20/20 exact identity; content scope separately listed"
+    },
+    {
+      "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/PRIMARY-PACKET.json",
+      "sha256": "e65e1e39c11990504cd9ea2bd2ae3a01971c1675eb89040ff70c917e41994b03",
+      "manifestPath": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/MANIFEST.json",
+      "manifestSha256": "c7ced50ef8a590eb62f834f288626c3d5094a3eb3d5bb05e64f3b5eecd200ebc",
+      "refs": [
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/FORMULA.md",
+          "sha256": "963317112d71802e31333f8343e20001e42233fd6cd21b008375d4c851f1aebc",
+          "bytes": 4189,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/PRIMARY-PACKET.json",
+          "sha256": "e65e1e39c11990504cd9ea2bd2ae3a01971c1675eb89040ff70c917e41994b03",
+          "bytes": 1558,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/capacity-metadata.mjs",
+          "sha256": "a18a04cb1bf121c2ff5d39879674858f112fedc9e7e9c9ced56e1f3bf0f66377",
+          "bytes": 10388,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/capacity-result.json",
+          "sha256": "5bbbdecbc516f31c676275f3506048185d744ee8de85661131c3f68d1708ad01",
+          "bytes": 6501,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/execution.json",
+          "sha256": "971d01bb21bce7299fe139b6f83d41a6fb72a781d639cdc5bb0c7a2cbb52b2ad",
+          "bytes": 473,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/old-inputs/max-format-consumer-probe.mjs",
+          "sha256": "adcfc4ea87953ebd44845643b7c21e977fb22c774360a2ba8de50f2d956c3661",
+          "bytes": 9041,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/old-inputs/max-format-fixtures.mjs",
+          "sha256": "70c5a15e822e779983c9bd05bdd1de4ae733382de9c7bc8aca57dc952d3873ef",
+          "bytes": 24482,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/old-inputs/maxN1024-consumer-receipt.json",
+          "sha256": "66e93dc4257595c2b0cb73ca21734d8d8822df0c6b25b30e5e9f6d1c64c58404",
+          "bytes": 1633,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/old-inputs/registration-6eae.mjs",
+          "sha256": "98e162c114ef1329c99ac9b5bd8f24ab5a2df3d2e95da4b9d8caf5c69378079a",
+          "bytes": 16518,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/bench/profile/server-profile-contract.mjs",
+          "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+          "bytes": 73913,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/bench/profile/server-profile-registration.mjs",
+          "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+          "bytes": 18998,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/bench/profile/server-profile-runner.mjs",
+          "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+          "bytes": 51648,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/test/server-profile-contract.test.ts",
+          "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+          "bytes": 97980,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/stderr.log",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "bytes": 0,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        },
+        {
+          "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/stdout.log",
+          "sha256": "06e707f942df6fe241b225a329d10a20daaca3fd2429b73178e7616296111f44",
+          "bytes": 5033,
+          "matches": true,
+          "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+        }
+      ],
+      "meaning": "15/15 exact identity; FORMULA.md content not read as oracle; content scope separately listed",
+      "archivePath": "/tmp/motion-native-rle-max-carrier-bound-20261002/capacity-primary.tar",
+      "archiveSha256": "76d6bded5ff88cde1b7aa6d47382458b2a8bf2d8fdd111cdbb0024d2badfca7a",
+      "archiveMembers": 16,
+      "archiveMemberIdentityMatches": 16
+    }
+  ],
+  "sourceIdentity": {
+    "path": "/tmp/motion-native-cpu-rle-final-20261002/source.tar",
+    "sha256": "de9d2501a5391527a252da1428ee031d15e187fdc5224f7bcb2df60a95656797",
+    "files": 639,
+    "byteComparedAgainstOwn088": 639,
+    "unchanged": 632,
+    "changed": [
+      "bench/profile/native-clock/README.md",
+      "bench/profile/server-profile-contract.mjs",
+      "bench/profile/server-profile-registration.mjs",
+      "bench/profile/server-profile-runner.mjs",
+      "docs/recipes.md",
+      "docs/server-profile.md",
+      "test/server-profile-contract.test.ts"
+    ],
+    "missing": 0,
+    "semanticWholeSourceAudit": false
+  },
+  "excludedOracles": [
+    "foreign REPORT/HANDOFF",
+    "root or bot verdict",
+    "author success interpretations",
+    "profile-top/cost interpretation",
+    "withdrawn6502 source/test rationale"
+  ],
+  "skill": {
+    "resource": "skill://user/6ab1aaddc46481918fb78c5248bfdd91/verify/SKILL.md",
+    "via": "skills.read earlier; carried same task context",
+    "purpose": "scope and identity of evidence transfer"
+  },
+  "executionScope": {
+    "cpu": 2,
+    "currentProductionImports": 0,
+    "runtimeProbes": 0,
+    "builds": 0,
+    "profiles": 0,
+    "registeredTiming": 0,
+    "pilot": 0,
+    "fullN": 0,
+    "wholeSuites": 0,
+    "sourceNormThresholdTestMutations": 0
+  },
+  "capacitySupplement": {
+    "scope": "Successful fixed old synthetic maxN geometry, widens native CPU/clock fields; not actual trace/runtime upper",
+    "endpointCountEachCarrier": 1939840,
+    "combinedSyntheticCarrierBytes": 1954891521,
+    "actualSeriesMaximumFootprint": "UNPROVEN",
+    "actualSeriesRuntimeUpper": "UNPROVEN",
+    "primaryActualEndUtc": "2026-10-02T02:30:43.200471+00:00",
+    "ownProductionRuntime": 0,
+    "independentStaticReadback": "CAPACITY-READBACK.json",
+    "oldCompressedMetadataScope": [
+      {
+        "path": "/tmp/motion-server-stock-c-profile-20261001T1610Z/maxN1024.json.gz",
+        "compressedFileStatBytes": 43955429,
+        "gzipMagic": "1f8b",
+        "lastMemberISIZE": 963959689,
+        "matchesOldReceiptBytes": true,
+        "meaning": "readonly header/footer/stat consistency; no full gzip hash/decompression or full-carrier replay"
+      },
+      {
+        "path": "/tmp/motion-server-stock-c-profile-20261001T1610Z/maxN1024.ndjson.gz",
+        "compressedFileStatBytes": 47879950,
+        "gzipMagic": "1f8b",
+        "lastMemberISIZE": 974479628,
+        "matchesOldReceiptBytes": true,
+        "meaning": "readonly header/footer/stat consistency; no full gzip hash/decompression or full-carrier replay"
+      }
+    ]
+  },
+  "coordinationVisibility": "One list_agents status call displayed automatically supplied completed synopses of other axes after core source review. These were not used as oracle. No foreign REPORT/HANDOFF or root verdict files read."
+}

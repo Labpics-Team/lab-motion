@@ -1,0 +1,22 @@
+{
+  "startUtc": "2026-10-02T02:48:02.014686+00:00",
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/prepare.mjs"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "scriptSha256": "3675b0df822a5ce1589b38a85abc55bfa413326daa4d43c298f1be754bc3bdc7",
+  "scope": "Only source/tool/environment/native binary qualification metadata; no SUT/timing distributions",
+  "env": {
+    "PATH": "/tmp/motion-server-toolchain-20261001/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/override:/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin:/opt/codex/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/agent/.local/bin:/opt/codex/runtimes/codex-primary-runtime/dependencies/bin/fallback",
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null,
+    "CI": "true"
+  },
+  "endUtc": "2026-10-02T02:48:05.670429+00:00",
+  "exitCode": 0,
+  "allChildrenJoined": true
+}

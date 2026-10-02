@@ -1,0 +1,1142 @@
+[
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "compactCoordinates",
+    "beforeLines": [
+      60,
+      68
+    ],
+    "afterLines": [
+      60,
+      68
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "8cc68b6dce37f579851ca02a7664fc4b9cc390390a808d8cc807c9dbd95916a0",
+    "afterSha256": "8cc68b6dce37f579851ca02a7664fc4b9cc390390a808d8cc807c9dbd95916a0"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "compactSemanticGroups",
+    "beforeLines": [
+      84,
+      88
+    ],
+    "afterLines": [
+      84,
+      88
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "b9cbba4fd03c5d1427f38146180079145c4cd1ac5d6e4567574b159c35aaf84f",
+    "afterSha256": "b9cbba4fd03c5d1427f38146180079145c4cd1ac5d6e4567574b159c35aaf84f"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "compactServerSemanticEvidence",
+    "beforeLines": [
+      90,
+      110
+    ],
+    "afterLines": [
+      90,
+      110
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "6a19e78748b4d14f5ce188eb16c9fdffe9a701fd2445dc250aa7c46911802fbe",
+    "afterSha256": "6a19e78748b4d14f5ce188eb16c9fdffe9a701fd2445dc250aa7c46911802fbe"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "coordinateReader",
+    "beforeLines": [
+      330,
+      354
+    ],
+    "afterLines": [
+      397,
+      421
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "ad026a17e1369f7309bb3fabe5cdffd324a58c0ed1d6385c7e5fc7b6904df568",
+    "afterSha256": "ad026a17e1369f7309bb3fabe5cdffd324a58c0ed1d6385c7e5fc7b6904df568"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "errorBounds",
+    "beforeLines": [
+      29,
+      32
+    ],
+    "afterLines": [
+      29,
+      32
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "7f256f7b96badd108b37a35da9e49e521bf49459808d81fb5de17b2c34f02fb7",
+    "afterSha256": "7f256f7b96badd108b37a35da9e49e521bf49459808d81fb5de17b2c34f02fb7"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "expandCoordinates",
+    "beforeLines": [
+      70,
+      82
+    ],
+    "afterLines": [
+      70,
+      82
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "59d0bd45da6608f82601d7768f5b8eb39d4b2c0667e7a360d53f316b5730bcd4",
+    "afterSha256": "59d0bd45da6608f82601d7768f5b8eb39d4b2c0667e7a360d53f316b5730bcd4"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "invariant",
+    "beforeLines": [
+      16,
+      18
+    ],
+    "afterLines": [
+      16,
+      18
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "47731a1e37782536cb98c2098f87922f97cbc262f1d50fd7df4f62c7d5a9da53",
+    "afterSha256": "47731a1e37782536cb98c2098f87922f97cbc262f1d50fd7df4f62c7d5a9da53"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "meanBounds",
+    "beforeLines": [
+      21,
+      27
+    ],
+    "afterLines": [
+      21,
+      27
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "a6aa93874099d8c9dfb9e9c6833bdf4a818b2924e9fe71f420764ecdd724d3bc",
+    "afterSha256": "a6aa93874099d8c9dfb9e9c6833bdf4a818b2924e9fe71f420764ecdd724d3bc"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "parseServerJournalBytes",
+    "beforeLines": [
+      741,
+      754
+    ],
+    "afterLines": [
+      808,
+      821
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "87f052bb3de6fc011e13aafbd6c3aced1e07c251b05f6c6999560f69adc4ba16",
+    "afterSha256": "87f052bb3de6fc011e13aafbd6c3aced1e07c251b05f6c6999560f69adc4ba16"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "parseServerJsonBytes",
+    "beforeLines": [
+      689,
+      739
+    ],
+    "afterLines": [
+      756,
+      806
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "29fa1dacad77179d0c391476d97bc94d8aa2bcb17b387bf39c120e0445030f88",
+    "afterSha256": "29fa1dacad77179d0c391476d97bc94d8aa2bcb17b387bf39c120e0445030f88"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "positive",
+    "beforeLines": [
+      19,
+      19
+    ],
+    "afterLines": [
+      19,
+      19
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "f00d0d3ef238203139a74ba386b14072c3b96624612344fe5018559e7de295f0",
+    "afterSha256": "f00d0d3ef238203139a74ba386b14072c3b96624612344fe5018559e7de295f0"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "readServerSample",
+    "beforeLines": [
+      224,
+      300
+    ],
+    "afterLines": [
+      290,
+      366
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "246222dd40ea0e4ad63d13f249c5c030988ff40924ecde09427e267d87d007be",
+    "afterSha256": "246222dd40ea0e4ad63d13f249c5c030988ff40924ecde09427e267d87d007be"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverArtifactChunks",
+    "beforeLines": [
+      652,
+      672
+    ],
+    "afterLines": [
+      719,
+      739
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "d552d5f2b3a2f3968d380e8fb4250d7627778bd66825d3fa8cb8dcab97b8e5d9",
+    "afterSha256": "d552d5f2b3a2f3968d380e8fb4250d7627778bd66825d3fa8cb8dcab97b8e5d9"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverArtifactDigest",
+    "beforeLines": [
+      633,
+      647
+    ],
+    "afterLines": [
+      700,
+      714
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "63a18aaad9b6fd8c6358f879cca464bf70d15dca67a2998c32af64f5953e43ff",
+    "afterSha256": "63a18aaad9b6fd8c6358f879cca464bf70d15dca67a2998c32af64f5953e43ff"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverBrowserClockBounds",
+    "beforeLines": [
+      36,
+      50
+    ],
+    "afterLines": [
+      36,
+      50
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "10ba14ada8acd7b75dbe57c57f9c6166e07f1a0d4ec47d973121b5c9ec202a3b",
+    "afterSha256": "10ba14ada8acd7b75dbe57c57f9c6166e07f1a0d4ec47d973121b5c9ec202a3b"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverBrowserSemanticClockErrorMs",
+    "beforeLines": [
+      56,
+      58
+    ],
+    "afterLines": [
+      56,
+      58
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "c00dd155bddf97c8f53cb42839fc6c822d97b3a5c97999fd5533cf4e532af0fd",
+    "afterSha256": "c00dd155bddf97c8f53cb42839fc6c822d97b3a5c97999fd5533cf4e532af0fd"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverCalibrationVerdict",
+    "beforeLines": [
+      487,
+      498
+    ],
+    "afterLines": [
+      554,
+      565
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "cf46c24bcf7456d405ece277b16e44f19b61e0dc19d252c95d93edd48c7e2704",
+    "afterSha256": "cf46c24bcf7456d405ece277b16e44f19b61e0dc19d252c95d93edd48c7e2704"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverCellPairs",
+    "beforeLines": [
+      197,
+      222
+    ],
+    "afterLines": [
+      263,
+      288
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "937ba3be26e518faf1391649c96dd9958302763851283039fb7f9f7031b2e242",
+    "afterSha256": "937ba3be26e518faf1391649c96dd9958302763851283039fb7f9f7031b2e242"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverComparatorPlan",
+    "beforeLines": [
+      406,
+      409
+    ],
+    "afterLines": [
+      473,
+      476
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "719b96dce04cb6d5dd183ec95486af8462ed40752d3460d4c5d72bcc5db4452e",
+    "afterSha256": "719b96dce04cb6d5dd183ec95486af8462ed40752d3460d4c5d72bcc5db4452e"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverDescriptiveTiming",
+    "beforeLines": [
+      880,
+      883
+    ],
+    "afterLines": [
+      947,
+      950
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "98bba1dcc9b3a02dc3bc947d94a350c75a2c0a44f6ac33282d5d1d2e4268fcda",
+    "afterSha256": "98bba1dcc9b3a02dc3bc947d94a350c75a2c0a44f6ac33282d5d1d2e4268fcda"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverFamilyIntervals",
+    "beforeLines": [
+      458,
+      485
+    ],
+    "afterLines": [
+      525,
+      552
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "00878e04dd0ddba35b3da90849cb71d67d98a8c627ad89d9b75db931495183c7",
+    "afterSha256": "00878e04dd0ddba35b3da90849cb71d67d98a8c627ad89d9b75db931495183c7"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverMetricCells",
+    "beforeLines": [
+      188,
+      193
+    ],
+    "afterLines": [
+      254,
+      259
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "360dc9bd9210e5016c8e22b4273ccbdd64442d5a88ea1a672ee3578e055b0c04",
+    "afterSha256": "360dc9bd9210e5016c8e22b4273ccbdd64442d5a88ea1a672ee3578e055b0c04"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverOrderStatisticBounds",
+    "beforeLines": [
+      448,
+      456
+    ],
+    "afterLines": [
+      515,
+      523
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "059d4663ec9a16d96d3c4d86ed994f0138c3654aa84e158881480f769c4259f6",
+    "afterSha256": "059d4663ec9a16d96d3c4d86ed994f0138c3654aa84e158881480f769c4259f6"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverOrders",
+    "beforeLines": [
+      182,
+      186
+    ],
+    "afterLines": [
+      248,
+      252
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "8bb464b9ea2684e34fa56f2657d73163bc665244fad80dd35a50c95cc09c5853",
+    "afterSha256": "8bb464b9ea2684e34fa56f2657d73163bc665244fad80dd35a50c95cc09c5853"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverResourceReasons",
+    "beforeLines": [
+      500,
+      523
+    ],
+    "afterLines": [
+      567,
+      590
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "2aed410005f7a2f328fdb9f8b89dbfee1e7386973b737c298664da7d0b5ae8db",
+    "afterSha256": "2aed410005f7a2f328fdb9f8b89dbfee1e7386973b737c298664da7d0b5ae8db"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "serverStagePlan",
+    "beforeLines": [
+      756,
+      765
+    ],
+    "afterLines": [
+      823,
+      832
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "fed6b43ecb8c59593970dd8f8a0931425694dc6dd46b716d00a189fe0c38e4b4",
+    "afterSha256": "fed6b43ecb8c59593970dd8f8a0931425694dc6dd46b716d00a189fe0c38e4b4"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "unsupportedComparator",
+    "beforeLines": [
+      402,
+      404
+    ],
+    "afterLines": [
+      469,
+      471
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "4412a0d3d0b413387e53ab078582304d7d01db0bcfd654c223e4fc647758c175",
+    "afterSha256": "4412a0d3d0b413387e53ab078582304d7d01db0bcfd654c223e4fc647758c175"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "validTraceHashes",
+    "beforeLines": [
+      440,
+      444
+    ],
+    "afterLines": [
+      507,
+      511
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "941183139677b0b3320782c5febe4ec965656daad108809893763a4e92cd6c97",
+    "afterSha256": "941183139677b0b3320782c5febe4ec965656daad108809893763a4e92cd6c97"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "validateCancellationWitness",
+    "beforeLines": [
+      379,
+      400
+    ],
+    "afterLines": [
+      446,
+      467
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "130f4e0036bfd0898df1794fa26a1cf2d7a544bfd125889e63637f92ed05c928",
+    "afterSha256": "130f4e0036bfd0898df1794fa26a1cf2d7a544bfd125889e63637f92ed05c928"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "validateNormalMotion",
+    "beforeLines": [
+      112,
+      147
+    ],
+    "afterLines": [
+      112,
+      147
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "be72a9f02f4a95d63b56dfb5a2ca829503e5c2b6c9ad788cef77d3d669d2dde5",
+    "afterSha256": "be72a9f02f4a95d63b56dfb5a2ca829503e5c2b6c9ad788cef77d3d669d2dde5"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "validateServerArtifact",
+    "beforeLines": [
+      525,
+      629
+    ],
+    "afterLines": [
+      592,
+      696
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "c5c27604471bed49cf207e192edbbc41df0ebc73a0e80d38452148af1e1c43c1",
+    "afterSha256": "c5c27604471bed49cf207e192edbbc41df0ebc73a0e80d38452148af1e1c43c1"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "validateServerBrowserSample",
+    "beforeLines": [
+      318,
+      322
+    ],
+    "afterLines": [
+      385,
+      389
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "535993b8a5c068828e59a531a0ba807a5aab750da456e71e51b908b0c37f6918",
+    "afterSha256": "535993b8a5c068828e59a531a0ba807a5aab750da456e71e51b908b0c37f6918"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "validateServerEngineSample",
+    "beforeLines": [
+      324,
+      328
+    ],
+    "afterLines": [
+      391,
+      395
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "66ddff7b0a701bac2dddccbfb99f0d910dc55405ad7ebac036855dcb6c9f52f9",
+    "afterSha256": "66ddff7b0a701bac2dddccbfb99f0d910dc55405ad7ebac036855dcb6c9f52f9"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "validateServerJournal",
+    "beforeLines": [
+      767,
+      878
+    ],
+    "afterLines": [
+      834,
+      945
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "7d763f64d08049187b8c92752d3e29187d2248519f1862205b6fa5f3b2f3dab4",
+    "afterSha256": "7d763f64d08049187b8c92752d3e29187d2248519f1862205b6fa5f3b2f3dab4"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "validateStartWitness",
+    "beforeLines": [
+      356,
+      377
+    ],
+    "afterLines": [
+      423,
+      444
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "1e2ada0db8f61aa4441e29f1501cc44a15a47d75643676f525d7df445776e535",
+    "afterSha256": "1e2ada0db8f61aa4441e29f1501cc44a15a47d75643676f525d7df445776e535"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "validateSupplementalSamples",
+    "beforeLines": [
+      411,
+      438
+    ],
+    "afterLines": [
+      478,
+      505
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "a0386e477f549dc2d6b094f3ed7487d29661e22c06ceaf09d72725a95a2df1f7",
+    "afterSha256": "a0386e477f549dc2d6b094f3ed7487d29661e22c06ceaf09d72725a95a2df1f7"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "validateThreadCpuFields",
+    "beforeLines": [
+      302,
+      316
+    ],
+    "afterLines": [
+      368,
+      383
+    ],
+    "bytesUnchanged": false,
+    "beforeSha256": "15a0bf25ae9e16217230d1ea56e2244e553f19b4353b590a5b44fa279c854d1b",
+    "afterSha256": "fc56b6610792618b5050a9cd0edcb14f6b28334736c679c0b1c058e2aef452a9"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "verifyServerClockRegistration",
+    "beforeLines": [
+      149,
+      175
+    ],
+    "afterLines": [
+      149,
+      175
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "9ff75a13b717db36cf04175a27ff388de9283792452012ce1f498ac3b0b1d208",
+    "afterSha256": "9ff75a13b717db36cf04175a27ff388de9283792452012ce1f498ac3b0b1d208"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "verifyThreadCpuIdentity",
+    "beforeLines": [
+      177,
+      180
+    ],
+    "afterLines": [
+      177,
+      180
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "68347865f8ce6bb7724a4432671d93f001d3ef84e121fa2bd9ef8817944f7c41",
+    "afterSha256": "68347865f8ce6bb7724a4432671d93f001d3ef84e121fa2bd9ef8817944f7c41"
+  },
+  {
+    "path": "bench/profile/server-profile-contract.mjs",
+    "function": "writeServerArtifact",
+    "beforeLines": [
+      674,
+      685
+    ],
+    "afterLines": [
+      741,
+      752
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "e48ed21ae4a88090611f8518547bdc7e82a22b7a5d2cf3114aea4d59c96ab44e",
+    "afterSha256": "e48ed21ae4a88090611f8518547bdc7e82a22b7a5d2cf3114aea4d59c96ab44e"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "browserTimerProbe",
+    "beforeLines": [
+      278,
+      289
+    ],
+    "afterLines": [
+      286,
+      297
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "d325d177e8fa46aac00fbfef3a0f0c17958c60c66fe70f636e53206c949dba95",
+    "afterSha256": "d325d177e8fa46aac00fbfef3a0f0c17958c60c66fe70f636e53206c949dba95"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "buildAdapter",
+    "beforeLines": [
+      146,
+      155
+    ],
+    "afterLines": [
+      146,
+      155
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "1a5ad3b9b69740fd42772da7f989a6a7dda5115ec0120c44fadce9f4182db0bc",
+    "afterSha256": "1a5ad3b9b69740fd42772da7f989a6a7dda5115ec0120c44fadce9f4182db0bc"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "buildToStderr",
+    "beforeLines": [
+      102,
+      105
+    ],
+    "afterLines": [
+      102,
+      105
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "851513d160c5768522a899e17a90bdd180870c868eb4a239a4d35f868eab06b5",
+    "afterSha256": "851513d160c5768522a899e17a90bdd180870c868eb4a239a4d35f868eab06b5"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "captureServerLoad",
+    "beforeLines": [
+      52,
+      57
+    ],
+    "afterLines": [
+      52,
+      57
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "855fc274af1811dc2e0e0c0c4f2686cb961e5b771aee4616eb726f2ba85d0fb6",
+    "afterSha256": "855fc274af1811dc2e0e0c0c4f2686cb961e5b771aee4616eb726f2ba85d0fb6"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "captureServerMachine",
+    "beforeLines": [
+      66,
+      87
+    ],
+    "afterLines": [
+      66,
+      87
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "9701a2956992e8b5777e32baefaac5927047801e9cd80813bdb44a2c94437bef",
+    "afterSha256": "9701a2956992e8b5777e32baefaac5927047801e9cd80813bdb44a2c94437bef"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "contextSwitches",
+    "beforeLines": [
+      47,
+      51
+    ],
+    "afterLines": [
+      47,
+      51
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "d3b8b83a483d56bb23ceacbd432cf1ca73cee2168d48509c774bf71a3c61dcaf",
+    "afterSha256": "d3b8b83a483d56bb23ceacbd432cf1ca73cee2168d48509c774bf71a3c61dcaf"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "createServerJournal",
+    "beforeLines": [
+      89,
+      100
+    ],
+    "afterLines": [
+      89,
+      100
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "8e9c9ee57306ba9bbfd09a887d9f14ee329b2a7105ee0307cc3da0000ccaa4aa",
+    "afterSha256": "8e9c9ee57306ba9bbfd09a887d9f14ee329b2a7105ee0307cc3da0000ccaa4aa"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "errorRecord",
+    "beforeLines": [
+      39,
+      45
+    ],
+    "afterLines": [
+      39,
+      45
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "6409f2698df131e309b9b3b4191668b713e79925475ebf04af821830b4149868",
+    "afterSha256": "6409f2698df131e309b9b3b4191668b713e79925475ebf04af821830b4149868"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "makeRetention",
+    "beforeLines": [
+      477,
+      485
+    ],
+    "afterLines": [
+      485,
+      493
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "2733dcc5bd5d47ec08269fc4b447691aecb2d5505cfdb5685f0032b1f06c2f5e",
+    "afterSha256": "2733dcc5bd5d47ec08269fc4b447691aecb2d5505cfdb5685f0032b1f06c2f5e"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "measureBrowserRawControls",
+    "beforeLines": [
+      432,
+      475
+    ],
+    "afterLines": [
+      440,
+      483
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "9b24e3771ad544a9bf708b85d463a718e6420ab65d4a725e6fecb1d16c26c30b",
+    "afterSha256": "9b24e3771ad544a9bf708b85d463a718e6420ab65d4a725e6fecb1d16c26c30b"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "measureServerBrowser",
+    "beforeLines": [
+      291,
+      430
+    ],
+    "afterLines": [
+      299,
+      438
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "57802dcd4465598dddc7cb61d5bf9812c05b6957731c9ff407b59568ff201de3",
+    "afterSha256": "57802dcd4465598dddc7cb61d5bf9812c05b6957731c9ff407b59568ff201de3"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "measureServerEngine",
+    "beforeLines": [
+      176,
+      209
+    ],
+    "afterLines": [
+      184,
+      217
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "364b02d12a998a625cd6a7257547b063c1d21a84b26bd0b19fc26b020fa15e6e",
+    "afterSha256": "364b02d12a998a625cd6a7257547b063c1d21a84b26bd0b19fc26b020fa15e6e"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "measureServerStockC",
+    "beforeLines": [
+      212,
+      276
+    ],
+    "afterLines": [
+      220,
+      284
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "626b4de8890a5286bcf80ae4f52210e9ade5016e942711a4393fac2e4e1eb31b",
+    "afterSha256": "626b4de8890a5286bcf80ae4f52210e9ade5016e942711a4393fac2e4e1eb31b"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "packConsumer",
+    "beforeLines": [
+      109,
+      123
+    ],
+    "afterLines": [
+      109,
+      123
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "0157c6d06ca5d19adde5dca8d520a1690d5a0185bb930d188b0e64b10ea4c6b0",
+    "afterSha256": "0157c6d06ca5d19adde5dca8d520a1690d5a0185bb930d188b0e64b10ea4c6b0"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "packageClosure",
+    "beforeLines": [
+      125,
+      144
+    ],
+    "afterLines": [
+      125,
+      144
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "5022e9bb77b414497868af48071ebd86938530b9d99f6571b57a74fdbf6587ad",
+    "afterSha256": "5022e9bb77b414497868af48071ebd86938530b9d99f6571b57a74fdbf6587ad"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "parseServerProfileArgs",
+    "beforeLines": [
+      679,
+      685
+    ],
+    "afterLines": [
+      689,
+      695
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "b06bb65687867531d9a26428b7536014455c4a3b60fac95edf09a9d724f1499c",
+    "afterSha256": "b06bb65687867531d9a26428b7536014455c4a3b60fac95edf09a9d724f1499c"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "preserveRawNumbers",
+    "beforeLines": [
+      32,
+      37
+    ],
+    "afterLines": [
+      32,
+      37
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "9c8e666f19d4db7f6fc8314106b66e1f12e2fed8624306018c7412f6007e0a2b",
+    "afterSha256": "9c8e666f19d4db7f6fc8314106b66e1f12e2fed8624306018c7412f6007e0a2b"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "readOptional",
+    "beforeLines": [
+      46,
+      46
+    ],
+    "afterLines": [
+      46,
+      46
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "c7ff1b7bf52ed996a0e928c3ff003bf4973b3d1d91fbe994f999810aeda2ce8d",
+    "afterSha256": "c7ff1b7bf52ed996a0e928c3ff003bf4973b3d1d91fbe994f999810aeda2ce8d"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "runServerProfile",
+    "beforeLines": [
+      487,
+      677
+    ],
+    "afterLines": [
+      495,
+      687
+    ],
+    "bytesUnchanged": false,
+    "beforeSha256": "bf916580c6c56f7c6cdc8be3102ba7a2195888e99305de650018af40e574e5dc",
+    "afterSha256": "8bcc4fe2a40ff7965d1de772a9d35b4b5445955f4c053f03209668d1c89e4be2"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "sampleCpuClock",
+    "beforeLines": [
+      171,
+      174
+    ],
+    "afterLines": [
+      171,
+      174
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "e0ce9980ee4698bbbedfae7d9050519e6fab7660ea368351ea6a3fcc4b9433f7",
+    "afterSha256": "e0ce9980ee4698bbbedfae7d9050519e6fab7660ea368351ea6a3fcc4b9433f7"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "threadCpuNs",
+    "beforeLines": [
+      157,
+      169
+    ],
+    "afterLines": [
+      157,
+      169
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "7003d83e9032eb4507a15d7fc0bf65637778a9864dea2bdeda7223cc0efd8007",
+    "afterSha256": "7003d83e9032eb4507a15d7fc0bf65637778a9864dea2bdeda7223cc0efd8007"
+  },
+  {
+    "path": "bench/profile/server-profile-runner.mjs",
+    "function": "withBrowserTimeout",
+    "beforeLines": [
+      58,
+      65
+    ],
+    "afterLines": [
+      58,
+      65
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "5ae8826cd2b8f04a6068589e09988da4a05bf7caf5867f98c7591cd95a37f782",
+    "afterSha256": "5ae8826cd2b8f04a6068589e09988da4a05bf7caf5867f98c7591cd95a37f782"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "admissionEvents",
+    "beforeLines": [
+      202,
+      223
+    ],
+    "afterLines": [
+      202,
+      223
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "a7a7e73f39d6663d31c6d8c1d6eef10b1bd149bef9d7b91b437bdc5ad811cd20",
+    "afterSha256": "a7a7e73f39d6663d31c6d8c1d6eef10b1bd149bef9d7b91b437bdc5ad811cd20"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "admissionHistory",
+    "beforeLines": [
+      240,
+      246
+    ],
+    "afterLines": [
+      240,
+      254
+    ],
+    "bytesUnchanged": false,
+    "beforeSha256": "280b5c3e861634dfd9a6782b138ff2005c5ed0daf12b7e32bc840aa5edc4489c",
+    "afterSha256": "ad9af96672362d9391cd3e7c173d7d65a71925b443252f90daef73fd2f3fdb01"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "chain",
+    "beforeLines": [
+      225,
+      235
+    ],
+    "afterLines": [
+      225,
+      235
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "28725dd714906832a68c8fb38aa9eca5b29d9cc953626bcdfd8fddb90a9ab223",
+    "afterSha256": "28725dd714906832a68c8fb38aa9eca5b29d9cc953626bcdfd8fddb90a9ab223"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "engineRaw",
+    "beforeLines": [
+      47,
+      79
+    ],
+    "afterLines": [
+      47,
+      79
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "cc53630e532ca55c18a92db925b2f9085b6f0d0c3fa2afc7f54cefbb924d098c",
+    "afterSha256": "cc53630e532ca55c18a92db925b2f9085b6f0d0c3fa2afc7f54cefbb924d098c"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "healthyAdmission",
+    "beforeLines": [
+      175,
+      200
+    ],
+    "afterLines": [
+      175,
+      200
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "88fcb3b5c90f449187dcb2c8af4746bccbf2cfe657dd842fffcdd15b9b44f36d",
+    "afterSha256": "88fcb3b5c90f449187dcb2c8af4746bccbf2cfe657dd842fffcdd15b9b44f36d"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "nativeCpuEndpoint",
+    "beforeLines": [
+      22,
+      24
+    ],
+    "afterLines": [
+      22,
+      24
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "b88167cf59d998b22c31a57dac994d5df079fe4051c4df70132f5f2dd7fc4d6d",
+    "afterSha256": "b88167cf59d998b22c31a57dac994d5df079fe4051c4df70132f5f2dd7fc4d6d"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "normalMotion",
+    "beforeLines": [
+      31,
+      44
+    ],
+    "afterLines": [
+      31,
+      44
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "ceb95485ac6a9cbb9d38d38ccb24afeff77787f8ae0a3dca2b39a3559b551cca",
+    "afterSha256": "ceb95485ac6a9cbb9d38d38ccb24afeff77787f8ae0a3dca2b39a3559b551cca"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "pairs",
+    "beforeLines": [
+      25,
+      29
+    ],
+    "afterLines": [
+      25,
+      29
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "893c4be553f7c2e36d14038a9d5fd78b03d079ca7cfadd18787cc6d935f0842c",
+    "afterSha256": "893c4be553f7c2e36d14038a9d5fd78b03d079ca7cfadd18787cc6d935f0842c"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "registeredRefusal",
+    "beforeLines": [
+      146,
+      173
+    ],
+    "afterLines": [
+      146,
+      173
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "599338400afc076b553b57d5e4e234aa626e4090da63f5c9502b79c7ecc25c33",
+    "afterSha256": "599338400afc076b553b57d5e4e234aa626e4090da63f5c9502b79c7ecc25c33"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "stage",
+    "beforeLines": [
+      92,
+      144
+    ],
+    "afterLines": [
+      92,
+      144
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "0ffd4cdcdaf4384d3003964124e5983ad660aad47ba0983507ca7a90660969f4",
+    "afterSha256": "0ffd4cdcdaf4384d3003964124e5983ad660aad47ba0983507ca7a90660969f4"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "stockRaw",
+    "beforeLines": [
+      81,
+      90
+    ],
+    "afterLines": [
+      81,
+      90
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "f1e15efdee5a4711cb0b39ac43f9d88963bd5dffb2ca39414c51bcd24f08ea77",
+    "afterSha256": "f1e15efdee5a4711cb0b39ac43f9d88963bd5dffb2ca39414c51bcd24f08ea77"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "syntheticBrowser",
+    "beforeLines": [
+      250,
+      320
+    ],
+    "afterLines": [
+      288,
+      358
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "a39ec6392adddeb2f6c8e4fc190285b2d49fd068fa4b2cf8906fb45f80634cef",
+    "afterSha256": "a39ec6392adddeb2f6c8e4fc190285b2d49fd068fa4b2cf8906fb45f80634cef"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "syntheticNativeEndpoint",
+    "beforeLines": [
+      19,
+      21
+    ],
+    "afterLines": [
+      19,
+      21
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "56118c7d5d7e03e8a47383a9b7591f4e452aef382c4311063e244b305bfea9b0",
+    "afterSha256": "56118c7d5d7e03e8a47383a9b7591f4e452aef382c4311063e244b305bfea9b0"
+  },
+  {
+    "path": "test/server-profile-contract.test.ts",
+    "function": "syntheticSemanticControl",
+    "beforeLines": [
+      324,
+      331
+    ],
+    "afterLines": [
+      362,
+      369
+    ],
+    "bytesUnchanged": true,
+    "beforeSha256": "2d8f823a45958d3c39a3ca8a568ff8e339d4c0e2570489214940bc41eb4a4277",
+    "afterSha256": "2d8f823a45958d3c39a3ca8a568ff8e339d4c0e2570489214940bc41eb4a4277"
+  }
+]

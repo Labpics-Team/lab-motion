@@ -1,0 +1,42 @@
+[
+  {
+    "fragment": "callback",
+    "oldPrimary": "/tmp/motion-native-cpu-rle-final-20261002/callback-old.ts",
+    "newPrimary": "/tmp/motion-native-cpu-rle-final-20261002/callback-new.ts",
+    "bytes": 1701,
+    "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+    "primarySame": true,
+    "oldActualOccurrences": 1,
+    "newActualOccurrences": 1,
+    "beforeSourceSha": "694bfdf8b75b4ee102cc05f9857312c531a39984bdc9ccf0c592bc94684f0991",
+    "afterSourceSha": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+    "oldActualLines": [
+      964,
+      982
+    ],
+    "newActualLines": [
+      1002,
+      1020
+    ]
+  },
+  {
+    "fragment": "legacy-native-controls",
+    "oldPrimary": "/tmp/motion-native-cpu-rle-final-20261002/legacy-native-controls-old.ts",
+    "newPrimary": "/tmp/motion-native-cpu-rle-final-20261002/legacy-native-controls-new.ts",
+    "bytes": 4889,
+    "sha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc",
+    "primarySame": true,
+    "oldActualOccurrences": 1,
+    "newActualOccurrences": 1,
+    "beforeSourceSha": "694bfdf8b75b4ee102cc05f9857312c531a39984bdc9ccf0c592bc94684f0991",
+    "afterSourceSha": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+    "oldActualLines": [
+      1156,
+      1224
+    ],
+    "newActualLines": [
+      1194,
+      1262
+    ]
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "changedOwner": "bench/compare/provenance.mjs",
+  "ownerSha256": "7f060a05151fffcf43901f1b652ac5d92d511bebf2624a26cb7c1baa270c6fff",
+  "conserved": {
+    "bench/profile/server-profile-contract.mjs": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8",
+    "bench/profile/server-profile-registration.mjs": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87",
+    "bench/compare/methodology.mjs": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+    "scripts/bench-transform-support.mjs": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+    "test/server-profile-contract.test.ts": "694bfdf8b75b4ee102cc05f9857312c531a39984bdc9ccf0c592bc94684f0991"
+  },
+  "scope": "Same frozen full-four callback/fixture. Only admitted SHA fast-path changed. JSON, guards, model, tests/30s/defaultworker law unchanged."
+}

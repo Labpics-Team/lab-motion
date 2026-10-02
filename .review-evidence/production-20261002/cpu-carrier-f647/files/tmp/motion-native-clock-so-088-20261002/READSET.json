@@ -1,0 +1,374 @@
+{
+  "capturedAtUtc": "2026-10-02T01:13:49.479815+00:00",
+  "axis": "последствия второго порядка",
+  "head": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "entries": [
+    {
+      "path": "/workspace/agents-config/AGENTS.md",
+      "kind": "normative",
+      "scope": "Рабочие нормы; фокус 103–145 и 199, область и полномочия",
+      "bytes": 38398,
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a"
+    },
+    {
+      "path": "/workspace/agents-config/plans/SPEC.md",
+      "kind": "normative",
+      "scope": "Вся спецификация 1–368; authoritative/lifecycle/draft/grants/evidence",
+      "bytes": 31491,
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651"
+    },
+    {
+      "path": "/workspace/agents-config/plans/TEMPLATE.md",
+      "kind": "normative",
+      "scope": "Весь template; выбранный подход/alternatives/cost/evidence",
+      "bytes": 10270,
+      "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/ACTIVE.md",
+      "kind": "normative",
+      "scope": "Полный файл: r11 active",
+      "bytes": 235,
+      "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/CLAIM.md",
+      "kind": "normative",
+      "scope": "Полный файл: r11 PROFILE-01",
+      "bytes": 139,
+      "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/ACTIVATION.md",
+      "kind": "normative",
+      "scope": "Полный файл: r11 grant",
+      "bytes": 194,
+      "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/r11.md",
+      "kind": "normative",
+      "scope": "Scoped: original objective; M-04/M-05; ASM/INV; PROFILE 339–351; G-PERF 435–456; статусы/Unknowns. Не весь файл semantic-audited.",
+      "bytes": 74166,
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/r12.md",
+      "kind": "normative",
+      "scope": "Подготовленный successor; сохранение области, objective, ASM/INV, PROFILE, gates/Unknowns. Не treated as active.",
+      "bytes": 40024,
+      "sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622"
+    },
+    {
+      "path": "/workspace/agents-config/skills/architecture/references/composition.md",
+      "kind": "normative",
+      "scope": "Нормативная процедура при изменении эксплуатационной границы; scope/consumer/budget/alternatives. Tool output частично truncates middle; не заявляется полный semantic audit.",
+      "bytes": 18836,
+      "sha256": "9297e36749db27c85b57aa65048faa72f656d23a68c49f3f4459c0269ce55d03"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/server-thread-cpu-clock.mjs",
+      "kind": "immutable-source",
+      "scope": "Полный файл; private qualification/build/cache/identity",
+      "bytes": 7279,
+      "sha256": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/server-thread-cpu-clock.c",
+      "kind": "immutable-source",
+      "scope": "Полный файл; native includes/API shape; correctness axis не закрывается",
+      "bytes": 4159,
+      "sha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/server-profile-registration.mjs",
+      "kind": "immutable-source",
+      "scope": "Полный файл; fixed source/model/units/old guard values",
+      "bytes": 18946,
+      "sha256": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/server-profile-contract.mjs",
+      "kind": "immutable-source",
+      "scope": "Scoped imports, qualification149–176, raw/diff lines195–318, artifact525–574, stream630–742, journal searches; не весь correctness axis",
+      "bytes": 69001,
+      "sha256": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/server-profile-runner.mjs",
+      "kind": "immutable-source",
+      "scope": "Scoped imports1–110, endpoint/stock155–280, run/registration480–556, stage570–615, final650–700, точный diff; no actual series",
+      "bytes": 50951,
+      "sha256": "72383a1abfd70b2bdb163995f8d6dac7cf70624e6f4658db395123554dcfffcf"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/docs/server-profile.md",
+      "kind": "immutable-source",
+      "scope": "Полный current doc; объявленная область, не oracle фактической калибровки",
+      "bytes": 9198,
+      "sha256": "488f3c61436d88924d218fd990fa1840e0c30c850c7af2992755e6872f0a5c18"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/native-clock/README.md",
+      "kind": "immutable-source",
+      "scope": "Полный файл; provenance/header/license owner",
+      "bytes": 1105,
+      "sha256": "1525470faf40e14918937094ac475ed9e9f6cdcadf1b51a4f603a78dc733d7a6"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/native-clock/LICENSE",
+      "kind": "immutable-source",
+      "scope": "Полный файл; exact upstream prefix compare",
+      "bytes": 2337,
+      "sha256": "ec62dc96da0099b87f4511736c87309335527fb7031639493e06c95728dc8c54"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/package.json",
+      "kind": "immutable-source",
+      "scope": "Exports/scripts/files scoped read plus structured guard; package boundary",
+      "bytes": 16122,
+      "sha256": "de278702d9f6843be2b682c27d9cc0d16d552327f77f7a9f07bee0ff6793da52"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/tsup.config.ts",
+      "kind": "immutable-source",
+      "scope": "Полный файл; src-only export-derived entries",
+      "bytes": 6233,
+      "sha256": "bc9079fb5b8fff97bff753acde91ba2fe6c85e8d78a256edc2fe0601a76e8d14"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/.github/workflows/profile-01.yml",
+      "kind": "immutable-source",
+      "scope": "Полный workflow; old-vector does not claim native series",
+      "bytes": 5639,
+      "sha256": "67076c39901a63cfab587c6dd483b953d5865fc2c391694d18e4694d330efc8a"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/scripts/check-native-gate.mjs",
+      "kind": "immutable-source",
+      "scope": "Полный; existing native typecheck не C getter gate",
+      "bytes": 2002,
+      "sha256": "54c7cdd1e5feca208ba647e17ab14a3d12e971c9dd6b38ee14b5413ddaebe32c"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/scripts/bench-transform-support.mjs",
+      "kind": "immutable-source",
+      "scope": "Scoped clock/lineage search; imported by pure contract; не весь source",
+      "bytes": 31565,
+      "sha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/compare/provenance.mjs",
+      "kind": "immutable-source",
+      "scope": "Scoped clock search/import; runtime hash provider; не полный audit",
+      "bytes": 24949,
+      "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/test/server-profile-contract.test.ts",
+      "kind": "immutable-source",
+      "scope": "Scoped diff portions + carrier tests811–837 and max-N searches; tests не запускались и не oracle whole correctness",
+      "bytes": 95174,
+      "sha256": "694bfdf8b75b4ee102cc05f9857312c531a39984bdc9ccf0c592bc94684f0991"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/native-clock/include/node_api_types.h",
+      "kind": "immutable-header",
+      "scope": "Include closure search and exact-byte qualification; not full header semantic audit",
+      "bytes": 1930,
+      "sha256": "a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/native-clock/include/node_api.h",
+      "kind": "immutable-header",
+      "scope": "Include closure search and exact-byte qualification; not full header semantic audit",
+      "bytes": 10370,
+      "sha256": "2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/native-clock/include/js_native_api_types.h",
+      "kind": "immutable-header",
+      "scope": "Include closure search and exact-byte qualification; not full header semantic audit",
+      "bytes": 7871,
+      "sha256": "4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0"
+    },
+    {
+      "path": "/tmp/motion-native-clock-so-088-20261002/source/bench/profile/native-clock/include/js_native_api.h",
+      "kind": "immutable-header",
+      "scope": "Include closure search and exact-byte qualification; not full header semantic audit",
+      "bytes": 33158,
+      "sha256": "8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788"
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/source.tar.gz",
+      "kind": "immutable-input",
+      "scope": "Exact hash checked; archive639 paths verified; diff scoped native/profile/doc/test review; method-readset identity only",
+      "bytes": 1766073,
+      "sha256": "bc22b2359f3a8466a9daa9ced434f561525d120782ec7efeefbe2e57ff410db3"
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/diff.patch",
+      "kind": "immutable-input",
+      "scope": "Exact hash checked; archive639 paths verified; diff scoped native/profile/doc/test review; method-readset identity only",
+      "bytes": 166454,
+      "sha256": "c20b40756914d860d754188c97512dd2b83e3fbb86f089fe575b41ebe06b679f"
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/PRIMARY-MANIFEST.json",
+      "kind": "immutable-input",
+      "scope": "Exact hash checked; archive639 paths verified; diff scoped native/profile/doc/test review; method-readset identity only",
+      "bytes": 20157,
+      "sha256": "80e5dd4b030bbb8287416eb4b1372af7164801eacde39ed642a14a9ea86fec4a"
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/source-manifest.json",
+      "kind": "immutable-input",
+      "scope": "Exact hash checked; archive639 paths verified; diff scoped native/profile/doc/test review; method-readset identity only",
+      "bytes": 151106,
+      "sha256": "81e832fa375a233931e26eb41dfd1624c14402292c5f9b75d325e8eb8fba3388"
+    },
+    {
+      "path": "/tmp/motion-native-clock-successor-088fbc60-20261002/method-readset.json",
+      "kind": "immutable-input",
+      "scope": "Exact hash checked; archive639 paths verified; diff scoped native/profile/doc/test review; method-readset identity only",
+      "bytes": 7068,
+      "sha256": "7f234a2aff0925bb3315d49ed311455022834efead7f2fd84c5fa77613c26d2f"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters.c",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 2516,
+      "sha256": "d17df8ca1eb2f290cbb0df7e50c500d317b450b7794d4958be34357417411caf"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/diagnostic-raw.json",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 18162,
+      "sha256": "fda29e81d18c42ea0049e6aeb39057d9c4d3be9d603da4d595b0624fe5f73dc3"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/execution.json",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 939,
+      "sha256": "8a31743e8a75047f0d1e9ae75dcfcc5f8b7d2ed79d744e28425dbe6187a660ab"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/raw-delta-readback.json",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 7886,
+      "sha256": "91f258044fed7255e6f4e10561400b983e9b7011a2f3e36fa55212f38289c77d"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/native-source-pins.json",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 614,
+      "sha256": "9e77ba12491bb7b5b9ce7f82ead941442afdc50a7646cce15d9050f3c07eebb2"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/napi-header-source-manifest.json",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 1153,
+      "sha256": "c6cfb7e6313756e31e07f42021a3123e83b5f7b59708326ced3d93a4c23c3f1f"
+    },
+    {
+      "path": "/tmp/motion-clock-freshness-diagnostic-20261002/node-LICENSE.raw",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 157606,
+      "sha256": "148eacf7863ef4329224a29398623077200a27194aa075569faf4a0a85566ca5"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/stdout.json",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 2814,
+      "sha256": "9e5badf12d7aefbb0c9abb1439d640de30461279a87866918cd2ad0b9eebcc28"
+    },
+    {
+      "path": "/tmp/motion-native-clock-api-smoke-green-20261002/native-clock/thread-cpu-clock.node",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 16192,
+      "sha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a"
+    },
+    {
+      "path": "/tmp/motion-server-series-185f02c2-7016c19a-20261001-epoch6/server-profile.json",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 86606,
+      "sha256": "672b6740f847404966ae86564f8a809deb45d4fbd74bb65d35bebbcd844416e4"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/control.mjs",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 1547,
+      "sha256": "05177572a8c021eb5de03e84321b8ef38dd1f9089b548dde9ca97cb03606f038"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/execution.json",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 9236,
+      "sha256": "08096eccba064211cf92d5289e27208a14b8c68553f415ef914cae4fc56a0494"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/missing-compiler.stdout",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 99,
+      "sha256": "f8e348ea3490cd857542133049c5de27dc017d85bfa73493e8f9fbbf5ae450f0"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/stale-binary.stdout",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 227,
+      "sha256": "966c6d6dfd9067fd45ab9066d2032bb6719937fc2ff8a960624c47ab3a16744d"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation.stdout",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 2208,
+      "sha256": "a61a0a17c5540dba59420c26bfba6b0e9a051947b4da02af9e03da3dd6bcfab5"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/nonlinux.stdout",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 186,
+      "sha256": "7b45ef0a7077796cc20a454f6848cb8398eb90c78494b2378a97295707712d0b"
+    },
+    {
+      "path": "/tmp/motion-native-clock-preparation-controls-20261002/worker.stdout",
+      "kind": "primary-content",
+      "scope": "Scoped raw/qualification/schema/ELF/failure control evidence; diagnostic raw independently recomputed; derived readback not used as independent oracle",
+      "bytes": 186,
+      "sha256": "ff4f6e040e7e7a34ba8a3994057f6c3783f9bec4650d85ffc46fb8356693c340"
+    }
+  ],
+  "identityOnlySets": {
+    "sourceFiles": 639,
+    "primaryRefs": 93,
+    "sourceEvidence": "source-identity-check.json",
+    "primaryEvidence": "primary-identity-check.json"
+  },
+  "scannedWithoutFullRead": "Immutable src/**/*.ts searched for private getter references; no matches. Snapshot byte verification is not semantic review.",
+  "excludedOracles": [
+    "author REPORT/HANDOFF",
+    "foreign verdicts",
+    "author reasoning notes"
+  ],
+  "skill": {
+    "resource": "skill://user/6ab1aaddc46481918fb78c5248bfdd91/verify/SKILL.md",
+    "via": "skills.read",
+    "purpose": "точность области/evidence/identity; не новый нормативный owner"
+  }
+}

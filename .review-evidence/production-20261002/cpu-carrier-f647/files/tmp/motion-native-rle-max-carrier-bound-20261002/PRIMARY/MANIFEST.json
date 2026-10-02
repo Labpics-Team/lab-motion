@@ -1,0 +1,80 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "path": "FORMULA.md",
+      "bytes": 4189,
+      "sha256": "963317112d71802e31333f8343e20001e42233fd6cd21b008375d4c851f1aebc"
+    },
+    {
+      "path": "PRIMARY-PACKET.json",
+      "bytes": 1558,
+      "sha256": "e65e1e39c11990504cd9ea2bd2ae3a01971c1675eb89040ff70c917e41994b03"
+    },
+    {
+      "path": "capacity-metadata.mjs",
+      "bytes": 10388,
+      "sha256": "a18a04cb1bf121c2ff5d39879674858f112fedc9e7e9c9ced56e1f3bf0f66377"
+    },
+    {
+      "path": "capacity-result.json",
+      "bytes": 6501,
+      "sha256": "5bbbdecbc516f31c676275f3506048185d744ee8de85661131c3f68d1708ad01"
+    },
+    {
+      "path": "execution.json",
+      "bytes": 473,
+      "sha256": "971d01bb21bce7299fe139b6f83d41a6fb72a781d639cdc5bb0c7a2cbb52b2ad"
+    },
+    {
+      "path": "old-inputs/max-format-consumer-probe.mjs",
+      "bytes": 9041,
+      "sha256": "adcfc4ea87953ebd44845643b7c21e977fb22c774360a2ba8de50f2d956c3661"
+    },
+    {
+      "path": "old-inputs/max-format-fixtures.mjs",
+      "bytes": 24482,
+      "sha256": "70c5a15e822e779983c9bd05bdd1de4ae733382de9c7bc8aca57dc952d3873ef"
+    },
+    {
+      "path": "old-inputs/maxN1024-consumer-receipt.json",
+      "bytes": 1633,
+      "sha256": "66e93dc4257595c2b0cb73ca21734d8d8822df0c6b25b30e5e9f6d1c64c58404"
+    },
+    {
+      "path": "old-inputs/registration-6eae.mjs",
+      "bytes": 16518,
+      "sha256": "98e162c114ef1329c99ac9b5bd8f24ab5a2df3d2e95da4b9d8caf5c69378079a"
+    },
+    {
+      "path": "source/bench/profile/server-profile-contract.mjs",
+      "bytes": 73913,
+      "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e"
+    },
+    {
+      "path": "source/bench/profile/server-profile-registration.mjs",
+      "bytes": 18998,
+      "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470"
+    },
+    {
+      "path": "source/bench/profile/server-profile-runner.mjs",
+      "bytes": 51648,
+      "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636"
+    },
+    {
+      "path": "source/test/server-profile-contract.test.ts",
+      "bytes": 97980,
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7"
+    },
+    {
+      "path": "stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "stdout.log",
+      "bytes": 5033,
+      "sha256": "06e707f942df6fe241b225a329d10a20daaca3fd2429b73178e7616296111f44"
+    }
+  ]
+}

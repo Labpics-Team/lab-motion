@@ -1,0 +1,1363 @@
+{
+  "scope": "Readonly existing corpus byte counts only; no imported codec/runtime; author passed/failures flags not oracle",
+  "source": "/tmp/motion-native-cpu-rle-parity-20261002/result.json",
+  "sha256": "852f2410f83f599920baffed2229f5ad03fd2ecfe4cab1a5c6ca3e63b927d368",
+  "artifactOwnerSha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+  "sourceOwnerSha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+  "rowsWithRawVectors": 135,
+  "counts": [
+    {
+      "name": "empty-warmup",
+      "fields": 0,
+      "sizesIndependentlyCounted": {
+        "original": 2,
+        "encoded": 2,
+        "restored": 2
+      },
+      "ratioEncodedOriginal": 1.0
+    },
+    {
+      "name": "zero",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 235,
+        "encoded": 157,
+        "restored": 235
+      },
+      "ratioEncodedOriginal": 0.6680851063829787
+    },
+    {
+      "name": "one-ns",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 235,
+        "encoded": 157,
+        "restored": 235
+      },
+      "ratioEncodedOriginal": 0.6680851063829787
+    },
+    {
+      "name": "second-boundary",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 267,
+        "encoded": 173,
+        "restored": 267
+      },
+      "ratioEncodedOriginal": 0.6479400749063671
+    },
+    {
+      "name": "above-number-integer",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 315,
+        "encoded": 189,
+        "restored": 315
+      },
+      "ratioEncodedOriginal": 0.6
+    },
+    {
+      "name": "signed64-second-bound",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 341,
+        "encoded": 209,
+        "restored": 341
+      },
+      "ratioEncodedOriginal": 0.6129032258064516
+    },
+    {
+      "name": "same-and-changing-metadata-runs",
+      "fields": 4,
+      "sizesIndependentlyCounted": {
+        "original": 469,
+        "encoded": 353,
+        "restored": 469
+      },
+      "ratioEncodedOriginal": 0.7526652452025586
+    },
+    {
+      "name": "scalar-live-100/0/left/raw-0",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2103,
+        "encoded": 383,
+        "restored": 2103
+      },
+      "ratioEncodedOriginal": 0.1821207798383262
+    },
+    {
+      "name": "scalar-live-100/0/left/raw-1",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/left/raw-2",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/left/raw-3",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/left/raw-4",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/left/raw-5",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/left/raw-6",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/left/raw-7",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-0",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2103,
+        "encoded": 383,
+        "restored": 2103
+      },
+      "ratioEncodedOriginal": 0.1821207798383262
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-1",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-2",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-3",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-4",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-5",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-6",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-7",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-8",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-9",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-10",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 383,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.1793911007025761
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-11",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-12",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-13",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-14",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "scalar-live-100/0/right/raw-15",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "transform-fresh-1000/0/left/raw-0",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2103,
+        "encoded": 383,
+        "restored": 2103
+      },
+      "ratioEncodedOriginal": 0.1821207798383262
+    },
+    {
+      "name": "transform-fresh-1000/0/left/raw-1",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/left/raw-2",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/left/raw-3",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/left/raw-4",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/left/raw-5",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/left/raw-6",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/left/raw-7",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-0",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2103,
+        "encoded": 383,
+        "restored": 2103
+      },
+      "ratioEncodedOriginal": 0.1821207798383262
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-1",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-2",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-3",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-4",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-5",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-6",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-7",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-8",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-9",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-10",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 383,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.1793911007025761
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-11",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-12",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-13",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-14",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "transform-fresh-1000/0/right/raw-15",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "motion-value-default-stock-c/0/left/raw-0",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 265,
+        "encoded": 171,
+        "restored": 265
+      },
+      "ratioEncodedOriginal": 0.6452830188679245
+    },
+    {
+      "name": "motion-value-default-stock-c/0/left/raw-1",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 267,
+        "encoded": 171,
+        "restored": 267
+      },
+      "ratioEncodedOriginal": 0.6404494382022472
+    },
+    {
+      "name": "motion-value-default-stock-c/0/left/raw-2",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 267,
+        "encoded": 171,
+        "restored": 267
+      },
+      "ratioEncodedOriginal": 0.6404494382022472
+    },
+    {
+      "name": "motion-value-default-stock-c/0/left/raw-3",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 267,
+        "encoded": 171,
+        "restored": 267
+      },
+      "ratioEncodedOriginal": 0.6404494382022472
+    },
+    {
+      "name": "motion-value-default-stock-c/0/left/raw-4",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 269,
+        "encoded": 172,
+        "restored": 269
+      },
+      "ratioEncodedOriginal": 0.6394052044609665
+    },
+    {
+      "name": "motion-value-default-stock-c/0/left/raw-5",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/0/left/raw-6",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/0/left/raw-7",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/0/right/raw-0",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 265,
+        "encoded": 171,
+        "restored": 265
+      },
+      "ratioEncodedOriginal": 0.6452830188679245
+    },
+    {
+      "name": "motion-value-default-stock-c/0/right/raw-1",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 267,
+        "encoded": 171,
+        "restored": 267
+      },
+      "ratioEncodedOriginal": 0.6404494382022472
+    },
+    {
+      "name": "motion-value-default-stock-c/0/right/raw-2",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 269,
+        "encoded": 172,
+        "restored": 269
+      },
+      "ratioEncodedOriginal": 0.6394052044609665
+    },
+    {
+      "name": "motion-value-default-stock-c/0/right/raw-3",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/0/right/raw-4",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/0/right/raw-5",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/0/right/raw-6",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/0/right/raw-7",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "scalar-live-100/1/left/raw-0",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2103,
+        "encoded": 383,
+        "restored": 2103
+      },
+      "ratioEncodedOriginal": 0.1821207798383262
+    },
+    {
+      "name": "scalar-live-100/1/left/raw-1",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/left/raw-2",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/left/raw-3",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/left/raw-4",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/left/raw-5",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/left/raw-6",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/left/raw-7",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-0",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2103,
+        "encoded": 383,
+        "restored": 2103
+      },
+      "ratioEncodedOriginal": 0.1821207798383262
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-1",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-2",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-3",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-4",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-5",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-6",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-7",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-8",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-9",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-10",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 383,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.1793911007025761
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-11",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-12",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-13",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-14",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "scalar-live-100/1/right/raw-15",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "transform-fresh-1000/1/left/raw-0",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2103,
+        "encoded": 383,
+        "restored": 2103
+      },
+      "ratioEncodedOriginal": 0.1821207798383262
+    },
+    {
+      "name": "transform-fresh-1000/1/left/raw-1",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/left/raw-2",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/left/raw-3",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/left/raw-4",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/left/raw-5",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/left/raw-6",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/left/raw-7",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-0",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2103,
+        "encoded": 383,
+        "restored": 2103
+      },
+      "ratioEncodedOriginal": 0.1821207798383262
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-1",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-2",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-3",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-4",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-5",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-6",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-7",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-8",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-9",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 399,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.18688524590163935
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-10",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2135,
+        "encoded": 383,
+        "restored": 2135
+      },
+      "ratioEncodedOriginal": 0.1793911007025761
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-11",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-12",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-13",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-14",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "transform-fresh-1000/1/right/raw-15",
+      "fields": 16,
+      "sizesIndependentlyCounted": {
+        "original": 2151,
+        "encoded": 399,
+        "restored": 2151
+      },
+      "ratioEncodedOriginal": 0.18549511854951187
+    },
+    {
+      "name": "motion-value-default-stock-c/1/left/raw-0",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 265,
+        "encoded": 171,
+        "restored": 265
+      },
+      "ratioEncodedOriginal": 0.6452830188679245
+    },
+    {
+      "name": "motion-value-default-stock-c/1/left/raw-1",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 267,
+        "encoded": 171,
+        "restored": 267
+      },
+      "ratioEncodedOriginal": 0.6404494382022472
+    },
+    {
+      "name": "motion-value-default-stock-c/1/left/raw-2",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 267,
+        "encoded": 171,
+        "restored": 267
+      },
+      "ratioEncodedOriginal": 0.6404494382022472
+    },
+    {
+      "name": "motion-value-default-stock-c/1/left/raw-3",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 267,
+        "encoded": 171,
+        "restored": 267
+      },
+      "ratioEncodedOriginal": 0.6404494382022472
+    },
+    {
+      "name": "motion-value-default-stock-c/1/left/raw-4",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 269,
+        "encoded": 172,
+        "restored": 269
+      },
+      "ratioEncodedOriginal": 0.6394052044609665
+    },
+    {
+      "name": "motion-value-default-stock-c/1/left/raw-5",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/1/left/raw-6",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/1/left/raw-7",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/1/right/raw-0",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 265,
+        "encoded": 171,
+        "restored": 265
+      },
+      "ratioEncodedOriginal": 0.6452830188679245
+    },
+    {
+      "name": "motion-value-default-stock-c/1/right/raw-1",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 267,
+        "encoded": 171,
+        "restored": 267
+      },
+      "ratioEncodedOriginal": 0.6404494382022472
+    },
+    {
+      "name": "motion-value-default-stock-c/1/right/raw-2",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 269,
+        "encoded": 172,
+        "restored": 269
+      },
+      "ratioEncodedOriginal": 0.6394052044609665
+    },
+    {
+      "name": "motion-value-default-stock-c/1/right/raw-3",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/1/right/raw-4",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/1/right/raw-5",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/1/right/raw-6",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    },
+    {
+      "name": "motion-value-default-stock-c/1/right/raw-7",
+      "fields": 2,
+      "sizesIndependentlyCounted": {
+        "original": 271,
+        "encoded": 173,
+        "restored": 271
+      },
+      "ratioEncodedOriginal": 0.6383763837638377
+    }
+  ],
+  "capturedUtc": "2026-10-02T02:10:35.099718+00:00",
+  "heavy": 0,
+  "queued": 0
+}

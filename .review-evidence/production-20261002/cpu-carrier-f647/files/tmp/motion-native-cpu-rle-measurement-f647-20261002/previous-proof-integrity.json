@@ -1,0 +1,250 @@
+{
+  "/tmp/motion-native-clock-measurement-088-20261002/norm/AGENTS.md": {
+    "bytes": 38398,
+    "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/norm/plans/lab-motion-production/r11.md": {
+    "bytes": 74166,
+    "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/norm/plans/lab-motion-production/r12.md": {
+    "bytes": 40024,
+    "sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/bench/profile/server-thread-cpu-clock.mjs": {
+    "bytes": 7279,
+    "sha256": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/bench/profile/server-thread-cpu-clock.c": {
+    "bytes": 4159,
+    "sha256": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/bench/profile/server-profile-contract.mjs": {
+    "bytes": 69001,
+    "sha256": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/bench/profile/server-profile-runner.mjs": {
+    "bytes": 50951,
+    "sha256": "72383a1abfd70b2bdb163995f8d6dac7cf70624e6f4658db395123554dcfffcf"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/bench/profile/server-profile-registration.mjs": {
+    "bytes": 18946,
+    "sha256": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/norm/plans/SPEC.md": {
+    "bytes": 31491,
+    "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/norm/plans/lab-motion-production/ACTIVE.md": {
+    "bytes": 235,
+    "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/norm/plans/lab-motion-production/CLAIM.md": {
+    "bytes": 139,
+    "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/norm/plans/lab-motion-production/ACTIVATION.md": {
+    "bytes": 194,
+    "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/norm/plans/TEMPLATE.md": {
+    "bytes": 10270,
+    "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e"
+  },
+  "/tmp/motion-clock-freshness-diagnostic-20261002/compare-counters.c": {
+    "bytes": 2516,
+    "sha256": "d17df8ca1eb2f290cbb0df7e50c500d317b450b7794d4958be34357417411caf"
+  },
+  "/tmp/motion-clock-freshness-diagnostic-20261002/raw-delta-readback.json": {
+    "bytes": 7886,
+    "sha256": "91f258044fed7255e6f4e10561400b983e9b7011a2f3e36fa55212f38289c77d"
+  },
+  "/tmp/motion-clock-freshness-diagnostic-20261002/diagnostic-raw.json": {
+    "bytes": 18162,
+    "sha256": "fda29e81d18c42ea0049e6aeb39057d9c4d3be9d603da4d595b0624fe5f73dc3"
+  },
+  "/tmp/motion-clock-freshness-diagnostic-20261002/kernel-source-manifest.json": {
+    "bytes": 1292,
+    "sha256": "1357b0dad58a27b9d6bf0c2bab35e80d6000df50b63e6b824fb3065d41885841"
+  },
+  "/tmp/motion-clock-freshness-diagnostic-20261002/runtime-clock-metadata.json": {
+    "bytes": 213,
+    "sha256": "3ae33f840b1ea1c6496bcd539df774b3262c6eb036d8ff2a48c1aa7f574e4331"
+  },
+  "/tmp/motion-clock-freshness-diagnostic-20261002/execution.json": {
+    "bytes": 939,
+    "sha256": "8a31743e8a75047f0d1e9ae75dcfcc5f8b7d2ed79d744e28425dbe6187a660ab"
+  },
+  "/tmp/motion-native-clock-successor-088fbc60-20261002/diff.patch": {
+    "bytes": 166454,
+    "sha256": "c20b40756914d860d754188c97512dd2b83e3fbb86f089fe575b41ebe06b679f"
+  },
+  "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--time--posix-cpu-timers.c": {
+    "bytes": 49795,
+    "sha256": "23255e35526f6582c00ad0c88438c378bfa45d49316019fa76cacd6be1983621"
+  },
+  "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--core.c": {
+    "bytes": 289670,
+    "sha256": "5b510e027f1a6236165f26da4b1195530264dc0013ff8883bf49d03114ea26c2"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/diff-server-profile-contract.mjs.txt": {
+    "bytes": 15319,
+    "sha256": "0198524df5d146517196753fec53502324397e0ecdc000a1d9fab3ad84fc9de2"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/diff-server-profile-runner.mjs.txt": {
+    "bytes": 11487,
+    "sha256": "d0a3edd9d51c8bb10484622551977132b4e1a6ad03ca9cb892ffb83adefe42bd"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/scripts/bench-transform-support.mjs": {
+    "bytes": 31565,
+    "sha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c"
+  },
+  "/tmp/motion-clock-freshness-diagnostic-20261002/kernel--sched--cputime.c": {
+    "bytes": 27252,
+    "sha256": "eabd7ccf5bafd87ccd686829b1192e56dafb8c213f10f12aec619405246977a6"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/bench/compare/methodology.mjs": {
+    "bytes": 57045,
+    "sha256": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87"
+  },
+  "/tmp/motion-native-clock-api-smoke-green-20261002/stdout.json": {
+    "bytes": 2814,
+    "sha256": "9e5badf12d7aefbb0c9abb1439d640de30461279a87866918cd2ad0b9eebcc28"
+  },
+  "/tmp/motion-native-clock-fault-controls-20261002/errno.stdout": {
+    "bytes": 53,
+    "sha256": "def380c13e6734f89e3d1f7139d256c224d8e1b7be9aa60991334c96fbc388b5"
+  },
+  "/tmp/motion-native-clock-fault-controls-20261002/negative-ns.stdout": {
+    "bytes": 80,
+    "sha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851"
+  },
+  "/tmp/motion-native-clock-fault-controls-20261002/large-ns.stdout": {
+    "bytes": 80,
+    "sha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851"
+  },
+  "/tmp/motion-native-clock-fault-controls-20261002/large-sec.stdout": {
+    "bytes": 84,
+    "sha256": "55db18e17e6f4d302b08258127c40a60eeed9122b8bbeef75ef5b4d9dc1d80fe"
+  },
+  "/tmp/motion-native-clock-fault-controls-20261002/negative-sec.stdout": {
+    "bytes": 80,
+    "sha256": "6f7f9fd2e0bf13c93fccba299359846e6944ef7015395e2b92a5957fe11e6851"
+  },
+  "/tmp/motion-native-clock-fault-controls-20261002/execution.json": {
+    "bytes": 5971,
+    "sha256": "dc1b27afd678854401b38cc8ed2a712045d5d5795981621f04ad15cc01a1196a"
+  },
+  "/tmp/motion-native-clock-api-smoke-green-20261002/execution.json": {
+    "bytes": 1494,
+    "sha256": "89f363e2eb84919b4e96f1b0d717141a8cc539e3e01dd9404adf81aa327276db"
+  },
+  "/tmp/motion-native-clock-fault-controls-20261002/wrap-clock.c": {
+    "bytes": 536,
+    "sha256": "a7374c48444a0d20c37fbc7da4169b7aa087b8598824752853b33a8e5367230f"
+  },
+  "/tmp/motion-native-clock-fault-controls-20261002/control.mjs": {
+    "bytes": 245,
+    "sha256": "c94f0565092e0ca16e19ebf697f7453d28166bcc8175b45dbf9e5577f95afde9"
+  },
+  "/tmp/motion-clock-freshness-diagnostic-20261002/kernel-config.gz": {
+    "bytes": 20709,
+    "sha256": "7f98e7fb11220b6ec5891c2e2165c115d4a20ba5087898d436f3ab843b3baa96"
+  },
+  "/tmp/motion-native-clock-preparation-controls-20261002/missing-compiler.stdout": {
+    "bytes": 99,
+    "sha256": "f8e348ea3490cd857542133049c5de27dc017d85bfa73493e8f9fbbf5ae450f0"
+  },
+  "/tmp/motion-native-clock-preparation-controls-20261002/nonlinux.stdout": {
+    "bytes": 186,
+    "sha256": "7b45ef0a7077796cc20a454f6848cb8398eb90c78494b2378a97295707712d0b"
+  },
+  "/tmp/motion-native-clock-preparation-controls-20261002/worker.stdout": {
+    "bytes": 186,
+    "sha256": "ff4f6e040e7e7a34ba8a3994057f6c3783f9bec4650d85ffc46fb8356693c340"
+  },
+  "/tmp/motion-native-clock-preparation-controls-20261002/wrong-node.stdout": {
+    "bytes": 185,
+    "sha256": "27988329930b381fab623b0bcec1e00654d32591544cf230a6c3440df01aec52"
+  },
+  "/tmp/motion-native-clock-preparation-controls-20261002/stale-binary.stdout": {
+    "bytes": 227,
+    "sha256": "966c6d6dfd9067fd45ab9066d2032bb6719937fc2ff8a960624c47ab3a16744d"
+  },
+  "/tmp/motion-native-clock-preparation-controls-20261002/binary-mutation.stdout": {
+    "bytes": 2208,
+    "sha256": "a61a0a17c5540dba59420c26bfba6b0e9a051947b4da02af9e03da3dd6bcfab5"
+  },
+  "/tmp/motion-native-clock-preparation-controls-20261002/control.mjs": {
+    "bytes": 1547,
+    "sha256": "05177572a8c021eb5de03e84321b8ef38dd1f9089b548dde9ca97cb03606f038"
+  },
+  "/tmp/motion-native-clock-consumer-closure-20261002/affected-full.json": {
+    "bytes": 83334,
+    "sha256": "63d9519cf22ea314ee1cfa6007de31a9ba1ab538bfea6129b1afc0b0c6367473"
+  },
+  "/tmp/motion-native-clock-consumer-closure-20261002/affected-full.execution.json": {
+    "bytes": 3311,
+    "sha256": "85ed4b1857e925c15d7edf89f07f4799bf2986397063b66f2c7262f9da7bbc42"
+  },
+  "/tmp/motion-native-clock-consumer-closure-20261002/source-before.json": {
+    "bytes": 904,
+    "sha256": "f5ab84c7b32da57ad958087efa9ed454ab93f41227254de336bc01b4c427517e"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/docs/server-profile.md": {
+    "bytes": 9198,
+    "sha256": "488f3c61436d88924d218fd990fa1840e0c30c850c7af2992755e6872f0a5c18"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/bench/profile/native-clock/README.md": {
+    "bytes": 1105,
+    "sha256": "1525470faf40e14918937094ac475ed9e9f6cdcadf1b51a4f603a78dc733d7a6"
+  },
+  "/tmp/motion-native-clock-api-smoke-20261002/stderr.log": {
+    "bytes": 2093,
+    "sha256": "6346296f424f540872a4bdd6e6582c8f336bd58236081de3e61921224c8d61c5"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/test/server-profile-contract.test.ts": {
+    "bytes": 95174,
+    "sha256": "694bfdf8b75b4ee102cc05f9857312c531a39984bdc9ccf0c592bc94684f0991"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/source/bench/profile/native-clock/include/node_api.h": {
+    "bytes": 10370,
+    "sha256": "2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a"
+  },
+  "/tmp/motion-native-clock-successor-088fbc60-20261002/PRIMARY-MANIFEST.json": {
+    "bytes": 20157,
+    "sha256": "80e5dd4b030bbb8287416eb4b1372af7164801eacde39ed642a14a9ea86fec4a"
+  },
+  "/tmp/motion-native-clock-successor-088fbc60-20261002/source-manifest.json": {
+    "bytes": 151106,
+    "sha256": "81e832fa375a233931e26eb41dfd1624c14402292c5f9b75d325e8eb8fba3388"
+  },
+  "/tmp/motion-native-clock-successor-088fbc60-20261002/method-readset.json": {
+    "bytes": 7068,
+    "sha256": "7f234a2aff0925bb3315d49ed311455022834efead7f2fd84c5fa77613c26d2f"
+  },
+  "/tmp/motion-native-clock-successor-088fbc60-20261002/source.tar.gz": {
+    "bytes": 1766073,
+    "sha256": "bc22b2359f3a8466a9daa9ced434f561525d120782ec7efeefbe2e57ff410db3"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/consumer-witness.mjs": {
+    "bytes": 4674,
+    "sha256": "2651f75d9fc804494bc26e09dde74f2a2ba7f2f226a3bada71fb8d5ced26e009"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/native-api-witness.mjs": {
+    "bytes": 1172,
+    "sha256": "7e5942a12d6b987d2db7c193456241ad6880881edc907f8235543536df3644ba"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/consumer-witness.stdout.json": {
+    "bytes": 4022,
+    "sha256": "7e355c425ab0863dc5268843c2e40622e94954f54f46df0fb676fc822f64bd01"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/native-api-witness.stdout.json": {
+    "bytes": 3004,
+    "sha256": "4258b4d7ed5ecbb3446892ddc6610fe01360fe01db057de9bd6bc6b2354d67a0"
+  },
+  "/tmp/motion-native-clock-measurement-088-20261002/REPORT.md": {
+    "bytes": 16799,
+    "sha256": "59deb141150a3678a5aab33bf1a12ec809ffb25b3ff82abeed9830eba7793bbd"
+  }
+}

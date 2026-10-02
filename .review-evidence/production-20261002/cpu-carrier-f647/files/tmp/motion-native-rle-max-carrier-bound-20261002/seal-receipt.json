@@ -1,0 +1,19 @@
+{
+  "sealedAt": "2026-10-02T02:37:52.197291+00:00",
+  "packet": {
+    "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/PRIMARY-PACKET.json",
+    "sha256": "e65e1e39c11990504cd9ea2bd2ae3a01971c1675eb89040ff70c917e41994b03"
+  },
+  "manifest": {
+    "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/MANIFEST.json",
+    "sha256": "c7ced50ef8a590eb62f834f288626c3d5094a3eb3d5bb05e64f3b5eecd200ebc"
+  },
+  "tar": {
+    "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/capacity-primary.tar",
+    "bytes": 358400,
+    "sha256": "76d6bded5ff88cde1b7aa6d47382458b2a8bf2d8fdd111cdbb0024d2badfca7a"
+  },
+  "membersChecked": 15,
+  "membersMatched": 15,
+  "liveSourceMatches": true
+}

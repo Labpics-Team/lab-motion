@@ -1,0 +1,12 @@
+{"name":"fixture/admissionHistory","elapsedMs":8417.783358,"cpuUs":{"user":7589420,"system":823421},"status":"returned"}
+{"name":"validateServerArtifact","elapsedMs":1730.2741449999994,"cpuUs":{"user":1665384,"system":64148},"status":"returned"}
+{"name":"validateServerJournal","elapsedMs":4157.552227,"cpuUs":{"user":3828099,"system":327070},"status":"returned"}
+{"name":"fixture/chain","elapsedMs":1897.8707699999995,"cpuUs":{"user":1786430,"system":110831},"status":"returned"}
+{"name":"validateServerJournal","elapsedMs":3.909998999999516,"cpuUs":{"user":3919,"system":0},"status":"threw"}
+{"name":"fixture/chain","elapsedMs":1873.7491679999985,"cpuUs":{"user":1786373,"system":86390},"status":"returned"}
+{"name":"validateServerJournal","elapsedMs":1.8716940000012983,"cpuUs":{"user":1728,"system":148},"status":"threw"}
+{"name":"fixture/chain","elapsedMs":1.830301000001782,"cpuUs":{"user":1832,"system":0},"status":"returned"}
+{"name":"validateServerJournal","elapsedMs":58.508795999998256,"cpuUs":{"user":54489,"system":4016},"status":"threw"}
+{"name":"validateServerArtifact","elapsedMs":15.217881000000489,"cpuUs":{"user":15222,"system":0},"status":"threw"}
+{"name":"fixture/chain","elapsedMs":0.6392039999991539,"cpuUs":{"user":642,"system":0},"status":"returned"}
+{"name":"validateServerJournal","elapsedMs":1947.5874220000005,"cpuUs":{"user":1773735,"system":172325},"status":"threw"}

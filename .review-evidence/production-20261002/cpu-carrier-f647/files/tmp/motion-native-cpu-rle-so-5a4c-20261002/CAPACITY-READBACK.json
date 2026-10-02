@@ -1,0 +1,341 @@
+{
+  "checkedUtc": "2026-10-02T02:38:40.406250+00:00",
+  "scope": "Independent static source binding, fixture structure and arithmetic readback. No Node imports, codec execution, dense carrier generation, replay or timing by reviewer. Geometry bound only, not actual trace/runtime upper.",
+  "files": [
+    {
+      "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/capacity-result.json",
+      "sha256": "5bbbdecbc516f31c676275f3506048185d744ee8de85661131c3f68d1708ad01",
+      "bytes": 6501,
+      "contentRead": true
+    },
+    {
+      "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/execution.json",
+      "sha256": "971d01bb21bce7299fe139b6f83d41a6fb72a781d639cdc5bb0c7a2cbb52b2ad",
+      "bytes": 473,
+      "contentRead": true
+    },
+    {
+      "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/capacity-metadata.mjs",
+      "sha256": "a18a04cb1bf121c2ff5d39879674858f112fedc9e7e9c9ced56e1f3bf0f66377",
+      "bytes": 10388,
+      "contentRead": true
+    },
+    {
+      "path": "/tmp/motion-server-stock-c-profile-20261001T1610Z/max-format-fixtures.mjs",
+      "sha256": "70c5a15e822e779983c9bd05bdd1de4ae733382de9c7bc8aca57dc952d3873ef",
+      "bytes": 24482,
+      "contentRead": true
+    },
+    {
+      "path": "/tmp/motion-server-stock-c-profile-20261001T1610Z/maxN1024-consumer-receipt.json",
+      "sha256": "66e93dc4257595c2b0cb73ca21734d8d8822df0c6b25b30e5e9f6d1c64c58404",
+      "bytes": 1633,
+      "contentRead": true
+    }
+  ],
+  "sourceBindings": {
+    "bench/profile/server-profile-registration.mjs": true,
+    "bench/profile/server-profile-contract.mjs": true,
+    "bench/profile/server-profile-runner.mjs": true,
+    "test/server-profile-contract.test.ts": true
+  },
+  "allSourceBindingsMatch": true,
+  "recomputedStages": {
+    "warmup": {
+      "runs": 4,
+      "samples": 24,
+      "rawRepetitions": 192,
+      "endpointCountEachCarrier": 2176,
+      "replacementDeltaEachCarrierBytes": 10680
+    },
+    "pilot": {
+      "runs": 8,
+      "samples": 48,
+      "rawRepetitions": 384,
+      "endpointCountEachCarrier": 4352,
+      "replacementDeltaEachCarrierBytes": 21360
+    },
+    "aa": {
+      "runs": 1024,
+      "samples": 6144,
+      "rawRepetitions": 49152,
+      "endpointCountEachCarrier": 557056,
+      "replacementDeltaEachCarrierBytes": 2734080
+    },
+    "positive": {
+      "runs": 1024,
+      "samples": 6144,
+      "rawRepetitions": 65536,
+      "endpointCountEachCarrier": 819200,
+      "replacementDeltaEachCarrierBytes": 2701312
+    },
+    "ab": {
+      "runs": 1024,
+      "samples": 6144,
+      "rawRepetitions": 49152,
+      "endpointCountEachCarrier": 557056,
+      "replacementDeltaEachCarrierBytes": 2734080
+    }
+  },
+  "recomputedEndpointCountEachCarrier": 1939840,
+  "recomputedDeltaEachCarrierBytes": 8201512,
+  "recomputedSyntheticCarrierBytes": {
+    "raw": 972185791,
+    "journal": 982705730,
+    "combined": 1954891521
+  },
+  "combinedGiB": 1.8206346044316888,
+  "requiredWith1GiBReserve": 3028633345,
+  "snapshotHeadroomBytes": 148748543,
+  "snapshotHeadroomMiB": 141.85766506195068,
+  "oldCompressedMetadataReadback": [
+    {
+      "path": "/tmp/motion-server-stock-c-profile-20261001T1610Z/maxN1024.json.gz",
+      "compressedFileStatBytes": 43955429,
+      "gzipMagic": "1f8b",
+      "lastMemberISIZE": 963959689,
+      "matchesOldReceiptBytes": true,
+      "meaning": "readonly header/footer/stat consistency; no full gzip hash/decompression or full-carrier replay"
+    },
+    {
+      "path": "/tmp/motion-server-stock-c-profile-20261001T1610Z/maxN1024.ndjson.gz",
+      "compressedFileStatBytes": 47879950,
+      "gzipMagic": "1f8b",
+      "lastMemberISIZE": 974479628,
+      "matchesOldReceiptBytes": true,
+      "meaning": "readonly header/footer/stat consistency; no full gzip hash/decompression or full-carrier replay"
+    }
+  ],
+  "literalExecutionExit": 0,
+  "literalExecutionEndedUtc": "2026-10-02T02:30:43.200471+00:00",
+  "literalRuntimeEvidenceOwner": "capacity supplement, not own runtime",
+  "ownProductionRuntime": 0,
+  "ownHeavy": 0,
+  "ownQueued": 0,
+  "actualSeriesMaximumFootprint": "UNPROVEN",
+  "actualSeriesRuntimeUpper": "UNPROVEN",
+  "allEND": true,
+  "sealedPrimary": {
+    "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/PRIMARY-PACKET.json",
+    "sha256": "e65e1e39c11990504cd9ea2bd2ae3a01971c1675eb89040ff70c917e41994b03",
+    "manifestPath": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/MANIFEST.json",
+    "manifestSha256": "c7ced50ef8a590eb62f834f288626c3d5094a3eb3d5bb05e64f3b5eecd200ebc",
+    "manifestRefs": [
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/FORMULA.md",
+        "sha256": "963317112d71802e31333f8343e20001e42233fd6cd21b008375d4c851f1aebc",
+        "bytes": 4189,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/PRIMARY-PACKET.json",
+        "sha256": "e65e1e39c11990504cd9ea2bd2ae3a01971c1675eb89040ff70c917e41994b03",
+        "bytes": 1558,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/capacity-metadata.mjs",
+        "sha256": "a18a04cb1bf121c2ff5d39879674858f112fedc9e7e9c9ced56e1f3bf0f66377",
+        "bytes": 10388,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/capacity-result.json",
+        "sha256": "5bbbdecbc516f31c676275f3506048185d744ee8de85661131c3f68d1708ad01",
+        "bytes": 6501,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/execution.json",
+        "sha256": "971d01bb21bce7299fe139b6f83d41a6fb72a781d639cdc5bb0c7a2cbb52b2ad",
+        "bytes": 473,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/old-inputs/max-format-consumer-probe.mjs",
+        "sha256": "adcfc4ea87953ebd44845643b7c21e977fb22c774360a2ba8de50f2d956c3661",
+        "bytes": 9041,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/old-inputs/max-format-fixtures.mjs",
+        "sha256": "70c5a15e822e779983c9bd05bdd1de4ae733382de9c7bc8aca57dc952d3873ef",
+        "bytes": 24482,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/old-inputs/maxN1024-consumer-receipt.json",
+        "sha256": "66e93dc4257595c2b0cb73ca21734d8d8822df0c6b25b30e5e9f6d1c64c58404",
+        "bytes": 1633,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/old-inputs/registration-6eae.mjs",
+        "sha256": "98e162c114ef1329c99ac9b5bd8f24ab5a2df3d2e95da4b9d8caf5c69378079a",
+        "bytes": 16518,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/bench/profile/server-profile-contract.mjs",
+        "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+        "bytes": 73913,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/bench/profile/server-profile-registration.mjs",
+        "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+        "bytes": 18998,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/bench/profile/server-profile-runner.mjs",
+        "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+        "bytes": 51648,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/source/test/server-profile-contract.test.ts",
+        "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+        "bytes": 97980,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      },
+      {
+        "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/stdout.log",
+        "sha256": "06e707f942df6fe241b225a329d10a20daaca3fd2429b73178e7616296111f44",
+        "bytes": 5033,
+        "matches": true,
+        "role": "identity only unless separate content scope; FORMULA.md not read as oracle"
+      }
+    ],
+    "matches": 15,
+    "archivePath": "/tmp/motion-native-rle-max-carrier-bound-20261002/capacity-primary.tar",
+    "archiveBytes": 358400,
+    "archiveSha256": "76d6bded5ff88cde1b7aa6d47382458b2a8bf2d8fdd111cdbb0024d2badfca7a",
+    "archiveMembers": [
+      {
+        "member": "FORMULA.md",
+        "sha256": "963317112d71802e31333f8343e20001e42233fd6cd21b008375d4c851f1aebc",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "MANIFEST.json",
+        "sha256": "c7ced50ef8a590eb62f834f288626c3d5094a3eb3d5bb05e64f3b5eecd200ebc",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "PRIMARY-PACKET.json",
+        "sha256": "e65e1e39c11990504cd9ea2bd2ae3a01971c1675eb89040ff70c917e41994b03",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "capacity-metadata.mjs",
+        "sha256": "a18a04cb1bf121c2ff5d39879674858f112fedc9e7e9c9ced56e1f3bf0f66377",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "capacity-result.json",
+        "sha256": "5bbbdecbc516f31c676275f3506048185d744ee8de85661131c3f68d1708ad01",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "execution.json",
+        "sha256": "971d01bb21bce7299fe139b6f83d41a6fb72a781d639cdc5bb0c7a2cbb52b2ad",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "old-inputs/max-format-consumer-probe.mjs",
+        "sha256": "adcfc4ea87953ebd44845643b7c21e977fb22c774360a2ba8de50f2d956c3661",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "old-inputs/max-format-fixtures.mjs",
+        "sha256": "70c5a15e822e779983c9bd05bdd1de4ae733382de9c7bc8aca57dc952d3873ef",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "old-inputs/maxN1024-consumer-receipt.json",
+        "sha256": "66e93dc4257595c2b0cb73ca21734d8d8822df0c6b25b30e5e9f6d1c64c58404",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "old-inputs/registration-6eae.mjs",
+        "sha256": "98e162c114ef1329c99ac9b5bd8f24ab5a2df3d2e95da4b9d8caf5c69378079a",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "source/bench/profile/server-profile-contract.mjs",
+        "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "source/bench/profile/server-profile-registration.mjs",
+        "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "source/bench/profile/server-profile-runner.mjs",
+        "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "source/test/server-profile-contract.test.ts",
+        "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "stderr.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      },
+      {
+        "member": "stdout.log",
+        "sha256": "06e707f942df6fe241b225a329d10a20daaca3fd2429b73178e7616296111f44",
+        "existsLiteral": true,
+        "matchesLiteral": true
+      }
+    ],
+    "authorFormulaContentRead": false
+  },
+  "stockScopeLengthReadback": {
+    "oldBytes": 301,
+    "currentBytes": 301,
+    "positiveGrowthBytes": 0
+  },
+  "oldProducerReadScope": "max-format-consumer-probe.mjs lines15–106 targeted search: source-generated fixture, synthetic declaration, scalar right pilot operationNs/clock field mutation, maxN shape expansion, raw/journal exact byte count and gzip production. status/matched/PASS flags not oracle.",
+  "lastCheckedUtc": "2026-10-02T02:42:39.537238+00:00"
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "function": "serverProfileDigest",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+    "line": 137,
+    "selfMs": 4079.991
+  },
+  {
+    "function": "valueChunks",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 720,
+    "selfMs": 3967.51
+  },
+  {
+    "function": "update",
+    "url": "node:internal/crypto/hash",
+    "line": 145,
+    "selfMs": 3497.158
+  },
+  {
+    "function": "",
+    "url": "file:///tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/fixtures.mjs",
+    "line": 322,
+    "selfMs": 1558.073
+  },
+  {
+    "function": "(garbage collector)",
+    "url": "",
+    "line": 0,
+    "selfMs": 1449.045
+  },
+  {
+    "function": "",
+    "url": "file:///tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/fixtures.mjs",
+    "line": 414,
+    "selfMs": 1145.334
+  },
+  {
+    "function": "replayTransformLifecycleSample",
+    "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+    "line": 171,
+    "selfMs": 667.316
+  },
+  {
+    "function": "interpolate",
+    "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+    "line": 33,
+    "selfMs": 378.52
+  },
+  {
+    "function": "expandServerCpuEvidence",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 221,
+    "selfMs": 357.087
+  },
+  {
+    "function": "readServerSample",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 290,
+    "selfMs": 255.059
+  },
+  {
+    "function": "",
+    "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+    "line": 184,
+    "selfMs": 202.083
+  },
+  {
+    "function": "structuredClone",
+    "url": "node:internal/worker/js_transferable",
+    "line": 113,
+    "selfMs": 170.859
+  },
+  {
+    "function": "validateThreadCpuFields",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 368,
+    "selfMs": 157.495
+  },
+  {
+    "function": "expectedTransformValues",
+    "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+    "line": 38,
+    "selfMs": 131.865
+  },
+  {
+    "function": "validateServerJournal",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 834,
+    "selfMs": 125.004
+  }
+]

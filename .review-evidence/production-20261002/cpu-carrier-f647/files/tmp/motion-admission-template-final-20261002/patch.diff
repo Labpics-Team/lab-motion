@@ -1,0 +1,61 @@
+diff --git a/test/server-profile-contract.test.ts b/test/server-profile-contract.test.ts
+index acf6d651..0805109b 100644
+--- a/test/server-profile-contract.test.ts
++++ b/test/server-profile-contract.test.ts
+@@ -172,13 +172,36 @@ function registeredRefusal() {
+     failures: [{ stage: 'warmup', error: { message: 'незавершённая контрольная серия' } }] };
+ }
+ 
+-function healthyAdmission() {
++// В stage() raw зависит от сцены/участника/repetition, а run меняет только
++// tuple/order и ресурсный block. Каждый row получает отдельный native clone;
++// проверки и хеши по-прежнему читают все N полных samples внутри callback.
++function preparedAdmissionStage(name = 'aa', runs = 2) {
++  const template = stage(name, 2), orders = serverOrders(runs), rowsPerRun = template.rows.length / 2;
++  for (const row of template.rows) if (row.kind === 'engine') {
++    for (const sample of Object.values(row.samples) as any[]) for (const measured of sample.raw) {
++      measured.raw.cpuReads = compactServerCpuEvidence(measured.raw.cpuReads);
++    }
++  }
++  const rows = Array.from({ length: runs }, (_, run) => template.rows.slice(0, rowsPerRun).map((row) => {
++    const copied = clone(row); copied.run = run; copied.order = [...orders[run]]; return copied;
++  })).flat();
++  const blocks = Array.from({ length: runs / 2 }, (_, block) => {
++    const copied = clone(template.blocks[0]); copied.block = block;
++    for (const phase of ['before', 'after'] as const) {
++      copied[phase].cpuStat.usage_usec += block * 10; copied[phase].cpuStat.user_usec += block * 10;
++    }
++    return copied;
++  });
++  return { ...template, rows, blocks };
++}
++
++function healthyAdmission(prepareStage = stage) {
+   const artifact: any = registeredRefusal(); artifact.failures = []; artifact.verdict = 'PASS';
+-  artifact.warmup = stage('warmup', SERVER_PROFILE.warmupRuns);
+-  artifact.pilot = stage('pilot', SERVER_PROFILE.pilotRuns);
++  artifact.warmup = prepareStage('warmup', SERVER_PROFILE.warmupRuns);
++  artifact.pilot = prepareStage('pilot', SERVER_PROFILE.pilotRuns);
+   artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot'));
+   const runs = artifact.samplePlan.runs;
+-  artifact.aa = stage('aa', runs); artifact.positive = stage('positive', runs); artifact.ab = stage('ab', runs);
++  artifact.aa = prepareStage('aa', runs); artifact.positive = prepareStage('positive', runs); artifact.ab = prepareStage('ab', runs);
+   artifact.frozenPlanDigest = serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan });
+   const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, runs, 'aa'));
+   const positive = serverFamilyIntervals(serverCellPairs(artifact.positive, runs, 'positive'));
+@@ -239,14 +262,7 @@ function chain(events: any[], shared?: { events: any[]; records: any[] }) {
+ let sharedAdmission: { artifact: any; events: any[]; records: any[] } | undefined;
+ function admissionHistory() {
+   if (!sharedAdmission) {
+-    const artifact = healthyAdmission();
+-    // Полные независимые vectors переходят в зарегистрированный carrier до events/hash.
+-    // N, поля наблюдений и четыре контрпримера остаются прежними; legacy fault fixtures не меняются.
+-    for (const name of ['warmup', 'pilot', 'aa', 'positive', 'ab']) for (const row of artifact[name].rows) {
+-      if (row.kind === 'engine') for (const sample of Object.values(row.samples) as any[]) {
+-        for (const measured of sample.raw) measured.raw.cpuReads = compactServerCpuEvidence(measured.raw.cpuReads);
+-      }
+-    }
++    const artifact = healthyAdmission(preparedAdmissionStage);
+     const events = admissionEvents(artifact);
+     sharedAdmission = { artifact, events, records: chain(events) };
+   }

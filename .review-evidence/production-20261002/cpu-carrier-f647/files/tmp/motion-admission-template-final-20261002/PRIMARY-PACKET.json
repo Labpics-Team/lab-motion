@@ -1,0 +1,95 @@
+{
+  "createdUtc": "2026-10-02T02:10:03.738532+00:00",
+  "base": "5a4c29d8abb102b1fea563d14c30c3cdf13efe2c",
+  "head": "6502fda9c9b80d1f05f4b01b236fee10253d7fac",
+  "tree": "9a4e7683f92edf4df8d7767f58f366279701706c",
+  "changed": [
+    "test/server-profile-contract.test.ts"
+  ],
+  "callbackOldSha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+  "callbackNewSha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+  "references": [
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/source.tar",
+      "bytes": 7434240,
+      "sha256": "ddbe2f2861d4fa881d26f753426c971f3618950e01cdb81012e403df7bfa11c7"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/patch.diff",
+      "bytes": 4019,
+      "sha256": "2eea00e89c3223085445af1810d5520f56145e80db495a620429c19066ad0506"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/source.test.ts",
+      "bytes": 98766,
+      "sha256": "4976454599362b938e4e9737574e0593387f4885d83897841809e1a33696d007"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/callback-old.ts",
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/callback-new.ts",
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/probe.mjs",
+      "bytes": 3947,
+      "sha256": "9db3dc5c4d793d70df4937bfb68f8912801b1deee5c3fe5f658838681a0879a3"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/execution.json",
+      "bytes": 475,
+      "sha256": "28ca423b3ca8e5f0e8e7117582c80f9df59b7339dd4e54f540566ba33d574c91"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/result.json",
+      "bytes": 5864,
+      "sha256": "95a32b6b953b75b01ba239bc80ab8023b24e316e04759a97d114d41c2e05c0dc"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/probe.log",
+      "bytes": 100,
+      "sha256": "6b9c8c5202f9904e688bf3d3553dd03edf62ea65ae3e6259247a01842fd62405"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/old-test.ts",
+      "bytes": 97980,
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/new-test.ts",
+      "bytes": 98766,
+      "sha256": "4976454599362b938e4e9737574e0593387f4885d83897841809e1a33696d007"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/old-fixture.mjs",
+      "bytes": 20527,
+      "sha256": "bd8e9d360525f8db7fa493c11a1aca31a4c77cf95fba791743b69e786c702039"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/new-fixture.mjs",
+      "bytes": 21304,
+      "sha256": "5e51e17fbcf69b00ef16ffd5d6e8517c25e0ad1879e515296f5780ee4c6a9d44"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/PRIMARY-PACKET.json",
+      "bytes": 5667,
+      "sha256": "e749209ac077ed25373d9f1b9b963177ed603c48468f55f221b750d5744fa992"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/execution.json",
+      "bytes": 2765,
+      "sha256": "5dc2138e858bfe886717dd22e7204781d1bd738831e71006ba5a374fcbbbffee"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/probe-result.json",
+      "bytes": 2885,
+      "sha256": "378acaa2769be5429b7dbb1120a2a4eab9ae5b0a6e5530ea2b438cf318ea619d"
+    }
+  ],
+  "currentActualSutPerformanceSamples": 0,
+  "historicalQualification": "epoch6 has one incomplete baseline warmup with8raw executions; no pilot/candidate/AA/AB. All historical failures retained."
+}

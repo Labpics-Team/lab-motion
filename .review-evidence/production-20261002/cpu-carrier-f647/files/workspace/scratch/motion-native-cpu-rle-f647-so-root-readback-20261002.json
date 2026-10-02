@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "capturedAtUtc": "2026-10-02T02:56:37.297541+00:00",
+  "head": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "tree": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "fullReportReadAtUtc": "2026-10-02T02:49:33+00:00",
+  "outputs": [
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/REPORT.md",
+      "bytes": 26849,
+      "sha256": "2c2ca68c1e497196363a1450cd7caef2bf2b30479bc399d4ee23a380b4358829",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/READSET.json",
+      "bytes": 37557,
+      "sha256": "29446511ed5dd03508581c9858d5fb7b9dfb4e1203dfe21bc3cc9f23a9937528",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/IDENTITY.json",
+      "bytes": 114337,
+      "sha256": "b86f57afc01cf158427a103ab60507c12ae9c2a5ba9be6ce721d11b54fbbc70b",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/FINAL-IDENTITY.json",
+      "bytes": 7473,
+      "sha256": "51705c4d7ba40dc1777acd90e32df5b13647a83991029c687de2f9dfb61afa68",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/TRANSFER.json",
+      "bytes": 4046,
+      "sha256": "eeea4f3152fb13ef8043d143a68d592ad8e26baae96e04a6a3e0f0b67de3ba00",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/CORPUS-BYTE-READBACK.json",
+      "bytes": 34809,
+      "sha256": "377301b77e109cf394dbfdeb6e1719f1fec5af61cbb400c1311e19594da2829c",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/CAPACITY-READBACK.json",
+      "bytes": 14064,
+      "sha256": "d0931c0cc8af6eb5c4ae4131d69faed8a26a8c71edd7ea07b966e576b160def9",
+      "match": true
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-so-5a4c-20261002/TERMINAL.json",
+      "bytes": 1075,
+      "sha256": "88a00ff9f35fd96fef5f5f06a7a434b7119ef41c2d1dc2402e5284b07668bb03",
+      "match": true
+    }
+  ],
+  "allEightOutputBindingsMatch": true,
+  "terminal": {
+    "schema": 1,
+    "head": "f6476ae990254f606faf97f80afe41965bec2fb2",
+    "tree": "40fbe427bbd750e9423feb71b6b6238080300022",
+    "axis": "second-order CPU evidence representation/docs and scoped synthetic capacity geometry",
+    "actualEndUtc": "2026-10-02T02:48:00.166499+00:00",
+    "exitCode": 0,
+    "allEND": true,
+    "allOwnedChildrenJoined": true,
+    "cpu": 2,
+    "heavy": 0,
+    "queued": 0,
+    "registeredTiming": 0,
+    "pilot": 0,
+    "fullN": 0,
+    "wholeSuites": 0,
+    "productionImports": 0,
+    "runtimeProbes": 0,
+    "builds": 0,
+    "profiles": 0,
+    "sourceNormThresholdTestMutations": 0,
+    "freshF647RuntimeClaim": false,
+    "sourceTransfer": "independent Git commit and all639-byte final tree binding; own088 unchanged boundary proof transferred",
+    "capacityEvidence": "literal owner metadata run only; independently source-read/arithmetic checked, not rerun",
+    "scopeOfHeavyAndQueued": "owned workload only; parent tasks not asserted",
+    "verdict": "PASS scoped source architecture/compatibility/docs; actual series footprint/runtime upper UNPROVEN",
+    "afterDelivery": "STOP"
+  },
+  "verdict": "PASS scoped architecture/compatibility/docs/synthetic capacity arithmetic; actual-series footprint/runtime upper UNPROVEN",
+  "primaryAndCapacityRootReadbacks": [
+    "/workspace/scratch/motion-profile-f647-final-primary-root-readback-20261002.json",
+    "/workspace/scratch/motion-native-rle-capacity-root-readback-20261002.json"
+  ],
+  "runtimeExecutionByRoot": false
+}

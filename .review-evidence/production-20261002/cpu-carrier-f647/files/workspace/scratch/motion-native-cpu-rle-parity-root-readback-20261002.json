@@ -1,0 +1,33 @@
+{
+  "at": "2026-10-02T01:48:57.566477+00:00",
+  "source": "uncommitted codec slice pending immutable freeze",
+  "all169RowsRead": true,
+  "normalRoundTripRowsIndependentlyRecomputed": 135,
+  "encoderRefusalRowsWithPreservedOriginal": 16,
+  "authorSourceOwnerSha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+  "authorSourceTestSha256": "049b2739089d4e6bd9e2af014e75f672407d6b9e985c37b66a3e35744b9563b2",
+  "initialRootReaderSchemaAssumption": "First bounded reader incorrectly assumed every successful refusal row has passed; failed before writing output. Corrected by explicit row discriminant; no SUT mutation or rerun.",
+  "rawFiles": [
+    {
+      "path": "/tmp/motion-native-cpu-rle-parity-20261002/fixtures.mjs",
+      "bytes": 20556,
+      "sha256": "4bd7aeaa744cd221439407be93a88afc551c19a578833d4ba68fe6790fe7c76d"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-parity-20261002/probe.log",
+      "bytes": 101,
+      "sha256": "6e2f8cad2c738a2c50c007c6a7ff1326ba71eca0be355a3b1762c97661096f3c"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-parity-20261002/probe.mjs",
+      "bytes": 6393,
+      "sha256": "e3d6b7f8ef6553ca594e4445881da0d0990f27a59537e1f35ee7227628a4c516"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-parity-20261002/result.json",
+      "bytes": 971357,
+      "sha256": "852f2410f83f599920baffed2229f5ad03fd2ecfe4cab1a5c6ca3e63b927d368"
+    }
+  ],
+  "qualification": "Проверка сохранности контрольного корпуса; не независимая приёмка метода, не результат быстродействия."
+}

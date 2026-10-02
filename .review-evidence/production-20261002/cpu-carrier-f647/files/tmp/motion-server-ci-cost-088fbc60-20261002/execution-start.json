@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "--cpu-prof",
+    "--cpu-prof-dir=/tmp/motion-server-ci-cost-088fbc60-20261002",
+    "--cpu-prof-name=before.cpuprofile",
+    "/tmp/motion-server-ci-cost-088fbc60-20261002/probe.mjs"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "startUtc": "2026-10-02T01:15:20.987661+00:00",
+  "endUtc": null,
+  "exitCode": null,
+  "diagnosticTimeoutSeconds": 60,
+  "timedOut": false,
+  "actualRegisteredPerformanceSamples": 0,
+  "environment": {
+    "nodeExecutable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "nodeVersion": "v24.19.0",
+    "nodeOptions": null,
+    "nodePath": null,
+    "ci": "true"
+  },
+  "source": {
+    "bench/profile/server-profile-contract.mjs": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8",
+    "bench/profile/server-profile-registration.mjs": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87",
+    "bench/compare/methodology.mjs": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+    "scripts/bench-transform-support.mjs": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+    "test/server-profile-contract.test.ts": "694bfdf8b75b4ee102cc05f9857312c531a39984bdc9ccf0c592bc94684f0991"
+  }
+}

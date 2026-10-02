@@ -1,0 +1,18 @@
+{
+  "startUtc": "2026-10-02T02:09:23.462222+00:00",
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/tmp/motion-admission-template-parity-20261002/probe.mjs"
+  ],
+  "probeSha256": "9db3dc5c4d793d70df4937bfb68f8912801b1deee5c3fe5f658838681a0879a3",
+  "env": {
+    "NODE_PATH": null,
+    "NODE_OPTIONS": null,
+    "CI": "true"
+  },
+  "endUtc": "2026-10-02T02:09:24.478743+00:00",
+  "exitCode": 0
+}

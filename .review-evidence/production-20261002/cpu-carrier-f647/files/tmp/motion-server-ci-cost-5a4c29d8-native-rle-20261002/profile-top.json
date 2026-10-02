@@ -1,0 +1,152 @@
+[
+  {
+    "function": "serverProfileDigest",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+    "line": 137,
+    "selfMs": 3758.301
+  },
+  {
+    "function": "valueChunks",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 720,
+    "selfMs": 3640.502
+  },
+  {
+    "function": "update",
+    "url": "node:internal/crypto/hash",
+    "line": 145,
+    "selfMs": 3486.601
+  },
+  {
+    "function": "(garbage collector)",
+    "url": "",
+    "line": 0,
+    "selfMs": 1604.915
+  },
+  {
+    "function": "compactServerCpuEvidence",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 185,
+    "selfMs": 1061.949
+  },
+  {
+    "function": "",
+    "url": "file:///tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/fixtures.mjs",
+    "line": 390,
+    "selfMs": 1043.19
+  },
+  {
+    "function": "replayTransformLifecycleSample",
+    "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+    "line": 171,
+    "selfMs": 584.687
+  },
+  {
+    "function": "interpolate",
+    "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+    "line": 33,
+    "selfMs": 336.319
+  },
+  {
+    "function": "readServerSample",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 290,
+    "selfMs": 256.804
+  },
+  {
+    "function": "engineRaw",
+    "url": "file:///tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/fixtures.mjs",
+    "line": 64,
+    "selfMs": 223.414
+  },
+  {
+    "function": "objectComparisonStart",
+    "url": "node:internal/util/comparisons",
+    "line": 282,
+    "selfMs": 172.625
+  },
+  {
+    "function": "checkValues",
+    "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+    "line": 96,
+    "selfMs": 166.47
+  },
+  {
+    "function": "expandServerCpuEvidence",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 221,
+    "selfMs": 165.243
+  },
+  {
+    "function": "validateThreadCpuFields",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 368,
+    "selfMs": 163.325
+  },
+  {
+    "function": "assertBalancedRunBlocks",
+    "url": "file:///workspace/lab-motion/bench/compare/methodology.mjs",
+    "line": 170,
+    "selfMs": 161.333
+  },
+  {
+    "function": "",
+    "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+    "line": 184,
+    "selfMs": 151.659
+  },
+  {
+    "function": "expectedTransformValues",
+    "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+    "line": 38,
+    "selfMs": 147.798
+  },
+  {
+    "function": "validateServerJournal",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 834,
+    "selfMs": 137.077
+  },
+  {
+    "function": "Hash",
+    "url": "node:internal/crypto/hash",
+    "line": 97,
+    "selfMs": 123.339
+  },
+  {
+    "function": "serverBrowserClockBounds",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 36,
+    "selfMs": 119.985
+  },
+  {
+    "function": "",
+    "url": "file:///workspace/lab-motion/bench/compare/methodology.mjs",
+    "line": 161,
+    "selfMs": 107.318
+  },
+  {
+    "function": "includePositions",
+    "url": "file:///workspace/lab-motion/bench/compare/methodology.mjs",
+    "line": 686,
+    "selfMs": 103.665
+  },
+  {
+    "function": "nativeCpuEndpoint",
+    "url": "file:///tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/fixtures.mjs",
+    "line": 20,
+    "selfMs": 92.968
+  },
+  {
+    "function": "expandCoordinates",
+    "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+    "line": 70,
+    "selfMs": 83.767
+  },
+  {
+    "function": "(program)",
+    "url": "",
+    "line": 0,
+    "selfMs": 83.445
+  }
+]

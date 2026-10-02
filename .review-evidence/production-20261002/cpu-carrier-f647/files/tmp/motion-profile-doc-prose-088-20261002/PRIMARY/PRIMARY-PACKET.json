@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "sourceBase": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "scope": [
+    "docs/server-profile.md",
+    "bench/profile/native-clock/README.md",
+    "docs/recipes.md"
+  ],
+  "primaryFiles": [
+    "before/",
+    "after/",
+    "before-receipt.json",
+    "conservation-receipt.json",
+    "source-freeze.json",
+    "docs-only.patch"
+  ],
+  "externalReviewPrimary": {
+    "path": "/tmp/motion-profile-doc-prose-088-20261002/original-review-body.md",
+    "sha256": "25e6afa9e8dd718924203289b6557dbf4961fedec93cc7a7ea97d9a97c06c1a4"
+  },
+  "storageEstimatePrimary": {
+    "path": "/tmp/motion-native-max-carrier-estimate-20261002/metadata-estimate.json",
+    "sha256": "118899a726031d98d606b6e80b5394ec11ed57485d3ea7cd07e481b9dc9f8b84"
+  },
+  "executedScope": "Только чтение, правка Markdown и механическая проверка сохранности. Примеры, компиляция, тестовые наборы и измерения не выполнялись.",
+  "authorTriageExcluded": true
+}

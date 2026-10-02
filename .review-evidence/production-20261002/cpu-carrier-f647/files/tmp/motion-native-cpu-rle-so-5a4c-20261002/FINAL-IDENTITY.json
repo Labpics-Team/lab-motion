@@ -1,0 +1,132 @@
+{
+  "checkedUtc": "2026-10-02T02:20:46.533028+00:00",
+  "primarySha256": "e0d911564aae5890a75788c33347e01299993c2b7b1c643edfb69e94863e2961",
+  "expectedPrimarySha256": "e0d911564aae5890a75788c33347e01299993c2b7b1c643edfb69e94863e2961",
+  "references": [
+    {
+      "path": "/tmp/motion-profile-f647-final-20261002/commit.raw",
+      "sha256": "1fa6cd250f87f75d9ebec228c5c9460fc2c630bd04360004598e714961fa041d",
+      "expectedSha256": "1fa6cd250f87f75d9ebec228c5c9460fc2c630bd04360004598e714961fa041d",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-profile-f647-final-20261002/tree.raw",
+      "sha256": "9f40fafa814871a848794ce301976fa31760ab149a8d530c4289b114fab0b429",
+      "expectedSha256": "9f40fafa814871a848794ce301976fa31760ab149a8d530c4289b114fab0b429",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/PRIMARY-PACKET.json",
+      "sha256": "e749209ac077ed25373d9f1b9b963177ed603c48468f55f221b750d5744fa992",
+      "expectedSha256": "e749209ac077ed25373d9f1b9b963177ed603c48468f55f221b750d5744fa992",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source.tar",
+      "sha256": "de9d2501a5391527a252da1428ee031d15e187fdc5224f7bcb2df60a95656797",
+      "expectedSha256": "de9d2501a5391527a252da1428ee031d15e187fdc5224f7bcb2df60a95656797",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/patch.diff",
+      "sha256": "39d46a3c4c20633f4a29e1df26b4891d3fae94772d364088ecc810da688c4db6",
+      "expectedSha256": "39d46a3c4c20633f4a29e1df26b4891d3fae94772d364088ecc810da688c4db6",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/execution.json",
+      "sha256": "5dc2138e858bfe886717dd22e7204781d1bd738831e71006ba5a374fcbbbffee",
+      "expectedSha256": "5dc2138e858bfe886717dd22e7204781d1bd738831e71006ba5a374fcbbbffee",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/probe-result.json",
+      "sha256": "378acaa2769be5429b7dbb1120a2a4eab9ae5b0a6e5530ea2b438cf318ea619d",
+      "expectedSha256": "378acaa2769be5429b7dbb1120a2a4eab9ae5b0a6e5530ea2b438cf318ea619d",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/after-rle.cpuprofile",
+      "sha256": "bb2a3daf72cc5d59385d6694f2d606b1523e4d5169858eb6853137573da07701",
+      "expectedSha256": "bb2a3daf72cc5d59385d6694f2d606b1523e4d5169858eb6853137573da07701",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/acquired-steps.ndjson",
+      "sha256": "bfd44257e6a0ffee4d0f8efb55de95ed0863d19b5f8a520ba8050c59404fea62",
+      "expectedSha256": "bfd44257e6a0ffee4d0f8efb55de95ed0863d19b5f8a520ba8050c59404fea62",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/profile-top.json",
+      "sha256": "10ad4101d830339a64bc71caf9dcc3fd485bb2c06d9bffe864112509f39b6d76",
+      "expectedSha256": "10ad4101d830339a64bc71caf9dcc3fd485bb2c06d9bffe864112509f39b6d76",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/execution.json",
+      "sha256": "f5b2eb72c7de37758562c817197ae619128ea8a617d3e97a2cf8f5a53f343a1f",
+      "expectedSha256": "f5b2eb72c7de37758562c817197ae619128ea8a617d3e97a2cf8f5a53f343a1f",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/probe-result.json",
+      "sha256": "8f39d756b88660f1da5e4587f255ecbdb4657f618de0cbbd8dbe0296371aa3c4",
+      "expectedSha256": "8f39d756b88660f1da5e4587f255ecbdb4657f618de0cbbd8dbe0296371aa3c4",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/after-template.cpuprofile",
+      "sha256": "40ed9913df79cb80ede2431a411050023990c8361f267a3c936be58785b1c4e0",
+      "expectedSha256": "40ed9913df79cb80ede2431a411050023990c8361f267a3c936be58785b1c4e0",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/acquired-steps.ndjson",
+      "sha256": "bb0878efaefe8d3038195d038088cd451fd05090966aa6148509c53e7fe090b4",
+      "expectedSha256": "bb0878efaefe8d3038195d038088cd451fd05090966aa6148509c53e7fe090b4",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/profile-top.json",
+      "sha256": "b4345513e86e21df01aeb50e9cbd7bd27b539f4a8194cd0b800cc75202855ead",
+      "expectedSha256": "b4345513e86e21df01aeb50e9cbd7bd27b539f4a8194cd0b800cc75202855ead",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/PRIMARY-PACKET.json",
+      "sha256": "6ae51a8e8e922cfd05ba984290393bd08941a5526d0274297a2e9219ecff08d9",
+      "expectedSha256": "6ae51a8e8e922cfd05ba984290393bd08941a5526d0274297a2e9219ecff08d9",
+      "matches": true,
+      "role": "identity only unless recorded content readset; cost profiles/author interpretation not read"
+    }
+  ],
+  "declaredHead": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "computedCommitOid": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "commitTreeHeader": "tree 40fbe427bbd750e9423feb71b6b6238080300022",
+  "declaredTree": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "computedTreeFrom639ArchiveBlobs": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "computedRawTreeOid": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "sourceArchiveHead": "5a4c29d8abb102b1fea563d14c30c3cdf13efe2c",
+  "sourceArchiveTree": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "freshF647RuntimeClaim": false,
+  "allEND": true,
+  "heavy": 0,
+  "queued": 0,
+  "scope": "Independent Git identity computation; no runtime/probes/build"
+}

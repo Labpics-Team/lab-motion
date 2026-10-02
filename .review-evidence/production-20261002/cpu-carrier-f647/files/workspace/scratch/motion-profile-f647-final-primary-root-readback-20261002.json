@@ -1,0 +1,318 @@
+{
+  "at": "2026-10-02T02:20:48.293850+00:00",
+  "head": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "tree": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "primarySha256": "e0d911564aae5890a75788c33347e01299993c2b7b1c643edfb69e94863e2961",
+  "allDirectAndRecursivePrimaryBindingsMatch": true,
+  "uniqueBindings": 61,
+  "references": [
+    {
+      "path": "/tmp/motion-profile-f647-final-20261002/commit.raw",
+      "bytes": 344,
+      "sha256": "1fa6cd250f87f75d9ebec228c5c9460fc2c630bd04360004598e714961fa041d"
+    },
+    {
+      "path": "/tmp/motion-profile-f647-final-20261002/tree.raw",
+      "bytes": 1192,
+      "sha256": "9f40fafa814871a848794ce301976fa31760ab149a8d530c4289b114fab0b429"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/PRIMARY-PACKET.json",
+      "bytes": 5667,
+      "sha256": "e749209ac077ed25373d9f1b9b963177ed603c48468f55f221b750d5744fa992"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/legacy-native-controls-new.ts",
+      "bytes": 4889,
+      "sha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/legacy-native-controls-old.ts",
+      "bytes": 4889,
+      "sha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/callback-new.ts",
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/callback-old.ts",
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source.tar",
+      "bytes": 7424000,
+      "sha256": "de9d2501a5391527a252da1428ee031d15e187fdc5224f7bcb2df60a95656797"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/patch.diff",
+      "bytes": 50173,
+      "sha256": "39d46a3c4c20633f4a29e1df26b4891d3fae94772d364088ecc810da688c4db6"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/test/server-profile-contract.test.ts",
+      "bytes": 97980,
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/docs/server-profile.md",
+      "bytes": 5987,
+      "sha256": "fbef20828a855c6f289de8a1c7d6049738fefec6c4d73f0ce57a68640c4557f7"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/docs/recipes.md",
+      "bytes": 57377,
+      "sha256": "0808d2bde83cdd6d3af74c0e3bd4dd4996d469ff29c56c4937dae05ecccef8f3"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-runner.mjs",
+      "bytes": 51648,
+      "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-registration.mjs",
+      "bytes": 18998,
+      "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/server-profile-contract.mjs",
+      "bytes": 73913,
+      "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-final-20261002/source/bench/profile/native-clock/README.md",
+      "bytes": 1385,
+      "sha256": "209fe23d861255eb9c83ac37f00b68168aeb6c4f30bb485f57eb5bbed92ebcf1"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-parity-20261002/probe.mjs",
+      "bytes": 6393,
+      "sha256": "e3d6b7f8ef6553ca594e4445881da0d0990f27a59537e1f35ee7227628a4c516"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-parity-20261002/fixtures.mjs",
+      "bytes": 20556,
+      "sha256": "4bd7aeaa744cd221439407be93a88afc551c19a578833d4ba68fe6790fe7c76d"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-parity-20261002/result.json",
+      "bytes": 971357,
+      "sha256": "852f2410f83f599920baffed2229f5ad03fd2ecfe4cab1a5c6ca3e63b927d368"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-parity-20261002/probe.log",
+      "bytes": 101,
+      "sha256": "6e2f8cad2c738a2c50c007c6a7ff1326ba71eca0be355a3b1762c97661096f3c"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/PRIMARY-PACKET.json",
+      "bytes": 5370,
+      "sha256": "56bbdab8fb90c587fe0c013f9a60dbf4d2791447d0b74ef4cd4ae0a61a4e69d7"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/source.tar",
+      "bytes": 7424000,
+      "sha256": "a57c95755184da34b45b8d62e1cae26148e889e5f5543326b762b16238fe1355"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/legacy-native-controls-new.ts",
+      "bytes": 4889,
+      "sha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/legacy-native-controls-old.ts",
+      "bytes": 4889,
+      "sha256": "ea377b07e9288aa9f05da604e47d68630a383e3eec3ae34aba82649053f23efc"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/callback-new.ts",
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/callback-old.ts",
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/patch.diff",
+      "bytes": 47642,
+      "sha256": "b6959e63742267a3c69a794c02ca933d8f69f9adc0c75304dd456e398877ae85"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/source/test/server-profile-contract.test.ts",
+      "bytes": 95839,
+      "sha256": "049b2739089d4e6bd9e2af014e75f672407d6b9e985c37b66a3e35744b9563b2"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/source/docs/server-profile.md",
+      "bytes": 5987,
+      "sha256": "fbef20828a855c6f289de8a1c7d6049738fefec6c4d73f0ce57a68640c4557f7"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/source/docs/recipes.md",
+      "bytes": 57377,
+      "sha256": "0808d2bde83cdd6d3af74c0e3bd4dd4996d469ff29c56c4937dae05ecccef8f3"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/source/bench/profile/server-profile-runner.mjs",
+      "bytes": 51648,
+      "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/source/bench/profile/server-profile-registration.mjs",
+      "bytes": 18998,
+      "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/source/bench/profile/server-profile-contract.mjs",
+      "bytes": 73913,
+      "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e"
+    },
+    {
+      "path": "/tmp/motion-native-cpu-rle-successor-20261002/source/bench/profile/native-clock/README.md",
+      "bytes": 1385,
+      "sha256": "209fe23d861255eb9c83ac37f00b68168aeb6c4f30bb485f57eb5bbed92ebcf1"
+    },
+    {
+      "path": "/tmp/motion-ci-088fbc60-failure-20261002/connector-primary-receipt.json",
+      "bytes": 1002,
+      "sha256": "7ab68879d7fd8ef66b6c5de79445b996476aa65aa6aae7c79ec71ff6a1341e85"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-088fbc60-20261002/execution.json",
+      "bytes": 2603,
+      "sha256": "7417c35a98f3177c370821229f69a02224c87565a70e471478a553c7d87e663b"
+    },
+    {
+      "path": "/tmp/motion-profile-doc-prose-088-20261002/PRIMARY/PRIMARY-PACKET.json",
+      "bytes": 1045,
+      "sha256": "aae7a37c7dcd6ce0a10d47b6fc99efe22f1259cbb1a766735f56a28fa00d8ceb"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/execution.json",
+      "bytes": 2765,
+      "sha256": "5dc2138e858bfe886717dd22e7204781d1bd738831e71006ba5a374fcbbbffee"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/probe-result.json",
+      "bytes": 2885,
+      "sha256": "378acaa2769be5429b7dbb1120a2a4eab9ae5b0a6e5530ea2b438cf318ea619d"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/after-rle.cpuprofile",
+      "bytes": 338892,
+      "sha256": "bb2a3daf72cc5d59385d6694f2d606b1523e4d5169858eb6853137573da07701"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/acquired-steps.ndjson",
+      "bytes": 1399,
+      "sha256": "bfd44257e6a0ffee4d0f8efb55de95ed0863d19b5f8a520ba8050c59404fea62"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/profile-top.json",
+      "bytes": 3877,
+      "sha256": "10ad4101d830339a64bc71caf9dcc3fd485bb2c06d9bffe864112509f39b6d76"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/execution.json",
+      "bytes": 2788,
+      "sha256": "f5b2eb72c7de37758562c817197ae619128ea8a617d3e97a2cf8f5a53f343a1f"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/probe-result.json",
+      "bytes": 2883,
+      "sha256": "8f39d756b88660f1da5e4587f255ecbdb4657f618de0cbbd8dbe0296371aa3c4"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/after-template.cpuprofile",
+      "bytes": 334335,
+      "sha256": "40ed9913df79cb80ede2431a411050023990c8361f267a3c936be58785b1c4e0"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/acquired-steps.ndjson",
+      "bytes": 1391,
+      "sha256": "bb0878efaefe8d3038195d038088cd451fd05090966aa6148509c53e7fe090b4"
+    },
+    {
+      "path": "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/profile-top.json",
+      "bytes": 2370,
+      "sha256": "b4345513e86e21df01aeb50e9cbd7bd27b539f4a8194cd0b800cc75202855ead"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/PRIMARY-PACKET.json",
+      "bytes": 3817,
+      "sha256": "6ae51a8e8e922cfd05ba984290393bd08941a5526d0274297a2e9219ecff08d9"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/source.tar",
+      "bytes": 7434240,
+      "sha256": "ddbe2f2861d4fa881d26f753426c971f3618950e01cdb81012e403df7bfa11c7"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/patch.diff",
+      "bytes": 4019,
+      "sha256": "2eea00e89c3223085445af1810d5520f56145e80db495a620429c19066ad0506"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/source.test.ts",
+      "bytes": 98766,
+      "sha256": "4976454599362b938e4e9737574e0593387f4885d83897841809e1a33696d007"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/callback-old.ts",
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    {
+      "path": "/tmp/motion-admission-template-final-20261002/callback-new.ts",
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/probe.mjs",
+      "bytes": 3947,
+      "sha256": "9db3dc5c4d793d70df4937bfb68f8912801b1deee5c3fe5f658838681a0879a3"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/execution.json",
+      "bytes": 475,
+      "sha256": "28ca423b3ca8e5f0e8e7117582c80f9df59b7339dd4e54f540566ba33d574c91"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/result.json",
+      "bytes": 5864,
+      "sha256": "95a32b6b953b75b01ba239bc80ab8023b24e316e04759a97d114d41c2e05c0dc"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/probe.log",
+      "bytes": 100,
+      "sha256": "6b9c8c5202f9904e688bf3d3553dd03edf62ea65ae3e6259247a01842fd62405"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/old-test.ts",
+      "bytes": 97980,
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/new-test.ts",
+      "bytes": 98766,
+      "sha256": "4976454599362b938e4e9737574e0593387f4885d83897841809e1a33696d007"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/old-fixture.mjs",
+      "bytes": 20527,
+      "sha256": "bd8e9d360525f8db7fa493c11a1aca31a4c77cf95fba791743b69e786c702039"
+    },
+    {
+      "path": "/tmp/motion-admission-template-parity-20261002/new-fixture.mjs",
+      "bytes": 21304,
+      "sha256": "5e51e17fbcf69b00ef16ffd5d6e8517c25e0ad1879e515296f5780ee4c6a9d44"
+    }
+  ],
+  "gitCommitAndTreeRawOidIndependentlyRecomputed": true,
+  "sourceArchiveTransferredByExactTreeIdentity": true,
+  "qualification": "Первичные данные и идентичность source; historical rejected experiments не часть finalsource, CI/общаяприёмка не заявлены."
+}

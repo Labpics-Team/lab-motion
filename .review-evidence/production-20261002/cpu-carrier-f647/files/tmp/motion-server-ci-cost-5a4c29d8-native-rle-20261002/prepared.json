@@ -1,0 +1,18 @@
+{
+  "head": "5a4c29d8abb102b1fea563d14c30c3cdf13efe2c",
+  "source": {
+    "bench/profile/server-profile-contract.mjs": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+    "bench/profile/server-profile-registration.mjs": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+    "bench/compare/methodology.mjs": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+    "scripts/bench-transform-support.mjs": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+    "test/server-profile-contract.test.ts": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7"
+  },
+  "harness": {
+    "probe.mjs": "c919df2f4c0f2bdd40f0cf9d8e9e3d5fbc6ff44fbf0b98aab402be8c014e6b11",
+    "run.py": "482a530546c44f6be9681b4d10da248df098a03aff939524590bbc2a57a1f73e"
+  },
+  "callbackSha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db",
+  "priorDiagnostic": "/tmp/motion-server-ci-cost-088fbc60-20261002",
+  "corpus": "/tmp/motion-native-cpu-rle-parity-20261002/result.json",
+  "qualification": "N292/four/healthy/late-prefix callback unchanged; only carrier representation differs. Newly added Vitest registration excluded from helper extraction. No inferential SUT measurements."
+}

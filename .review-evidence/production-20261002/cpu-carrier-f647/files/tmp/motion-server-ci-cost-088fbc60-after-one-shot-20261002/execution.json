@@ -1,0 +1,79 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "--cpu-prof",
+    "--cpu-prof-dir=/tmp/motion-server-ci-cost-088fbc60-after-one-shot-20261002",
+    "--cpu-prof-name=after.cpuprofile",
+    "/tmp/motion-server-ci-cost-088fbc60-after-one-shot-20261002/probe.mjs"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "startUtc": "2026-10-02T01:23:35.186112+00:00",
+  "endUtc": "2026-10-02T01:23:55.669314+00:00",
+  "exitCode": 0,
+  "diagnosticTimeoutSeconds": 60,
+  "timedOut": false,
+  "actualRegisteredPerformanceSamples": 0,
+  "environment": {
+    "nodeExecutable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "nodeVersion": "v24.19.0",
+    "nodeOptions": null,
+    "nodePath": null,
+    "ci": "true"
+  },
+  "source": {
+    "bench/profile/server-profile-contract.mjs": "21efcae2340efbe0232b79cd125bcef3aa2d5e7ebfda612e3aaf5dd56959c2d8",
+    "bench/profile/server-profile-registration.mjs": "e937e72a5d7ea8175382400e5a50a2233c12eaf1671fbc6d6aea2aa042881a87",
+    "bench/compare/methodology.mjs": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+    "scripts/bench-transform-support.mjs": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+    "test/server-profile-contract.test.ts": "694bfdf8b75b4ee102cc05f9857312c531a39984bdc9ccf0c592bc94684f0991"
+  },
+  "files": {
+    "after.cpuprofile": {
+      "bytes": 335984,
+      "sha256": "db66dcc4e957bec7814a03cefa14f418f56d784b52fecda8f530a34cc76dddff"
+    },
+    "probe-result.json": {
+      "bytes": 2775,
+      "sha256": "1e578d14890ef820a89b550501cdcb95ce4c7f556f13758273d967a38a833698"
+    },
+    "acquired-steps.ndjson": {
+      "bytes": 1396,
+      "sha256": "64b073dd7dd36c7c59624358220370897d5a3a915bb219193dcc1725285406ee"
+    },
+    "fixtures.mjs": {
+      "bytes": 20167,
+      "sha256": "a5299059c88d99534bbca38e2f215b039421484815e800977b2f5e76c4939e35"
+    },
+    "exact-test-callback.ts": {
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    "probe.log": {
+      "bytes": 1907,
+      "sha256": "fcc7d53c883ff7d8e6c5de14c758fbb132362f92af4cff763ec526f8589bd9d6"
+    },
+    "execution-start.json": {
+      "bytes": 1363,
+      "sha256": "5364262571efaeae11ceaa3754c9ee183817a44538e6320f0517a646ea691078"
+    },
+    "intervention.json": {
+      "bytes": 876,
+      "sha256": "6caa76b9e13debb2f38a8750e160c4d37d9e713c5a2cc8a2acd3259b413e1c5b"
+    },
+    "provenance-after.mjs": {
+      "bytes": 25373,
+      "sha256": "7f060a05151fffcf43901f1b652ac5d92d511bebf2624a26cb7c1baa270c6fff"
+    },
+    "run.py": {
+      "bytes": 2299,
+      "sha256": "6d009654b8302049b0f164533bfe81b561e9baf5ae7409c08657e630f54e368c"
+    },
+    "probe.mjs": {
+      "bytes": 3594,
+      "sha256": "2675d76350fffedce9ef4f30f0dc225875c5a6021052b91e42ab3b2febd1ab84"
+    }
+  }
+}

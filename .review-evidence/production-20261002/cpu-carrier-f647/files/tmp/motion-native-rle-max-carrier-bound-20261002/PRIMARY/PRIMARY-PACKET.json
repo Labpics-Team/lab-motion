@@ -1,0 +1,38 @@
+{
+  "schema": 1,
+  "sourceHead": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "protocolDigest": "ce535cf6d6f0b0f140d44403627b63d936ef2461883a52680e7bbcad3ee49e5a",
+  "sourceRows": [
+    {
+      "path": "bench/profile/server-profile-registration.mjs",
+      "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+      "bytes": 18998
+    },
+    {
+      "path": "bench/profile/server-profile-contract.mjs",
+      "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+      "bytes": 73913
+    },
+    {
+      "path": "bench/profile/server-profile-runner.mjs",
+      "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+      "bytes": 51648
+    },
+    {
+      "path": "test/server-profile-contract.test.ts",
+      "sha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+      "bytes": 97980
+    }
+  ],
+  "resultSha256": "5bbbdecbc516f31c676275f3506048185d744ee8de85661131c3f68d1708ad01",
+  "helperSha256": "a18a04cb1bf121c2ff5d39879674858f112fedc9e7e9c9ced56e1f3bf0f66377",
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "/tmp/motion-native-rle-max-carrier-bound-20261002/capacity-metadata.mjs"
+  ],
+  "sourceWrites": false,
+  "denseCarrierGenerated": false,
+  "consumerExecuted": false,
+  "timingSamplesCollectedByThisControl": false,
+  "inputScope": "Собственные текущие исходники, предыдущие source/receipt max-format owner; без чужих REPORT или вердиктов."
+}

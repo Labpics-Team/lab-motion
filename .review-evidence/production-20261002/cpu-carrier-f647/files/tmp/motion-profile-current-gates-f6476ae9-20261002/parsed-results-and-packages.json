@@ -1,0 +1,51 @@
+{
+  "head": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "counts": {
+    "numTotalTestSuites": 1289,
+    "numPassedTestSuites": 1289,
+    "numFailedTestSuites": 0,
+    "numTotalTests": 5019,
+    "numPassedTests": 5019,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "numTodoTests": 0,
+    "success": true
+  },
+  "selected": [
+    {
+      "fullName": "серверный PROFILE: независимые sabotage controls завершённый public admission отвергает четыре независимых reviewer counterexamples",
+      "status": "passed",
+      "duration": 25640.258035000003,
+      "failureMessages": []
+    }
+  ],
+  "packages": {
+    "candidate-pnpm.tgz": {
+      "bytes": 561934,
+      "sha256": "f12daa72232c1e352ec2ba23f3a8a1314e1963943dac937b264190e57a899877",
+      "files": 312,
+      "changedMembersVs088": [
+        "package/docs/recipes.md"
+      ],
+      "addedMembers": [],
+      "missingMembers": [],
+      "comparedWith": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/candidate-pnpm.tgz",
+      "allOtherMembersByteConserved": true
+    },
+    "labpics-motion-0.3.0.tgz": {
+      "bytes": 559924,
+      "sha256": "7b1422d84b92bc2eeb5ecd943832cae26ae316e3eb482c1899b7cdd8addc46ca",
+      "files": 312,
+      "changedMembersVs088": [
+        "package/docs/recipes.md"
+      ],
+      "addedMembers": [],
+      "missingMembers": [],
+      "comparedWith": "/tmp/motion-native-clock-whole-gates-088fbc60-20261002/labpics-motion-0.3.0.tgz",
+      "allOtherMembersByteConserved": true
+    }
+  },
+  "receiptSha256": "b09359dbca0f13039e999c1af3a29ebccca14d41fe34ebe5de7b7e154afb82e1",
+  "wholeJsonSha256": "4d88be2e91f29c65c54a6855b8d62d6c21cea5e6c883c0e7edf48cd4d665d0ec",
+  "files": 344
+}

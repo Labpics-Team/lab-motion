@@ -1,0 +1,192 @@
+{
+  "schema": "motion-independent-measurement-manifest-v2",
+  "axis": "measurement-method-and-acquired-cpu-evidence-preservation",
+  "verdict": "PASS",
+  "sourceHead": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "sourceTree": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "sourceArchiveHead": "5a4c29d8abb102b1fea563d14c30c3cdf13efe2c",
+  "freshRuntimeAtFinalHead": false,
+  "inputsManifestSha256": "886e1fecfeeb9cc390e4997a72f721d858aa4452b0966eae2d1d6915810850be",
+  "actualEndUtc": "2026-10-02T02:30:43.667397+00:00",
+  "exitCode": 0,
+  "allEND": true,
+  "heavy": 0,
+  "queued": 0,
+  "files": [
+    {
+      "path": "REPORT.md",
+      "bytes": 21170,
+      "sha256": "66bfc3259980fc6ee7a82b5d5f6968b78025d68cadd3f6fce9e55f20b9b1ae40"
+    },
+    {
+      "path": "all-bindings.json",
+      "bytes": 466671,
+      "sha256": "886e1fecfeeb9cc390e4997a72f721d858aa4452b0966eae2d1d6915810850be"
+    },
+    {
+      "path": "bind-source.py",
+      "bytes": 7583,
+      "sha256": "71c3d09f8fcb169df9dceca2baecf7f0c51c53701111d35975eff761d324d12b"
+    },
+    {
+      "path": "captured-private-helper.txt",
+      "bytes": 557,
+      "sha256": "f01a58c37e598035a2ffb49d512842afb104878ed77dfdc51dd6cab7ca0d2b6d"
+    },
+    {
+      "path": "commit.raw",
+      "bytes": 344,
+      "sha256": "1fa6cd250f87f75d9ebec228c5c9460fc2c630bd04360004598e714961fa041d"
+    },
+    {
+      "path": "final-primary-integrity.json",
+      "bytes": 5728,
+      "sha256": "371712b9db8600e1fe443c3e8f87abba7e217c2b9987d5cc10b86b8cc6be2ac4"
+    },
+    {
+      "path": "finalize-evidence.py",
+      "bytes": 5404,
+      "sha256": "69afd91a2798a6e3b771f93a231959c973cba91e86b43c849a295a5b387c20fc"
+    },
+    {
+      "path": "function-transfer-bindings.json",
+      "bytes": 30413,
+      "sha256": "76b78332df62a2845c679b23b682f7b9aa8346d216211c61e14c0c56b116fadf"
+    },
+    {
+      "path": "initial-primary-integrity.json",
+      "bytes": 4289,
+      "sha256": "dca56af1f082ef79c3056f8b87e0e0dcb2023f5ce8bed87065e12259a780650b"
+    },
+    {
+      "path": "norm/AGENTS.md",
+      "bytes": 38398,
+      "sha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a"
+    },
+    {
+      "path": "norm/plans/SPEC.md",
+      "bytes": 31491,
+      "sha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651"
+    },
+    {
+      "path": "norm/plans/TEMPLATE.md",
+      "bytes": 10270,
+      "sha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e"
+    },
+    {
+      "path": "norm/plans/lab-motion-production/ACTIVATION.md",
+      "bytes": 194,
+      "sha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908"
+    },
+    {
+      "path": "norm/plans/lab-motion-production/ACTIVE.md",
+      "bytes": 235,
+      "sha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731"
+    },
+    {
+      "path": "norm/plans/lab-motion-production/CLAIM.md",
+      "bytes": 139,
+      "sha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8"
+    },
+    {
+      "path": "norm/plans/lab-motion-production/r11.md",
+      "bytes": 74166,
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b"
+    },
+    {
+      "path": "norm/plans/lab-motion-production/r12.md",
+      "bytes": 40024,
+      "sha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622"
+    },
+    {
+      "path": "norm-bindings.json",
+      "bytes": 4231,
+      "sha256": "df9fb8e0b40c755a96500b4823019b8d0cf37dd5114a009efd4ced88b2b63d7d"
+    },
+    {
+      "path": "previous-proof-integrity.json",
+      "bytes": 11699,
+      "sha256": "6fe7256eb8e2443f717e4f864ca0d57e9dc88d9b06908f73fbad787a09a223d6"
+    },
+    {
+      "path": "primary-fragment-bindings.json",
+      "bytes": 1385,
+      "sha256": "c5d1ff0010306a4ff10d2fffdc8cf57e42416946c0b7fc1a57f57bce74a2bb41"
+    },
+    {
+      "path": "primary-packet.json",
+      "bytes": 3823,
+      "sha256": "e0d911564aae5890a75788c33347e01299993c2b7b1c643edfb69e94863e2961"
+    },
+    {
+      "path": "readset.json",
+      "bytes": 56739,
+      "sha256": "e485491f9d5c4fc3b3e923dbc50482ea34e1729c2dc567abf41283abd2835e30"
+    },
+    {
+      "path": "readset.ndjson",
+      "bytes": 4856,
+      "sha256": "e24e9ee3d02cfd815a1de19249e31930f383951e367661d15b61be59a4ea2970"
+    },
+    {
+      "path": "seal.py",
+      "bytes": 3583,
+      "sha256": "ddfd6bd0ea3f60278acb12837a133af729c3c4838b5d9d8b6c195530c5dc058c"
+    },
+    {
+      "path": "source",
+      "type": "symlink",
+      "target": "/tmp/motion-native-cpu-rle-measurement-5a4c-20261002/source"
+    },
+    {
+      "path": "source-bindings.json",
+      "bytes": 301370,
+      "sha256": "f7cbe918fc1bc323e93749d9a30d3063b6a721b29a2760b58233adfac254d3f6"
+    },
+    {
+      "path": "source-only-finalization.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "source-only-finalization.stdout.log",
+      "bytes": 258,
+      "sha256": "e68c4f946d42a04a9a36a2dd8e6de4cd739897c909277de3ed0740fe2f7fa329"
+    },
+    {
+      "path": "start.json",
+      "bytes": 302,
+      "sha256": "8a7edbb992ca776494b0e32fa77b2959b781aa738566d2c089213ca845c244d3"
+    },
+    {
+      "path": "terminal.json",
+      "bytes": 3049,
+      "sha256": "a6e7e5ab4e2d9fe1c0aa328532384ad9579740c87cab888c776bdbd1b8ffec9d"
+    },
+    {
+      "path": "tree.raw",
+      "bytes": 1192,
+      "sha256": "9f40fafa814871a848794ce301976fa31760ab149a8d530c4289b114fab0b429"
+    },
+    {
+      "path": "witness.execution.json",
+      "bytes": 1808,
+      "sha256": "8c3ec76be1651c0a51467ea642b91568abfc5a0ea56b67d7101c39b90c6c893f"
+    },
+    {
+      "path": "witness.mjs",
+      "bytes": 10700,
+      "sha256": "1ea422513abf492ef881598f826c0c537dcf7db3039dfa0cf4fd7cf05d83c7c6"
+    },
+    {
+      "path": "witness.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "witness.stdout.json",
+      "bytes": 317360,
+      "sha256": "4010cd708dc5ebe9741f4106cea82b47a250c52984df8bd985f22d141ad43955"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+tree 40fbe427bbd750e9423feb71b6b6238080300022
+parent 6502fda9c9b80d1f05f4b01b236fee10253d7fac
+author Даниил Ерошов <daniilerosov12@gmail.com> 1790907325 +0000
+committer Даниил Ерошов <daniilerosov12@gmail.com> 1790907325 +0000
+
+test(profile): убрать неподтверждённую оптимизацию fixture

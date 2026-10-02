@@ -1,0 +1,11 @@
+{
+  "utc": "2026-10-02T02:01:21.753370+00:00",
+  "head": "5a4c29d8abb102b1fea563d14c30c3cdf13efe2c",
+  "tree": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "base": "088fbc605c95fd6a6a7620301a450d6388386997",
+  "phase": "SOURCE-LIGHT ONLY",
+  "cpu": "1",
+  "ownProbes": 0,
+  "heavy": 0,
+  "queued": 0
+}

@@ -1,0 +1,75 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "--cpu-prof",
+    "--cpu-prof-dir=/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002",
+    "--cpu-prof-name=after-rle.cpuprofile",
+    "/tmp/motion-server-ci-cost-5a4c29d8-native-rle-20261002/probe.mjs"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "startUtc": "2026-10-02T02:02:12.124969+00:00",
+  "endUtc": "2026-10-02T02:02:32.621251+00:00",
+  "exitCode": 0,
+  "diagnosticTimeoutSeconds": 60,
+  "timedOut": false,
+  "actualRegisteredPerformanceSamples": 0,
+  "environment": {
+    "nodeExecutable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "nodeVersion": "v24.19.0",
+    "nodeOptions": null,
+    "nodePath": null,
+    "ci": "true"
+  },
+  "source": {
+    "bench/profile/server-profile-contract.mjs": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+    "bench/profile/server-profile-registration.mjs": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+    "bench/compare/methodology.mjs": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+    "scripts/bench-transform-support.mjs": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+    "test/server-profile-contract.test.ts": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7"
+  },
+  "files": {
+    "after-rle.cpuprofile": {
+      "bytes": 338892,
+      "sha256": "bb2a3daf72cc5d59385d6694f2d606b1523e4d5169858eb6853137573da07701"
+    },
+    "probe-result.json": {
+      "bytes": 2885,
+      "sha256": "378acaa2769be5429b7dbb1120a2a4eab9ae5b0a6e5530ea2b438cf318ea619d"
+    },
+    "acquired-steps.ndjson": {
+      "bytes": 1399,
+      "sha256": "bfd44257e6a0ffee4d0f8efb55de95ed0863d19b5f8a520ba8050c59404fea62"
+    },
+    "fixtures.mjs": {
+      "bytes": 20528,
+      "sha256": "179d61b55e5a3084e324b4841cadd876643af347af30486cd1a53cd82438b6cc"
+    },
+    "exact-test-callback.ts": {
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    "probe.log": {
+      "bytes": 2017,
+      "sha256": "15533b83576bfac672e80ec943a8bec8061c5414a653061a036316315ab51964"
+    },
+    "execution-start.json": {
+      "bytes": 1359,
+      "sha256": "6d8085e6f58b7a8d3faeff3c6da8971ab8337e1b7e51968116542c7c66919320"
+    },
+    "prepared.json": {
+      "bytes": 1261,
+      "sha256": "78c731283fb6d2dada51588c6b6aad0ed75ba6a62466d962dbdea8b166aa73bc"
+    },
+    "run.py": {
+      "bytes": 2299,
+      "sha256": "482a530546c44f6be9681b4d10da248df098a03aff939524590bbc2a57a1f73e"
+    },
+    "probe.mjs": {
+      "bytes": 3875,
+      "sha256": "c919df2f4c0f2bdd40f0cf9d8e9e3d5fbc6ff44fbf0b98aab402be8c014e6b11"
+    }
+  }
+}

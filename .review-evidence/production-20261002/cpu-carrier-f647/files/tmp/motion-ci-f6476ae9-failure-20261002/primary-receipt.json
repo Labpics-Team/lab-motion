@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "capturedAt": "2026-10-02T03:03:08.488790+00:00",
+  "source": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "run": 36957979043,
+  "job": 110685127941,
+  "currentFailedOwner": "test/server-profile-contract.test.ts:1002",
+  "failure": "Test timed out in 30000ms",
+  "testFiles": 344,
+  "passedAssertions": 5018,
+  "failedAssertions": 1,
+  "finitenessStep": "not executed because previous step failed",
+  "rerun": false,
+  "primaryRefs": [
+    {
+      "path": "/tmp/motion-ci-f6476ae9-failure-20261002/causal-excerpt.txt",
+      "bytes": 3559,
+      "sha256": "10a71af13018a0025b9a46e03536407e0b134f87c1dd603ad7a0692692922489"
+    },
+    {
+      "path": "/tmp/motion-ci-f6476ae9-failure-20261002/job-110685127941.log",
+      "bytes": 244446,
+      "sha256": "812738cebb87d49e9e519bedf542e7f6f1a199d6cd612f06d636c9d13bb39860"
+    },
+    {
+      "path": "/tmp/motion-ci-f6476ae9-failure-20261002/log-acquisition.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-ci-f6476ae9-failure-20261002/run.json",
+      "bytes": 13151,
+      "sha256": "4e32d07e1f22ee7745295f332be2009c80f3c9a7bb79d987c6d43442fe3ab754"
+    }
+  ]
+}

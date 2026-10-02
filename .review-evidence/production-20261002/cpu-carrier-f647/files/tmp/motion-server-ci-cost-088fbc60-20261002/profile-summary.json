@@ -1,0 +1,324 @@
+{
+  "steps": [
+    {
+      "name": "fixture/admissionHistory",
+      "elapsedMs": 8417.783358,
+      "cpuUs": {
+        "user": 7589420,
+        "system": 823421
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerArtifact",
+      "elapsedMs": 1730.2741449999994,
+      "cpuUs": {
+        "user": 1665384,
+        "system": 64148
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerJournal",
+      "elapsedMs": 4157.552227,
+      "cpuUs": {
+        "user": 3828099,
+        "system": 327070
+      },
+      "status": "returned"
+    },
+    {
+      "name": "fixture/chain",
+      "elapsedMs": 1897.8707699999995,
+      "cpuUs": {
+        "user": 1786430,
+        "system": 110831
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerJournal",
+      "elapsedMs": 3.909998999999516,
+      "cpuUs": {
+        "user": 3919,
+        "system": 0
+      },
+      "status": "threw"
+    },
+    {
+      "name": "fixture/chain",
+      "elapsedMs": 1873.7491679999985,
+      "cpuUs": {
+        "user": 1786373,
+        "system": 86390
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerJournal",
+      "elapsedMs": 1.8716940000012983,
+      "cpuUs": {
+        "user": 1728,
+        "system": 148
+      },
+      "status": "threw"
+    },
+    {
+      "name": "fixture/chain",
+      "elapsedMs": 1.830301000001782,
+      "cpuUs": {
+        "user": 1832,
+        "system": 0
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerJournal",
+      "elapsedMs": 58.508795999998256,
+      "cpuUs": {
+        "user": 54489,
+        "system": 4016
+      },
+      "status": "threw"
+    },
+    {
+      "name": "validateServerArtifact",
+      "elapsedMs": 15.217881000000489,
+      "cpuUs": {
+        "user": 15222,
+        "system": 0
+      },
+      "status": "threw"
+    },
+    {
+      "name": "fixture/chain",
+      "elapsedMs": 0.6392039999991539,
+      "cpuUs": {
+        "user": 642,
+        "system": 0
+      },
+      "status": "returned"
+    },
+    {
+      "name": "validateServerJournal",
+      "elapsedMs": 1947.5874220000005,
+      "cpuUs": {
+        "user": 1773735,
+        "system": 172325
+      },
+      "status": "threw"
+    }
+  ],
+  "hotspots": [
+    {
+      "name": "serverProfileDigest",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "line": 137,
+      "ms": 1404.487,
+      "hits": 1289
+    },
+    {
+      "name": "valueChunks",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "line": 653,
+      "ms": 1344.806,
+      "hits": 1231
+    },
+    {
+      "name": "serverProfileDigest",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "line": 137,
+      "ms": 1271.548,
+      "hits": 1183
+    },
+    {
+      "name": "serverProfileDigest",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "line": 137,
+      "ms": 1271.47,
+      "hits": 1188
+    },
+    {
+      "name": "valueChunks",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "line": 653,
+      "ms": 1247.196,
+      "hits": 1135
+    },
+    {
+      "name": "(garbage collector)",
+      "url": "",
+      "line": 0,
+      "ms": 1189.829,
+      "hits": 563
+    },
+    {
+      "name": "",
+      "url": "file:///tmp/motion-server-ci-cost-088fbc60-20261002/fixtures.mjs",
+      "line": 389,
+      "ms": 1187.759,
+      "hits": 1083
+    },
+    {
+      "name": "valueChunks",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "line": 653,
+      "ms": 1143.301,
+      "hits": 1054
+    },
+    {
+      "name": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 145,
+      "ms": 577.812,
+      "hits": 534
+    },
+    {
+      "name": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 145,
+      "ms": 560.445,
+      "hits": 521
+    },
+    {
+      "name": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 145,
+      "ms": 506.878,
+      "hits": 470
+    },
+    {
+      "name": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 145,
+      "ms": 506.093,
+      "hits": 458
+    },
+    {
+      "name": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 145,
+      "ms": 490.412,
+      "hits": 454
+    },
+    {
+      "name": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 145,
+      "ms": 457.284,
+      "hits": 422
+    },
+    {
+      "name": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 145,
+      "ms": 441.122,
+      "hits": 409
+    },
+    {
+      "name": "replayTransformLifecycleSample",
+      "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+      "line": 171,
+      "ms": 237.419,
+      "hits": 169
+    },
+    {
+      "name": "replayTransformLifecycleSample",
+      "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+      "line": 171,
+      "ms": 217.721,
+      "hits": 173
+    },
+    {
+      "name": "engineRaw",
+      "url": "file:///tmp/motion-server-ci-cost-088fbc60-20261002/fixtures.mjs",
+      "line": 63,
+      "ms": 201.05,
+      "hits": 161
+    },
+    {
+      "name": "interpolate",
+      "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+      "line": 33,
+      "ms": 156.832,
+      "hits": 120
+    },
+    {
+      "name": "serverProfileDigest",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-registration.mjs",
+      "line": 137,
+      "ms": 153.947,
+      "hits": 144
+    },
+    {
+      "name": "valueChunks",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "line": 653,
+      "ms": 144.332,
+      "hits": 134
+    },
+    {
+      "name": "readServerSample",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "line": 224,
+      "ms": 141.706,
+      "hits": 104
+    },
+    {
+      "name": "valueChunks",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "line": 653,
+      "ms": 140.138,
+      "hits": 128
+    },
+    {
+      "name": "assertBalancedRunBlocks",
+      "url": "file:///workspace/lab-motion/bench/compare/methodology.mjs",
+      "line": 170,
+      "ms": 135.794,
+      "hits": 115
+    },
+    {
+      "name": "interpolate",
+      "url": "file:///workspace/lab-motion/scripts/bench-transform-support.mjs",
+      "line": 33,
+      "ms": 132.966,
+      "hits": 98
+    },
+    {
+      "name": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 145,
+      "ms": 125.581,
+      "hits": 117
+    },
+    {
+      "name": "valueChunks",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "line": 653,
+      "ms": 125.46,
+      "hits": 117
+    },
+    {
+      "name": "validateThreadCpuFields",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "line": 302,
+      "ms": 117.08,
+      "hits": 92
+    },
+    {
+      "name": "readServerSample",
+      "url": "file:///workspace/lab-motion/bench/profile/server-profile-contract.mjs",
+      "line": 224,
+      "ms": 109.392,
+      "hits": 79
+    },
+    {
+      "name": "update",
+      "url": "node:internal/crypto/hash",
+      "line": 145,
+      "ms": 107.831,
+      "hits": 101
+    }
+  ]
+}

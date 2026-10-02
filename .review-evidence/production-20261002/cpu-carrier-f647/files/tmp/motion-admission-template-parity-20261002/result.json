@@ -1,0 +1,184 @@
+{
+  "startUtc": "2026-10-02T02:09:23.498Z",
+  "endUtc": "2026-10-02T02:09:24.417Z",
+  "node": "v24.19.0",
+  "rows": [
+    {
+      "name": "warmup",
+      "runs": 2,
+      "rowCount": 10,
+      "expectedSha256": "2a6b1199a818026c571e6df5dc4ae9e971aeeceffc7931837f6b030e7ff83b65",
+      "actualSha256": "2a6b1199a818026c571e6df5dc4ae9e971aeeceffc7931837f6b030e7ff83b65",
+      "bytes": 454978,
+      "independentRows": true
+    },
+    {
+      "name": "warmup",
+      "runs": 4,
+      "rowCount": 20,
+      "expectedSha256": "75b09a3c0b077e6cf97d71e980cc273bfbb16a3efa9815c20eca5f9f1256dd45",
+      "actualSha256": "75b09a3c0b077e6cf97d71e980cc273bfbb16a3efa9815c20eca5f9f1256dd45",
+      "bytes": 909919,
+      "independentRows": true
+    },
+    {
+      "name": "warmup",
+      "runs": 6,
+      "rowCount": 30,
+      "expectedSha256": "9cc3782ab626c44dc3dd0ebc4d52dedac4bc76cdf954f31c7521673a5078a21f",
+      "actualSha256": "9cc3782ab626c44dc3dd0ebc4d52dedac4bc76cdf954f31c7521673a5078a21f",
+      "bytes": 1364860,
+      "independentRows": true
+    },
+    {
+      "name": "pilot",
+      "runs": 2,
+      "rowCount": 10,
+      "expectedSha256": "4a997e84f27b7a84e04eabe18cbf25167599352ca38f0e6edf6f7c980a7e3b47",
+      "actualSha256": "4a997e84f27b7a84e04eabe18cbf25167599352ca38f0e6edf6f7c980a7e3b47",
+      "bytes": 454977,
+      "independentRows": true
+    },
+    {
+      "name": "pilot",
+      "runs": 4,
+      "rowCount": 20,
+      "expectedSha256": "2b7ebb4619b86b3eef504f06ded8f57e8705da09a3ccf955f778dd2c26f331a7",
+      "actualSha256": "2b7ebb4619b86b3eef504f06ded8f57e8705da09a3ccf955f778dd2c26f331a7",
+      "bytes": 909918,
+      "independentRows": true
+    },
+    {
+      "name": "pilot",
+      "runs": 6,
+      "rowCount": 30,
+      "expectedSha256": "4deb227fc73ef396c3c9ea3b10c3d8d8c74f6d6f40b6cea2aee7d2ca0a8b609b",
+      "actualSha256": "4deb227fc73ef396c3c9ea3b10c3d8d8c74f6d6f40b6cea2aee7d2ca0a8b609b",
+      "bytes": 1364859,
+      "independentRows": true
+    },
+    {
+      "name": "aa",
+      "runs": 2,
+      "rowCount": 10,
+      "expectedSha256": "829ca8f8b2a3bba3d5ac68c6ccfbc550b7ebf01c1dc9e0110cd037ed3495d8f3",
+      "actualSha256": "829ca8f8b2a3bba3d5ac68c6ccfbc550b7ebf01c1dc9e0110cd037ed3495d8f3",
+      "bytes": 454974,
+      "independentRows": true
+    },
+    {
+      "name": "aa",
+      "runs": 4,
+      "rowCount": 20,
+      "expectedSha256": "091d61ae0f9a069090f2db3a0dfabbd8561727420fb225ce4e8558db3f56df77",
+      "actualSha256": "091d61ae0f9a069090f2db3a0dfabbd8561727420fb225ce4e8558db3f56df77",
+      "bytes": 909915,
+      "independentRows": true
+    },
+    {
+      "name": "aa",
+      "runs": 6,
+      "rowCount": 30,
+      "expectedSha256": "66d7be9d62115c4b309807f2188df3019e74cb4c6fff2b941e7cdd3bd16c6aa2",
+      "actualSha256": "66d7be9d62115c4b309807f2188df3019e74cb4c6fff2b941e7cdd3bd16c6aa2",
+      "bytes": 1364856,
+      "independentRows": true
+    },
+    {
+      "name": "positive",
+      "runs": 2,
+      "rowCount": 10,
+      "expectedSha256": "79d19b2df4a7703a0e0e1b9bb3973bc3c7d44508e9294ed7416d01e36fa9c82b",
+      "actualSha256": "79d19b2df4a7703a0e0e1b9bb3973bc3c7d44508e9294ed7416d01e36fa9c82b",
+      "bytes": 625238,
+      "independentRows": true
+    },
+    {
+      "name": "positive",
+      "runs": 4,
+      "rowCount": 20,
+      "expectedSha256": "3f62b5a56487b64175835b39aeef7010e6b52d50d01151883c7cf0a99bdc4a23",
+      "actualSha256": "3f62b5a56487b64175835b39aeef7010e6b52d50d01151883c7cf0a99bdc4a23",
+      "bytes": 1250437,
+      "independentRows": true
+    },
+    {
+      "name": "positive",
+      "runs": 6,
+      "rowCount": 30,
+      "expectedSha256": "fdd7a4fdc01b342ce842312e87ee2754700758159033611e3594d8dc81fc1d7e",
+      "actualSha256": "fdd7a4fdc01b342ce842312e87ee2754700758159033611e3594d8dc81fc1d7e",
+      "bytes": 1875636,
+      "independentRows": true
+    },
+    {
+      "name": "ab",
+      "runs": 2,
+      "rowCount": 10,
+      "expectedSha256": "b83353b1cd49712385f9b89744dcf96c194e99ad660ea1a79bf6e8af9714ca3a",
+      "actualSha256": "b83353b1cd49712385f9b89744dcf96c194e99ad660ea1a79bf6e8af9714ca3a",
+      "bytes": 454974,
+      "independentRows": true
+    },
+    {
+      "name": "ab",
+      "runs": 4,
+      "rowCount": 20,
+      "expectedSha256": "a35489dcbbef3ddf64534051ea59a8770f1be1d8bc1f662bacc8297ff6abdd5b",
+      "actualSha256": "a35489dcbbef3ddf64534051ea59a8770f1be1d8bc1f662bacc8297ff6abdd5b",
+      "bytes": 909915,
+      "independentRows": true
+    },
+    {
+      "name": "ab",
+      "runs": 6,
+      "rowCount": 30,
+      "expectedSha256": "5d0337d489682cdf99ea1bc8ff24f16cc2439d8369581d696c2007fe86283031",
+      "actualSha256": "5d0337d489682cdf99ea1bc8ff24f16cc2439d8369581d696c2007fe86283031",
+      "bytes": 1364856,
+      "independentRows": true
+    }
+  ],
+  "registeredRuns": 292,
+  "registeredIndexLaw": [
+    {
+      "run": 0,
+      "order": [
+        "left",
+        "right"
+      ],
+      "rowIndex": 0,
+      "block": 0,
+      "beforeUsageUsec": 10,
+      "afterUsageUsec": 20
+    },
+    {
+      "run": 146,
+      "order": [
+        "left",
+        "right"
+      ],
+      "rowIndex": 730,
+      "block": 73,
+      "beforeUsageUsec": 740,
+      "afterUsageUsec": 750
+    },
+    {
+      "run": 291,
+      "order": [
+        "left",
+        "right"
+      ],
+      "rowIndex": 1455,
+      "block": 145,
+      "beforeUsageUsec": 1460,
+      "afterUsageUsec": 1470
+    }
+  ],
+  "source": {
+    "oldSha256": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+    "newSha256": "4976454599362b938e4e9737574e0593387f4885d83897841809e1a33696d007"
+  },
+  "failures": 0,
+  "scope": "Small independent old/new complete ordered JSON and detached-row controls. N292 construction law is the identical run/order and block formula; all samples still encoded, cloned, hashed and validated inside the unchanged callback. No performance series."
+}

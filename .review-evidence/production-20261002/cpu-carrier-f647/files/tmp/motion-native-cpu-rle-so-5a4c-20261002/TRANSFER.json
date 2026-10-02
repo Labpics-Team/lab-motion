@@ -1,0 +1,73 @@
+{
+  "checkedUtc": "2026-10-02T02:11:19.541466+00:00",
+  "norms": [
+    {
+      "path": "/workspace/agents-config/AGENTS.md",
+      "priorSha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "currentSha256": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "byteIdentical": true,
+      "priorReadScope": "Рабочие нормы; фокус 103–145 и 199, область и полномочия"
+    },
+    {
+      "path": "/workspace/agents-config/plans/SPEC.md",
+      "priorSha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "currentSha256": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "byteIdentical": true,
+      "priorReadScope": "Вся спецификация 1–368; authoritative/lifecycle/draft/grants/evidence"
+    },
+    {
+      "path": "/workspace/agents-config/plans/TEMPLATE.md",
+      "priorSha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e",
+      "currentSha256": "7f4cb8dcc983f392a01f2abdddc7b74527412b0da725b114cee94677c651a97e",
+      "byteIdentical": true,
+      "priorReadScope": "Весь template; выбранный подход/alternatives/cost/evidence"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/ACTIVE.md",
+      "priorSha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731",
+      "currentSha256": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731",
+      "byteIdentical": true,
+      "priorReadScope": "Полный файл: r11 active"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/CLAIM.md",
+      "priorSha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8",
+      "currentSha256": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8",
+      "byteIdentical": true,
+      "priorReadScope": "Полный файл: r11 PROFILE-01"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/ACTIVATION.md",
+      "priorSha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908",
+      "currentSha256": "97e6b6ce4080b5c91d62e7ace5844a3c7aeeaa3bce04b21f832785bc807a4908",
+      "byteIdentical": true,
+      "priorReadScope": "Полный файл: r11 grant"
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/r11.md",
+      "priorSha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "currentSha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "byteIdentical": true,
+      "priorReadScope": "Scoped: original objective; M-04/M-05; ASM/INV; PROFILE 339–351; G-PERF 435–456; статусы/Unknowns. Не весь файл semantic-audited."
+    },
+    {
+      "path": "/workspace/agents-config/plans/lab-motion-production/r12.md",
+      "priorSha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622",
+      "currentSha256": "b2e6d1462b0bce43773beaf307e3b3963c426bf07134f49c844d4991e1753622",
+      "byteIdentical": true,
+      "priorReadScope": "Подготовленный successor; сохранение области, objective, ASM/INV, PROFILE, gates/Unknowns. Не treated as active."
+    },
+    {
+      "path": "/workspace/agents-config/skills/architecture/references/composition.md",
+      "priorSha256": "9297e36749db27c85b57aa65048faa72f656d23a68c49f3f4459c0269ce55d03",
+      "currentSha256": "9297e36749db27c85b57aa65048faa72f656d23a68c49f3f4459c0269ce55d03",
+      "byteIdentical": true,
+      "priorReadScope": "Нормативная процедура при изменении эксплуатационной границы; scope/consumer/budget/alternatives. Tool output частично truncates middle; не заявляется полный semantic audit."
+    }
+  ],
+  "carrierDigestChunksParserJournalCliSuffixByteIdentical": true,
+  "scope": "static bytes; no execution or cost inference",
+  "allEND": true,
+  "heavy": 0,
+  "queued": 0
+}

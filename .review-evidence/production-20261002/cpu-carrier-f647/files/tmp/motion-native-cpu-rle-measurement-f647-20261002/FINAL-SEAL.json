@@ -1,0 +1,20 @@
+{
+  "sourceHead": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "sourceTree": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "verdict": "PASS",
+  "reportSha256": "66bfc3259980fc6ee7a82b5d5f6968b78025d68cadd3f6fce9e55f20b9b1ae40",
+  "manifestSha256": "35ea57c49dca88fc010c1b692a36d633ccdacbff36ea0ced2427f1a2d7f13ae9",
+  "readsetSha256": "e485491f9d5c4fc3b3e923dbc50482ea34e1729c2dc567abf41283abd2835e30",
+  "allBindingsSha256": "886e1fecfeeb9cc390e4997a72f721d858aa4452b0966eae2d1d6915810850be",
+  "terminalSha256": "a6e7e5ab4e2d9fe1c0aa328532384ad9579740c87cab888c776bdbd1b8ffec9d",
+  "witnessActualEndUtc": "2026-10-02T02:10:53.844492+00:00",
+  "witnessExitCode": 0,
+  "sourceOnlyActualEndUtc": "2026-10-02T02:30:43.667397+00:00",
+  "sourceOnlyExitCode": 0,
+  "sealWrittenUtc": "2026-10-02T02:30:43.672249+00:00",
+  "allEND": true,
+  "heavy": 0,
+  "queued": 0,
+  "freshRuntimeAtFinalHead": false,
+  "stopOwnExecAfterSeal": true
+}

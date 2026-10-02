@@ -1,0 +1,59 @@
+{
+  "createdUtc": "2026-10-02T02:49:40.428412+00:00",
+  "epoch": 7,
+  "head": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "protocolDigest": "ce535cf6d6f0b0f140d44403627b63d936ef2461883a52680e7bbcad3ee49e5a",
+  "clockModelDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+  "output": "/tmp/motion-server-series-f6476ae9-ce535cf6-20261002-epoch7",
+  "outputAbsent": true,
+  "currentProtocolSutSamplesObserved": 0,
+  "historicalEpoch6Scope": "One incomplete baseline warmup with8raw executions/47counter plateaus. No pilot/AA/AB/candidate inferential observations. Old RUSAGE ±2us certificate is not transferred.",
+  "references": [
+    {
+      "path": "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/prepare.mjs",
+      "bytes": 7865,
+      "sha256": "3675b0df822a5ce1589b38a85abc55bfa413326daa4d43c298f1be754bc3bdc7"
+    },
+    {
+      "path": "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/preparation-start.json",
+      "bytes": 1138,
+      "sha256": "1d0b7bcf5d31d64b2f6592859128e728f27e02c3e84afbf93882085781b3162c"
+    },
+    {
+      "path": "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/preparation-execution.json",
+      "bytes": 1232,
+      "sha256": "87cf7fdd3ffc41259b006deb3df8efa46548f2a4509b09b83c6b1b767fd17750"
+    },
+    {
+      "path": "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/prepare.stdout",
+      "bytes": 646,
+      "sha256": "d0b9606123800f39666d43ba85c05198d3f6c33bdd9d5cd9189856ada889d22f"
+    },
+    {
+      "path": "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/prepare.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/predata-tuple.json",
+      "bytes": 46594,
+      "sha256": "b35d390d19f6269e5f6bd01afec8ce1aa04d311b233c5028e07ed179281cd7f2"
+    },
+    {
+      "path": "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/predata-tuple.sha256",
+      "bytes": 85,
+      "sha256": "5c1d3b06a3649d81d747ae31f7fc4e31e4a1af4aa069c209352ff7d65ef98bc9"
+    },
+    {
+      "path": "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/native-clock/thread-cpu-clock.node",
+      "bytes": 16192,
+      "sha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a"
+    },
+    {
+      "path": "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/initial-prepared-tuple.json",
+      "bytes": 41707,
+      "sha256": "f6565fa070302e35ae1b296507a75531ed7e023cf1583b7af3f63392775341fb"
+    }
+  ],
+  "metadataQualificationDelta": "Initial prepared tuple f6565… retained exactly; final tuple corrects inherited17-owner wording and explicitly includes registered upstreamclock sourcepins. No observations/runtime/source/policy changed."
+}

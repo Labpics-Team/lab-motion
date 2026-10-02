@@ -1,0 +1,818 @@
+{
+  "createdAt": "2026-10-02T02:48:05.014Z",
+  "scope": "Только независимый predata source/environment/logistics tuple. Ни browser motion, ни распределения API-cost здесь не собираются.",
+  "actualRegisteredPerformanceSamples": 0,
+  "expectedHead": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "baselineRevision": "0b6f537e148b7dadadfb9e3ce7c446d014975958",
+  "protocol": {
+    "schema": 1,
+    "rawEncoding": "compact-json-stream-v1/native-cpu-rle-v1; every sample and exact reconstructed CPU field preserved; external digest and journal bind exact file bytes",
+    "id": "PROFILE-01-server",
+    "baselineRevision": "0b6f537e148b7dadadfb9e3ce7c446d014975958",
+    "candidateSamplesObservedScope": "на момент регистрации ещё нет registered CPU/API cost samples текущего protocol epoch; historical exploratory stock wall и semantic/memory controls candidate уже известны",
+    "exploratoryPrehistory": {
+      "kind": "existing stock C wall bench; exploratory scope-trigger до нового CPU protocol, не registered CPU samples",
+      "baselineReportedMedian": "7.2k ns",
+      "candidateReportedMedian": "8.3k ns",
+      "baselineStdoutSha256": "28b5cdb758254fba1c49b658541a2ecfe0e840e0ed53d108cfe03f82e8ca205b",
+      "candidateStdoutSha256": "1ccde5b80240f0abdf9806d0543a6782fe4b5799af80083b933775e578973b73",
+      "helperSemanticReceiptSha256": "010140351e9b3e2f17b1be6bd632a9ee21be67cf41220adcb86f1aec51010686",
+      "selectionScope": "N выводится только из нового baseline-only pilot по прежнему закону; 1.05/MDE/power/counts не подгоняются к exploratory effect"
+    },
+    "browsers": [
+      "chromium",
+      "firefox",
+      "webkit"
+    ],
+    "viewport": {
+      "width": 800,
+      "height": 200
+    },
+    "deviceScaleFactor": 1,
+    "headless": true,
+    "cpuThrottle": 1,
+    "engineScenes": [
+      {
+        "id": "scalar-live-100",
+        "lifecycle": "live",
+        "count": 100,
+        "channels": 1
+      },
+      {
+        "id": "transform-fresh-1000",
+        "lifecycle": "fresh",
+        "count": 1000,
+        "channels": 7
+      },
+      {
+        "id": "motion-value-default-stock-c",
+        "workload": "stock-c",
+        "callsPerRepetition": 2000,
+        "warmupBatches": 2,
+        "expectedFrames": 47,
+        "initial": 0,
+        "target": 100,
+        "spring": {
+          "mass": 1,
+          "stiffness": 170,
+          "damping": 26
+        },
+        "metrics": [
+          "operationNs"
+        ]
+      }
+    ],
+    "browserScenes": [
+      {
+        "id": "s2",
+        "targetsPerCall": 100,
+        "staggerGapMs": 0
+      },
+      {
+        "id": "s3",
+        "targetsPerCall": 200,
+        "staggerGapMs": 5
+      }
+    ],
+    "comparators": [
+      "motion",
+      "gsap",
+      "anime",
+      "waapi-ctl",
+      "motion-mini",
+      "anime-waapi"
+    ],
+    "durationMs": 128,
+    "toPx": 300,
+    "repetitions": 8,
+    "browserBatchCalls": 32,
+    "browserSemanticCalls": 1,
+    "browserSemantics": {
+      "movementThresholdPx": 0.5,
+      "finalTolerancePx": 2,
+      "requireFreshStart": true,
+      "fromPx": 0,
+      "requireDocumentFrame": true,
+      "temporalOracle": "наблюдаемый свежий onset 0→300 до/после API; фаза связана с началом вызова; полный displacement interval разрешающей пары внутри прежнего CSS допуска; timed onset ограничен actual batch/read часами; CSS в actual стабильном document frame, связанном с rAF; perf chronology сохранена, без расширения при uncertainty"
+    },
+    "warmupRuns": 4,
+    "pilotRuns": 8,
+    "minRuns": 292,
+    "maxRuns": 1024,
+    "seed": 1397904978,
+    "statistics": "точные биномиальные интервалы порядковых статистик по среднему стоимости двух противоположных runs",
+    "familyAlpha": 0.05,
+    "familySize": 11,
+    "nonInferiorityUpper": 1.05,
+    "positiveLower": 1.5,
+    "positiveWorkMultiplier": 2,
+    "mdeRelative": 0.05,
+    "power": 0.8,
+    "zPower": 0.8416212335729143,
+    "zFamily": 3.052065201864885,
+    "metrics": {
+      "engine": [
+        "operationNs",
+        "meanFrameNs",
+        "cancelDrainNs"
+      ],
+      "browser": [
+        "startMs",
+        "cancelMs"
+      ]
+    },
+    "clock": {
+      "engine": "Linux CLOCK_THREAD_CPUTIME_ID: reported scheduled-runtime текущего потока, наносекунды",
+      "browser": "realm-local performance.now, миллисекунды"
+    },
+    "engineRawLineage": "все native CLOCK_THREAD_CPUTIME_ID seconds/nanoseconds/PID/TID и ordered scheduler/CSS traces сохраняются lossless; legacy16 endpoints, stockC2 endpoints + каждый фактический47-frame/endpoint100 исход; BigInt endpoints, интервалы и denominator пересчитываются существующим owner",
+    "samplingUnit": "средняя стоимость парного блока двух противоположных runs; повторы/кадры зависимы; p95 относится к распределению средних блоков",
+    "denominator": "стоимость полезного вызова с зарегистрированными targets: browser batch/32; positive64actualcalls; legacyengine unchanged; stockC batch/2000, positive4000actualcalls/2000 без деления на два",
+    "stockCpuScope": "штатный whole stockC macro main-entry MotionValue: factory+2×2000warmups внеCPU; clock/drain/construct/onChange/setTarget/destroy вCPU, preallocated per-operation last+getFrameCount recording вCPU одинаков обеимролям; RLE/oracle внеCPU. Не per-framep99/100channels.",
+    "stoppingRule": "один baseline-only pilot → замороженный N → один A/A и 2×work → A/B только при годной калибровке; добор и повтор к green запрещены",
+    "preservedGuards": "size-gate, численные/семантические допуски и protected p95 upper ≤1.05 не меняются",
+    "scope": "headless server: CPU потока engine и API browser при duration=128 ms; counts/stagger закреплены; endpoint/start/frame/retarget/cancel отдельно; canonical 1200 ms guards независимы",
+    "unproven": [
+      "mobile Android/iOS",
+      "physical 60/120 Hz",
+      "whole-page energy",
+      "GPU",
+      "M-04 physical-device envelope",
+      "M-05 product scene families"
+    ],
+    "forcedGc": "только отдельный retention child process после host turn, затем два GC у каждого heap snapshot; в timing отсутствует",
+    "rawControls": "baseline no-motion: два одинаковых PNG; reduced-motion: endpoint без rAF/WAAPI; candidate controls только после PASS calibration",
+    "resourcePolicy": "весь cgroup: до/после каждого парного блока; affinity неизменна, nr_throttled/throttled_usec delta=0; все samples сохраняются, нарушение даёт UNPROVEN без post-hoc исключений",
+    "browserOperationTimeoutMs": 30000,
+    "clockError": {
+      "id": "linux-thread-scheduled-runtime-node24.19-chromium149-isolated",
+      "kernelRelease": "6.18.44",
+      "nodeVersion": "v24.19.0",
+      "nodeExecutableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+      "browser": "chromium",
+      "browserVersion": "149.0.7827.55",
+      "browserExecutableSha256": "2d18db9d8608b052b6a552ee00ec1e830f93692e928b65ecc67d693bd33fe801",
+      "browserClampErrorPerTimestampMs": 0.005,
+      "browserTickTruncationPerTimestampMs": 0.001,
+      "monotonicCounterLimitMs": 4398046511104,
+      "engineClock": "CLOCK_THREAD_CPUTIME_ID",
+      "engineCounterOutwardPaddingNs": 2000,
+      "engineCounterScope": "сообщённый Linux scheduled-runtime текущего main-thread; 2us — прежнее консервативное outward padding reported counter, без гарантии физической точности или выводов из nominal clock_getres; getter overhead не вычитается",
+      "nativeSourceFiles": {
+        "bench/profile/server-thread-cpu-clock.c": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+        "bench/profile/native-clock/include/js_native_api.h": "8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788",
+        "bench/profile/native-clock/include/js_native_api_types.h": "4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0",
+        "bench/profile/native-clock/include/node_api.h": "2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a",
+        "bench/profile/native-clock/include/node_api_types.h": "a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00"
+      },
+      "sources": {
+        "timeClamper": {
+          "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/timing/time_clamper.cc",
+          "sha256": "2491cb64f50a54ccd10f778c058f0960ad4d9fa0861e39212bc27b8343bd103c"
+        },
+        "timeClamperHeader": {
+          "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/timing/time_clamper.h",
+          "sha256": "f8065edb3ba8da66d58eb7042523fba44b6d515c04d482614670a5414a684944"
+        },
+        "performance": {
+          "url": "https://raw.githubusercontent.com/chromium/chromium/149.0.7827.55/third_party/blink/renderer/core/timing/performance.cc",
+          "sha256": "62de6788c9361958757f47a173369cc668f3691ec58f27e2d2edfab780efe200"
+        },
+        "windowPerformance": {
+          "url": "https://raw.githubusercontent.com/chromium/chromium/149.0.7827.55/third_party/blink/renderer/core/timing/window_performance.cc",
+          "sha256": "5916501d9960c6355f1b2b0cee7cbc10091bf63ac64b0bf6397d96e495f71983"
+        },
+        "timeTicks": {
+          "url": "https://raw.githubusercontent.com/chromium/chromium/149.0.7827.55/base/time/time_now_posix.cc",
+          "sha256": "6a7b898ec4a2eedbfcc2173ca3cac17b188829b9531ba3febcfe942925ed5796"
+        },
+        "documentTimeline": {
+          "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/document_timeline.cc",
+          "sha256": "e8e405492b4f49f6be850e68c3431d1e2107ac032ea4ff11c433cc726642c702"
+        },
+        "animationClock": {
+          "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/animation_clock.cc",
+          "sha256": "f3290008c81dab4f17c7ae8439de25c1c95d0204be6dbb16dada0fd1a8e584eb"
+        },
+        "animationTimeline": {
+          "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/animation_timeline.cc",
+          "sha256": "6745f06a855d19691098929b29a5d28331d814c6ae21f1cdf12368eeb7ab5c90"
+        },
+        "documentAnimations": {
+          "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/animation/document_animations.cc",
+          "sha256": "6b20e0668cc740d1e2c9a9828b5316c81b7c43f2eb907af686729e51d10855d2"
+        },
+        "pageAnimator": {
+          "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/page/page_animator.cc",
+          "sha256": "ba6157ecdc92b5e3375e0239c3b79f39050f5ea3a84d27f65e60b03f1b676e03"
+        },
+        "cssComputedStyle": {
+          "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/css/css_computed_style_declaration.cc",
+          "sha256": "fc8f9580c1fd1bc2c28d753083925118c38134c37406dcd2f55d98a8ea2bbfb6"
+        },
+        "documentStyle": {
+          "url": "https://chromium.googlesource.com/chromium/src/+/149.0.7827.55/third_party/blink/renderer/core/dom/document.cc",
+          "sha256": "8a09dd50bdbbca54b11af849376c4f76df2fd62b14ae665c4c208553b4941dd6"
+        },
+        "nodeProcess": {
+          "url": "https://raw.githubusercontent.com/nodejs/node/v24.19.0/src/node_process_methods.cc",
+          "sha256": "6f2d27513a933dd3d076c0ffe2f95a1846ba1d1060f7ccfbc6eb2df6692a34eb"
+        },
+        "libuvCore": {
+          "url": "https://raw.githubusercontent.com/nodejs/node/v24.19.0/deps/uv/src/unix/core.c",
+          "sha256": "18bfd5f2045417f8ace5d76e222bf7441b31ead5fc2cbaf6225965e0afea8767"
+        },
+        "libuvLinux": {
+          "url": "https://raw.githubusercontent.com/nodejs/node/v24.19.0/deps/uv/src/unix/linux.c",
+          "sha256": "215185d94697e05cd75ba9466bb9ea93076769a7767218d4183eaf0723ccf2d2"
+        },
+        "linuxRusage": {
+          "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sys.c",
+          "sha256": "0b656f8809d781b7e684a1a4c4144d925684c69e9f6050c41c6374c5206d2c8d"
+        },
+        "linuxTimeval": {
+          "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/time/time.c",
+          "sha256": "e757e825d72489c929a273f22aba8fa31487c29738960aea2683ac0274a58e6a"
+        },
+        "linuxPosixCpuTimers": {
+          "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/time/posix-cpu-timers.c",
+          "sha256": "23255e35526f6582c00ad0c88438c378bfa45d49316019fa76cacd6be1983621"
+        },
+        "linuxSchedulerCore": {
+          "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/core.c",
+          "sha256": "5b510e027f1a6236165f26da4b1195530264dc0013ff8883bf49d03114ea26c2"
+        },
+        "linuxSchedulerCpuTime": {
+          "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/cputime.c",
+          "sha256": "eabd7ccf5bafd87ccd686829b1192e56dafb8c213f10f12aec619405246977a6"
+        },
+        "linuxSchedulerClock": {
+          "url": "https://raw.githubusercontent.com/gregkh/linux/v6.18.44/kernel/sched/clock.c",
+          "sha256": "043618ff56eb333bd7c3a243bc9597387f8e9bb7b240c7383712a4643d196118"
+        }
+      },
+      "documentFrame": "Chromium149 PageAnimator coarsens frame TimeTicks тем же isolated TimeClamper; DocumentTimeline origin совпадает с навигацией; AnimationClock стабилен в rendering/task; CSS recalc обновляет animation timing этим clock. До/после onset API observed publication clock одинаков и связывает origin свежего движения; checkpoint clock одинаков до/после CSS и связан с observed rAF. Frame timestamp может предшествовать execution wall, wall chronology отдельна. Сопоставление frame/perf включает три coarsened timestamps(frame/now/origin): upward(1.5×прежний2-endpoint envelope), без изменения API-cost bounds. Нет qualification или clocks противоречат — отказ. Это clock публикации CSS, а не атрибуция внутреннего таймера JS/native API.",
+      "scope": "Linux CLOCK_THREAD_CPUTIME_ID: разность exact seconds/nanoseconds reported scheduled-runtime с прежним2us outward padding; Chromium isolated TimeClamper может округлять в обе стороны на5us, TimeTicks truncates1us; обе browser clockreads и binary64 roundoff входят в pointwise bounds до CI, без shrink по repeats/N",
+      "assumption": "закреплённые official browser/Node binaries, private native getter и Linux6.18.44 исполняют указанную upstream clock model; Node hrtime и browser TimeTicks используют общий Linux CLOCK_MONOTONIC без namespace/clock override; reported scheduled-runtime не является физическим elapsed временем, nominal resolution/observed quantum не являются сертификатами error; другие binary/model/небезопасные counters дают отказ"
+    },
+    "browserCancellationWitness": {
+      "frames": 2,
+      "transformTolerancePx": 0.000001,
+      "scope": "attached targets после cancel: нет WAAPI, transform неизменен два rAF; sync cancelMs и elapsed cancel→drain раздельно; swallowed vendor exceptions нормализованного adapter не наблюдаются"
+    },
+    "stationarityAssumption": "независимые одинаково распределённые средние paired blocks при закреплённой среде; A/A и ресурсные controls проверяют разрешимость, перенос за пределы этой клетки не доказан"
+  },
+  "protocolDigest": "ce535cf6d6f0b0f140d44403627b63d936ef2461883a52680e7bbcad3ee49e5a",
+  "clockModelDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+  "sourceFreeze": {
+    "path": "/tmp/motion-profile-f647-final-20261002/PRIMARY-PACKET.json",
+    "bytes": 3823,
+    "sha256": "e0d911564aae5890a75788c33347e01299993c2b7b1c643edfb69e94863e2961"
+  },
+  "sourcePins": {
+    "animation_clock.cc": "f3290008c81dab4f17c7ae8439de25c1c95d0204be6dbb16dada0fd1a8e584eb",
+    "animation_timeline.cc": "6745f06a855d19691098929b29a5d28331d814c6ae21f1cdf12368eeb7ab5c90",
+    "css_computed_style_declaration.cc": "fc8f9580c1fd1bc2c28d753083925118c38134c37406dcd2f55d98a8ea2bbfb6",
+    "document.cc": "8a09dd50bdbbca54b11af849376c4f76df2fd62b14ae665c4c208553b4941dd6",
+    "document_animations.cc": "6b20e0668cc740d1e2c9a9828b5316c81b7c43f2eb907af686729e51d10855d2",
+    "document_timeline.cc": "e8e405492b4f49f6be850e68c3431d1e2107ac032ea4ff11c433cc726642c702",
+    "libuv-core.c": "18bfd5f2045417f8ace5d76e222bf7441b31ead5fc2cbaf6225965e0afea8767",
+    "libuv-linux.c": "215185d94697e05cd75ba9466bb9ea93076769a7767218d4183eaf0723ccf2d2",
+    "linux-sys.c": "0b656f8809d781b7e684a1a4c4144d925684c69e9f6050c41c6374c5206d2c8d",
+    "linux-time.c": "e757e825d72489c929a273f22aba8fa31487c29738960aea2683ac0274a58e6a",
+    "node_process_methods.cc": "6f2d27513a933dd3d076c0ffe2f95a1846ba1d1060f7ccfbc6eb2df6692a34eb",
+    "page_animator.cc": "ba6157ecdc92b5e3375e0239c3b79f39050f5ea3a84d27f65e60b03f1b676e03",
+    "performance.cc": "62de6788c9361958757f47a173369cc668f3691ec58f27e2d2edfab780efe200",
+    "time_clamper.cc": "2491cb64f50a54ccd10f778c058f0960ad4d9fa0861e39212bc27b8343bd103c",
+    "time_clamper.h": "f8065edb3ba8da66d58eb7042523fba44b6d515c04d482614670a5414a684944",
+    "time_now_posix.cc": "6a7b898ec4a2eedbfcc2173ca3cac17b188829b9531ba3febcfe942925ed5796",
+    "window_performance.cc": "5916501d9960c6355f1b2b0cee7cbc10091bf63ac64b0bf6397d96e495f71983"
+  },
+  "ownerHashes": {
+    "bench/profile/server-profile-registration.mjs": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+    "bench/profile/server-profile-contract.mjs": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+    "bench/profile/server-profile-runner.mjs": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636",
+    "bench/profile/server-profile-retention.mjs": "df27d82963f775cca2b8efd06587a42840cc4fd0de72a11873b1a43b402587e1",
+    "test/server-profile-contract.test.ts": "372a0938d7f7adaddb307a96904be9350f4269df9b22223af63051926e4067b7",
+    "docs/server-profile.md": "fbef20828a855c6f289de8a1c7d6049738fefec6c4d73f0ce57a68640c4557f7",
+    "bench/compare/bench.mjs": "4939941e3fa40f6122619a63483aacd3d3c7375a2dee1b5e320fde653ba27a94",
+    "bench/compare/methodology.mjs": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+    "scripts/bench-transform-support.mjs": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+    "test/bench-transform-pair.test.ts": "52cddc9fdbf34c220d140c26db644e913d698f4a6d6df98f951e9f14e45e9a4f",
+    "test/benchmark-methodology.test.ts": "1728e170a5f8c35a2b2ace615aedc9682ed77e8b6b280cab8f0c7c3c9fdaec98",
+    "test/benchmark-report-contract.test.ts": "91759d8223e76cc8db450c392fa2983229945de40a7f61e19892002fefe36647",
+    "scripts/bench-support.mjs": "2fb04fcfd34788870649982724f1166cb4c14a78ae1c44544028565db8208e05",
+    "scripts/bench.mjs": "74b76202acc517036d43631466ec71e5fd2e6bf954522cf572b9a96d8d5f9f26",
+    "bench/profile/probe-profile-01.mjs": "42952452cb39ff80fe7af89215f1e7839199c6e1d0c637471186e1a1b3317e5d",
+    "bench/profile/validate-profile-01.mjs": "1ec1b58869ebd36da0754b831bb1340aa5052fb0b8fa0a4d0fc715d0d54d1e04",
+    "test/profile-measurement.test.ts": "29f99acbbc56a3671442ca9382b8cd400085f06b1dce4c65bcc8d6b682adbbbc",
+    "bench/profile/server-thread-cpu-clock.mjs": "bb31090e4beaa6d4bc4dcc7789d0993672630e091fca65957174988c58ddba71",
+    "bench/profile/server-thread-cpu-clock.c": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0",
+    "bench/profile/native-clock/include/js_native_api.h": "8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788",
+    "bench/profile/native-clock/include/js_native_api_types.h": "4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0",
+    "bench/profile/native-clock/include/node_api.h": "2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a",
+    "bench/profile/native-clock/include/node_api_types.h": "a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00"
+  },
+  "source": {
+    "baseline": {
+      "revision": "0b6f537e148b7dadadfb9e3ce7c446d014975958",
+      "shortRevision": "0b6f537e148b",
+      "revisionLabel": "0b6f537e148b",
+      "dirty": false,
+      "trackedRevisionSha256": "a007976da18c0b0a57baeaf2820d2cfe9dfda768d75a7c38729df07fb831aed0",
+      "worktreeSha256": "a007976da18c0b0a57baeaf2820d2cfe9dfda768d75a7c38729df07fb831aed0"
+    },
+    "candidate": {
+      "revision": "f6476ae990254f606faf97f80afe41965bec2fb2",
+      "shortRevision": "f6476ae99025",
+      "revisionLabel": "f6476ae99025",
+      "dirty": false,
+      "trackedRevisionSha256": "3ec43e31f486145aab08708c45e38f4322fbdf40c2b364d8a2d2f6ca29552692",
+      "worktreeSha256": "3ec43e31f486145aab08708c45e38f4322fbdf40c2b364d8a2d2f6ca29552692"
+    }
+  },
+  "environments": {
+    "baseline": {
+      "node": "v24.19.0",
+      "nodeExecutableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+      "pnpm": "11.11.0",
+      "packages": {
+        "esbuild": {
+          "version": "0.28.1",
+          "sha256": "b8324734b879391cf940a4432c6ea70c04dfc68ee087d8a07e2a81695fb2f31c",
+          "files": 7
+        },
+        "playwright": {
+          "version": "1.61.1",
+          "sha256": "af51a04a6e6b8e7dcddb8ca870fea6357de5185e97e908b81558dba27e85de40",
+          "files": 63
+        },
+        "motion": {
+          "version": "12.42.2",
+          "sha256": "72c17e35c31a0ab237632bf042c3e60ccedea08115520fbff5b3682b8e8db1df",
+          "files": 30
+        },
+        "gsap": {
+          "version": "3.15.0",
+          "sha256": "2f7e7524219e647e73e092714262ef2473a59817bf22e04db3952f769710ba35",
+          "files": 179
+        },
+        "animejs": {
+          "version": "4.5.0",
+          "sha256": "186102a8378cd4531697ee409d284593980fd770e9f718db17fee440003af0ff",
+          "files": 215
+        }
+      },
+      "rootPackages": {
+        "tsup": {
+          "version": "8.5.1",
+          "sha256": "897380bc5824e41999cad580dee5670f791646847cbdb01a741bbccd94ae8847",
+          "files": 25
+        },
+        "typescript": {
+          "version": "6.0.3",
+          "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+          "files": 140
+        },
+        "esbuild": {
+          "version": "0.28.2",
+          "sha256": "d6866b8bacdb30d35739bef878ad8634042d56c6d2a0b3451711a3f04f03d3bd",
+          "files": 7
+        }
+      }
+    },
+    "candidate": {
+      "node": "v24.19.0",
+      "nodeExecutableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+      "pnpm": "11.11.0",
+      "packages": {
+        "esbuild": {
+          "version": "0.28.1",
+          "sha256": "b8324734b879391cf940a4432c6ea70c04dfc68ee087d8a07e2a81695fb2f31c",
+          "files": 7
+        },
+        "playwright": {
+          "version": "1.61.1",
+          "sha256": "af51a04a6e6b8e7dcddb8ca870fea6357de5185e97e908b81558dba27e85de40",
+          "files": 63
+        },
+        "motion": {
+          "version": "12.42.2",
+          "sha256": "72c17e35c31a0ab237632bf042c3e60ccedea08115520fbff5b3682b8e8db1df",
+          "files": 30
+        },
+        "gsap": {
+          "version": "3.15.0",
+          "sha256": "2f7e7524219e647e73e092714262ef2473a59817bf22e04db3952f769710ba35",
+          "files": 179
+        },
+        "animejs": {
+          "version": "4.5.0",
+          "sha256": "186102a8378cd4531697ee409d284593980fd770e9f718db17fee440003af0ff",
+          "files": 215
+        }
+      },
+      "rootPackages": {
+        "tsup": {
+          "version": "8.5.1",
+          "sha256": "c703a2b8ef42b2b39e78c58ea3361cab84d53cc8188bfacc412719693aa3328f",
+          "files": 25
+        },
+        "typescript": {
+          "version": "6.0.3",
+          "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+          "files": 140
+        },
+        "esbuild": {
+          "version": "0.28.2",
+          "sha256": "172d2f7d53175288c7490242477bd573957d65aeb166b86572256b062d8cff27",
+          "files": 8
+        }
+      }
+    }
+  },
+  "machine": {
+    "identity": {
+      "platform": "linux",
+      "release": "6.18.44",
+      "arch": "x64",
+      "host": "273c7540954b",
+      "cpu": "AMD EPYC 9V74 80-Core Processor",
+      "logicalCpus": 5,
+      "totalMemoryBytes": 18882699264,
+      "affinity": "0",
+      "cgroupCpuMax": "400000 100000",
+      "cgroupMemoryMax": "17179869184",
+      "governor": null,
+      "display": "headless; физический экран отсутствует",
+      "power": "среда сервера; не устройство",
+      "thermal": "не измеряется",
+      "node": "v24.19.0",
+      "nodeExecutableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+      "execArgv": []
+    },
+    "sha256": "4ce9aa23473a89a69e904406d8f0e024c57c0538b3cdf015b66b0905efc35cb8",
+    "observation": {
+      "at": "2026-10-02T02:48:04.223Z",
+      "loadavg": [
+        0,
+        0,
+        0.1
+      ],
+      "memory": {
+        "rss": 274726912,
+        "heapTotal": 114294784,
+        "heapUsed": 54446384,
+        "external": 130161635,
+        "arrayBuffers": 126203895
+      }
+    }
+  },
+  "clockRegistration": {
+    "browser": "chromium",
+    "browserVersion": "149.0.7827.55",
+    "browserExecutableSha256": "2d18db9d8608b052b6a552ee00ec1e830f93692e928b65ecc67d693bd33fe801",
+    "machine": {
+      "identity": {
+        "platform": "linux",
+        "release": "6.18.44",
+        "arch": "x64",
+        "host": "273c7540954b",
+        "cpu": "AMD EPYC 9V74 80-Core Processor",
+        "logicalCpus": 5,
+        "totalMemoryBytes": 18882699264,
+        "affinity": "0",
+        "cgroupCpuMax": "400000 100000",
+        "cgroupMemoryMax": "17179869184",
+        "governor": null,
+        "display": "headless; физический экран отсутствует",
+        "power": "среда сервера; не устройство",
+        "thermal": "не измеряется",
+        "node": "v24.19.0",
+        "nodeExecutableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+        "execArgv": []
+      },
+      "sha256": "4ce9aa23473a89a69e904406d8f0e024c57c0538b3cdf015b66b0905efc35cb8",
+      "observation": {
+        "at": "2026-10-02T02:48:04.223Z",
+        "loadavg": [
+          0,
+          0,
+          0.1
+        ],
+        "memory": {
+          "rss": 274726912,
+          "heapTotal": 114294784,
+          "heapUsed": 54446384,
+          "external": 130161635,
+          "arrayBuffers": 126203895
+        }
+      }
+    },
+    "clockModelDigest": "04d863513d53b248b1be3e0905240f3bd6f4d06124582ce3093c2cbfe5320852",
+    "engineClock": {
+      "schema": 1,
+      "clock": "CLOCK_THREAD_CPUTIME_ID",
+      "pid": 698191,
+      "tid": 698191,
+      "napiVersion": 8,
+      "node": {
+        "version": "v24.19.0",
+        "executableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
+      },
+      "nativeBinary": {
+        "path": "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/native-clock/thread-cpu-clock.node",
+        "bytes": 16192,
+        "sha256": "21bb3221b35523770ee025546c5e4fadb8bd7a64627a65147bd23ca48ac6c76a"
+      },
+      "nativeSources": {
+        "bench/profile/native-clock/include/js_native_api.h": "8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788",
+        "bench/profile/native-clock/include/js_native_api_types.h": "4f19cb90d240765cc0961d92a1ee20f65fdc50db7de1ab0a5cb6bc227224e1a0",
+        "bench/profile/native-clock/include/node_api.h": "2d4560831e525b47b060ec8a0864ab73993df9e20215ce9f0fe7b24cd31af32a",
+        "bench/profile/native-clock/include/node_api_types.h": "a25356630d3058f0a0c8937d9f297e9471e037fda58c2696d8a505c2bd99cb00",
+        "bench/profile/server-thread-cpu-clock.c": "4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0"
+      },
+      "nativeSourceDigest": "6bea5676da3bcc677eef962aaa265edbc285964e6cf4f4e1867591a6705abf62",
+      "compiler": {
+        "path": "/usr/bin/x86_64-linux-gnu-gcc-14",
+        "version": "x86_64-linux-gnu-gcc-14 (Debian 14.2.0-19) 14.2.0\nCopyright (C) 2024 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+        "binarySha256": "a23ecab8ff08f09ad8c80602c2c5df7f49e09c25905cb8975902e101bf72635f",
+        "flags": [
+          "-std=c11",
+          "-O2",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-shared",
+          "-fPIC",
+          "-fvisibility=hidden",
+          "-DNAPI_VERSION=8",
+          "-I",
+          "/workspace/lab-motion/bench/profile/native-clock/include",
+          "-o",
+          "/tmp/motion-server-predata-f6476ae9-ce535cf6-20261002-epoch7/native-clock/thread-cpu-clock.node",
+          "/workspace/lab-motion/bench/profile/server-thread-cpu-clock.c"
+        ]
+      },
+      "libc": {
+        "path": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+        "sha256": "fa430b8f298f817a266046af84a77533185ad6fc4406c7d3787b5a0a0c207826"
+      },
+      "nominalResolutionNs": "1",
+      "nominalResolutionIsNotErrorCertificate": true
+    },
+    "provenance": {
+      "baseline": {
+        "environment": {
+          "node": "v24.19.0",
+          "nodeExecutableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+          "pnpm": "11.11.0",
+          "packages": {
+            "esbuild": {
+              "version": "0.28.1",
+              "sha256": "b8324734b879391cf940a4432c6ea70c04dfc68ee087d8a07e2a81695fb2f31c",
+              "files": 7
+            },
+            "playwright": {
+              "version": "1.61.1",
+              "sha256": "af51a04a6e6b8e7dcddb8ca870fea6357de5185e97e908b81558dba27e85de40",
+              "files": 63
+            },
+            "motion": {
+              "version": "12.42.2",
+              "sha256": "72c17e35c31a0ab237632bf042c3e60ccedea08115520fbff5b3682b8e8db1df",
+              "files": 30
+            },
+            "gsap": {
+              "version": "3.15.0",
+              "sha256": "2f7e7524219e647e73e092714262ef2473a59817bf22e04db3952f769710ba35",
+              "files": 179
+            },
+            "animejs": {
+              "version": "4.5.0",
+              "sha256": "186102a8378cd4531697ee409d284593980fd770e9f718db17fee440003af0ff",
+              "files": 215
+            }
+          },
+          "rootPackages": {
+            "tsup": {
+              "version": "8.5.1",
+              "sha256": "897380bc5824e41999cad580dee5670f791646847cbdb01a741bbccd94ae8847",
+              "files": 25
+            },
+            "typescript": {
+              "version": "6.0.3",
+              "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+              "files": 140
+            },
+            "esbuild": {
+              "version": "0.28.2",
+              "sha256": "d6866b8bacdb30d35739bef878ad8634042d56c6d2a0b3451711a3f04f03d3bd",
+              "files": 7
+            }
+          }
+        }
+      },
+      "candidate": {
+        "environment": {
+          "node": "v24.19.0",
+          "nodeExecutableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+          "pnpm": "11.11.0",
+          "packages": {
+            "esbuild": {
+              "version": "0.28.1",
+              "sha256": "b8324734b879391cf940a4432c6ea70c04dfc68ee087d8a07e2a81695fb2f31c",
+              "files": 7
+            },
+            "playwright": {
+              "version": "1.61.1",
+              "sha256": "af51a04a6e6b8e7dcddb8ca870fea6357de5185e97e908b81558dba27e85de40",
+              "files": 63
+            },
+            "motion": {
+              "version": "12.42.2",
+              "sha256": "72c17e35c31a0ab237632bf042c3e60ccedea08115520fbff5b3682b8e8db1df",
+              "files": 30
+            },
+            "gsap": {
+              "version": "3.15.0",
+              "sha256": "2f7e7524219e647e73e092714262ef2473a59817bf22e04db3952f769710ba35",
+              "files": 179
+            },
+            "animejs": {
+              "version": "4.5.0",
+              "sha256": "186102a8378cd4531697ee409d284593980fd770e9f718db17fee440003af0ff",
+              "files": 215
+            }
+          },
+          "rootPackages": {
+            "tsup": {
+              "version": "8.5.1",
+              "sha256": "c703a2b8ef42b2b39e78c58ea3361cab84d53cc8188bfacc412719693aa3328f",
+              "files": 25
+            },
+            "typescript": {
+              "version": "6.0.3",
+              "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+              "files": 140
+            },
+            "esbuild": {
+              "version": "0.28.2",
+              "sha256": "172d2f7d53175288c7490242477bd573957d65aeb166b86572256b062d8cff27",
+              "files": 8
+            }
+          }
+        }
+      }
+    }
+  },
+  "browserVersionLiteral": "Google Chrome for Testing 149.0.7827.55",
+  "browserExecutable": "/home/agent/.cache/ms-playwright/chromium-1228/chrome-linux64/chrome",
+  "browserTree": {
+    "sha256": "7bc3b18ab62eb4bc6637bfd5fb3e71e74e9be148f2f93eb04e3041781554846d",
+    "files": 303
+  },
+  "playwrightPackage": "/workspace/lab-motion/bench/compare/node_modules/.pnpm/playwright@1.61.1/node_modules/playwright/package.json",
+  "playwrightBrowserMetadata": "/workspace/lab-motion/bench/compare/node_modules/.pnpm/playwright-core@1.61.1/node_modules/playwright-core/browsers.json",
+  "existingActualPackages": [
+    {
+      "path": "/tmp/motion-server-baseline-prepared-20261001-independent/baseline.tgz",
+      "bytes": 560519,
+      "sha256": "3787bfcc0b9b4302d826984cefc29a0a5ff7142d60a52d721c8d2f1397125470"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-f6476ae9-20261002/candidate-pnpm.tgz",
+      "bytes": 561934,
+      "sha256": "f12daa72232c1e352ec2ba23f3a8a1314e1963943dac937b264190e57a899877"
+    },
+    {
+      "path": "/tmp/motion-profile-current-gates-f6476ae9-20261002/labpics-motion-0.3.0.tgz",
+      "bytes": 559924,
+      "sha256": "7b1422d84b92bc2eeb5ecd943832cae26ae316e3eb482c1899b7cdd8addc46ca"
+    }
+  ],
+  "currentCombinedSource": {
+    "path": "/tmp/motion-profile-current-gates-f6476ae9-20261002/parsed-results-and-packages.json",
+    "bytes": 1743,
+    "sha256": "47aaa7d6c578ca2380831227b972c5598aa751e5d2fd2d16f64cf2f338218f94"
+  },
+  "currentChecksManifestAtPreparation": {
+    "path": "/tmp/motion-profile-current-gates-f6476ae9-20261002/receipt.json",
+    "bytes": 5357,
+    "sha256": "b09359dbca0f13039e999c1af3a29ebccca14d41fe34ebe5de7b7e154afb82e1"
+  },
+  "plannedInvocation": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "bench/profile/server-profile-runner.mjs",
+    "--baseline",
+    "/tmp/motion-server-baseline-0b6f537e",
+    "--candidate",
+    "/workspace/lab-motion",
+    "--browser",
+    "chromium",
+    "--out",
+    "/tmp/motion-server-series-f6476ae9-ce535cf6-20261002-epoch7"
+  ],
+  "parsedArgs": {
+    "baseline": "/tmp/motion-server-baseline-0b6f537e",
+    "candidate": "/workspace/lab-motion",
+    "browser": "chromium",
+    "out": "/tmp/motion-server-series-f6476ae9-ce535cf6-20261002-epoch7"
+  },
+  "outputMustBeAbsent": true,
+  "chain": [
+    "registration-before-any-sample",
+    "raw-controls-baseline",
+    "warmup:4",
+    "pilot:8",
+    "N-frozen-before-calibration-and-AB",
+    "aa:N",
+    "positive:N:2x actual work",
+    "calibration",
+    "candidate only if calibrated PASS",
+    "ab:N",
+    "comparators descriptive",
+    "retention separate forced-GC",
+    "finished"
+  ],
+  "sampleBounds": {
+    "minimumRuns": 292,
+    "maximumRuns": 1024,
+    "tail": {
+      "alphaPerTail": 0.0005681818181818182,
+      "quantiles": [
+        0.5,
+        0.95
+      ],
+      "minimumBlocks": 146,
+      "correction": "Bonferroni: 11 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%"
+    }
+  },
+  "stopping": "один baseline-only pilot → замороженный N → один A/A и 2×work → A/B только при годной калибровке; добор и повтор к green запрещены",
+  "resourceBudget": {
+    "space": [
+      {
+        "path": "/workspace",
+        "freeBytes": "105885696",
+        "blockSize": "4096"
+      },
+      {
+        "path": "/tmp",
+        "freeBytes": "3175862272",
+        "blockSize": "4096"
+      }
+    ],
+    "maximumSyntheticShapeCarrierBytes": 1954891521,
+    "extraReserveBytes": 1073741824,
+    "shapeScope": "Верхняя граница успешной существующей synthetic max-N формы после замены CPU/clock fields. Не граница реальной серии: browser/трассы/ошибки/пути регистрации могут иметь другую ширину.",
+    "capacityPrimary": {
+      "path": "/tmp/motion-native-rle-max-carrier-bound-20261002/PRIMARY/PRIMARY-PACKET.json",
+      "bytes": 1558,
+      "sha256": "e65e1e39c11990504cd9ea2bd2ae3a01971c1675eb89040ff70c917e41994b03"
+    },
+    "policy": "Fresh actual registration/path/trace widths require qualification before launch; synthetic shape bound is not unconditional actual disk certificate. No deletion or observed-value filtering."
+  },
+  "hold": "HOLD for exact current CI/full scoped method reports/current CodeRabbit qualification, actual resource-width triage and new root/parent quiet grant. No SUT or inferential samples collected in metadata preparation.",
+  "epoch": 7,
+  "predataIdentityQualification": "Сохранённые browser tree/source pins/package tar refs из epoch5; свежие source/17owners/root+bench tool trees/machine/clock registration/resources. Реальный CLI до наблюдений повторно проверяет полный browser и prepared toolchain.",
+  "clockModelQualification": "Linux main-thread reported scheduled-runtime CLOCK_THREAD_CPUTIME_ID; exact sec+nsec→BigInt. Unchanged conservative2us outward padding to this observable, not physical error certificate; source/binary/compiler/libc pinned before data, overhead included symmetrically.",
+  "planContext": {
+    "head": "222c18d02789c8f13f2a34b464f800930f0ab6c1",
+    "normativeHashes": {
+      "AGENTS.md": "0e1376312cedf91660b1c919ba4c1a9a6e067fe8719eb8daeb52113508b28f0a",
+      "plans/SPEC.md": "7488d5885ee2405d678e488e34a84ce48254978c3a6ad3de2e4d31dfe7b3f651",
+      "plans/lab-motion-production/ACTIVE.md": "42e36c2efa89912aa00395c938263c1bf35275325420df52ec736b0986606731",
+      "plans/lab-motion-production/CLAIM.md": "56ac2167795a81b9d1a60d2ebc1cb8830a2653cbc45026bbcb2d0b0f8e837fa8",
+      "plans/lab-motion-production/r11.md": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b"
+    }
+  },
+  "historicalActual": [
+    {
+      "epoch": 5,
+      "tuple": {
+        "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001/predata-tuple.json",
+        "bytes": 38509,
+        "sha256": "e7472dfbdb3bdca3aa5065543d431f9bb70f6410d0d76e63c5f22ff3050a3691"
+      },
+      "outcome": "Preparation UNPROVEN before warmup; no SUT cost samples."
+    },
+    {
+      "epoch": 6,
+      "tuple": {
+        "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/predata-tuple.json",
+        "bytes": 39450,
+        "sha256": "e9687480c8ce7d2028a55275e84a77f9ce195cdbae783170573bf63035c52f31"
+      },
+      "primary": {
+        "path": "/tmp/motion-server-predata-185f02c2-7016c19a-20261001-epoch6/first-warmup-cpu-refusal-primary/PRIMARY-PACKET.json",
+        "bytes": 3110,
+        "sha256": "9d8b010f9ddd38e6bac25004fa156daae0200f71c3a8f18f1412619b8dea8983"
+      },
+      "outcome": "One incomplete baseline warmup with8raw executions/47counter plateaus. No pilot/AA/AB/candidate inferential observations. Old RUSAGE ±2us certificate is not transferred."
+    }
+  ],
+  "actualRegisteredPerformanceSamplesScope": "Current native-clock/RLE protocol epoch only; historical warmup observations explicitly retained above."
+}

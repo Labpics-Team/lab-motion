@@ -1,0 +1,82 @@
+{
+  "schema": "motion-independent-measurement-terminal-v2",
+  "sourceHead": "f6476ae990254f606faf97f80afe41965bec2fb2",
+  "sourceTree": "40fbe427bbd750e9423feb71b6b6238080300022",
+  "boundedWitness": {
+    "startUtc": "2026-10-02T02:10:53.760821+00:00",
+    "actualEndUtc": "2026-10-02T02:10:53.844492+00:00",
+    "argv": [
+      "taskset",
+      "-c",
+      "1",
+      "node",
+      "/tmp/motion-native-cpu-rle-measurement-5a4c-20261002/witness.mjs"
+    ],
+    "timeoutSeconds": 3,
+    "timedOut": false,
+    "exitCode": 0,
+    "allEND": true,
+    "allChildrenJoined": true,
+    "heavy": 0,
+    "queued": 0,
+    "sourceHead": "5a4c29d8abb102b1fea563d14c30c3cdf13efe2c",
+    "inputs": {
+      "witness.mjs": {
+        "bytes": 10700,
+        "sha256": "1ea422513abf492ef881598f826c0c537dcf7db3039dfa0cf4fd7cf05d83c7c6"
+      },
+      "source/bench/profile/server-profile-contract.mjs": {
+        "bytes": 73913,
+        "sha256": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e"
+      },
+      "source/bench/profile/server-profile-runner.mjs": {
+        "bytes": 51648,
+        "sha256": "a5ed5d601ff4f31a72c739462e0f18622a39a0c1cd76742a1743090833a7c636"
+      },
+      "source/bench/profile/server-profile-registration.mjs": {
+        "bytes": 18998,
+        "sha256": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470"
+      },
+      "source/scripts/bench-transform-support.mjs": {
+        "bytes": 31565,
+        "sha256": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c"
+      },
+      "source/bench/compare/methodology.mjs": {
+        "bytes": 57045,
+        "sha256": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87"
+      },
+      "source/bench/compare/provenance.mjs": {
+        "bytes": 24949,
+        "sha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623"
+      }
+    },
+    "stdoutSha256": "4010cd708dc5ebe9741f4106cea82b47a250c52984df8bd985f22d141ad43955",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "syntheticOnly": true,
+    "registeredTimingSamples": 0
+  },
+  "sourceOnlyFinalization": {
+    "startUtc": "2026-10-02T02:30:43.556907+00:00",
+    "actualEndUtc": "2026-10-02T02:30:43.667397+00:00",
+    "exitCode": 0,
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+      "/tmp/motion-native-cpu-rle-measurement-f647-20261002/finalize-evidence.py"
+    ],
+    "cpu": 1,
+    "allEND": true,
+    "allChildrenJoined": true,
+    "stdoutSha256": "e68c4f946d42a04a9a36a2dd8e6de4cd739897c909277de3ed0740fe2f7fa329",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "action": "source-only hash/binding/readset finalization; no SUT/runtime probe/build/profile"
+  },
+  "actualEndUtc": "2026-10-02T02:30:43.667397+00:00",
+  "exitCode": 0,
+  "allEND": true,
+  "allChildrenJoined": true,
+  "heavy": 0,
+  "queued": 0,
+  "registeredTimingSamples": 0,
+  "freshRuntimeAtFinalHead": false,
+  "stopOwnExecAfterSeal": true
+}

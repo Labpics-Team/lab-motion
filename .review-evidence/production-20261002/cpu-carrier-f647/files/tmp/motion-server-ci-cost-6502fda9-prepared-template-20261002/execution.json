@@ -1,0 +1,75 @@
+{
+  "argv": [
+    "taskset",
+    "-c",
+    "0",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "--cpu-prof",
+    "--cpu-prof-dir=/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002",
+    "--cpu-prof-name=after-template.cpuprofile",
+    "/tmp/motion-server-ci-cost-6502fda9-prepared-template-20261002/probe.mjs"
+  ],
+  "cwd": "/workspace/lab-motion",
+  "startUtc": "2026-10-02T02:12:31.857973+00:00",
+  "endUtc": "2026-10-02T02:12:52.345031+00:00",
+  "exitCode": 0,
+  "diagnosticTimeoutSeconds": 60,
+  "timedOut": false,
+  "actualRegisteredPerformanceSamples": 0,
+  "environment": {
+    "nodeExecutable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "nodeVersion": "v24.19.0",
+    "nodeOptions": null,
+    "nodePath": null,
+    "ci": "true"
+  },
+  "source": {
+    "bench/profile/server-profile-contract.mjs": "ba6d365e3faf623cc8da5dae78ff2bfa3288529b9640052a0474d55d8e33d72e",
+    "bench/profile/server-profile-registration.mjs": "90bf39f1aa0118251353001ff015df8e2a67651bee924d147a87841dbae2d470",
+    "bench/compare/methodology.mjs": "a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87",
+    "scripts/bench-transform-support.mjs": "fcb531d342cb6e72ea06acb16bc5fc25f52440aa9c6aff8c7e09f2215476850c",
+    "test/server-profile-contract.test.ts": "4976454599362b938e4e9737574e0593387f4885d83897841809e1a33696d007"
+  },
+  "files": {
+    "after-template.cpuprofile": {
+      "bytes": 334335,
+      "sha256": "40ed9913df79cb80ede2431a411050023990c8361f267a3c936be58785b1c4e0"
+    },
+    "probe-result.json": {
+      "bytes": 2883,
+      "sha256": "8f39d756b88660f1da5e4587f255ecbdb4657f618de0cbbd8dbe0296371aa3c4"
+    },
+    "acquired-steps.ndjson": {
+      "bytes": 1391,
+      "sha256": "bb0878efaefe8d3038195d038088cd451fd05090966aa6148509c53e7fe090b4"
+    },
+    "fixtures.mjs": {
+      "bytes": 21279,
+      "sha256": "dc5b03791c8ddefbc999c0e1602825a80fc8ef0f722fe7b2b394b1548031f363"
+    },
+    "exact-test-callback.ts": {
+      "bytes": 1701,
+      "sha256": "7d1e66d88568f137f5831ed9cc52b38375587dc13673a6fd6faf29eaaa5977db"
+    },
+    "probe.log": {
+      "bytes": 2015,
+      "sha256": "4a5d5c3a97f225a1286bfb0f2ff05a77ebfe0a602fcf0b912ca7fef4328780de"
+    },
+    "execution-start.json": {
+      "bytes": 1378,
+      "sha256": "73916b6be5490488361de6d34994013d0346910a8454154f2fd0f603d84d6203"
+    },
+    "prepared.json": {
+      "bytes": 331,
+      "sha256": "de2dcccf6fdce9fd8cb6bffb1b13a2c8608dfa8d843013e4e80ff44b0fcfec97"
+    },
+    "run.py": {
+      "bytes": 2311,
+      "sha256": "9ba17286b93104dd093423b4158be80cfe94ac690380f1a802a7a0d31209db76"
+    },
+    "probe.mjs": {
+      "bytes": 3882,
+      "sha256": "0c013e346ce1660b85266346bca19d19ddc7149adc099e4358a87f9be1d85710"
+    }
+  }
+}
