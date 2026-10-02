@@ -114,14 +114,22 @@ test('рецепт карусели: локальная страница, пов
   await page.mouse.up();
   await expect(page.locator('[data-page-status]')).toHaveText('Страница 2 из 3');
   expect(await page.locator('[data-track]').evaluate((el) => el.getAnimations().length)).toBe(1);
-  await page.evaluate(() => { (window as unknown as ProbeWindow).followProbe.animations.at(-1)!.currentTime = 30; });
+  // Финальная поза отличается от исходной и не зависит от скорости указателя.
+  await page.evaluate(() => {
+    const animation = (window as unknown as ProbeWindow).followProbe.animations.at(-1)!;
+    animation.currentTime = Number(animation.effect!.getComputedTiming().duration);
+  });
   const before = await page.locator('[data-track]').evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).m41);
+  expect(before).toBeCloseTo(-240, 2);
   await page.mouse.move(x, y);
   await page.mouse.down();
   const after = await page.locator('[data-track]').evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).m41);
   expect(Math.abs(after - before)).toBeLessThan(0.01);
   await page.mouse.move(x - 40, y, { steps: 3 });
+  const releasedFrom = await page.locator('[data-track]').evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).m41);
+  expect(releasedFrom).toBeCloseTo(-280, 2);
   await page.mouse.up();
+  await expect(page.locator('[data-page-status]')).toHaveText('Страница 2 из 3');
   expect(await page.locator('[data-track]').evaluate((el) => el.getAnimations().length)).toBe(1);
   await page.locator('[data-next]').focus();
   await page.keyboard.press('Enter');
