@@ -56,14 +56,14 @@ test('RESOURCE-01: 10 000 native/live/serialized циклов фактическ
       requestFrame, now: () => now,
       matchMedia: query => window.matchMedia(query),
     });
-    const animation = (element: HTMLElement): Animation => {
+    const animation = (element: HTMLElement): number => {
       const effects = element.getAnimations();
       assert(effects.length === 1, 'одна поверхность должна иметь один native effect');
       const effect = effects[0]!;
       assert(effect.effect instanceof KeyframeEffect && effect.effect.target === element,
         'Animation должен принадлежать исследуемой поверхности');
       effect.pause(); effect.currentTime = 32;
-      return effect;
+      return effects.length;
     };
 
     assert(document.getAnimations().length === 0, 'стенд не начал с пустого native ownership');
@@ -86,9 +86,10 @@ test('RESOURCE-01: 10 000 native/live/serialized циклов фактическ
       const beforeNative = requests;
       controller.start(); animation(element);
       assert(controller.mode === 'compositor', 'нативный участок не принят');
-      controller.retarget(0.8); animation(element);
+      controller.retarget(0.8); const retargetEffectCount = animation(element);
       assert(requests === beforeNative && queue.length === 0, 'native start/retarget создал собственный frame');
-      maximumCycleEffects = Math.max(maximumCycleEffects, element.getAnimations().length);
+      // Число измерено при native commit; pause/currentTime семплируют тот же Animation.
+      maximumCycleEffects = Math.max(maximumCycleEffects, retargetEffectCount);
 
       const dynamic = controller.handoffToLive(0.6);
       assert(element.getAnimations().length === 0, 'native donor не отменён после live commit');
