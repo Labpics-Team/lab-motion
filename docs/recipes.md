@@ -451,7 +451,8 @@ export function mountCompositorSheet(root: HTMLElement, options: {
   const events = new AbortController();
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   const quiet = () => options.motion === 'none' || reduced.matches;
-  const originalTransform = panel.style.transform;
+  const originalTransform = panel.style.getPropertyValue('transform');
+  const originalTransformPriority = panel.style.getPropertyPriority('transform');
   const focused = () => {
     let tree = root.getRootNode() as Document | ShadowRoot;
     let active = tree.activeElement;
@@ -543,7 +544,9 @@ export function mountCompositorSheet(root: HTMLElement, options: {
     resume() { if (!events.signal.aborted) { paused = false; select(selected); } },
     destroy() {
       if (events.signal.aborted) return;
-      events.abort(); releaseCapture(); live = undefined; motion.destroy(); panel.style.transform = originalTransform;
+      events.abort(); releaseCapture(); live = undefined; motion.destroy();
+      if (originalTransform) panel.style.setProperty('transform', originalTransform, originalTransformPriority);
+      else panel.style.removeProperty('transform');
       let active: Element | null = focused();
       while (active && active !== root) active = active.parentElement ?? (active.getRootNode() as ShadowRoot).host ?? null;
       if (active && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
@@ -557,6 +560,8 @@ export function mountCompositorSheet(root: HTMLElement, options: {
 и удержание фокуса остаются у компонента. `pause()` сохраняет позу, `resume()`
 продолжает движение. `motion: 'none'` и системное уменьшенное движение применяют
 цель сразу. При размонтировании вызовите `destroy()` для очистки и возврата фокуса.
+Очистка возвращает исходное inline-значение `transform` вместе с приоритетом;
+если свойство отсутствовало, оно удаляется.
 
 ## Pager: страницы и RTL принадлежат компоненту
 
@@ -593,7 +598,8 @@ export function mountCompositorPager(root: HTMLElement, options: {
   const events = new AbortController();
   const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
   const quiet = () => options.motion === 'none' || reduced.matches;
-  const originalTransform = track.style.transform;
+  const originalTransform = track.style.getPropertyValue('transform');
+  const originalTransformPriority = track.style.getPropertyPriority('transform');
   const focused = () => {
     let tree = root.getRootNode() as Document | ShadowRoot;
     let active = tree.activeElement;
@@ -688,7 +694,9 @@ export function mountCompositorPager(root: HTMLElement, options: {
     resume() { if (!events.signal.aborted) { paused = false; select(selected); } },
     destroy() {
       if (events.signal.aborted) return;
-      events.abort(); releaseCapture(); live = undefined; motion.destroy(); track.style.transform = originalTransform;
+      events.abort(); releaseCapture(); live = undefined; motion.destroy();
+      if (originalTransform) track.style.setProperty('transform', originalTransform, originalTransformPriority);
+      else track.style.removeProperty('transform');
       let active: Element | null = focused();
       while (active && active !== root) active = active.parentElement ?? (active.getRootNode() as ShadowRoot).host ?? null;
       if (active && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
