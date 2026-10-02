@@ -166,8 +166,6 @@ export class MotionValue {
    * отсекает уже выданные host callbacks, даже после следующего запуска.
    */
   private _run: object | null = null;
-  /** Single-flight re-entrancy guard for the tick body. */
-  private _tickActive: boolean = false;
   /** Whether to use setTimeout fallback (handle=0 path). */
   private _useTimeoutFallback: boolean = false;
 
@@ -305,8 +303,6 @@ export class MotionValue {
     // ── Start frame loop (idempotent: only one loop runs at a time) ──────
     if (!this._run) {
       this._useTimeoutFallback = false;
-      // Новый цикл не наследует guard отозванного tick, ещё исполняющего getter/listener.
-      this._tickActive = false;
       this._run = {};
       this._schedule(this._run);
     }
@@ -383,7 +379,9 @@ export class MotionValue {
           if (sync) {
             called = true;
             timestamp = ts;
-          } else if (!this._useTimeoutFallback) {
+          } else if (!called && !this._useTimeoutFallback) {
+            // Заявка rAF одноразова: погашаем её до getter/listener-границ тика.
+            called = true;
             this._tick(ts, run);
           }
         });
@@ -410,83 +408,78 @@ export class MotionValue {
   private _tick(ts: number | undefined, run: object): void {
     // Отозванный цикл не публикует кадры и не ставит новые, даже если
     // setTarget уже начал другой цикл на том же экземпляре.
-    if (run !== this._run || this._tickActive) return;
-    this._tickActive = true;
-    try {
-      // Advance elapsed time.
-      if (ts !== undefined) {
-        if (this._startTs === undefined) this._startTs = ts;
-        this._elapsed = (ts - this._startTs) / 1000;
-      } else {
-        this._elapsed += FIXED_DT_S;
-      }
-
-      this._frameCount++;
-
-      const range = this._range;
-      const absRange = Math.abs(range);
-
-      // Общий солвер (internal/solver.ts) + стражи этого модуля инлайн
-      // (value→1, velocity→0 — политика отличается от clampFinite spring.ts).
-      const raw = solveSpring(this._spring!, this._elapsed, this._v0Normalized, solverSample);
-      // Getter мог завершить владельца или сменить цикл внутри solver.
-      if (run !== this._run) return;
-      const normPos = Number.isFinite(raw.value) ? raw.value : 1;
-      const normVel = Number.isFinite(raw.velocity) ? raw.velocity : 0;
-
-      // Denormalize: absolute value and velocity.
-      const rawValue = this._from + normPos * range;
-      const rawVelocity = normVel * range; // units/s
-
-      // Check convergence or hard cap.
-      // Единый epsilon-пол знаменателя (двойной Math.max свёрнут в const — ужим).
-      const denom = Math.max(absRange, EPSILON);
-      const converged =
-        // Frame-cap страхует только застывший host-clock. При растущем времени
-        // большой переносимый v0 вправе оседать дольше rest-бюджета.
-        (this._frameCount >= MAX_FRAMES && this._elapsed <= 0) ||
-        !Number.isFinite(range) || // unrepresentable span: |from|+|target| overflowed past MAX_VALUE
-        // Реально крошечный span из покоя снапается как раньше. При живом
-        // импульсе _range синтетически представим и эта ветка не съедает скорость.
-        (absRange < EPSILON && this._v0Normalized === 0) ||
-        (Math.abs(rawValue - (this._from + range)) / denom < CONVERGENCE_THRESHOLD &&
-          Math.abs(rawVelocity) / denom < CONVERGENCE_THRESHOLD);
-
-      // Emit value. bounded=true (default): CSS-safe clamp to [from, target].
-      // bounded=false: honest trajectory — underdamped overshoot is emitted.
-      const outputRange = this._target - this._from;
-      const lo = outputRange >= 0 ? this._from : this._target;
-      const hi = outputRange >= 0 ? this._target : this._from;
-      const clampedValue = this._clamp ? Math.max(lo, Math.min(hi, rawValue)) : rawValue;
-
-      // Единый снап-в-target: сходимость ИЛИ финальный CSS-страж (инвариант 2) —
-      // даже конечный range может переполнить денормализацию в Inf/NaN на
-      // экстремальных величинах; non-finite не эмитится НИКОГДА, единственный
-      // контрактно-безопасный исход — снап в (валидированно-конечный) target.
-      // Одно тело вместо двух идентичных (converged / non-finite) — семантика
-      // бит-в-бит прежняя, ужим под размерный гейт ядра (срез #93).
-      if (converged || !Number.isFinite(clampedValue) || !Number.isFinite(rawVelocity)) {
-        this._value = this._target;
-        this._velocity = 0;
-        this._run = null;
-        this._emit(this._target);
-        return;
-      }
-
-      this._value = clampedValue;
-      this._velocity = rawVelocity;
-      try {
-        this._emit(clampedValue);
-      } catch (primaryError) {
-        // Сначала сохраняем живой ран; transactional _schedule сам сделает его
-        // retryable при host-ошибке. Вторичная ошибка не маскирует listener RCA.
-        try { this._schedule(run); } catch { /* первична listener-ошибка */ }
-        throw primaryError;
-      }
-      this._schedule(run);
-    } finally {
-      this._tickActive = false;
+    if (run !== this._run) return;
+    // Advance elapsed time.
+    if (ts !== undefined) {
+      if (this._startTs === undefined) this._startTs = ts;
+      this._elapsed = (ts - this._startTs) / 1000;
+    } else {
+      this._elapsed += FIXED_DT_S;
     }
+
+    this._frameCount++;
+
+    const range = this._range;
+    const absRange = Math.abs(range);
+
+    // Общий солвер (internal/solver.ts) + стражи этого модуля инлайн
+    // (value→1, velocity→0 — политика отличается от clampFinite spring.ts).
+    const raw = solveSpring(this._spring!, this._elapsed, this._v0Normalized, solverSample);
+    // Getter мог завершить владельца или сменить цикл внутри solver.
+    if (run !== this._run) return;
+    const normPos = Number.isFinite(raw.value) ? raw.value : 1;
+    const normVel = Number.isFinite(raw.velocity) ? raw.velocity : 0;
+
+    // Denormalize: absolute value and velocity.
+    const rawValue = this._from + normPos * range;
+    const rawVelocity = normVel * range; // units/s
+
+    // Check convergence or hard cap.
+    // Единый epsilon-пол знаменателя (двойной Math.max свёрнут в const — ужим).
+    const denom = Math.max(absRange, EPSILON);
+    const converged =
+      // Frame-cap страхует только застывший host-clock. При растущем времени
+      // большой переносимый v0 вправе оседать дольше rest-бюджета.
+      (this._frameCount >= MAX_FRAMES && this._elapsed <= 0) ||
+      !Number.isFinite(range) || // unrepresentable span: |from|+|target| overflowed past MAX_VALUE
+      // Реально крошечный span из покоя снапается как раньше. При живом
+      // импульсе _range синтетически представим и эта ветка не съедает скорость.
+      (absRange < EPSILON && this._v0Normalized === 0) ||
+      (Math.abs(rawValue - (this._from + range)) / denom < CONVERGENCE_THRESHOLD &&
+        Math.abs(rawVelocity) / denom < CONVERGENCE_THRESHOLD);
+
+    // Emit value. bounded=true (default): CSS-safe clamp to [from, target].
+    // bounded=false: honest trajectory — underdamped overshoot is emitted.
+    const outputRange = this._target - this._from;
+    const lo = outputRange >= 0 ? this._from : this._target;
+    const hi = outputRange >= 0 ? this._target : this._from;
+    const clampedValue = this._clamp ? Math.max(lo, Math.min(hi, rawValue)) : rawValue;
+
+    // Единый снап-в-target: сходимость ИЛИ финальный CSS-страж (инвариант 2) —
+    // даже конечный range может переполнить денормализацию в Inf/NaN на
+    // экстремальных величинах; non-finite не эмитится НИКОГДА, единственный
+    // контрактно-безопасный исход — снап в (валидированно-конечный) target.
+    // Одно тело вместо двух идентичных (converged / non-finite) — семантика
+    // бит-в-бит прежняя, ужим под размерный гейт ядра (срез #93).
+    if (converged || !Number.isFinite(clampedValue) || !Number.isFinite(rawVelocity)) {
+      this._value = this._target;
+      this._velocity = 0;
+      this._run = null;
+      this._emit(this._target);
+      return;
+    }
+
+    this._value = clampedValue;
+    this._velocity = rawVelocity;
+    try {
+      this._emit(clampedValue);
+    } catch (primaryError) {
+      // Сначала сохраняем живой ран; transactional _schedule сам сделает его
+      // retryable при host-ошибке. Вторичная ошибка не маскирует listener RCA.
+      try { this._schedule(run); } catch { /* первична listener-ошибка */ }
+      throw primaryError;
+    }
+    this._schedule(run);
   }
 
   private _emit(value: number): void {
