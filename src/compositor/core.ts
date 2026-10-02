@@ -472,7 +472,7 @@ export class CompositorSpring {
   /** @internal Монотонный identity-token текущего owner/continuation. */
   protected _epoch = 0;
   /** @internal Host cleanup блокирует мутации, пока current-owner continuation не выдаст capability. */
-  protected _cleaning?: true;
+  declare protected _cleaning?: true;
 
   /** @internal
    * Единый мост «кадр живой пружины → внутреннее значение + apply». Один экземпляр
@@ -592,17 +592,32 @@ export class CompositorSpring {
     }
     // Живой rAF-путь (waapi-no-linear / raf / ssr).
     if (!this._ensureFallback(generation)) return;
-    if (this._delay > 0) {
-      // Fallback-каскад: callback атомарно потребляет timer-owner.
-      this._adoptTimer(generation, () => this._setTimer!(() => {
+    if (this._delay === 0) {
+      this._mv!.setTarget(this._to);
+      return;
+    }
+    // Резервируем слот до внешнего вызова; устаревший результат освобождаем отдельно.
+    this._host = null;
+    let host: () => void;
+    try {
+      host = this._setTimer!(() => {
         if (this._epoch === generation) {
           this._host = undefined;
           this._epoch++;
           this._mv!.setTarget(this._to);
         }
-      }, this._delay));
-    } else if (this._epoch === generation) {
-      this._mv!.setTarget(this._to);
+      }, this._delay);
+    } catch (error) {
+      if (this._host === null) {
+        this._host = undefined;
+        this._epoch++;
+      }
+      throw error;
+    }
+    if (this._epoch === generation) {
+      this._host = host;
+    } else {
+      if (this._host !== host) this._cancelHost(host);
     }
   }
 
@@ -802,7 +817,7 @@ export class CompositorSpring {
     this._epoch++;
     this._artifact = this._format = this._setTimer = this._now =
       this._target = this._requestFrame = this._apply = undefined;
-    this._releaseLive();
+    this._commitOwner();
     this._releaseHost();
   }
 
@@ -816,13 +831,6 @@ export class CompositorSpring {
     const value = new MotionValue({ initial: this._from, spring: this._spring });
     value.destroy();
     return value;
-  }
-
-  /** Снимает live-capability до callback-границы прежнего host-owner. */
-  private _releaseLive(): void {
-    const mv = this._mv;
-    this._mv = undefined;
-    mv?.destroy();
   }
 
   /** На cleanup-стеке только continuation текущего owner получает право мутации. */
@@ -854,26 +862,6 @@ export class CompositorSpring {
     }
     // Нетерминальные callers входят только из mutation-capability; destroy уже снял _now.
     this._cleaning = undefined;
-  }
-
-  /** CAS-граница setTimer: stale-return оплачивается, новый owner не стирается. */
-  private _adoptTimer(generation: number, create: () => () => void): void {
-    this._host = null;
-    let host: () => void;
-    try {
-      host = create();
-    } catch (error) {
-      if (this._host === null) {
-        this._host = undefined;
-        this._epoch++;
-      }
-      throw error;
-    }
-    if (this._epoch === generation) {
-      this._host = host;
-    } else {
-      if (this._host !== host) this._cancelHost(host);
-    }
   }
 
   /** @internal Фактический piecewise-снимок без style/layout-read. */
@@ -953,10 +941,9 @@ export class CompositorSpring {
     this._startDelay = delayMs;
     this._startTime = now;
     this._artifact = artifact;
+    // До cleanup прежнего host отзываются input и live capability,
+    // включая уже выданный кадр, доставленный из cleanup timer-owner.
     this._commitOwner();
-    // После native commit live donor больше не имеет capability записи,
-    // включая его уже выданный кадр, доставленный из cleanup timer-owner.
-    this._releaseLive();
     if (donor !== host) this._cancelHost(donor);
   }
 
@@ -999,10 +986,9 @@ export class CompositorSpring {
       this._releaseHost();
       if (this._epoch === generation) {
         // Новый loan не оставляет прежний live-owner за пределами lifetime.
-        this._releaseLive();
+        this._commitOwner();
         this._to = target;
         this._mv = mv;
-        this._commitOwner();
         // Commit заканчивается до scheduler-IO: после cancel donor откат уже
         // воскрешал бы чужой owner, поэтому ошибка запуска оставляет mv повторяемым.
         mv.setTarget(target);
@@ -1027,8 +1013,12 @@ export class CompositorSpring {
     return false;
   }
 
-  /** @internal Commit заканчивается до callback нового владельца исполнения. */
-  protected _commitOwner(): void {}
+  /** @internal Отзывает прежнее исполнение до публикации нового live-owner или host cleanup. */
+  protected _commitOwner(): void {
+    const mv = this._mv;
+    this._mv = undefined;
+    mv?.destroy();
+  }
 }
 
 /** Часы по умолчанию: performance.now при наличии, иначе Date.now (SSR-safe). */

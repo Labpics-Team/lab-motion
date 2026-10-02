@@ -6,13 +6,14 @@ import { setImmediate } from 'node:timers/promises';
 // резолвятся только через его package.json, а не через исходный checkout.
 const require = createRequire(import.meta.url);
 const specifiers = ['@labpics/motion', '@labpics/motion/frame', '@labpics/motion/compositor',
-  '@labpics/motion/bindings', '@labpics/motion/behaviors', '@labpics/motion/behaviors/reorder'];
+  '@labpics/motion/bindings', '@labpics/motion/behaviors', '@labpics/motion/behaviors/reorder',
+  '@labpics/motion/compositor/follow'];
 const modules = [];
 for (const format of ['esm', 'cjs']) {
   const loaded = [];
   for (const name of specifiers) loaded.push(format === 'esm' ? await import(name) : require(name));
-  const [root, frame, compositor, bindings, behaviors, reorder] = loaded;
-  modules.push({ format, root, frame, compositor, bindings, behaviors, reorder });
+  const [root, frame, compositor, bindings, behaviors, reorder, follow] = loaded;
+  modules.push({ format, root, frame, compositor, bindings, behaviors, reorder, follow });
 }
 const mode = process.argv[2];
 assert.ok(['witness', 'lifecycle', 'retention', 'bytes'].includes(mode), 'неизвестный режим RESOURCE proof');
@@ -20,7 +21,8 @@ const CYCLES = 10_000;
 const SPRING = Object.freeze({ mass: 1, stiffness: 170, damping: 26 });
 const KINDS = ['frame', 'motion-value', 'compositor-native', 'compositor-live',
   'compositor-delay', 'compositor-handoff', 'compositor-roundtrip', 'compositor-reduced-loans', 'binding', 'sheet', 'pager',
-  'dismiss', 'pull', 'pull-pending', 'pull-settled', 'reorder'];
+  'dismiss', 'pull', 'pull-pending', 'pull-settled', 'reorder',
+  'follow-native', 'follow-pickup', 'follow-live'];
 const CASES = modules.flatMap(mod => KINDS.map(kind => ({ mod, kind, name: `${mod.format}/${kind}` })));
 const terminalPromises = [];
 const settledPromises = [];
@@ -44,40 +46,66 @@ function deferred() {
 // Host-seams измеряют владение package. Реальные raster/GPU bytes этим double
 // не измеряются. Stale frame физически дрейнится один раз по RequestFrameFn:
 // у этого публичного шва нет cancel handle, но stale callback инертен.
-function makeHost() {
-  const frames = [], timers = new Map(), effects = new Set();
-  let next = 0, now = 0, createdEffects = 0, scheduledFrames = 0;
-  return {
-    get now() { return now; },
-    get pendingFrames() { return frames.length; },
-    get pendingTimers() { return timers.size; },
-    get activeEffects() { return effects.size; },
-    get createdEffects() { return createdEffects; },
-    get scheduledFrames() { return scheduledFrames; },
-    requestFrame(callback) { frames.push(callback); scheduledFrames++; return ++next; },
-    setTimer(callback) { const token = ++next; timers.set(token, callback); return () => { timers.delete(token); }; },
-    animate() {
-      const effect = { currentTime: 32, cancel() { effects.delete(effect); } };
-      effects.add(effect); createdEffects++; return effect;
-    },
-    step() { now += 16; const batch = frames.splice(0); for (const callback of batch) callback(now); },
-    drain() {
-      let count = 0;
-      while (frames.length) {
-        assert.ok(++count <= 1000, 'здоровый runner не достиг terminal snapshot');
-        this.step();
-      }
-    },
-    terminalDrain() {
-      assert.equal(timers.size, 0, 'terminal owner оставил timer');
-      assert.equal(effects.size, 0, 'terminal owner оставил native effect');
-      this.step();
-      assert.equal(frames.length, 0, 'terminal drain создал следующий frame');
-      assert.equal(timers.size, 0, 'terminal drain воскресил timer');
-      assert.equal(effects.size, 0, 'terminal drain воскресил native effect');
-    },
+// Все terminal host-объекты остаются roots. Общий prototype и отсутствие
+// пустых очередей отделяют стоимость observer от удержания package owners.
+class ResourceHost {
+  #frames;
+  #timers;
+  #effects;
+  #next = 0;
+  #now = 0;
+  #createdEffects = 0;
+  #cancelledEffects = 0;
+  #scheduledFrames = 0;
+
+  get now() { return this.#now; }
+  get pendingFrames() { return this.#frames?.length ?? 0; }
+  get pendingTimers() { return this.#timers?.size ?? 0; }
+  get activeEffects() { return this.#effects?.size ?? 0; }
+  get createdEffects() { return this.#createdEffects; }
+  get cancelledEffects() { return this.#cancelledEffects; }
+  get scheduledFrames() { return this.#scheduledFrames; }
+  requestFrame = callback => { (this.#frames ??= []).push(callback); this.#scheduledFrames++; return ++this.#next; };
+  setTimer = callback => {
+    const token = ++this.#next; (this.#timers ??= new Map()).set(token, callback);
+    return () => {
+      this.#timers?.delete(token);
+      if (this.#timers?.size === 0) this.#timers = undefined;
+    };
   };
+  animate = () => {
+    const effect = { currentTime: 32, cancel: () => {
+      this.#cancelledEffects++;
+      this.#effects?.delete(effect);
+      if (this.#effects?.size === 0) this.#effects = undefined;
+    } };
+    (this.#effects ??= new Set()).add(effect); this.#createdEffects++; return effect;
+  };
+  step() {
+    this.#now += 16;
+    const batch = this.#frames ?? [];
+    this.#frames = undefined;
+    for (const callback of batch) callback(this.#now);
+  }
+  drain() {
+    let count = 0;
+    while (this.pendingFrames) {
+      assert.ok(++count <= 1000, 'здоровый runner не достиг terminal snapshot');
+      this.step();
+    }
+  }
+  terminalDrain() {
+    assert.equal(this.pendingTimers, 0, 'terminal owner оставил timer');
+    assert.equal(this.activeEffects, 0, 'terminal owner оставил native effect');
+    assert.equal(this.cancelledEffects, this.createdEffects, 'native effects должны отменяться ровно один раз');
+    this.step();
+    assert.equal(this.pendingFrames, 0, 'terminal drain создал следующий frame');
+    assert.equal(this.pendingTimers, 0, 'terminal drain воскресил timer');
+    assert.equal(this.activeEffects, 0, 'terminal drain воскресил native effect');
+    assert.equal(this.cancelledEffects, this.createdEffects, 'stale callback повторно отменил native effect');
+  }
 }
+function makeHost() { return new ResourceHost(); }
 
 function runCase({ mod, kind, name }, value, terminal) {
   const host = makeHost();
@@ -154,6 +182,49 @@ function runCase({ mod, kind, name }, value, terminal) {
       }
       destroy = () => { owner.destroy(); owner.start(); owner.retarget(1); };
       owners = [owner, ...(live ? [live, off] : [])];
+      break;
+    }
+    case 'follow-native':
+    case 'follow-pickup':
+    case 'follow-live': {
+      const target = { marker: value, animate() {
+        const effect = host.animate(); effect.target = this; return effect;
+      } };
+      const owner = mod.follow.createCompositorFollow({
+        spring: { ...SPRING, owner: value }, property: 'opacity', from: 0, to: 1, target,
+        apply: notify, format: formatter(value), now: clock(value, host), requestFrame: frame,
+      });
+      owner.beginFollow(0); owner.follow(0.2, 0.02); owner.settle(1, 0.02);
+      assert.equal(host.activeEffects, 1, name + ': native settle не создал владельца');
+      assert.equal(host.pendingFrames, 0, name + ': native settle создал frame');
+      const loans = [];
+      if (kind === 'follow-live') {
+        const donor = owner.handoffToLive(0.6), off = donor.onChange(notify);
+        loans.push(donor, off);
+        host.step(); host.step();
+        assert.ok(host.pendingFrames > 0, name + ': live donor не работает');
+        owner.beginFollow(0.03);
+        const before = value.publications;
+        donor.setTarget(0.1); host.step();
+        assert.equal(value.publications, before, name + ': pickup не отозвал live donor');
+        assert.equal(host.pendingFrames, 0, name + ': старый donor создал следующий frame');
+        owner.follow(0.4, 0.04);
+        const live = owner.handoffToLive(0.7), liveOff = live.onChange(notify);
+        loans.push(live, liveOff);
+        host.step();
+        assert.ok(host.pendingFrames > 0, name + ': новый live owner не работает');
+      } else if (kind === 'follow-pickup') {
+        owner.beginFollow(0.03); owner.follow(0.4, 0.04);
+      }
+      assert.equal(host.activeEffects, kind === 'follow-native' ? 1 : 0,
+        name + ': pickup оставил native donor');
+      assert.ok(value.publications > 0, name + ': здоровый follow не доставил ввод');
+      destroy = () => {
+        owner.destroy(); owner.beginFollow(2); owner.follow(0.5, 2); owner.settle(1, 2);
+        owner.start(); owner.retarget(1);
+        for (const loan of loans) if (typeof loan !== 'function') loan.setTarget(0.2);
+      };
+      owners = [owner, ...loans];
       break;
     }
     case 'compositor-reduced-loans': {
@@ -421,6 +492,49 @@ function promiseRoot(mod, kind) {
   return { ref, owners: kind === 'promise-only' ? [action] : [owner, off, action, host] };
 }
 
+// Узкие witnesses прежнего follow proof: scheduler/listeners уже входят в
+// общий корпус, а spring-only и отменённый native donor требуют отдельных roots.
+function springRoot(mod, kind, terminal, metadata) {
+  const value = component(7), ref = new WeakRef(value);
+  const spring = metadata ? { ...SPRING, owner: value } : SPRING;
+  const options = { spring, property: 'opacity', from: 0, to: 1 };
+  const owner = kind === 'motion-value'
+    ? new mod.root.MotionValue({ initial: 0, spring, requestFrame: () => 1 })
+    : kind === 'follow' ? mod.follow.createCompositorFollow(options)
+      : new mod.compositor.CompositorSpring(options);
+  if (terminal) owner.destroy();
+  return { ref, owners: [owner] };
+}
+
+function lateCallbackRoot(mod) {
+  const value = component(8), ref = new WeakRef(value);
+  const owner = new mod.root.MotionValue({ initial: 0, spring: SPRING, requestFrame: () => 1 });
+  owner.destroy();
+  return { ref, owners: [owner, owner.onChange(listener(value))] };
+}
+
+function followEffectRoot(mod, pickup, terminal) {
+  const value = component(9), ref = new WeakRef(value), host = makeHost();
+  let effectRef;
+  const target = { marker: value, animate() {
+    const effect = host.animate(); effect.target = this; effectRef = new WeakRef(effect); return effect;
+  } };
+  const owner = mod.follow.createCompositorFollow({
+    spring: SPRING, property: 'opacity', from: 0, to: 1, target,
+    apply: listener(value), format: formatter(value), now: () => host.now, requestFrame: host.requestFrame,
+  });
+  owner.beginFollow(0); owner.follow(0.2, 0.02); owner.settle(1, 0.02);
+  assert.equal(host.createdEffects, 1, 'follow settle должен создать ровно один native effect');
+  assert.equal(host.activeEffects, 1, 'follow reference control не создал native effect');
+  assert.equal(host.cancelledEffects, 0, 'follow settle преждевременно отменил native effect');
+  if (pickup) owner.beginFollow(0.03);
+  assert.equal(host.cancelledEffects, pickup ? 1 : 0, 'follow pickup должен отменить donor ровно один раз');
+  if (terminal) owner.destroy();
+  assert.equal(host.activeEffects, pickup || terminal ? 0 : 1);
+  assert.equal(host.cancelledEffects, pickup || terminal ? 1 : 0, 'follow native effect отменён больше одного раза');
+  return { ref, effectRef, owners: [owner, host] };
+}
+
 async function promiseHealthy(mod) {
   const value = component(6), action = deferred(), host = makeHost();
   const owner = mod.behaviors.createPullToRefresh({
@@ -479,6 +593,25 @@ if (mode === 'lifecycle') {
   const terminalOwners = [], terminalRefs = CASES.map(() => []), droppedRefs = [], liveOwners = [], liveRefs = [];
   const unsubscribedOwners = [], unsubscribedRefs = [];
   const promiseOwners = [], promiseRefs = { live: [], terminal: [], 'promise-only': [], 'user-owned': [] };
+  const inheritedOwners = [], inheritedChecks = [];
+  for (const mod of modules) {
+    for (const kind of ['motion-value', 'compositor', 'follow']) {
+      for (const [terminal, metadata] of [[true, true], [true, false], [false, true]]) {
+        const result = springRoot(mod, kind, terminal, metadata);
+        inheritedOwners.push(result.owners);
+        inheritedChecks.push({ ref: result.ref, alive: !terminal, label: `${mod.format}/${kind}/spring/${terminal}/${metadata}` });
+      }
+    }
+    const late = lateCallbackRoot(mod);
+    inheritedOwners.push(late.owners);
+    inheritedChecks.push({ ref: late.ref, alive: false, label: `${mod.format}/late-subscription` });
+    for (const pickup of [false, true]) for (const terminal of [false, true]) {
+      const result = followEffectRoot(mod, pickup, terminal);
+      inheritedOwners.push(result.owners);
+      inheritedChecks.push({ ref: result.ref, alive: !terminal, label: `${mod.format}/follow/target/${pickup}/${terminal}` });
+      inheritedChecks.push({ ref: result.effectRef, alive: !pickup && !terminal, label: `${mod.format}/follow/effect/${pickup}/${terminal}` });
+    }
+  }
   for (const mod of modules) {
     await promiseHealthy(mod);
     for (const kind of Object.keys(promiseRefs)) {
@@ -506,23 +639,27 @@ if (mode === 'lifecycle') {
     if ((cycle + 1) % 500 === 0) { await flushTerminalPromises(); await collect(2); }
   }
   // Глобальная достижимость не позволяет оптимизатору выбросить контролируемые roots.
-  globalThis.__resourceControls = { terminalOwners, liveOwners, deliberateOwners, unsubscribedOwners, promiseOwners };
+  globalThis.__resourceControls = { terminalOwners, liveOwners, deliberateOwners, unsubscribedOwners, promiseOwners, inheritedOwners };
   await flushTerminalPromises();
   await collect(16);
   const owners = CASES.map((testCase, index) => ({ name: testCase.name, retained: countAlive(terminalRefs[index]) }));
   const retainedComponentReferences = owners.reduce((total, owner) => total + owner.retained, 0);
-  const controls = { live: countAlive(liveRefs), expectedLive: CASES.length,
+  const inheritedFailures = inheritedChecks.filter(({ ref, alive }) => (ref.deref() !== undefined) !== alive)
+    .map(({ label }) => label);
+  const controls = { inheritedChecks: inheritedChecks.length, inheritedFailures,
+    live: countAlive(liveRefs), expectedLive: CASES.length,
     dropped: countAlive(droppedRefs), deliberate: countAlive(deliberateRefs),
     unsubscribedActive: countAlive(unsubscribedRefs), activeOwnersWithHealthySibling: unsubscribedOwners.length,
     promiseRoots: Object.fromEntries(Object.entries(promiseRefs).map(([name, refs]) => [name, countAlive(refs)])),
     healthyPromiseCompletions: modules.length, healthyDismissCompletions: modules.length };
-  const passed = retainedComponentReferences === 0 && controls.live === CASES.length
+  const passed = inheritedFailures.length === 0 && retainedComponentReferences === 0 && controls.live === CASES.length
     && controls.dropped === 0 && controls.deliberate === 1 && controls.unsubscribedActive === 0
     && controls.promiseRoots.live === 2 && controls.promiseRoots.terminal === 0
     && controls.promiseRoots['promise-only'] === 0 && controls.promiseRoots['user-owned'] === 2;
   const report = { status: passed ? 'pass' : 'fail', mode, cyclesPerOwner: count, executions: executions(),
     retainedComponentReferences, retainedComponentPayloadBytes: retainedComponentReferences === 0 ? 0 : null, owners, controls };
   console.log(JSON.stringify(report));
+  assert.deepEqual(inheritedFailures, [], 'spring/callback/follow reference contract нарушен');
   assert.equal(controls.live, CASES.length, 'live-owner control собран преждевременно');
   assert.equal(controls.dropped, 0, 'dropped-owner control остался достижим');
   assert.equal(controls.deliberate, 1, 'deliberate-retention control не обнаружен');

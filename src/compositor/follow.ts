@@ -121,12 +121,10 @@ class InputSpring extends CompositorSpring implements CompositorFollow {
     super.stop();
   }
 
-  override destroy(): void {
+  protected override _commitOwner(): void {
     this._following = undefined;
-    super.destroy();
+    super._commitOwner();
   }
-
-  protected override _commitOwner(): void { this._following = undefined; }
 
   private _writeInput(value: number): void {
     const input = this._following;

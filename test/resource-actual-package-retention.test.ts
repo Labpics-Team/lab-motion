@@ -15,13 +15,14 @@ const NPM = WINDOWS_SHELL ? 'npm.cmd' : 'npm';
 const shellPath = (value: string): string => WINDOWS_SHELL ? `"${value}"` : value;
 const RUNTIME_FILES = [
   'index', 'frame/index', 'compositor/index', 'bindings/index',
-  'behaviors/index', 'behaviors/reorder/index',
+  'behaviors/index', 'behaviors/reorder/index', 'compositor/follow/index',
 ].flatMap(entry => [`dist/${entry}.js`, `dist/${entry}.cjs`]);
 const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
 const EXPECTED_OWNERS = ['esm', 'cjs'].flatMap(format => [
   'frame', 'motion-value', 'compositor-native', 'compositor-live', 'compositor-delay',
   'compositor-handoff', 'compositor-roundtrip', 'compositor-reduced-loans', 'binding', 'sheet', 'pager',
   'dismiss', 'pull', 'pull-pending', 'pull-settled', 'reorder',
+  'follow-native', 'follow-pickup', 'follow-live',
 ].map(owner => `${format}/${owner}`));
 
 describe('RESOURCE-01: реальные байты установленного production tarball', () => {
