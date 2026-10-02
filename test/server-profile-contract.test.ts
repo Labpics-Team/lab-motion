@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, type TestContext } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -999,22 +999,52 @@ describe('серверный PROFILE: независимые sabotage controls',
     expect(() => serverCellPairs(value, 2, 'aa')).toThrow(/cancel/);
   });
 
-  it('завершённый public admission отвергает четыре независимых reviewer counterexamples', () => {
-    const history = admissionHistory(), { artifact, events } = history;
+  let healthyAdmissionTask: TestContext['task'] | undefined;
+  const acceptedAdmission = () => {
+    // Полный setup и успешный admission принадлежат предыдущему timed test.
+    // Result учитывает также framework timeout; отдельный fault без healthy
+    // prerequisite даёт отказ, не skip и не самостоятельный setup.
+    expect(healthyAdmissionTask?.result?.state).toBe('pass');
+    return admissionHistory();
+  };
+
+  it('полный healthy admission создаёт и проверяет весь зарегистрированный N', ({ task }) => {
+    healthyAdmissionTask = task;
+    const history = admissionHistory(), { artifact } = history;
     expect(validateServerArtifact(artifact).verdict).toBe('PASS');
     expect(validateServerJournal(artifact, history.records)).toHaveProperty('journalFinalDigest');
+  }, 30_000);
+
+  it('полная история отвергает calibration до завершения A/A и 2×work', () => {
+    const history = acceptedAdmission(), { artifact, events } = history;
     const earlyCalibration = events.filter((event) => event.type !== 'calibration');
     earlyCalibration.splice(earlyCalibration.findIndex((event) => event.type === 'N-frozen-before-calibration-and-AB') + 1, 0,
       { type: 'calibration', value: artifact.calibration });
     expect(() => validateServerJournal(artifact, chain(earlyCalibration, history))).toThrow(/до завершения/);
+  }, 30_000);
+
+  it('полная история отвергает замену противоположного порядка пар', () => {
+    const history = acceptedAdmission(), { artifact, events } = history;
     const alwaysLeft = [...events];
     const firstOpposite = alwaysLeft.findIndex((event) => event.type === 'sample' && event.value.participant === 'right');
     [alwaysLeft[firstOpposite], alwaysLeft[firstOpposite + 1]] = [alwaysLeft[firstOpposite + 1], alwaysLeft[firstOpposite]];
     expect(() => validateServerJournal(artifact, chain(alwaysLeft, history))).toThrow(/порядок/);
+  }, 30_000);
+
+  it('полная история отвергает потерянный failure union', () => {
+    const history = acceptedAdmission(), { artifact, events } = history;
     const ignoredFailure = [...events.slice(0, -1), { type: 'failure', value: { stage: 'ab', error: { message: 'retained reviewer failure' } } }, events.at(-1)];
     expect(() => validateServerJournal(artifact, chain(ignoredFailure, history))).toThrow(/failures/);
+  }, 30_000);
+
+  it('полная история отвергает подмену имени positive', () => {
+    const { artifact } = acceptedAdmission();
     const wrongPositive = { ...artifact, positive: { ...artifact.positive, name: 'aa' } };
     expect(() => validateServerArtifact(wrongPositive)).toThrow(/имя стадии/);
+  }, 30_000);
+
+  it('полная история отвергает подмену финального raw digest', () => {
+    const history = acceptedAdmission(), { artifact, events } = history;
     const wrongFinish = [...events.slice(0, -1), { type: 'finished', value: { verdict: 'PASS', digest: 'b'.repeat(64) } }];
     expect(() => validateServerJournal(artifact, chain(wrongFinish, history))).toThrow(/финальная/);
   }, 30_000);
