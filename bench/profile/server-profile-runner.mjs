@@ -99,6 +99,41 @@ export function createServerJournal(out) {
   };
 }
 
+export async function withServerProfileSignals(run) {
+  const controller = new AbortController();
+  const stop = (signal) => {
+    if (controller.signal.aborted) return;
+    controller.abort(Object.assign(new Error(`server profile: оператор запросил ${signal}`), {
+      name: 'AbortError', code: 'OPERATOR_INTERRUPTION', raw: { signal, receivedAt: new Date().toISOString() },
+    }));
+  };
+  const interrupt = () => stop('SIGINT'), terminate = () => stop('SIGTERM');
+  process.on('SIGINT', interrupt); process.on('SIGTERM', terminate);
+  try { return await run(controller.signal); }
+  finally { process.off('SIGINT', interrupt); process.off('SIGTERM', terminate); }
+}
+
+export async function runServerProfileCalibration(artifact, runStage, journal) {
+  artifact.warmup = await runStage('warmup', SERVER_PROFILE.warmupRuns);
+  artifact.pilot = await runStage('pilot', SERVER_PROFILE.pilotRuns);
+  artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock));
+  artifact.frozenPlanDigest = serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan });
+  journal('N-frozen-before-calibration-and-AB', { samplePlan: artifact.samplePlan, digest: artifact.frozenPlanDigest });
+  if (!artifact.samplePlan.feasible) throw Object.assign(new Error(`server profile: pilot требует ${artifact.samplePlan.requiredRuns} runs, предел ${SERVER_PROFILE.maxRuns}`), {
+    code: 'UNPROVEN_POWER', raw: { samplePlan: artifact.samplePlan, frozenPlanDigest: artifact.frozenPlanDigest },
+  });
+  artifact.aa = await runStage('aa', artifact.samplePlan.runs);
+  artifact.positive = await runStage('positive', artifact.samplePlan.runs);
+  const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, artifact.samplePlan.runs, 'aa', artifact.registration.engineClock));
+  const positiveControl = serverFamilyIntervals(serverCellPairs(artifact.positive, artifact.samplePlan.runs, 'positive', artifact.registration.engineClock));
+  const calibrated = serverCalibrationVerdict(aa, positiveControl, artifact.samplePlan);
+  calibrated.reasons.push(...serverResourceReasons([artifact.warmup, artifact.pilot, artifact.aa, artifact.positive], artifact.registration.machine.identity));
+  calibrated.verdict = calibrated.reasons.length ? 'UNPROVEN' : 'PASS';
+  artifact.calibration = { ...calibrated, aa, positive: positiveControl };
+  journal('calibration', artifact.calibration);
+  return artifact.calibration.verdict === 'PASS';
+}
+
 function buildToStderr(root) {
   execFileSync('pnpm', ['run', 'build'], { cwd: root, stdio: ['ignore', 'ignore', 'inherit'],
     shell: process.platform === 'win32', timeout: 180_000 });
@@ -497,7 +532,8 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
   const artifact = { schema: 1, protocol: SERVER_PROFILE, registration: null, registrationDigest: null,
     verdict: 'UNPROVEN', failures: [], warmup: [], gc: [], stages: [],
     jitObservation: { status: 'UNPROVEN', reason: 'GC events наблюдаются; точная JIT attribution требует отдельного intrusive trace и не подменяется гипотезой' } };
-  let browser, origin, observer, engineClock;
+  let browser, origin, observer, engineClock, interruptionRecorded = false;
+  const checkpoint = () => dependencies.signal?.throwIfAborted();
   let prepared = {}, roots = {}, harness = {}, packages = {};
   const verify = () => {
     engineClock?.assertUnchanged();
@@ -519,6 +555,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     if (artifact.registration?.browserTree && hashFileTree(artifact.registration.browserTree.directory).sha256 !== artifact.registration.browserTree.sha256) throw new Error('server profile: изменились browser bytes');
   };
   try {
+    checkpoint();
     if (!SERVER_PROFILE.browsers.includes(browserName)) throw new Error('server profile: неизвестный browser');
     if (browserName !== SERVER_PROFILE.clockError.browser) throw new Error('server profile: clock model этого browser пока UNPROVEN');
     roots = { baseline: realpathSync(baseline), candidate: realpathSync(candidate) };
@@ -549,7 +586,8 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     const adapters = {};
     for (const id of ['baseline', 'candidate', ...SERVER_PROFILE.comparators]) adapters[id] = buildAdapter(id, consumers[id] ?? consumers.comparators, esbuild, out);
     Object.entries(adapters).forEach(([id, value]) => { harness[`adapter:${id}`] = value; });
-    origin = await startBenchmarkOrigin(); browser = await browserType.launch({ headless: SERVER_PROFILE.headless, executablePath: executable });
+    origin = await startBenchmarkOrigin(); checkpoint();
+    browser = await browserType.launch({ headless: SERVER_PROFILE.headless, executablePath: executable }); checkpoint();
     artifact.registration = { protocolDigest: serverProfileDigest(SERVER_PROFILE), candidateSamplesObserved: false,
       candidateSamplesObservedScope: SERVER_PROFILE.candidateSamplesObservedScope,
       clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError),
@@ -559,9 +597,11 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     verifyServerClockRegistration(artifact.registration);
     artifact.registrationDigest = serverProfileDigest(artifact.registration);
     journal('registration-before-any-sample', { registration: artifact.registration, digest: artifact.registrationDigest });
+    checkpoint();
     verify();
     artifact.rawControls = { baseline: await measureBrowserRawControls(browser, origin, adapters.baseline, out, 'baseline') };
     journal('raw-controls-baseline', artifact.rawControls.baseline);
+    checkpoint();
     const implementations = {};
     const loadImplementation = async (id) => {
       const metadata = JSON.parse(readFileSync(path.join(packages[id].directory, 'package.json'), 'utf8'));
@@ -576,6 +616,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     const engineMeasure = dependencies.engineMeasure ?? measureServerEngine;
     const browserMeasure = dependencies.browserMeasure ?? measureServerBrowser;
     const runStage = async (name, runs) => {
+      checkpoint();
       const stage = { name, rows: [], blocks: [] }; artifact[name] = stage; artifact.stages.push(name);
       let resourceBefore;
       for (let run = 0; run < runs; run++) {
@@ -586,6 +627,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
             const current = { ...row, scene: scene.id, samples: {} };
             stage.rows.push(current);
             for (const id of current.order) {
+              checkpoint();
               const build = name === 'ab' && id === 'right' ? 'candidate' : 'baseline';
               const multiplier = name === 'positive' && id === 'right' ? SERVER_PROFILE.positiveWorkMultiplier : 1;
               try {
@@ -599,6 +641,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
                   partial: error.raw ?? null, timerEvidence: error.timerEvidence ?? null });
                 throw error;
               }
+              checkpoint();
             }
           }
         }
@@ -612,56 +655,48 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       }
       verify(); return stage;
     };
-    artifact.warmup = await runStage('warmup', SERVER_PROFILE.warmupRuns);
-    artifact.pilot = await runStage('pilot', SERVER_PROFILE.pilotRuns);
-    artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock));
-    artifact.frozenPlanDigest = serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan });
-    journal('N-frozen-before-calibration-and-AB', { samplePlan: artifact.samplePlan, digest: artifact.frozenPlanDigest });
-    // При N выше ресурсного предела A/A и 2×work всё равно сохраняются как
-    // диагностика. Admission останется UNPROVEN из-за недостаточной мощности.
-    artifact.aa = await runStage('aa', artifact.samplePlan.runs);
-    artifact.positive = await runStage('positive', artifact.samplePlan.runs);
-    const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, artifact.samplePlan.runs, 'aa', artifact.registration.engineClock));
-    const positiveControl = serverFamilyIntervals(serverCellPairs(artifact.positive, artifact.samplePlan.runs, 'positive', artifact.registration.engineClock));
-    const calibrated = serverCalibrationVerdict(aa, positiveControl, artifact.samplePlan);
-    calibrated.reasons.push(...serverResourceReasons([artifact.warmup, artifact.pilot, artifact.aa, artifact.positive], artifact.registration.machine.identity));
-    calibrated.verdict = calibrated.reasons.length ? 'UNPROVEN' : 'PASS';
-    artifact.calibration = { ...calibrated, aa, positive: positiveControl };
-    journal('calibration', artifact.calibration);
-    // Кандидат не измеряется при негодной калибровке; отрицательная серия сохраняется.
-    if (artifact.calibration.verdict !== 'PASS') return artifact;
+    if (!await runServerProfileCalibration(artifact, runStage, journal)) return artifact;
+    checkpoint();
     await loadImplementation('candidate');
+    checkpoint();
     artifact.rawControls.candidate = await measureBrowserRawControls(browser, origin, adapters.candidate, out, 'candidate');
     journal('raw-controls-candidate-after-calibration', artifact.rawControls.candidate);
+    checkpoint();
     artifact.ab = await runStage('ab', artifact.samplePlan.runs);
     artifact.comparison = serverFamilyIntervals(serverCellPairs(artifact.ab, artifact.samplePlan.runs, 'ab', artifact.registration.engineClock));
     const abResourceReasons = serverResourceReasons([artifact.ab], artifact.registration.machine.identity);
     if (abResourceReasons.length) throw new Error(`server profile: условия A/B нарушены: ${abResourceReasons.join('; ')}`);
     artifact.comparators = [];
     for (const scene of SERVER_PROFILE.browserScenes) for (const id of SERVER_PROFILE.comparators) {
+      checkpoint();
       if (scene.staggerGapMs > 0 && ['motion-mini', 'anime-waapi'].includes(id)) {
         artifact.comparators.push({ scene: scene.id, id, status: 'UNPROVEN', reason: 'existing owner entry не реализует общий stagger API' }); continue;
       }
       const comparison = { scene: scene.id, id, rows: [], claim: 'raw API cost; descriptive only, без рейтинга и M-05 superiority' };
       artifact.comparators.push(comparison);
       for (let run = 0; run < artifact.samplePlan.runs; run++) {
+        checkpoint();
         try {
           const sample = await browserMeasure(browser, origin, adapters[id], scene);
           comparison.rows.push(sample); journal('comparator-sample', { scene: scene.id, id, run, sample });
         } catch (error) {
           journal('failed-comparator-sample', { stage: 'ab', scene: scene.id, id, run, error: errorRecord(error) }); throw error;
         }
+        checkpoint();
       }
     }
     artifact.retention = {};
     for (const id of ['baseline', 'candidate']) {
+      checkpoint();
       artifact.retention[id] = makeRetention(packages[id].directory);
       journal('retention-sample', { id, value: artifact.retention[id] });
+      checkpoint();
     }
     journal('retention-separate-forced-GC', artifact.retention);
     artifact.verdict = artifact.comparison.every((cell) => cell.p95.bounded && cell.p95.high <= SERVER_PROFILE.nonInferiorityUpper) ? 'PASS' : 'NO-GO';
     return artifact;
   } catch (error) {
+    interruptionRecorded = dependencies.signal?.aborted && error === dependencies.signal.reason;
     artifact.failures.push({ stage: artifact.stages.at(-1) ?? 'preparation', at: new Date().toISOString(), error: errorRecord(error) });
     journal('failure', artifact.failures.at(-1)); return artifact;
   } finally {
@@ -678,6 +713,11 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
         artifact.verdict = 'UNPROVEN'; const failure = { stage: 'cleanup', resource, error: errorRecord(error) };
         artifact.failures.push(failure); journal('failure', failure);
       }
+    }
+    if (dependencies.signal?.aborted && !interruptionRecorded) {
+      artifact.verdict = 'UNPROVEN';
+      const failure = { stage: 'operator-interruption', error: errorRecord(dependencies.signal.reason) };
+      artifact.failures.push(failure); journal('failure', failure);
     }
     artifact.finishedAt = new Date().toISOString();
     const { sha256: digest } = writeServerArtifact(path.join(out, 'server-profile.json'), artifact);
@@ -696,7 +736,7 @@ export function parseServerProfileArgs(args) {
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
   try {
-    const artifact = await runServerProfile(parseServerProfileArgs(process.argv.slice(2)));
+    const artifact = await withServerProfileSignals((signal) => runServerProfile(parseServerProfileArgs(process.argv.slice(2)), { signal }));
     process.stdout.write(`${JSON.stringify({ verdict: artifact.verdict, registrationDigest: artifact.registrationDigest, failures: artifact.failures,
       artifact: path.join(parseServerProfileArgs(process.argv.slice(2)).out, 'server-profile.json') })}\n`);
     process.exitCode = artifact.verdict === 'PASS' ? 0 : 1;

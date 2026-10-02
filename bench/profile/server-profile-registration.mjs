@@ -73,7 +73,7 @@ export const SERVER_PROFILE = freeze({
   samplingUnit: 'средняя стоимость парного блока двух противоположных runs; повторы/кадры зависимы; p95 относится к распределению средних блоков',
   denominator: 'стоимость полезного вызова с зарегистрированными targets: browser batch/32; positive64actualcalls; legacyengine unchanged; stockC batch/2000, positive4000actualcalls/2000 без деления на два',
   stockCpuScope: 'штатный whole stockC macro main-entry MotionValue: factory+2×2000warmups внеCPU; clock/drain/construct/onChange/setTarget/destroy вCPU, preallocated per-operation last+getFrameCount recording вCPU одинаков обеимролям; RLE/oracle внеCPU. Не per-framep99/100channels.',
-  stoppingRule: 'один baseline-only pilot → замороженный N → один A/A и 2×work → A/B только при годной калибровке; добор и повтор к green запрещены',
+  stoppingRule: 'один baseline-only pilot → замороженный N; невозможная мощность немедленно сохраняет UNPROVEN без A/A, 2×work и A/B; иначе один A/A и 2×work → A/B только при годной калибровке; добор и повтор к green запрещены',
   preservedGuards: 'size-gate, численные/семантические допуски и protected p95 upper ≤1.05 не меняются',
   scope: 'headless server: CPU потока engine и API browser при duration=128 ms; counts/stagger закреплены; endpoint/start/frame/retarget/cancel отдельно; canonical 1200 ms guards независимы',
   unproven: ['mobile Android/iOS', 'physical 60/120 Hz', 'whole-page energy', 'GPU', 'M-04 physical-device envelope', 'M-05 product scene families'],

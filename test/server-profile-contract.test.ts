@@ -10,7 +10,7 @@ import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serve
   parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal,
   verifyServerClockRegistration, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
-import { measureServerBrowser, measureServerEngine } from '../bench/profile/server-profile-runner.mjs';
+import { measureServerBrowser, measureServerEngine, runServerProfile, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
 import * as threadCpuClock from '../bench/profile/server-thread-cpu-clock.mjs';
 
 const hash = 'a'.repeat(64);
@@ -877,6 +877,78 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
 });
 
 describe('серверный PROFILE: заранее зарегистрированные границы', () => {
+  it('сохраняет невозможную мощность до отказа и не запускает A/A, 2×work или кандидат', async () => {
+    const artifact: any = registeredRefusal();
+    artifact.failures = [];
+    const calls: any[] = [], events: any[] = [];
+    const runStage = async (name: string, runs: number) => {
+      calls.push({ name, runs });
+      if (!['warmup', 'pilot'].includes(name)) throw new Error('после невозможного N запущена новая стадия');
+      const value = stage(name, runs);
+      if (name === 'pilot') for (const row of value.rows.filter((row) => row.scene === 'motion-value-default-stock-c')) {
+        const factor = [1, 1, 100, 100, 2, 2, 3, 3][row.run];
+        const sample = row.samples.right;
+        sample.operationNs *= factor;
+        for (const raw of sample.raw) {
+          raw.operationNs *= factor;
+          for (const read of raw.raw.clockReads) read.valueNs = String(BigInt(read.valueNs) * BigInt(factor));
+          raw.raw.cpuReads = raw.raw.clockReads.map((read: any) => nativeCpuEndpoint(read));
+        }
+      }
+      return value;
+    };
+    await expect(runServerProfileCalibration(artifact, runStage, (type: string, value: any) => events.push({ type, value })))
+      .rejects.toMatchObject({ code: 'UNPROVEN_POWER' });
+    expect(calls).toEqual([{ name: 'warmup', runs: SERVER_PROFILE.warmupRuns }, { name: 'pilot', runs: SERVER_PROFILE.pilotRuns }]);
+    expect(artifact.samplePlan).toMatchObject({ feasible: false, runs: SERVER_PROFILE.maxRuns });
+    expect(artifact.samplePlan.requiredRuns).toBeGreaterThan(SERVER_PROFILE.maxRuns);
+    expect(events).toEqual([{ type: 'N-frozen-before-calibration-and-AB', value: {
+      samplePlan: artifact.samplePlan, digest: serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan }),
+    } }]);
+    expect(artifact.aa).toBeUndefined(); expect(artifact.positive).toBeUndefined(); expect(artifact.ab).toBeUndefined();
+  });
+
+  it('отмена перед запуском сохраняет отказ, digest и завершённый журнал', async () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'motion-profile-stop-'));
+    const out = path.join(directory, 'out'), controller = new AbortController();
+    const reason = Object.assign(new Error('остановлено оператором'), { code: 'OPERATOR_INTERRUPTION', raw: { signal: 'SIGTERM' } });
+    controller.abort(reason);
+    try {
+      const artifact = await runServerProfile({ baseline: directory, candidate: directory, browser: 'chromium', out }, { signal: controller.signal });
+      expect(artifact.verdict).toBe('UNPROVEN');
+      expect(artifact.failures).toHaveLength(1);
+      expect(artifact.failures[0].error).toMatchObject({ code: 'OPERATOR_INTERRUPTION', raw: { signal: 'SIGTERM' } });
+      expect(artifact.registration).toBeNull(); expect(artifact.stages).toEqual([]);
+      expect(readFileSync(path.join(out, 'server-profile.json'), 'utf8')).toBe(`${JSON.stringify(artifact)}\n`);
+      const records = parseServerJournalBytes(readFileSync(path.join(out, 'journal.ndjson')));
+      expect(records.map((record: any) => record.type)).toEqual(['failure', 'finished']);
+      expect(records.at(-1).value).toEqual({ verdict: 'UNPROVEN', digest: serverArtifactDigest(artifact) });
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it('отмена внутри получения sample сохраняет его до остановки следующего владельца', async () => {
+    const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
+    const begin = source.indexOf('    const runStage = async (name, runs) => {');
+    const end = source.indexOf('    if (!await runServerProfileCalibration(', begin);
+    expect(begin).toBeGreaterThan(0); expect(end).toBeGreaterThan(begin);
+    const controller = new AbortController(), reason = new Error('остановлено после приобретения sample');
+    const artifact: any = { stages: [] }, records: any[] = [];
+    const sample: any = stage('warmup', 2).rows[0].samples.left;
+    const measure = vi.fn(async () => { controller.abort(reason); return sample; });
+    const context = createContext({ artifact, SERVER_PROFILE: { ...SERVER_PROFILE, engineScenes: [SERVER_PROFILE.engineScenes[0]], browserScenes: [] },
+      checkpoint: () => controller.signal.throwIfAborted(), captureServerLoad: () => ({ cpuStat: {} }),
+      serverOrders, engineMeasure: measure, browserMeasure: vi.fn(), implementations: { baseline: {} },
+      compactSampleCpuEvidence: (value: any) => { for (const row of value.raw) row.raw.cpuReads = compactServerCpuEvidence(row.raw.cpuReads); },
+      journal: (type: string, value: any) => records.push({ type, value }), verify: vi.fn(), process: { stderr: { write: vi.fn() } } });
+    const runStage = runInContext(`(() => { ${source.slice(begin, end)} return runStage; })()`, context);
+    await expect(runStage('warmup', 2)).rejects.toBe(reason);
+    expect(measure).toHaveBeenCalledTimes(1);
+    expect(artifact.warmup.rows).toHaveLength(1);
+    expect(artifact.warmup.rows[0].samples).toEqual({ left: sample });
+    expect(records).toEqual([{ type: 'sample', value: { stage: 'warmup', kind: 'engine', scene: SERVER_PROFILE.engineScenes[0].id,
+      run: 0, participant: 'left', build: 'baseline', value: sample } }]);
+  });
+
   it('не выдаёт server CPU за mobile/GPU/экран или продуктовые семейства', () => {
     expect(SERVER_PROFILE.unproven).toContain('mobile Android/iOS');
     expect(SERVER_PROFILE.unproven).toContain('whole-page energy');

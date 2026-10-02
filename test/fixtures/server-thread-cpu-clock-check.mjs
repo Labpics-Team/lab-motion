@@ -1,6 +1,6 @@
 // Обязательная Linux/Node24.19 проверка private getter; не performance sample.
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, fork, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, appendFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -23,6 +23,33 @@ const codes = [['read-errno', 'read', 'CLOCK_READ'], ['negative-seconds', 'read'
   ['resolution-errno', 'info', 'CLOCK_RESOLUTION'], ['zero-resolution', 'info', 'CLOCK_RESOLUTION']];
 
 async function child(mode, directory) {
+  if (mode === 'operator-signal') {
+    const { parseServerProfileArgs, runServerProfile, withServerProfileSignals } = await import(new URL('../../bench/profile/server-profile-runner.mjs', import.meta.url));
+    const before = { interrupt: process.listenerCount('SIGINT'), terminate: process.listenerCount('SIGTERM') };
+    let aborts = 0, received;
+    const artifact = await withServerProfileSignals(async (signal) => {
+      const stopped = new Promise(resolve => signal.addEventListener('abort', () => { aborts++; resolve(); }, { once: true }));
+      process.channel.ref();
+      process.send({ ready: true, pid: process.pid });
+      await stopped;
+      process.channel.unref();
+      received = signal.reason.raw.signal;
+      return runServerProfile(parseServerProfileArgs(['--baseline', root, '--candidate', directory, '--browser', 'chromium', '--out', path.join(directory, 'out')]), { signal });
+    });
+    assert.equal(aborts, 1); assert.equal(received, process.argv[5]);
+    assert.equal(process.listenerCount('SIGINT'), before.interrupt);
+    assert.equal(process.listenerCount('SIGTERM'), before.terminate);
+    assert.equal(artifact.verdict, 'UNPROVEN'); assert.equal(artifact.registration, null);
+    assert.equal(artifact.failures.length, 1); assert.equal(artifact.failures[0].error.code, 'OPERATOR_INTERRUPTION');
+    assert.equal(artifact.failures[0].error.raw.signal, received); assert.deepEqual(artifact.stages, []);
+    const raw = readFileSync(path.join(directory, 'out/server-profile.json'));
+    assert.deepEqual(JSON.parse(raw), artifact);
+    assert.equal(readFileSync(path.join(directory, 'out/server-profile.sha256'), 'utf8').split(' ')[0], hash(raw));
+    const journal = readFileSync(path.join(directory, 'out/journal.ndjson'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(journal.map(row => row.type), ['failure', 'finished']);
+    assert.deepEqual(journal.at(-1).value, { verdict: 'UNPROVEN', digest: hash(raw) });
+    return { mode, signal: received, aborts, artifact, journal, scope: 'настоящий сигнал Node через общий CLI wrapper и реальный отказ/finally до подготовки; без SUT серии' };
+  }
   if (mode === 'native-abi') {
     const native = createRequire(import.meta.url)(directory);
     process.env.MOTION_CLOCK_CHECK_MODE = 'large-exact';
@@ -96,6 +123,29 @@ function run(mode, directory) {
   return spawnSync(process.execPath, [self, '--case', mode, directory], { encoding: 'utf8', timeout: 30000 });
 }
 
+async function runSignal(directory, signal) {
+  mkdirSync(directory);
+  const child = fork(self, ['--case', 'operator-signal', directory, signal], { stdio: ['ignore', 'pipe', 'pipe', 'ipc'] });
+  let stdout = '', stderr = '', sent = false;
+  child.stdout.on('data', data => { stdout += data; }); child.stderr.on('data', data => { stderr += data; });
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => { child.kill('SIGKILL'); reject(new Error(`operator-signal ${signal}: timeout`)); }, 30000);
+    child.once('error', error => { clearTimeout(timeout); reject(error); });
+    child.on('message', message => {
+      if (message?.ready !== true || sent) return;
+      sent = true; assert.equal(message.pid, child.pid);
+      assert(child.kill(signal)); assert(child.kill(signal));
+    });
+    child.once('close', (code, nativeSignal) => {
+      clearTimeout(timeout);
+      try {
+        assert(sent); assert.equal(nativeSignal, null); assert.equal(code, 0, stderr || stdout);
+        resolve(JSON.parse(stdout));
+      } catch (error) { reject(error); }
+    });
+  });
+}
+
 async function main() {
   assert.equal(process.platform, 'linux'); assert.equal(process.arch, 'x64'); assert.equal(process.version, 'v24.19.0');
   const directory = mkdtempSync(path.join(os.tmpdir(), 'motion-native-clock-check-'));
@@ -133,6 +183,7 @@ async function main() {
       records.push({ name, sourceSha256: hash(Buffer.from(body)), binarySha256: hash(readFileSync(binary)),
         argv, exitCode: result.status, killed: Boolean(before), stdout: result.stdout, stderr: result.stderr });
     }
+    for (const signal of ['SIGINT', 'SIGTERM']) records.push(await runSignal(path.join(directory, signal), signal));
     process.stdout.write(JSON.stringify({ node: process.version, kernel: os.release(), sourceSha256: hash(readFileSync(source)),
       hostSha256: hash(readFileSync(host)), records, registeredTimingSamples: 0 }) + '\n');
   } finally { rmSync(directory, { recursive: true, force: true }); }
