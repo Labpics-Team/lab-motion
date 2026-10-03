@@ -49,6 +49,21 @@ try {
   await page.locator('#new-title').fill('Новая книга');
   await page.locator('#add-form button').click();
   if (!await page.getByRole('heading', { name: 'Новая книга' }).isVisible()) throw new Error('Добавление не показано');
+  await page.evaluate(() => {
+    dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+    dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+  });
+  const beforeRestoreMove = await cards.allTextContents();
+  await page.locator('[data-id="b"] [data-move="previous"]').click();
+  if (JSON.stringify(await cards.allTextContents()) === JSON.stringify(beforeRestoreMove)) throw new Error('Контроллер не восстановлен после возврата страницы');
+  await page.setViewportSize({ width: 320, height: 700 });
+  const inputFits = await page.evaluate(() => {
+    document.body.style.zoom = '200%';
+    const input = document.querySelector('#new-title').getBoundingClientRect();
+    const form = document.querySelector('#add-form').getBoundingClientRect();
+    return input.right <= form.right + 1;
+  });
+  if (!inputFits) throw new Error('Поле добавления вышло за форму при увеличении');
   if (errors.length) throw new Error(`Ошибки страницы: ${errors.join('; ')}`);
   process.stdout.write('Reading shelf smoke: PASS\n');
 } finally {

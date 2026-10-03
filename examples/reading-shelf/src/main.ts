@@ -39,7 +39,8 @@ function makeController() {
     if (!controller.isCurrent(proposal)) return;
     const focused = document.activeElement as HTMLElement | null;
     if (!noMotion && !media.matches) projection.capture(cards());
-    const positions = order.map((id, index) => ({ id, index })).filter(item => visible().includes(item.id)).map(item => item.index);
+    const shown = new Set(visible());
+    const positions = order.map((id, index) => ({ id, index })).filter(item => shown.has(item.id)).map(item => item.index);
     next.forEach((id, index) => { order[positions[index]!] = id; });
     render();
     if (!noMotion && !media.matches) projection.play();
@@ -124,5 +125,6 @@ document.querySelector<HTMLFormElement>('#add-form')!.addEventListener('submit',
   event.preventDefault(); const input = document.querySelector<HTMLInputElement>('#new-title')!; const title = input.value.trim(); if (!title) return;
   const id = crypto.randomUUID(); entries.push({ id, title, stage: 'queue' }); order.push(id); input.value = ''; filter = 'all'; filterInput.value = 'all'; finish(); render(); shelf.querySelector<HTMLElement>(`[data-id="${id}"] [data-grip]`)!.focus(); status.textContent = `Добавлено: ${title}`;
 });
-window.addEventListener('pagehide', () => { finish(); controller.destroy(); projection.cancel(); }, { once: true });
+window.addEventListener('pagehide', () => { finish(); controller.destroy(); projection.cancel(); });
+window.addEventListener('pageshow', event => { if (event.persisted) resetView(); });
 render();
