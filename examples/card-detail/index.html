@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ru">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Атлас материалов — Lab Motion</title></head>
+<body>
+  <main class="app">
+    <header><span class="brand">АТЛАС / 04</span><button id="motion" type="button" aria-pressed="false">Без движения</button></header>
+    <section class="intro"><p class="eyebrow">Рабочая библиотека</p><h1>Материалы для <em>внимательного взгляда.</em></h1><p>Откройте карточку, чтобы прочитать заметку. Закрывайте, переключайтесь между материалами и меняйте текст, не теряя место в подборке.</p></section>
+    <div class="toolbar"><label for="direction">Направление</label><select id="direction"><option value="ltr">Слева направо</option><option value="rtl">Справа налево</option></select><span id="status" role="status" aria-live="polite"></span></div>
+    <section id="gallery" class="gallery" aria-label="Материалы"></section>
+    <footer>Содержимое и выбор материала принадлежат приложению. Движение следует за изменением геометрии.</footer>
+  </main>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
