@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Маршрут выходного дня — Lab Motion</title>
+  </head>
+  <body>
+    <main class="app">
+      <header class="top"><div class="brand"><span aria-hidden="true">✳</span> Маршрут</div><span>Выходной в городе · данные до закрытия страницы</span></header>
+      <section class="overview" aria-labelledby="title">
+        <p class="eyebrow">Суббота · пешая прогулка</p>
+        <h1 id="title">Город в своём<br /><em>темпе.</em></h1>
+        <p class="lead">Выберите точку на карте. Потяните панель, чтобы посмотреть детали, или откройте её кнопкой. Заметка к месту сохранится до закрытия страницы.</p>
+        <div class="toolbar"><button id="open-sheet" type="button" aria-controls="sheet-content" aria-expanded="false">Посмотреть маршрут</button><button id="quiet" type="button" aria-pressed="false">Без движения</button></div>
+      </section>
+      <section class="map" aria-label="Схема прогулки">
+        <div class="map-line" aria-hidden="true"></div>
+        <button class="stop stop-a" data-place="garden" type="button"><span>01</span> Сад</button>
+        <button class="stop stop-b" data-place="museum" type="button"><span>02</span> Музей</button>
+        <button class="stop stop-c" data-place="quay" type="button"><span>03</span> Набережная</button>
+        <p class="map-hint">Три остановки · около 4 км</p>
+      </section>
+      <section id="sheet" class="sheet" aria-label="Детали маршрута">
+        <div class="sheet-top"><button id="handle" type="button" aria-label="Переместить панель: стрелки вверх и вниз" aria-controls="sheet-content"><span class="grab" aria-hidden="true"></span><span id="sheet-state">Панель закрыта</span></button><div class="sheet-actions"><button data-snap="0" type="button">Раскрыть</button><button data-snap="1" type="button">Наполовину</button><button data-snap="2" type="button">Свернуть</button><button id="quiet-sheet" type="button" aria-pressed="false">Без движения</button></div></div>
+        <div id="sheet-content" class="sheet-content">
+          <div class="sheet-heading"><div><p class="eyebrow">Точка маршрута <span id="place-number">01</span> / 03</p><h2 id="place-title">Городской сад</h2></div><span id="place-time" class="time">10:00</span></div>
+          <p id="place-description" class="description">Начните прогулку среди старых деревьев и тихих аллей.</p>
+          <div class="place-nav"><button data-select-place="previous" type="button">← Предыдущая</button><button data-select-place="next" type="button">Следующая →</button></div>
+          <div class="detail-grid"><div><span class="detail-label">Время на месте</span><strong id="place-duration">45 минут</strong></div><div><span class="detail-label">Следующая точка</span><strong id="place-next">Музей · 12 минут пешком</strong></div></div>
+          <form id="note-form"><label for="note">Заметка к этой точке</label><textarea id="note" rows="3" placeholder="Что хотите увидеть или не забыть?"></textarea><button type="submit">Сохранить заметку</button></form>
+          <p id="note-status" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+      <p id="motion-status" class="visually-hidden" role="status" aria-live="polite"></p>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
