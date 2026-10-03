@@ -10,6 +10,7 @@ const places: Place[] = [
 ];
 let current = places[0]!;
 let noMotion = false;
+let lastSnap = 2;
 const sheet = document.querySelector<HTMLElement>('#sheet')!;
 const sheetTop = document.querySelector<HTMLElement>('.sheet-top')!;
 const handle = document.querySelector<HTMLButtonElement>('#handle')!;
@@ -43,7 +44,7 @@ function mountSheet() {
     return [0, Math.round(height * 0.48), Math.max(1, Math.round(height - sheetTop.getBoundingClientRect().height))];
   };
   let points = snap();
-  let selected = 2;
+  let selected = lastSnap;
   let pointer: number | undefined;
   let anchor = 0;
   let coordinate = 0;
@@ -52,11 +53,11 @@ function mountSheet() {
   const format = (value: number) => `translateY(${value}px)`;
   const motion = new CompositorSpring({
     spring: { mass: 1, stiffness: 240, damping: 28 }, property: 'transform',
-    from: points[2]!, to: points[2]!, target: sheet, format,
+    from: points[selected]!, to: points[selected]!, target: sheet, format,
     apply: value => { sheet.style.transform = String(value); },
     matchMedia: () => ({ matches: quiet() }),
   });
-  sheet.style.transform = format(points[2]!);
+  sheet.style.transform = format(points[selected]!);
   const bounded = (value: number) => Math.max(points[0]!, Math.min(points[2]!, value));
   function release() {
     const captured = pointer; pointer = undefined;
@@ -64,7 +65,7 @@ function mountSheet() {
   }
   function select(index: number) {
     if (events.signal.aborted) return;
-    release(); live = undefined; selected = Math.max(0, Math.min(2, index));
+    release(); live = undefined; selected = Math.max(0, Math.min(2, index)); lastSnap = selected;
     if (quiet()) motion.handoffToLive(points[selected]!).snapTo(points[selected]!);
     else motion.handoffToCompositor(points[selected]!);
     const labels = ['Панель раскрыта', 'Панель наполовину', 'Панель закрыта'];
@@ -117,7 +118,7 @@ function mountSheet() {
   });
   observer.observe(sheet);
   observer.observe(sheetTop);
-  select(2);
+  select(selected);
   return { select, get selected() { return selected; }, refreshMotion() {
     if (pointer !== undefined && live) { const goal = bounded(anchor + coordinate); if (quiet()) live.snapTo(goal); else live.setTarget(goal); }
     else select(selected);

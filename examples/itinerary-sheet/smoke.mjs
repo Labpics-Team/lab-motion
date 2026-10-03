@@ -5,6 +5,7 @@ const page = await browser.newPage({ viewport: { width: 1100, height: 850 } });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 try {
+  await page.addInitScript(() => window.addEventListener('pageshow', event => sessionStorage.setItem('sheetReturnPersisted', String(event.persisted))));
   await page.goto('http://127.0.0.1:4178/', { waitUntil: 'networkidle' });
   const state = page.locator('#sheet-state');
   if (await state.textContent() !== 'Панель закрыта') throw new Error('Исходная панель не закрыта');
@@ -41,12 +42,26 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.locator('[data-snap="0"]').click();
   if (await state.textContent() !== 'Панель раскрыта') throw new Error('Reduced-motion не сохранил доступную цель');
-  await page.locator('[data-snap="2"]').click();
+  await page.locator('[data-snap="1"]').click();
   await page.evaluate(() => { dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
+  if (await state.textContent() !== 'Панель наполовину') throw new Error('Положение панели потеряно при возврате');
+  if (await page.locator('#note').inputValue() !== 'Увидеть старую оранжерею') throw new Error('Заметка потеряна при возврате страницы');
   await page.locator('#open-sheet').click();
   if (await state.textContent() !== 'Панель раскрыта') throw new Error('Контроллер не восстановился при возврате');
   await page.waitForTimeout(700);
   await page.screenshot({ path: 'examples/itinerary-sheet/.artifacts/mobile.png' });
+  await page.route('http://127.0.0.1:4178/away', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Другая страница</title>' }));
+  await page.goto('http://127.0.0.1:4178/away');
+  await page.goBack();
+  const persisted = await page.evaluate(() => sessionStorage.getItem('sheetReturnPersisted'));
+  const restoration = await page.evaluate(() => {
+    const nav = performance.getEntriesByType('navigation')[0];
+    return 'notRestoredReasons' in nav ? JSON.stringify(nav.notRestoredReasons) : 'unavailable';
+  });
+  if (persisted === 'true') {
+    if (await state.textContent() !== 'Панель раскрыта') throw new Error('Реальный bfcache-возврат потерял положение');
+    if (await page.locator('#note').inputValue() !== 'Увидеть старую оранжерею') throw new Error('Реальный bfcache-возврат потерял заметку');
+  }
   if (errors.length) throw new Error(`Ошибки страницы: ${errors.join('; ')}`);
-  process.stdout.write('Itinerary sheet smoke: PASS\n');
+  process.stdout.write(`Itinerary sheet smoke: PASS; bfcache persisted=${persisted}; reasons=${restoration}\n`);
 } finally { await browser.close(); }
