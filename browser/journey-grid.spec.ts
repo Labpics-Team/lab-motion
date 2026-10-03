@@ -50,7 +50,8 @@ test('grid: приложение подтверждает keyboard reorder и о
     root.addEventListener('pointermove', event => session?.move({ x: event.clientX, y: event.clientY }));
     root.addEventListener('pointerup', () => { session?.end(); session = undefined; });
     (window as any).grid = {
-      read: () => ({ keys: [...keys], pending: pending?.keys, current: pending && resolver.isCurrent(pending.proposal), active: session?.active ?? false }),
+      read: () => ({ keys: [...keys], pending: pending?.keys, current: pending && resolver.isCurrent(pending.proposal),
+        activeKey: resolver.activeKey, active: session?.active ?? false }),
       hold: () => { accept = false; pending = undefined; },
       filter: () => { keys = ['b', 'c', 'd', 'e']; paint(); resolver.update(measure()); },
       commitPending: () => {
@@ -80,5 +81,12 @@ test('grid: приложение подтверждает keyboard reorder и о
   expect(await page.evaluate(() => (window as any).grid.read())).toMatchObject({
     keys: ['b', 'c', 'd', 'e'], current: false, active: false,
   });
+  const remaining = await page.getByRole('button', { name: 'b' }).boundingBox();
+  expect(remaining).not.toBeNull();
+  await page.mouse.move(remaining!.x + 20, remaining!.y + 20);
+  await page.mouse.down();
+  expect(await page.evaluate(() => (window as any).grid.read().activeKey)).toBe('b');
+  await page.mouse.up();
+  expect(await page.evaluate(() => (window as any).grid.read().activeKey)).toBeUndefined();
   await page.evaluate(() => (window as any).grid.destroy());
 });
