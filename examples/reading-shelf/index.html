@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light" />
+    <title>Полка для чтения — пример Lab Motion</title>
+  </head>
+  <body>
+    <main class="app" id="app">
+      <header class="masthead">
+        <div class="brand"><span class="brand-mark" aria-hidden="true">▥</span><span>Полка для чтения</span></div>
+        <span class="edition">Демонстрация Lab Motion · данные остаются в этом окне</span>
+      </header>
+      <section class="intro" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Личная коллекция</p>
+          <h1 id="page-title">Управляйте порядком,<br /><em>не теряя контекст.</em></h1>
+          <p class="intro-copy">Меняйте порядок мышью или клавиатурой, фильтруйте записи и добавляйте новые. Порядок принадлежит приложению; движение следует за ним.</p>
+        </div>
+        <p class="intro-count" aria-live="polite"><strong id="total-count">0</strong><span>записей<br />на полке</span></p>
+      </section>
+      <section class="workspace" aria-labelledby="shelf-title">
+        <div class="workspace-head">
+          <div><p class="eyebrow">Коллекция</p><h2 id="shelf-title">Мои записи</h2></div>
+          <div class="controls">
+            <label class="filter-label" for="filter">Показать <select id="filter"><option value="all">Все</option><option value="queue">На очереди</option><option value="reading">Читаю</option><option value="done">Прочитано</option></select></label>
+            <button id="direction" type="button" aria-pressed="false">Справа налево</button>
+            <button id="motion" type="button" aria-pressed="false">Без движения</button>
+          </div>
+        </div>
+        <form id="add-form" class="add-form">
+          <label for="new-title">Новая запись</label>
+          <input id="new-title" name="title" maxlength="80" required placeholder="Название книги или статьи" autocomplete="off" />
+          <button type="submit">Добавить на полку <span aria-hidden="true">↗</span></button>
+        </form>
+        <p class="usage">На карточке: стрелки перемещают запись, Escape отменяет жест. Кнопки «Раньше» и «Позже» дают ту же операцию без перетаскивания.</p>
+        <div id="shelf" class="shelf" aria-label="Записи для чтения"></div>
+        <p id="empty" class="empty" hidden>В этой подборке пока нет записей. Выберите другой фильтр или добавьте новую.</p>
+        <p id="status" class="status" role="status" aria-live="polite"></p>
+      </section>
+      <footer>Пример сценария коллекции · <span>Lab Motion</span></footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
