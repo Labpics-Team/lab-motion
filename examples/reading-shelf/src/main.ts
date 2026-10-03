@@ -15,7 +15,9 @@ let filter: Stage | 'all' = 'all';
 let rtl = false;
 let noMotion = false;
 let session: ReorderSession | undefined;
+let keyboardStart: string[] | undefined;
 let pointer: number | undefined;
+let rendering = false;
 let origin = { x: 0, y: 0 };
 const shelf = document.querySelector<HTMLElement>('#shelf')!;
 const status = document.querySelector<HTMLElement>('#status')!;
@@ -47,12 +49,14 @@ function makeController() {
 }
 function finish() {
   session?.end(); session = undefined;
+  keyboardStart = undefined;
   const captured = pointer; pointer = undefined;
   if (captured !== undefined && shelf.hasPointerCapture(captured)) shelf.releasePointerCapture(captured);
   shelf.querySelectorAll('[data-grip]').forEach(node => node.setAttribute('aria-pressed', 'false'));
 }
 function render() {
   const existing = new Map(cards().map(card => [card.dataset.id!, card]));
+  rendering = true;
   shelf.replaceChildren(...visible().map(id => {
     const item = byId(id);
     const previous = existing.get(id);
@@ -74,6 +78,7 @@ function render() {
     const actions = document.createElement('div'); actions.className = 'actions'; actions.append(grip, before, after, select, remove);
     card.append(label, heading, actions); return card;
   }));
+  rendering = false;
   empty.hidden = visible().length !== 0; total.textContent = String(entries.length);
   controller.update(measure());
 }
@@ -94,10 +99,13 @@ shelf.addEventListener('change', event => {
 shelf.addEventListener('keydown', event => {
   const target = event.target as Element; if (!target.matches('[data-grip]')) return;
   const id = cardFor(target)?.dataset.id; if (!id) return;
-  if (event.key === 'Escape') { event.preventDefault(); finish(); return; }
-  if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); if (session?.active) finish(); else { controller.update(measure()); session = controller.start(id); target.setAttribute('aria-pressed', 'true'); announce(id); } return; }
+  if (event.key === 'Escape') { event.preventDefault(); const original = keyboardStart; finish(); if (original) { projection.cancel(); order = original; render(); shelf.querySelector<HTMLElement>(`[data-id="${id}"] [data-grip]`)?.focus({ preventScroll: true }); status.textContent = 'Перемещение отменено'; } return; }
+  if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); if (session?.active && controller.activeKey === id) finish(); else { finish(); controller.update(measure()); session = controller.start(id); if (session) keyboardStart = [...order]; target.setAttribute('aria-pressed', String(!!session)); announce(id); } return; }
   const steps: Record<string, ReorderStep> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Home: 'first', End: 'last' };
   if (session?.active && steps[event.key]) { event.preventDefault(); controller.update(measure()); session.step(steps[event.key]!); }
+});
+shelf.addEventListener('focusout', event => {
+  if (!rendering && (event.target as Element).matches('[data-grip]') && session?.active && pointer === undefined) finish();
 });
 shelf.addEventListener('pointerdown', event => {
   if (event.button !== 0 || pointer !== undefined || !(event.target as Element).closest('[data-grip]')) return;
