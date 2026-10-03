@@ -49,6 +49,7 @@ try {
   await page.locator('[data-snap="0"]').click();
   const returnToMotion = await page.locator('#sheet').evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element).transform).m42);
   if (returnToMotion <= 0) throw new Error('После отключения reduced-motion не возобновилась анимация');
+  await page.waitForFunction(() => Math.abs(new DOMMatrixReadOnly(getComputedStyle(document.querySelector('#sheet')).transform).m42) < 1);
   await page.locator('[data-snap="1"]').click();
   await page.evaluate(() => { dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
   if (await state.textContent() !== 'Панель наполовину') throw new Error('Положение панели потеряно при возврате');
