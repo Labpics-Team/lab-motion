@@ -6,7 +6,6 @@
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm build
 node examples/reading-shelf/prepare.mjs
 pnpm exec tsc -p examples/reading-shelf/tsconfig.json
 pnpm exec vite build --config examples/reading-shelf/vite.config.mjs
@@ -20,4 +19,4 @@ pnpm exec vite build --config examples/reading-shelf/vite.config.mjs
 pnpm exec vite --config examples/reading-shelf/vite.config.mjs
 ```
 
-`prepare.mjs` создаёт `node_modules` внутри примера и устанавливает туда архив, созданный `npm pack`. `.artifacts/package.json` содержит SHA-256 архива и манифеста, версию, исходный commit и признак грязного рабочего дерева. Для проверки жеста возьмите кнопку «Переместить» мышью или нажмите на ней Enter, затем стрелки и Enter. Escape возвращает порядок до начала клавиатурного жеста; кнопки «Раньше» и «Позже» доступны отдельно. Фильтр, смена направления и добавление обновляют снимок списка.
+`prepare.mjs` заново собирает корневой пакет, затем создаёт `node_modules` внутри примера и устанавливает туда архив `npm pack`. `.artifacts/package.json` содержит SHA-256 архива и манифеста, версию npm, наблюдаемый исходный commit и признак грязного рабочего дерева. Commit и признак чистоты сами по себе не удостоверяют воспроизводимость сборки; точная идентичность используемых байтов — SHA-256 архива. Для проверки жеста возьмите кнопку «Переместить» мышью или нажмите на ней Enter, затем стрелки и Enter. Escape возвращает порядок до начала клавиатурного жеста; кнопки «Раньше» и «Позже» доступны отдельно. Фильтр, смена направления и добавление обновляют снимок списка.

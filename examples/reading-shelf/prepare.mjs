@@ -12,10 +12,18 @@ const installed = join(app, 'node_modules', '@labpics', 'motion');
 const receiptPath = join(app, '.artifacts', 'package.json');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 try {
-  const npmCli = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  // Собранный dist игнорируется Git: повторная сборка связывает архив с текущим source.
+  if (process.platform === 'win32') execFileSync('cmd.exe', ['/d', '/s', '/c', 'pnpm build'], { cwd: root, stdio: 'inherit', timeout: 180_000 });
+  else execFileSync('pnpm', ['build'], { cwd: root, stdio: 'inherit', timeout: 180_000 });
+  const npmLocation = process.platform === 'win32'
+    ? execFileSync('where.exe', ['npm.cmd'], { encoding: 'utf8' }).split(/\r?\n/).find(Boolean)
+    : undefined;
+  const npmCli = npmLocation ? join(dirname(npmLocation), 'node_modules', 'npm', 'bin', 'npm-cli.js') : undefined;
   const command = process.platform === 'win32' ? process.execPath : 'npm';
   const args = process.platform === 'win32' ? [npmCli] : [];
-  if (process.platform === 'win32' && !existsSync(npmCli)) throw new Error('Не найден npm CLI рядом с Node.js');
+  if (process.platform === 'win32' && (!npmCli || !existsSync(npmCli))) throw new Error('Не найден npm CLI рядом с npm.cmd');
+  const npmVersion = execFileSync(command, [...args, '--version'], { encoding: 'utf8' }).trim();
+  process.stdout.write(`npm CLI: ${npmCli ?? command} (${npmVersion})\n`);
   const [packed] = JSON.parse(execFileSync(command,
     [...args, 'pack', '--ignore-scripts', '--json', '--pack-destination', temporary],
     { cwd: root, encoding: 'utf8', timeout: 120_000 }));
@@ -44,7 +52,7 @@ try {
   writeFileSync(receiptPath, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'],
     { cwd: root, encoding: 'utf8' }).trim(), sourceDirty: execFileSync('git', ['status', '--porcelain'],
     { cwd: root, encoding: 'utf8' }).trim().length > 0, archiveSha256: hash(bytes),
-    manifestSha256: hash(installedManifest), package: manifest.name, version: manifest.version }, null, 2) + '\n');
+    manifestSha256: hash(installedManifest), npmVersion, package: manifest.name, version: manifest.version }, null, 2) + '\n');
   process.stdout.write(`Полка: установлен архив ${hash(bytes)}\n`);
 } finally {
   rmSync(temporary, { recursive: true, force: true });
