@@ -119,19 +119,17 @@ function mountSheet() {
   observer.observe(sheet);
   observer.observe(sheetTop);
   select(selected);
-  return { select, get selected() { return selected; }, refreshMotion() {
-    if (pointer !== undefined && live) { const goal = bounded(anchor + coordinate); if (quiet()) live.snapTo(goal); else live.setTarget(goal); }
-    else select(selected);
-  }, destroy() { events.abort(); observer.disconnect(); release(); live = undefined; motion.destroy(); sheet.style.removeProperty('transform'); } };
+  return { select, get selected() { return selected; }, destroy() { events.abort(); observer.disconnect(); release(); live = undefined; motion.destroy(); sheet.style.removeProperty('transform'); } };
 }
 
 let controller = mountSheet();
 renderPlace();
 open.addEventListener('click', () => controller.select(0));
-const toggleMotion = () => { noMotion = !noMotion; for (const button of [quietButton, quietSheetButton]) button.setAttribute('aria-pressed', String(noMotion)); controller.refreshMotion(); };
+const remount = () => { controller.destroy(); controller = mountSheet(); };
+const toggleMotion = () => { noMotion = !noMotion; for (const button of [quietButton, quietSheetButton]) button.setAttribute('aria-pressed', String(noMotion)); remount(); };
 quietButton.addEventListener('click', toggleMotion);
 quietSheetButton.addEventListener('click', toggleMotion);
-reduced.addEventListener('change', () => controller.refreshMotion());
+reduced.addEventListener('change', remount);
 document.querySelectorAll<HTMLButtonElement>('[data-place]').forEach(button => button.addEventListener('click', () => {
   current = places.find(place => place.id === button.dataset.place)!;
   renderPlace(); controller.select(0);

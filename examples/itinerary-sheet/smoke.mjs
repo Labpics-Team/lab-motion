@@ -5,7 +5,9 @@ const page = await browser.newPage({ viewport: { width: 1100, height: 850 } });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 try {
-  await page.addInitScript(() => window.addEventListener('pageshow', event => sessionStorage.setItem('sheetReturnPersisted', String(event.persisted))));
+  await page.addInitScript(() => window.addEventListener('pageshow', event => {
+    if (event.isTrusted && location.pathname === '/') sessionStorage.setItem('sheetReturnPersisted', String(event.persisted));
+  }));
   await page.goto('http://127.0.0.1:4178/', { waitUntil: 'networkidle' });
   const state = page.locator('#sheet-state');
   if (await state.textContent() !== 'Панель закрыта') throw new Error('Исходная панель не закрыта');
@@ -42,6 +44,11 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.locator('[data-snap="0"]').click();
   if (await state.textContent() !== 'Панель раскрыта') throw new Error('Reduced-motion не сохранил доступную цель');
+  await page.locator('[data-snap="2"]').click();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.locator('[data-snap="0"]').click();
+  const returnToMotion = await page.locator('#sheet').evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element).transform).m42);
+  if (returnToMotion <= 0) throw new Error('После отключения reduced-motion не возобновилась анимация');
   await page.locator('[data-snap="1"]').click();
   await page.evaluate(() => { dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
   if (await state.textContent() !== 'Панель наполовину') throw new Error('Положение панели потеряно при возврате');
@@ -51,8 +58,10 @@ try {
   await page.waitForTimeout(700);
   await page.screenshot({ path: 'examples/itinerary-sheet/.artifacts/mobile.png' });
   await page.route('http://127.0.0.1:4178/away', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Другая страница</title>' }));
+  await page.evaluate(() => sessionStorage.removeItem('sheetReturnPersisted'));
   await page.goto('http://127.0.0.1:4178/away');
   await page.goBack();
+  await page.waitForFunction(() => sessionStorage.getItem('sheetReturnPersisted') !== null);
   const persisted = await page.evaluate(() => sessionStorage.getItem('sheetReturnPersisted'));
   const restoration = await page.evaluate(() => {
     const nav = performance.getEntriesByType('navigation')[0];
