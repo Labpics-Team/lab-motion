@@ -266,15 +266,11 @@ export class MotionValue {
 
     // Повтор цели сохраняет подготовленную траекторию и её часы. Проверка
     // активного цикла важна: stop() не запрещает снова двигаться к той же цели.
-    if (this._run && target === this._target) return;
-
-    if (target === this._value && Math.abs(this._velocity) < EPSILON) {
-      if (target !== this._target) this._epoch++;
-      this._target = target;
-      return;
-    }
-
+    const settled = target === this._value && Math.abs(this._velocity) < EPSILON;
+    if (target === this._target && (this._run || settled)) return;
     this._epoch++;
+    this._target = target;
+    if (settled) return;
 
     // ── Smooth pickup: capture current velocity before resetting run state ──
     const currentVelocity = this._velocity; // units/s
@@ -293,7 +289,6 @@ export class MotionValue {
 
     // ── Reset run state ──────────────────────────────────────────────────
     this._from = this._value;
-    this._target = target;
     this._range = range;
     this._v0Normalized = v0Normalized;
     // Новый origin принадлежит последнему опубликованному snapshot, а не
@@ -456,9 +451,9 @@ export class MotionValue {
 
     // Emit value. bounded=true (default): CSS-safe clamp to [from, target].
     // bounded=false: honest trajectory — underdamped overshoot is emitted.
-    const outputRange = this._target - this._from;
-    const lo = outputRange >= 0 ? this._from : this._target;
-    const hi = outputRange >= 0 ? this._target : this._from;
+    const forward = this._target >= this._from;
+    const lo = forward ? this._from : this._target;
+    const hi = forward ? this._target : this._from;
     const clampedValue = this._clamp ? Math.max(lo, Math.min(hi, rawValue)) : rawValue;
 
     // Единый снап-в-target: сходимость ИЛИ финальный CSS-страж (инвариант 2) —
