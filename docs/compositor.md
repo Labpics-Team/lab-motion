@@ -127,7 +127,7 @@ panel.destroy();
 Если host отвергнет successor до commit, live donor остаётся управляемым.
 Реентрантный новый intent отзывает возвращающийся stale effect.
 
-Путь выбирается по прежнему capability-контракту. В RAF/reduced-среде и при
+Путь выбирается по-прежнему по capability-контракту. В RAF/reduced-среде и при
 невыразимом serialized impulse движение продолжает тот же live-owner; `.mode`
 показывает фактическое представление. Native release не вызывает собственных
 покадровых callbacks. Ранее выданный RAF callback исполняется один раз как

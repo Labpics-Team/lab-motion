@@ -134,8 +134,11 @@ function constructorExportOrigins(sources) {
       `${path}.ts`, `${path}.tsx`, resolve(path, 'index.ts'), resolve(path, 'index.tsx')]
       .find(candidate => modules.has(candidate));
   };
-  const exportsConstructor = (file, moduleName) => isErrorsModule(moduleName) ||
-    constructorModules.has(targetModule(resolve(file), moduleName));
+  const exportsConstructor = (file, moduleName) => {
+    const target = targetModule(resolve(file), moduleName);
+    return target !== undefined ? constructorModules.has(target) :
+      moduleName.startsWith('.') && isErrorsModule(moduleName);
+  };
 
   for (const [file, sourceFile] of modules) {
     const dependencies = [];

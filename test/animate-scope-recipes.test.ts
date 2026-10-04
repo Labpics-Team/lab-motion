@@ -58,7 +58,8 @@ it('runnable DOM setup снимает listener при броске; React recipe
     });
     const inputs = Object.keys(result.metafile!.inputs).map(path => resolve(root, path));
     expect(inputs.some(path => path.startsWith(packageRoot + sep))).toBe(true);
-    expect(inputs.some(path => path.startsWith(join(root, 'dist') + sep))).toBe(false);
+    expect(inputs.filter(path => path.startsWith(join(root, 'dist') + sep)
+      || path.startsWith(join(root, 'src') + sep))).toEqual([]);
     expect(execFileSync(process.execPath, [out], { cwd: root, encoding: 'utf8', timeout: 30_000 })).toContain('scope-recipes: PASS');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }, 120_000);
