@@ -23,6 +23,11 @@ export async function verifyJourneyTuple(page: Page, info: TestInfo): Promise<vo
   expect(bundle.ok()).toBe(true); expect(followBundle.ok()).toBe(true);
   const bytes = await archive.body();
   const sha256 = digest(bytes);
+  // Local globalSetup владеет expected bytes и при PW_REUSE_SERVER=1:
+  // взаимно согласованный foreign server не может удостоверить сам себя.
+  const expectedArchiveSha256 = digest(readFileSync(
+    new URL('../.artifacts/compositor-follow-package.tgz', import.meta.url)));
+  expect(sha256).toBe(expectedArchiveSha256);
   expect(sha256).toBe(scope.tarball.sha256);
   expect(`sha512-${createHash('sha512').update(bytes).digest('base64')}`).toBe(scope.tarball.integrity);
   // Два receipt могут ошибочно сообщить один hash; реальные архивы должны совпасть.
@@ -42,6 +47,6 @@ export async function verifyJourneyTuple(page: Page, info: TestInfo): Promise<vo
   }
   info.annotations.push({ type: 'package-sha256', description: sha256 });
   await info.attach('journey-package-tuple', { contentType: 'application/json', body: JSON.stringify({
-    scope, follow, browser: page.context().browser()?.version(), project: info.project.name,
+    scope, follow, expectedArchiveSha256, browser: page.context().browser()?.version(), project: info.project.name,
   }) });
 }
