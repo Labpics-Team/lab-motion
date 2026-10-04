@@ -1,5 +1,6 @@
 import { CompositorSpring } from '@labpics/motion/compositor';
 import { createDecay } from '@labpics/motion/decay';
+import { createVelocityTracker } from '@labpics/motion/gestures';
 import './style.css';
 
 type Place = { id: string; number: string; title: string; time: string; description: string; duration: string; next: string; note: string };
@@ -49,6 +50,7 @@ function mountSheet() {
   let anchor = 0;
   let coordinate = 0;
   let live: ReturnType<CompositorSpring['handoffToLive']> | undefined;
+  const velocity = createVelocityTracker();
   const quiet = () => noMotion || reduced.matches;
   const format = (value: number) => `translateY(${value}px)`;
   const motion = new CompositorSpring({
@@ -80,16 +82,17 @@ function mountSheet() {
   const follow = (event: PointerEvent) => {
     if (event.pointerId !== pointer || !live) return;
     coordinate = event.clientY;
+    velocity.push({ x: event.clientX, y: event.clientY, t: event.timeStamp / 1000 });
     const goal = bounded(anchor + coordinate);
     if (quiet()) live.snapTo(goal); else live.setTarget(goal);
   };
   const finish = (event: PointerEvent, cancelled: boolean) => {
     if (event.pointerId !== pointer || !live) return;
     if (!cancelled) follow(event);
-    // Быстрое отпускание может случиться до следующего кадра spring: value ещё
-    // отражает старую позицию, а последняя координата указателя уже известна.
+    // До следующего кадра spring.value и spring.velocity могут быть старыми.
+    // Положение и скорость отпускания берём из одного жеста указателя.
     const releaseGoal = bounded(anchor + event.clientY);
-    const rest = createDecay({ from: releaseGoal, velocity: live.velocity }).rest;
+    const rest = createDecay({ from: releaseGoal, velocity: velocity.velocity().vy }).rest;
     const next = cancelled ? selected : points.reduce((best, value, index) =>
       Math.abs(value - rest) < Math.abs(points[best]! - rest) ? index : best, 0);
     select(next);
@@ -98,6 +101,7 @@ function mountSheet() {
     if (!event.isPrimary || event.button !== 0 || pointer !== undefined) return;
     event.preventDefault(); handle.focus({ preventScroll: true });
     live = motion.handoffToLive(); coordinate = event.clientY; anchor = live.value - coordinate;
+    velocity.reset(); velocity.push({ x: event.clientX, y: event.clientY, t: event.timeStamp / 1000 });
     pointer = event.pointerId; handle.setPointerCapture(pointer);
   }, { signal: events.signal });
   handle.addEventListener('pointermove', follow, { signal: events.signal });
