@@ -26,14 +26,15 @@ const next = document.querySelector<HTMLButtonElement>('#next')!;
 const marksList = document.querySelector<HTMLOListElement>('#marks')!;
 const time = (seconds: number) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 const cueIndex = () => cues.findLastIndex(cue => cue.at <= position);
-// Держим трёхпиксельный курсор внутри дорожки даже на крайних значениях.
-const coordinate = () => 1 + (rtl ? 1 - position / duration : position / duration) * 98;
+const coordinate = () => (rtl ? 1 - position / duration : position / duration) * 100;
+const cursorLeft = (value: number) => value <= 0 ? '0px' : value >= 100 ? 'calc(100% - 3px)' : `calc(${value}% - ${rtl ? 1.6 : 1.4}px)`;
 const prefersQuiet = () => quiet || reduced.matches;
+document.querySelector<HTMLElement>('.segments')!.style.gridTemplateColumns = cues.map((cue, index) => `${(cues[index + 1]?.at ?? duration) - cue.at}fr`).join(' ');
 function makeMotion() {
   return new CompositorSpring({
     spring: { mass: 1, stiffness: 230, damping: 27 }, property: 'left',
     from: coordinate(), to: coordinate(), target: cursor,
-    format: value => `${value}%`, apply: value => { cursor.style.left = String(value); },
+    format: cursorLeft, apply: value => { cursor.style.left = String(value); },
     matchMedia: () => ({ matches: prefersQuiet() }),
   });
 }

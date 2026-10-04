@@ -18,7 +18,7 @@ p{line-height:1.6}
 .meta{font-size:13px;color:#6d7a73;margin-bottom:18px}
 .meta strong{font:32px Georgia,serif;color:#9f6248;margin-left:10px}
 .track{height:122px;position:relative;padding:12px 0;border-block:1px solid #dce4da;background:repeating-linear-gradient(90deg,#f3f6ef 0 10px,#fffefa 10px 18px)}
-.segments{height:100%;display:grid;grid-template-columns:1fr 1.4fr 1.1fr 1fr;gap:4px}
+.segments{height:100%;display:grid;grid-template-columns:repeat(4,1fr);gap:0}
 .segments span{background:#dfeae1;border-radius:5px;display:grid;place-items:center;text-align:center;padding:4px;color:#486a5a;font-size:12px}
 .segments span:nth-child(2){background:#d7e6df}
 .segments span:nth-child(3){background:#e8e3d7}

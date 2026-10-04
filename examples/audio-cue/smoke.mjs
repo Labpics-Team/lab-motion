@@ -11,6 +11,19 @@ try {
   await page.goto('http://127.0.0.1:4180/', { waitUntil: 'networkidle' });
   const seek = page.locator('#seek');
   if (await page.locator('#cue-title').textContent() !== 'Вступление') throw new Error('Начальный фрагмент неверен');
+  await page.locator('#quiet').click();
+  for (const [at, expected] of [[142, 2], [145, 3]]) {
+    await seek.evaluate((element, value) => { element.value = String(value); element.dispatchEvent(new Event('input', { bubbles: true })); }, at);
+    const visual = await page.locator('#cursor').evaluate(cursor => {
+      const x = cursor.getBoundingClientRect().left + cursor.getBoundingClientRect().width / 2;
+      return [...document.querySelectorAll('.segments span')].findIndex(segment => {
+        const rect = segment.getBoundingClientRect(); return rect.left <= x && x <= rect.right;
+      });
+    });
+    if (visual !== expected) throw new Error(`В ${at} с визуальный фрагмент ${visual}, ожидался ${expected}`);
+  }
+  await page.locator('#quiet').click();
+  await seek.evaluate(element => { element.value = '0'; element.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.locator('#next').click();
   if (await seek.inputValue() !== '40') throw new Error('Переход не установил границу фрагмента');
   await page.locator('#note').fill('Убрать паузу после первого слова');
@@ -31,6 +44,17 @@ try {
   await page.locator('#direction').click();
   if (await seek.getAttribute('dir') !== 'rtl') throw new Error('RTL не применён');
   await page.setViewportSize({ width: 390, height: 800 });
+  await page.locator('#quiet').click();
+  for (const [at, expected] of [[142, 2], [145, 3]]) {
+    await seek.evaluate((element, value) => { element.value = String(value); element.dispatchEvent(new Event('input', { bubbles: true })); }, at);
+    const visual = await page.locator('#cursor').evaluate(cursor => {
+      const x = cursor.getBoundingClientRect().left + cursor.getBoundingClientRect().width / 2;
+      return [...document.querySelectorAll('.segments span')].findIndex(segment => {
+        const rect = segment.getBoundingClientRect(); return rect.left <= x && x < rect.right;
+      });
+    });
+    if (visual !== expected) throw new Error(`В RTL при ${at} с визуальный фрагмент ${visual}, ожидался ${expected}`);
+  }
   await seek.focus(); await page.keyboard.press('Home');
   if (await seek.inputValue() !== '0') throw new Error('Начало шкалы недостижимо');
   const inside = await page.locator('#cursor').evaluate(e => {
@@ -38,7 +62,6 @@ try {
     return cursor.left >= track.left - 1 && cursor.right <= track.right + 1;
   });
   if (!inside) throw new Error('Курсор вышел из мобильной RTL шкалы');
-  await page.locator('#quiet').click();
   await page.locator('#next').click();
   if (await page.locator('#cursor').evaluate(e => e.getAnimations().length) !== 0) throw new Error('Ручной режим без движения анимировал курсор');
   await page.locator('#quiet').click();
