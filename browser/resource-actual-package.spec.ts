@@ -6,8 +6,21 @@ import { expect, test } from './fixtures/harness';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 type CompositorPackage = Pick<typeof import('../src/compositor/index.js'), 'CompositorSpring'>;
+type ResourceReachability = {
+  terminal: Array<WeakRef<HTMLElement>>;
+  live: WeakRef<HTMLElement>;
+  dropped: WeakRef<HTMLElement>;
+  droppedOwner: WeakRef<InstanceType<CompositorPackage['CompositorSpring']>>;
+  deliberate: WeakRef<HTMLElement>;
+  liveOwner: InstanceType<CompositorPackage['CompositorSpring']>;
+  deliberateOwner: HTMLElement | undefined;
+};
+type ResourcePage = typeof globalThis & {
+  __resourceTerminalOwners?: unknown[];
+  __resourceReachability?: ResourceReachability;
+};
 
-test('RESOURCE-01: 10 000 native/live/serialized циклов фактического tarball освобождают Animation owners и jobs', async ({ page, browserName }, info) => {
+test('RESOURCE-01: 10 000 native/live/serialized циклов фактического tarball освобождают Animation, jobs и DOM-цели', async ({ page, browserName }, info) => {
   test.setTimeout(90_000);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   const tuple = readFileSync(join(ROOT, 'browser/.artifacts/scope-recipes.package.json'));
@@ -77,11 +90,13 @@ test('RESOURCE-01: 10 000 native/live/serialized циклов фактическ
     assert(requests === 0 && queue.length === 0, 'автономные controls создали собственный frame');
 
     const retained = [];
+    const terminal: Array<WeakRef<HTMLElement>> = [];
     let cycles = 0, hostTurns = 0;
     let maximumCycleEffects = 0;
     const beforeEffects = createdEffects;
     for (let cycle = 0; cycle < 10_000; cycle++) {
       const element = target();
+      terminal.push(new WeakRef(element));
       const controller = owner(element);
       const beforeNative = requests;
       controller.start(); animation(element);
@@ -137,7 +152,20 @@ test('RESOURCE-01: 10 000 native/live/serialized циклов фактическ
     deliberate.cancel(); deliberateTarget.remove();
     const releasedRemaining = document.getAnimations().length;
     assert(releasedRemaining === 0, 'контрольное native ownership не освобождено');
-    (globalThis as typeof globalThis & { __resourceTerminalOwners?: unknown[] }).__resourceTerminalOwners = retained;
+    (globalThis as ResourcePage).__resourceTerminalOwners = retained;
+    // Все цели detached: document не подменяет сильное владение библиотеки.
+    // Живой controller удерживается, затем destroy проверяется на том же root.
+    const liveDom = target();
+    liveDom.remove();
+    const deliberateDom = document.createElement('div');
+    const droppedDom = document.createElement('div');
+    const droppedOwner = owner(droppedDom);
+    (globalThis as ResourcePage).__resourceReachability = {
+      terminal,
+      live: new WeakRef(liveDom), liveOwner: owner(liveDom),
+      dropped: new WeakRef(droppedDom), droppedOwner: new WeakRef(droppedOwner),
+      deliberate: new WeakRef(deliberateDom), deliberateOwner: deliberateDom,
+    };
 
     return { cycles, hostTurns, observedCycleEffects, maximumCycleEffects, retainedTerminalOwners: retained.length,
       terminalAnimations: document.getAnimations().length, terminalJobs: queue.length,
@@ -154,4 +182,33 @@ test('RESOURCE-01: 10 000 native/live/serialized циклов фактическ
   expect(report.retainedTerminalOwners).toBe(20_000);
   expect(report.terminalAnimations).toBe(0);
   expect(report.terminalJobs).toBe(0);
+
+  const collect = async () => {
+    // GC — отдельная проверка достижимости после возврата browser job;
+    // число собранных объектов не превращается в heap/raster/GPU bytes.
+    for (let round = 0; round < 4; round++) await page.requestGC();
+    return page.evaluate(() => {
+      const refs = (globalThis as ResourcePage).__resourceReachability!;
+      return {
+        observedTargets: refs.terminal.length,
+        terminal: refs.terminal.filter(ref => ref.deref() !== undefined).length,
+        live: Number(refs.live.deref() !== undefined),
+        dropped: Number(refs.dropped.deref() !== undefined),
+        droppedOwner: Number(refs.droppedOwner.deref() !== undefined),
+        deliberate: Number(refs.deliberate.deref() !== undefined),
+      };
+    });
+  };
+  const beforeRelease = await collect();
+  expect(beforeRelease).toEqual({ observedTargets: 10_000, terminal: 0, live: 1, dropped: 0, droppedOwner: 0, deliberate: 1 });
+  await page.evaluate(() => {
+    const refs = (globalThis as ResourcePage).__resourceReachability!;
+    refs.liveOwner.destroy();
+    refs.deliberateOwner = undefined;
+  });
+  const afterRelease = await collect();
+  expect(afterRelease).toEqual({ observedTargets: 10_000, terminal: 0, live: 0, dropped: 0, droppedOwner: 0, deliberate: 0 });
+  await info.attach('resource-dom-reachability', {
+    body: JSON.stringify({ browserName, beforeRelease, afterRelease }, null, 2), contentType: 'application/json',
+  });
 });
