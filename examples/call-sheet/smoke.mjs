@@ -1,6 +1,9 @@
-import { chromium } from '@playwright/test';
+import { chromium, firefox, webkit } from '@playwright/test';
 
-const browser = await chromium.launch({ headless: true });
+const engineName = process.env.MOTION_BROWSER ?? 'chromium';
+const engine = { chromium, firefox, webkit }[engineName];
+if (!engine) throw new Error(`Неизвестный браузер: ${engineName}`);
+const browser = await engine.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1220, height: 900 } });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
@@ -22,6 +25,8 @@ try {
   if (await page.evaluate(() => document.activeElement?.closest('[data-id]')?.getAttribute('data-id')) !== 'portrait') throw new Error('Escape потерял фокус');
   const title = page.locator('[data-id="portrait"] [data-title]');
   await title.fill('Портрет — вечерний свет');
+  if (await page.locator('[data-id="portrait"] [data-grip]').getAttribute('aria-label') !== 'Переместить «Портрет — вечерний свет»') throw new Error('Редактирование не обновило имя в управлении сценой');
+  if (await page.locator('[data-id="portrait"] [data-remove]').getAttribute('aria-label') !== 'Удалить «Портрет — вечерний свет»') throw new Error('Редактирование не обновило имя в удалении');
   await page.locator('[data-id="portrait"] [data-minutes]').fill('65');
   await page.locator('[data-id="portrait"] [data-minutes]').blur();
   if (await page.locator('#finish-label').textContent() !== 'Окончание 11:45') throw new Error('Длительность не пересчитала конец дня');
@@ -33,12 +38,22 @@ try {
   await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 6 }); await page.mouse.up();
   if (await rows.first().getAttribute('data-id') === 'window') throw new Error('Pointer не переместил строку');
   if (await title.inputValue() !== 'Портрет — вечерний свет') throw new Error('Правка названия потеряна после перестановки');
+  if (await page.locator('[data-id="portrait"] [data-minutes]').getAttribute('aria-label') !== 'Длительность сцены Портрет — вечерний свет в минутах') throw new Error('Перестановка потеряла доступное название');
   await page.waitForTimeout(450);
   await page.screenshot({ path: 'examples/call-sheet/.artifacts/desktop.png', fullPage: true });
   await page.locator('#direction').click();
   if (await page.locator('#schedule').getAttribute('dir') !== 'rtl') throw new Error('RTL не применён');
   await page.locator('#quiet').click();
   if (await page.locator('#quiet').getAttribute('aria-pressed') !== 'true') throw new Error('Без движения не включено');
+  await page.locator('[data-id="window"] [data-move="next"]').click();
+  if (await page.locator('#schedule').evaluate(element => element.getAnimations({ subtree: true }).length) !== 0) throw new Error('Режим без движения запустил анимацию');
+  await page.locator('#quiet').click();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.locator('[data-id="window"] [data-move="previous"]').click();
+  if (await page.locator('#schedule').evaluate(element => element.getAnimations({ subtree: true }).length) !== 0) throw new Error('Системное ограничение движения запустило анимацию');
+  await page.locator('#filter').selectOption('done');
+  await page.locator('#filter').selectOption('ready');
+  if (await page.locator('[data-id="portrait"] [data-grip]').getAttribute('aria-label') !== 'Переместить «Портрет — вечерний свет»') throw new Error('Фильтр потерял доступное название');
   await page.locator('#filter').selectOption('done');
   await page.locator('[data-id="detail"] [data-remove]').click();
   if (!await page.locator('#empty').isVisible()) throw new Error('Пустое представление не показано');
@@ -50,12 +65,14 @@ try {
   await page.setViewportSize({ width: 390, height: 800 });
   const longTitle = 'Длинное название сцены о разговоре героев на набережной после заката';
   await page.locator('[data-id="portrait"] [data-title]').fill(longTitle);
-  const readable = await page.locator('[data-id="portrait"] [data-title]').evaluate(element =>
-    element.scrollHeight <= element.clientHeight + 1 && element.getBoundingClientRect().right <= innerWidth);
+  const readable = await page.locator('[data-id="portrait"] [data-title]').evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    return element.scrollHeight <= element.clientHeight + 1 && rect.left >= 0 && rect.right <= innerWidth;
+  });
   if (!readable) throw new Error('Длинное название обрезано в мобильном RTL');
   await page.screenshot({ path: 'examples/call-sheet/.artifacts/mobile.png', fullPage: true });
   await page.evaluate(() => { dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
   await page.locator('[data-id="portrait"] [data-move="previous"]').click();
   if (errors.length) throw new Error(`Ошибки страницы: ${errors.join('; ')}`);
-  process.stdout.write('Call sheet smoke: PASS\n');
+  process.stdout.write(`Call sheet smoke (${engineName}): PASS\n`);
 } finally { await browser.close(); }

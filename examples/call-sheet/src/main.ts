@@ -97,7 +97,12 @@ function reset() { finish(); controller.destroy(); controller = makeController()
 const rowFor = (target: EventTarget | null) => target instanceof Element ? target.closest<HTMLElement>('[data-id]') : null;
 list.addEventListener('input', event => {
   const input = event.target as HTMLTextAreaElement; if (!input.matches('[data-title]')) return;
-  const row = rowFor(input); if (row) byId(row.dataset.id!).title = input.value;
+  const row = rowFor(input); if (!row) return;
+  byId(row.dataset.id!).title = input.value;
+  input.setAttribute('aria-label', `Название сцены ${input.value}`);
+  row.querySelector('[data-grip]')!.setAttribute('aria-label', `Переместить «${input.value}»`);
+  row.querySelector('[data-minutes]')!.setAttribute('aria-label', `Длительность сцены ${input.value} в минутах`);
+  row.querySelector('[data-remove]')!.setAttribute('aria-label', `Удалить «${input.value}»`);
 });
 list.addEventListener('change', event => {
   const input = event.target as HTMLInputElement; if (!input.matches('[data-minutes]')) return;
