@@ -129,16 +129,19 @@ test('RESOURCE-01: 10 000 native/live/serialized циклов фактическ
     }
     const observedCycleEffects = createdEffects - beforeEffects;
     assert(observedCycleEffects === cycles * 3, 'неполный знаменатель start/retarget/serialized commit');
-    assert(document.getAnimations().length === 2, 'живые controls были потеряны либо terminal effects остались');
+    const beforeRelease = document.getAnimations().length;
+    assert(beforeRelease === 2, 'живые controls были потеряны либо terminal effects остались');
     live.destroy(); liveTarget.remove();
-    assert(document.getAnimations().length === 1, 'deliberate effect не обнаруживается отдельно от live owner');
+    const deliberateRemaining = document.getAnimations().length;
+    assert(deliberateRemaining === 1, 'deliberate effect не обнаруживается отдельно от live owner');
     deliberate.cancel(); deliberateTarget.remove();
-    assert(document.getAnimations().length === 0, 'контрольное native ownership не освобождено');
+    const releasedRemaining = document.getAnimations().length;
+    assert(releasedRemaining === 0, 'контрольное native ownership не освобождено');
     (globalThis as typeof globalThis & { __resourceTerminalOwners?: unknown[] }).__resourceTerminalOwners = retained;
 
     return { cycles, hostTurns, observedCycleEffects, maximumCycleEffects, retainedTerminalOwners: retained.length,
       terminalAnimations: document.getAnimations().length, terminalJobs: queue.length,
-      controls: { live: 1, deliberate: 1, released: 0 },
+      controls: { beforeRelease, afterLiveRelease: deliberateRemaining, afterRelease: releasedRemaining },
       memory: { rasterGpu: 'не измерены: DOM Animation ownership не является GPU byte-измерением' } };
   });
   await info.attach('resource-native-ownership', {

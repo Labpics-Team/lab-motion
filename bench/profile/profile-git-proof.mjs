@@ -22,13 +22,14 @@ export const PREREG_OWN_PATHS = Object.freeze([
 
 export function makeGit(fail) {
   const head = (cwd) => {
+    let state;
     try {
-      const state = readCheckoutState(cwd);
-      if (state.dirty) fail('измерение требует clean checkout');
-      return state.revision;
+      state = readCheckoutState(cwd);
     } catch {
       fail('git недоступен для доказательства provenance');
     }
+    if (state.dirty) fail('измерение требует clean checkout');
+    return state.revision;
   };
   const blob = (cwd, rev, path) => {
     try {
@@ -46,7 +47,7 @@ export function makeGit(fail) {
   };
   const diffNames = (cwd, base, headRef) => {
     try {
-      const output = execFileSync('git', ['--no-replace-objects', 'diff', '--name-only', `${base}`, `${headRef}`], { cwd, encoding: 'utf8' });
+      const output = execFileSync('git', ['--no-replace-objects', 'diff', '--no-renames', '--name-only', `${base}`, `${headRef}`], { cwd, encoding: 'utf8' });
       return output.split('\n').map((line) => line.trim()).filter(Boolean);
     } catch {
       fail(`git не смог доказать эквивалентность дерева ${base}..${headRef}`);

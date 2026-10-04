@@ -35,6 +35,8 @@ describe('RESOURCE-01: реальные байты установленного 
     mkdirSync(EVIDENCE, { recursive: true });
     evidenceRun = mkdtempSync(join(EVIDENCE, 'run-'));
     work = mkdtempSync(join(tmpdir(), 'resource-actual-package-'));
+    execFileSync(NPM, ['run', 'build'], { cwd: ROOT, stdio: 'pipe', shell: WINDOWS_SHELL, timeout: 120_000 });
+    const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).trim();
     const packed = JSON.parse(execFileSync(NPM, [
       'pack', '--ignore-scripts', '--json', '--pack-destination', shellPath(work),
     ], { cwd: ROOT, encoding: 'utf8', shell: WINDOWS_SHELL, timeout: 30_000 })) as Array<{ filename: string }>;
@@ -59,6 +61,7 @@ describe('RESOURCE-01: реальные байты установленного 
     writeFileSync(join(evidenceRun, 'package-tuple.json'), JSON.stringify({
       node: process.version, platform: process.platform,
       head: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: 'utf8' }).trim(),
+      dirty,
       tarballSha256: digest(readFileSync(tarball)), installedRuntimeSha256: files,
       fixtureSha256: digest(readFileSync(join(ROOT, 'test/fixtures/resource-package-probe.mjs'))),
     }, null, 2) + '\n');
