@@ -92,6 +92,6 @@ directionButton.addEventListener('click', () => {
   directionButton.setAttribute('aria-pressed', String(rtl));
   motion.destroy(); motion = makeMotion(); render(false);
 });
-window.addEventListener('pagehide', () => { motion.destroy(); });
+window.addEventListener('pagehide', event => { if (event.persisted) motion.destroy(); });
 window.addEventListener('pageshow', event => { if (event.persisted) { motion = makeMotion(); render(false); } });
 render(false);

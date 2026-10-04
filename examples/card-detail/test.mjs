@@ -11,6 +11,9 @@ const receipt = JSON.parse(readFileSync(new URL('./.artifacts/package.json', imp
 const installedBytes = readFileSync(new URL('./node_modules/@labpics/motion/package.json', import.meta.url));
 const installed = JSON.parse(installedBytes);
 const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+if (execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim()) {
+  throw new Error('Рабочее дерево изменено после подготовки архива');
+}
 const digest = createHash('sha256').update(installedBytes).digest('hex');
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const archiveDigest = hash(readFileSync(new URL('./.artifacts/package.tgz', import.meta.url)));

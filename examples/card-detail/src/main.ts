@@ -87,7 +87,6 @@ document.addEventListener('keydown', event => {
 motionButton.addEventListener('click', () => {
   noMotion = !noMotion;
   motionButton.setAttribute('aria-pressed', String(noMotion));
-  motionButton.textContent = noMotion ? 'Включить движение' : 'Без движения';
   if (noMotion) projection.cancel();
   status.textContent = noMotion ? 'Движение выключено' : 'Движение включено';
 });

@@ -13,7 +13,7 @@ try {
   if (await cards.count() !== 4) throw new Error('Исходная коллекция не показана');
   await page.locator('[data-id="b"] [data-move="previous"]').click();
   if (await cards.first().getAttribute('data-id') !== 'b') throw new Error('Перестановка не сохранилась');
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-id]')].every(card => card.style.transform === ''));
   const grip = page.locator('[data-id="b"] [data-grip]');
   const target = page.locator('[data-id="d"]');
   const from = await grip.boundingBox(); const to = await target.boundingBox();

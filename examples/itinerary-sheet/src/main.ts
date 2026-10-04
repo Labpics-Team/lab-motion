@@ -155,4 +155,4 @@ document.querySelector<HTMLFormElement>('#note-form')!.addEventListener('submit'
   event.preventDefault(); current.note = note.value; noteStatus.textContent = `Заметка к точке «${current.title}» сохранена`;
 });
 window.addEventListener('pagehide', () => controller.destroy());
-window.addEventListener('pageshow', event => { if (event.persisted) controller = mountSheet(); });
+window.addEventListener('pageshow', event => { if (event.persisted) remount(); });

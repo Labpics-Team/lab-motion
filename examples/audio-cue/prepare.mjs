@@ -49,9 +49,10 @@ try {
     }
   }
   mkdirSync(dirname(receiptPath), { recursive: true });
+  const sourceDirty = execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8' }).trim().length > 0;
+  if (sourceDirty) throw new Error('Рабочее дерево изменено: архив нельзя связать с HEAD');
   writeFileSync(receiptPath, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'],
-    { cwd: root, encoding: 'utf8' }).trim(), sourceDirty: execFileSync('git', ['status', '--porcelain'],
-    { cwd: root, encoding: 'utf8' }).trim().length > 0, archiveSha256: hash(bytes),
+    { cwd: root, encoding: 'utf8' }).trim(), sourceDirty, archiveSha256: hash(bytes),
     manifestSha256: hash(installedManifest), npmVersion, package: manifest.name, version: manifest.version }, null, 2) + '\n');
   process.stdout.write(`Монтажная шкала: установлен архив ${hash(bytes)}\n`);
 } finally {
