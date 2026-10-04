@@ -1,0 +1,74 @@
+import { chromium, firefox, webkit } from '@playwright/test';
+
+const browsers = { chromium, firefox, webkit };
+const browserName = process.env.MOTION_BROWSER ?? 'chromium';
+if (!Object.hasOwn(browsers, browserName)) throw new Error(`Неподдерживаемый браузер: ${browserName}`);
+const browser = await browsers[browserName].launch({ headless: true });
+const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+try {
+  await page.goto('http://127.0.0.1:4177/', { waitUntil: 'networkidle' });
+  const cards = page.locator('[data-id]');
+  if (await cards.count() !== 4) throw new Error('Исходная коллекция не показана');
+  await page.locator('[data-id="b"] [data-move="previous"]').click();
+  if (await cards.first().getAttribute('data-id') !== 'b') throw new Error('Перестановка не сохранилась');
+  await page.waitForTimeout(600);
+  const grip = page.locator('[data-id="b"] [data-grip]');
+  const target = page.locator('[data-id="d"]');
+  const from = await grip.boundingBox(); const to = await target.boundingBox();
+  if (!from || !to) throw new Error('Карточки не измерены');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 5 });
+  await page.mouse.up();
+  if (await cards.last().getAttribute('data-id') !== 'b') throw new Error('Pointer перестановка не сохранилась');
+  await page.locator('#filter').selectOption('queue');
+  if (await cards.count() !== 2) throw new Error('Фильтр не применён');
+  await page.locator('[data-id="b"] [data-grip]').focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Home');
+  if (await cards.first().getAttribute('data-id') !== 'b') throw new Error('Клавиатурная перестановка не сохранилась');
+  if (await page.evaluate(() => document.activeElement?.closest('[data-id]')?.getAttribute('data-id')) !== 'b') throw new Error('Фокус потерян');
+  await page.keyboard.press('Escape');
+  if (await cards.last().getAttribute('data-id') !== 'b') throw new Error('Escape не вернул порядок');
+  if (await page.evaluate(() => document.activeElement?.closest('[data-id]')?.getAttribute('data-id')) !== 'b') throw new Error('Escape потерял фокус');
+  await page.locator('[data-id="d"] [data-grip]').focus();
+  await page.keyboard.press('Enter');
+  await page.locator('#filter').focus();
+  if (await page.locator('[data-id="d"] [data-grip]').getAttribute('aria-pressed') !== 'false') throw new Error('Сессия осталась активной после ухода фокуса');
+  await page.locator('[data-id="b"] [data-grip]').focus();
+  await page.keyboard.press('Enter');
+  if (await page.locator('[data-id="b"] [data-grip]').getAttribute('aria-pressed') !== 'true') throw new Error('Новая кнопка не начала сессию');
+  await page.keyboard.press('Enter');
+  await page.locator('#direction').click();
+  if (await page.locator('#shelf').getAttribute('dir') !== 'rtl') throw new Error('RTL не включился');
+  await page.locator('#motion').click();
+  if (await page.locator('#motion').getAttribute('aria-pressed') !== 'true') throw new Error('Режим без движения не включился');
+  await page.locator('#filter').selectOption('done');
+  await page.locator('[data-id="c"] [data-remove]').click();
+  if (!await page.locator('#empty').isVisible()) throw new Error('Пустое состояние не показано');
+  await page.locator('#filter').selectOption('all');
+  await page.locator('#new-title').fill('Новая книга');
+  await page.locator('#add-form button').click();
+  if (!await page.getByRole('heading', { name: 'Новая книга' }).isVisible()) throw new Error('Добавление не показано');
+  await page.evaluate(() => {
+    dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+    dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+  });
+  const beforeRestoreMove = await cards.allTextContents();
+  await page.locator('[data-id="b"] [data-move="previous"]').click();
+  if (JSON.stringify(await cards.allTextContents()) === JSON.stringify(beforeRestoreMove)) throw new Error('Контроллер не восстановлен после возврата страницы');
+  await page.setViewportSize({ width: 320, height: 700 });
+  const inputFits = await page.evaluate(() => {
+    document.body.style.zoom = '200%';
+    const input = document.querySelector('#new-title').getBoundingClientRect();
+    const form = document.querySelector('#add-form').getBoundingClientRect();
+    return input.right <= form.right + 1;
+  });
+  if (!inputFits) throw new Error('Поле добавления вышло за форму при увеличении');
+  if (errors.length) throw new Error(`Ошибки страницы: ${errors.join('; ')}`);
+  process.stdout.write(`Reading shelf smoke (${browserName}): PASS\n`);
+} finally {
+  await browser.close();
+}
