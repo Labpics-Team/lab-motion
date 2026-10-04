@@ -11,12 +11,14 @@ pnpm exec tsc -p examples/reading-shelf/tsconfig.json
 pnpm exec vite build --config examples/reading-shelf/vite.config.mjs
 ```
 
+При запущенном сервере на порту 4177 smoke-сценарий проверяется командой `node examples/reading-shelf/smoke.mjs`. Переменная `MOTION_BROWSER` выбирает `chromium`, `firefox` или `webkit`; без неё используется Chromium.
+
 ## Запуск
 
 Команда ниже запускает сервер и занимает терминал до остановки:
 
 ```sh
-pnpm exec vite --config examples/reading-shelf/vite.config.mjs
+pnpm exec vite --config examples/reading-shelf/vite.config.mjs --host 127.0.0.1 --port 4177 --strictPort
 ```
 
 `prepare.mjs` заново собирает корневой пакет, затем создаёт `node_modules` внутри примера и устанавливает туда архив `npm pack`. `.artifacts/package.json` содержит SHA-256 архива и манифеста, версию npm, наблюдаемый исходный commit и признак грязного рабочего дерева. Commit и признак чистоты сами по себе не удостоверяют воспроизводимость сборки; точная идентичность используемых байтов — SHA-256 архива. Для проверки жеста возьмите кнопку «Переместить» мышью или нажмите на ней Enter, затем стрелки и Enter. Escape возвращает порядок до начала клавиатурного жеста; кнопки «Раньше» и «Позже» доступны отдельно. Фильтр, смена направления и добавление обновляют снимок списка.

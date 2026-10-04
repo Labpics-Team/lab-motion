@@ -1,6 +1,9 @@
-import { chromium } from '@playwright/test';
+import { chromium, firefox, webkit } from '@playwright/test';
 
-const browser = await chromium.launch({ headless: true });
+const browsers = { chromium, firefox, webkit };
+const browserName = process.env.MOTION_BROWSER ?? 'chromium';
+if (!Object.hasOwn(browsers, browserName)) throw new Error(`Неподдерживаемый браузер: ${browserName}`);
+const browser = await browsers[browserName].launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
@@ -65,7 +68,7 @@ try {
   });
   if (!inputFits) throw new Error('Поле добавления вышло за форму при увеличении');
   if (errors.length) throw new Error(`Ошибки страницы: ${errors.join('; ')}`);
-  process.stdout.write('Reading shelf smoke: PASS\n');
+  process.stdout.write(`Reading shelf smoke (${browserName}): PASS\n`);
 } finally {
   await browser.close();
 }
