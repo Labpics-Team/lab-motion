@@ -36,20 +36,33 @@ try {
   await page.setViewportSize({ width: 430, height: 650 });
   await page.locator('[data-snap="2"]').click();
   await page.waitForTimeout(500);
-  async function upwardDrag(dwellMs) {
+  async function upwardDrag(dwellMs, amount = 220, shouldOpen = true) {
     const box = await page.locator('#handle').boundingBox();
     if (!box) throw new Error('Ручка не видна');
     const dragX = box.x + box.width / 3, dragY = box.y + box.height / 2;
     await page.mouse.move(dragX, dragY); await page.mouse.down();
-    await page.mouse.move(dragX, dragY - 220, { steps: 8 });
+    await page.mouse.move(dragX, dragY - amount, { steps: 8 });
     if (dwellMs) await page.waitForTimeout(dwellMs);
     await page.mouse.up();
-    if (await state.textContent() === 'Панель закрыта') throw new Error(`Жест 220px с ожиданием ${dwellMs}ms оставил панель закрытой`);
+    const opened = await state.textContent() !== 'Панель закрыта';
+    if (opened !== shouldOpen) throw new Error(`Жест ${amount}px с ожиданием ${dwellMs}ms выбрал неверное положение`);
   }
   await upwardDrag(0);
   await page.locator('[data-snap="2"]').click(); await page.waitForTimeout(500);
   await upwardDrag(100);
   await page.locator('[data-snap="2"]').click(); await page.waitForTimeout(500);
+  await upwardDrag(0, 70);
+  await page.locator('[data-snap="2"]').click(); await page.waitForTimeout(500);
+  await upwardDrag(180, 70, false);
+  await page.locator('[data-snap="2"]').click(); await page.waitForTimeout(500);
+  const reverseBox = await page.locator('#handle').boundingBox();
+  if (!reverseBox) throw new Error('Ручка не видна для разворота');
+  const reverseX = reverseBox.x + reverseBox.width / 3, reverseY = reverseBox.y + reverseBox.height / 2;
+  await page.mouse.move(reverseX, reverseY); await page.mouse.down();
+  await page.mouse.move(reverseX, reverseY - 130, { steps: 6 });
+  await page.waitForTimeout(120);
+  await page.mouse.move(reverseX, reverseY - 30, { steps: 6 }); await page.mouse.up();
+  if (await state.textContent() !== 'Панель закрыта') throw new Error('Разворот жеста не сохранил закрытое положение');
   const cancelBox = await page.locator('#handle').boundingBox();
   if (!cancelBox) throw new Error('Ручка не видна для отмены');
   const cancelX = cancelBox.x + cancelBox.width / 3, cancelY = cancelBox.y + cancelBox.height / 2;
