@@ -1,0 +1,103 @@
+import { chromium, firefox, webkit } from '@playwright/test';
+
+const engineName = process.env.MOTION_BROWSER ?? 'chromium';
+const engine = { chromium, firefox, webkit }[engineName];
+if (!engine) throw new Error(`Неизвестный браузер: ${engineName}`);
+const browser = await engine.launch({ headless: true });
+const page = await browser.newPage({ viewport: { width: 1100, height: 850 } });
+const errors = [];
+page.on('pageerror', error => errors.push(error.message));
+try {
+  await page.addInitScript(() => window.addEventListener('pageshow', event => {
+    if (event.isTrusted && location.pathname === '/') sessionStorage.setItem('sheetReturnPersisted', String(event.persisted));
+  }));
+  await page.goto('http://127.0.0.1:4178/', { waitUntil: 'networkidle' });
+  const state = page.locator('#sheet-state');
+  if (await state.textContent() !== 'Панель закрыта') throw new Error('Исходная панель не закрыта');
+  await page.locator('#open-sheet').click();
+  if (await state.textContent() !== 'Панель раскрыта') throw new Error('Панель не раскрылась');
+  await page.locator('#note').fill('Увидеть старую оранжерею');
+  await page.locator('#note-form button').click();
+  await page.locator('[data-select-place="next"]').click();
+  if (await page.locator('#place-title').textContent() !== 'Музей графики') throw new Error('Смена точки не обновила детали');
+  await page.locator('[data-select-place="previous"]').click();
+  if (await page.locator('#note').inputValue() !== 'Увидеть старую оранжерею') throw new Error('Заметка потеряна при возврате');
+  await page.locator('#handle').focus();
+  await page.keyboard.press('End');
+  if (await state.textContent() !== 'Панель закрыта') throw new Error('Клавиатура не закрыла панель');
+  await page.keyboard.press('ArrowUp');
+  if (await state.textContent() !== 'Панель наполовину') throw new Error('Клавиатура не открыла среднее положение');
+  await page.locator('#quiet-sheet').click();
+  await page.locator('[data-snap="0"]').click();
+  if (await page.locator('#quiet').getAttribute('aria-pressed') !== 'true') throw new Error('Режим без движения не включился');
+  if (await state.textContent() !== 'Панель раскрыта') throw new Error('Snap не сработал в режиме без движения');
+  await page.screenshot({ path: 'examples/itinerary-sheet/.artifacts/desktop.png' });
+  await page.locator('#quiet-sheet').click();
+  await page.setViewportSize({ width: 430, height: 650 });
+  await page.locator('[data-snap="2"]').click();
+  await page.waitForTimeout(500);
+  async function upwardDrag(dwellMs) {
+    const box = await page.locator('#handle').boundingBox();
+    if (!box) throw new Error('Ручка не видна');
+    const dragX = box.x + box.width / 3, dragY = box.y + box.height / 2;
+    await page.mouse.move(dragX, dragY); await page.mouse.down();
+    await page.mouse.move(dragX, dragY - 220, { steps: 8 });
+    if (dwellMs) await page.waitForTimeout(dwellMs);
+    await page.mouse.up();
+    if (await state.textContent() === 'Панель закрыта') throw new Error(`Жест 220px с ожиданием ${dwellMs}ms оставил панель закрытой`);
+  }
+  await upwardDrag(0);
+  await page.locator('[data-snap="2"]').click(); await page.waitForTimeout(500);
+  await upwardDrag(100);
+  await page.locator('[data-snap="2"]').click(); await page.waitForTimeout(500);
+  const cancelBox = await page.locator('#handle').boundingBox();
+  if (!cancelBox) throw new Error('Ручка не видна для отмены');
+  const cancelX = cancelBox.x + cancelBox.width / 3, cancelY = cancelBox.y + cancelBox.height / 2;
+  await page.locator('#handle').evaluate(element => element.addEventListener('pointerdown', event => { window.__dragPointer = event.pointerId; }, { once: true }));
+  await page.mouse.move(cancelX, cancelY); await page.mouse.down();
+  await page.mouse.move(cancelX, cancelY - 220, { steps: 8 });
+  await page.locator('#handle').evaluate(element => element.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: window.__dragPointer })));
+  await page.mouse.up();
+  if (await state.textContent() !== 'Панель закрыта') throw new Error('Отмена жеста изменила выбранное положение');
+  const handle = await page.locator('#handle').boundingBox();
+  if (!handle) throw new Error('Ручка не видна');
+  const x = handle.x + handle.width / 3, y = handle.y + handle.height / 2;
+  await page.mouse.move(x, y); await page.mouse.down();
+  await page.setViewportSize({ width: 460, height: 710 });
+  await page.mouse.move(x, y - 220, { steps: 8 }); await page.mouse.up();
+  if (await state.textContent() === 'Панель закрыта') throw new Error('Pointer-жест не выбрал открытое положение');
+  await page.locator('[data-snap="2"]').click();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.locator('[data-snap="0"]').click();
+  if (await state.textContent() !== 'Панель раскрыта') throw new Error('Reduced-motion не сохранил доступную цель');
+  await page.locator('[data-snap="2"]').click();
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.locator('[data-snap="0"]').click();
+  const returnToMotion = await page.locator('#sheet').evaluate(element => new DOMMatrixReadOnly(getComputedStyle(element).transform).m42);
+  if (returnToMotion <= 0) throw new Error('После отключения reduced-motion не возобновилась анимация');
+  await page.waitForFunction(() => Math.abs(new DOMMatrixReadOnly(getComputedStyle(document.querySelector('#sheet')).transform).m42) < 1);
+  await page.locator('[data-snap="1"]').click();
+  await page.evaluate(() => { dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true })); dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); });
+  if (await state.textContent() !== 'Панель наполовину') throw new Error('Положение панели потеряно при возврате');
+  if (await page.locator('#note').inputValue() !== 'Увидеть старую оранжерею') throw new Error('Заметка потеряна при возврате страницы');
+  await page.locator('#open-sheet').click();
+  if (await state.textContent() !== 'Панель раскрыта') throw new Error('Контроллер не восстановился при возврате');
+  await page.waitForTimeout(700);
+  await page.screenshot({ path: 'examples/itinerary-sheet/.artifacts/mobile.png' });
+  await page.route('http://127.0.0.1:4178/away', route => route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Другая страница</title>' }));
+  await page.evaluate(() => sessionStorage.removeItem('sheetReturnPersisted'));
+  await page.goto('http://127.0.0.1:4178/away');
+  await page.goBack();
+  await page.waitForFunction(() => sessionStorage.getItem('sheetReturnPersisted') !== null);
+  const persisted = await page.evaluate(() => sessionStorage.getItem('sheetReturnPersisted'));
+  const restoration = await page.evaluate(() => {
+    const nav = performance.getEntriesByType('navigation')[0];
+    return 'notRestoredReasons' in nav ? JSON.stringify(nav.notRestoredReasons) : 'unavailable';
+  });
+  if (persisted === 'true') {
+    if (await state.textContent() !== 'Панель раскрыта') throw new Error('Реальный bfcache-возврат потерял положение');
+    if (await page.locator('#note').inputValue() !== 'Увидеть старую оранжерею') throw new Error('Реальный bfcache-возврат потерял заметку');
+  }
+  if (errors.length) throw new Error(`Ошибки страницы: ${errors.join('; ')}`);
+  process.stdout.write(`Itinerary sheet smoke (${engineName}): PASS; bfcache persisted=${persisted}; reasons=${restoration}\n`);
+} finally { await browser.close(); }
