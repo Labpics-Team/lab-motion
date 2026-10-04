@@ -2,8 +2,14 @@ import { createServer } from 'vite';
 import { chromium, firefox, webkit } from '@playwright/test';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 const root = dirname(fileURLToPath(import.meta.url));
+const receipt = JSON.parse(readFileSync(new URL('./.artifacts/package.json', import.meta.url)));
+const installed = JSON.parse(readFileSync(new URL('./node_modules/@labpics/motion/package.json', import.meta.url)));
+if (receipt.package !== installed.name || receipt.version !== installed.version || !/^[0-9a-f]{64}$/.test(receipt.archiveSha256)) {
+  throw new Error('Пример не связан с установленным архивом');
+}
 const server = await createServer({ root, server: { host: '127.0.0.1', port: 0 } });
 await server.listen();
 const address = server.httpServer.address();
@@ -27,13 +33,34 @@ try {
       if (!(await space.locator('[data-open]').evaluate(el => el === document.activeElement))) throw new Error(`${name}: фокус не восстановлен`);
       await light.locator('[data-open]').click();
       if (await light.locator('textarea').inputValue() !== 'Мой текст') throw new Error(`${name}: заметка потеряна`);
+      await page.evaluate(() => {
+        window.__cardMeasures = 0;
+        const measure = HTMLElement.prototype.getBoundingClientRect;
+        HTMLElement.prototype.getBoundingClientRect = function () {
+          if (this.matches('[data-id]')) window.__cardMeasures++;
+          return measure.call(this);
+        };
+      });
       await page.setViewportSize({ width: 390, height: 760 });
+      await page.waitForTimeout(180);
+      if (await page.evaluate(() => window.__cardMeasures) === 0) throw new Error(`${name}: размер изменился во время полёта без нового замера цели`);
+      if (await light.evaluate(el => el.style.transform === '')) throw new Error(`${name}: resize не испытал активный полёт`);
+      await light.locator('textarea').evaluate(el => { el.style.height = '220px'; });
       await page.waitForTimeout(1200);
+      if (await light.evaluate(el => el.style.transform !== '')) throw new Error(`${name}: изменённая геометрия не завершила полёт`);
       if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error(`${name}: горизонтальный переполненный экран`);
       await page.locator('#motion').click();
       if (await page.locator('#motion').getAttribute('aria-pressed') !== 'true') throw new Error(`${name}: контроль движения не включился`);
+      if (await light.evaluate(el => el.style.transform !== '')) throw new Error(`${name}: движение не остановлено`);
       await page.locator('#direction').selectOption('rtl');
       await page.keyboard.press('Escape');
+      await light.locator('[data-open]').click();
+      if (await light.evaluate(el => el.style.transform !== '')) throw new Error(`${name}: режим без движения создал полёт`);
+      const reducedPage = await browser.newPage({ reducedMotion: 'reduce' });
+      await reducedPage.goto(url);
+      await reducedPage.locator('[data-id="light"] [data-open]').click();
+      if (await reducedPage.locator('[data-id="light"]').evaluate(el => el.style.transform !== '')) throw new Error(`${name}: системное снижение движения проигнорировано`);
+      await reducedPage.close();
       console.log(`${name}: PASS`);
     } finally { await browser.close(); }
   }

@@ -20,6 +20,16 @@ let returnFocus: string | null = null;
 const projection = createDomProjection({ radius: false, matchMedia: () => ({ matches: noMotion || reduced.matches }) });
 const card = (id: string) => gallery.querySelector<HTMLElement>(`[data-id="${id}"]`);
 const cards = () => Array.from(gallery.querySelectorAll<HTMLElement>('[data-id]'));
+let geometryFrame = 0;
+function rebaseGeometry(): void {
+  if (geometryFrame || !projection.playing) return;
+  geometryFrame = requestAnimationFrame(() => {
+    geometryFrame = 0;
+    if (!projection.playing) return;
+    projection.capture(cards());
+    projection.play();
+  });
+}
 
 function createCard(item: Material): HTMLElement {
   const article = document.createElement('article');
@@ -85,4 +95,7 @@ direction.addEventListener('change', () => {
   projection.capture(cards()); gallery.dir = direction.value; projection.play();
   status.textContent = direction.value === 'rtl' ? 'Направление справа налево' : 'Направление слева направо';
 });
-window.addEventListener('pagehide', () => projection.cancel());
+window.addEventListener('resize', rebaseGeometry);
+new ResizeObserver(rebaseGeometry).observe(gallery);
+reduced.addEventListener('change', () => { if (reduced.matches) projection.cancel(); });
+window.addEventListener('pagehide', () => { cancelAnimationFrame(geometryFrame); projection.cancel(); });
