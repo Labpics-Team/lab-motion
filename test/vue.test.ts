@@ -8,7 +8,7 @@
  *   C (Property): reduced-motion CHARACTER switching in useSpring AND vMotion directive
  *   D (Mutation proof): documented per test
  *
- * Vue's reactivity is mocked at the ref/watch/onUnmounted level.
+ * Реактивность Vue заменена на уровне ref/watch и завершения scope.
  * The virtual clock ensures deterministic animation.
  *
  * Reduced-motion CHARACTER: useSpring и vMotion идут через
@@ -74,6 +74,11 @@ vi.mock('vue', () => {
       return () => {}; // stop watcher (not used in tests)
     },
     onUnmounted: (cb: () => void) => {
+      _unmountedCallbacks.push(cb);
+    },
+    getCurrentInstance: () => ({}),
+    getCurrentScope: () => ({}),
+    onScopeDispose: (cb: () => void) => {
       _unmountedCallbacks.push(cb);
     },
   };
@@ -148,7 +153,7 @@ describe('useMotionValue', () => {
 
   it('destroy is called on unmount', () => {
     // A: Integration — cleanup registered
-    // Mutation proof: remove onUnmounted registration → destroySpy never called
+    // Удаление регистрации уборки оставит destroySpy невызванным.
     const clock = makeVirtualClock();
     const mv = useMotionValue(0, { mass: 1, stiffness: 200, damping: 20 }, clock.requestFrame);
     const destroySpy = vi.spyOn(mv, 'destroy');
@@ -198,7 +203,7 @@ describe('useSpring', () => {
 
   it('destroys MotionValue on unmount (no memory leak)', () => {
     // A: Integration — mv.destroy() called on component teardown
-    // Mutation proof: remove onUnmounted from useSpring → no cleanup, potential leak
+    // Удаление регистрации уборки оставит значение живым после scope.
     const clock = makeVirtualClock();
     let targetValue = 0;
 
@@ -209,7 +214,7 @@ describe('useSpring', () => {
       clock.requestFrame,
     );
 
-    // onUnmounted callbacks should have been registered
+    // Scope получил уборку владельца MotionValue.
     expect(_unmountedCallbacks.length).toBeGreaterThan(0);
   });
 });

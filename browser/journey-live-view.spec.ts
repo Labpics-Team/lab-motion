@@ -1,13 +1,13 @@
 /**
  * JOURNEY-01: два реальных браузерных потребителя ./smart.
  * Пакетный импорт отдельно запинен test/journey-package-consumers.test.ts;
- * здесь собранный dist проходит настоящий DOM, фокус, ввод и визуальную C0-границу.
+ * здесь установленный production tarball проходит настоящий DOM, фокус, ввод и визуальную C0-границу.
  */
 import { expect, test } from './fixtures/harness';
 
 test('card↔details: вложенная геометрия, перенацеливание в полёте, фокус и режимы без движения', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { captureSmart } = await import('/dist/smart/index.js');
+    const { captureSmart } = await import('/browser/.artifacts/scope-recipes.js');
     document.body.innerHTML = `
       <button id="focus">Фокус</button>
       <div id="root" style="position:relative;width:720px;height:640px">
@@ -124,7 +124,7 @@ test('card↔details: вложенная геометрия, перенацел�
 
 test('panel↔source: пересоздание узла, обратный ход, повторное открытие и интерактивность', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { captureSmart } = await import('/dist/smart/index.js');
+    const { captureSmart } = await import('/browser/.artifacts/scope-recipes.js');
     document.body.innerHTML = `
       <button id="focus">Фокус</button>
       <div id="root" style="position:relative;width:720px;height:640px">
@@ -232,7 +232,7 @@ test('panel↔source: пересоздание узла, обратный ход
 
 test('движущийся элемент управления принимает настоящий указатель и клавиатуру, сохраняя фокус', async ({ page }) => {
   await page.evaluate(async () => {
-    const { captureSmart } = await import('/dist/smart/index.js');
+    const { captureSmart } = await import('/browser/.artifacts/scope-recipes.js');
     document.body.innerHTML = `
       <div id="root" style="position:relative;width:720px;height:640px">
         <article id="card" data-motion-key="card" style="position:absolute;left:20px;top:40px;width:180px;height:120px">
@@ -297,7 +297,7 @@ test('движущийся элемент управления принимае�
   )).toBe(2);
 
   const focusedAtRetarget = await page.evaluate(async () => {
-    const { captureSmart } = await import('/dist/smart/index.js');
+    const { captureSmart } = await import('/browser/.artifacts/scope-recipes.js');
     const root = document.querySelector<HTMLElement>('#root')!;
     const card = document.querySelector<HTMLElement>('#card')!;
     const action = document.querySelector<HTMLButtonElement>('#action')!;
@@ -340,4 +340,75 @@ test('движущийся элемент управления принимае�
     };
   });
   expect(settled).toEqual({ activations: 3, focused: true, pending: 0 });
+});
+
+test('card↔details: выделение и ввод в том же input переживают retarget', async ({ page }) => {
+  await page.evaluate(async () => {
+    const { captureSmart } = await import('/browser/.artifacts/scope-recipes.js');
+    document.body.innerHTML = `
+      <div id="root" style="position:relative;width:720px;height:640px">
+        <article id="card" data-motion-key="card" style="position:absolute;left:20px;top:40px;width:180px;height:120px">
+          <label>Название <input id="title" value="alpha beta"></label>
+        </article>
+      </div>`;
+    const root = document.querySelector<HTMLElement>('#root')!;
+    const card = document.querySelector<HTMLElement>('#card')!;
+    const input = document.querySelector<HTMLInputElement>('#title')!;
+    const queue: Array<(time?: number) => void> = [];
+    let now = 0;
+    const state = {
+      input,
+      requestFrame(callback: (time?: number) => void): number { queue.push(callback); return queue.length; },
+      step(): void { now += 16; for (const callback of queue.splice(0)) callback(now); },
+      drain(): void {
+        let steps = 0;
+        while (queue.length) {
+          if (++steps > 4000) throw new Error('переход не завершился');
+          state.step();
+        }
+      },
+      first: Promise.resolve(), second: Promise.resolve(),
+    };
+    input.focus(); input.setSelectionRange(6, 10);
+    const first = captureSmart(root, { requestFrame: state.requestFrame, radius: false });
+    card.style.cssText += ';left:80px;top:90px;width:360px;height:260px';
+    state.first = first.animate().finished;
+    for (let i = 0; i < 4; i++) state.step();
+    (window as any).__journeyInput = state;
+  });
+
+  const before = await page.evaluate(() => {
+    const state = (window as any).__journeyInput;
+    const input = document.querySelector<HTMLInputElement>('#title')!;
+    return { same: input === state.input, focused: document.activeElement === input,
+      start: input.selectionStart, end: input.selectionEnd, value: input.value };
+  });
+  expect(before).toEqual({ same: true, focused: true, start: 6, end: 10, value: 'alpha beta' });
+
+  const atRetarget = await page.evaluate(async () => {
+    const { captureSmart } = await import('/browser/.artifacts/scope-recipes.js');
+    const root = document.querySelector<HTMLElement>('#root')!;
+    const card = document.querySelector<HTMLElement>('#card')!;
+    const state = (window as any).__journeyInput;
+    const second = captureSmart(root, { requestFrame: state.requestFrame, radius: false });
+    card.style.cssText += ';left:40px;top:120px;width:420px;height:300px';
+    state.second = second.animate().finished;
+    const input = document.querySelector<HTMLInputElement>('#title')!;
+    return { same: input === state.input, focused: document.activeElement === input,
+      start: input.selectionStart, end: input.selectionEnd };
+  });
+  expect(atRetarget).toEqual({ same: true, focused: true, start: 6, end: 10 });
+
+  await page.keyboard.insertText('世界');
+  const result = await page.evaluate(async () => {
+    const state = (window as any).__journeyInput;
+    await state.first;
+    state.drain();
+    await state.second;
+    const input = document.querySelector<HTMLInputElement>('#title')!;
+    return { same: input === state.input, focused: document.activeElement === input,
+      value: input.value, start: input.selectionStart, end: input.selectionEnd,
+      transform: document.querySelector<HTMLElement>('#card')!.style.transform };
+  });
+  expect(result).toEqual({ same: true, focused: true, value: 'alpha 世界', start: 8, end: 8, transform: '' });
 });

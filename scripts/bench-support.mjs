@@ -1,5 +1,41 @@
 /** Общие детерминированные швы Node-бенчмарков. */
 
+/** Штатный drain-clock stock C: без timestamp, с прежними handle и cap. */
+export function makeSynchronousDrainClock() {
+  let queue = [];
+  const requestFrame = (cb) => {
+    queue.push(cb);
+    return queue.length; // ненулевой handle
+  };
+  const drain = (cap = 100000) => {
+    let n = 0;
+    while (queue.length && n < cap) {
+      const cb = queue.shift();
+      cb();
+      n++;
+    }
+    return n;
+  };
+  return { requestFrame, drain };
+}
+
+/** Тело stock C общее; factory и чтение frame count находятся вне тайминга. */
+export function createMotionValueDefaultBenchmark(MotionValue, SPRING) {
+  let frames = 0;
+  const makeClock = makeSynchronousDrainClock;
+  const run = () => {
+    const clock = makeClock();
+    let last = 0;
+    const mv = new MotionValue({ initial: 0, spring: SPRING, requestFrame: clock.requestFrame });
+    mv.onChange((v) => (last = v));
+    mv.setTarget(100);
+    frames = clock.drain();
+    mv.destroy();
+    return last;
+  };
+  return { run, getFrameCount: () => frames };
+}
+
 export function createBenchClock() {
   let queue = [];
   let requests = 0;

@@ -18,16 +18,27 @@ export interface AnimationTimeSource {
  * Реальный `null` означает unresolved/pending local time: effect ещё не имеет
  * видимого времени и должен читаться как pre-start, а не догонять JS clock.
  * Duck-объект без свойства сохраняет детерминированный fallback старых seams.
+ * Числовые callers сохраняют -1 для pre-start; nullable reader нужен для
+ * отличия actual null от известного отрицательного numeric local time.
  */
+/** Числовая pre-start совместимость прежних sampler callers. */
 export function animationTimeOrFallback(
   animation: AnimationTimeSource | undefined,
   fallbackMs: number,
 ): number {
+  return animationLocalTimeOrFallback(animation, fallbackMs) ?? -1;
+}
+
+/** Настоящий null остаётся отличимым от любого конечного numeric local time. */
+export function animationLocalTimeOrFallback(
+  animation: AnimationTimeSource | undefined,
+  fallbackMs: number,
+): number | null {
   try {
     if (animation !== undefined && 'currentTime' in animation) {
       const current = animation.currentTime;
-      if (current === null) return -1;
-      if (typeof current === 'number' && Number.isFinite(current)) return current;
+      // Number.isFinite не приводит strings/objects и уже проверяет type.
+      if (current === null || Number.isFinite(current)) return current as number | null;
     }
   } catch {
     // Отказ host-getter/in-trap не блокирует monotonic fallback clock.

@@ -1,25 +1,15 @@
-import { readFileSync } from 'node:fs';
-import { transformSync } from 'esbuild';
 import { test, expect } from './fixtures/harness';
 
-const docs = readFileSync(new URL('../docs/recipes.md', import.meta.url), 'utf8');
-const recipe = docs.match(/```typescript\n([^`]*?export function bindAnimatedDialog[^]*?)\n```/)?.[1];
-if (!recipe) throw new Error('Рабочий рецепт отсутствует');
-const code = transformSync(recipe, { loader: 'ts', format: 'esm', target: 'es2022' }).code;
-
-// Исполняется буквальный пример документации, не его копия в test fixture.
+// Буквальный пример и runtime взяты из полного production tarball globalSetup.
 async function mount(page: import('@playwright/test').Page) {
-  await page.evaluate(async source => {
+  await page.evaluate(async () => {
     document.body.innerHTML = '<button id="open">Открыть</button><dialog aria-label="Настройки"><section data-panel><button autofocus>Готово</button></section></dialog>';
     const opener = document.querySelector<HTMLButtonElement>('#open')!;
     opener.focus();
-    const text = source.replaceAll('@labpics/motion/animate', location.origin + '/dist/animate/index.js')
-      .replaceAll('@labpics/motion/presence', location.origin + '/dist/presence/index.js');
-    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
-    const module = await import(url); URL.revokeObjectURL(url);
+    const module = await import('/browser/.artifacts/scope-recipes.js');
     const dialog = document.querySelector<HTMLDialogElement>('dialog')!;
     (window as unknown as { binding: Binding }).binding = module.bindAnimatedDialog(dialog);
-  }, code);
+  });
 }
 interface Binding {
   setPresent(value: boolean): Promise<unknown>;
@@ -86,7 +76,7 @@ test('повторное открытие не скрывает диалог п�
 
 test('вся группа native Animation завершена прежде onGone, не первый элемент', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { createPresenceTransition } = await import('/dist/presence/index.js');
+    const { createPresenceTransition } = await import('/browser/.artifacts/scope-recipes.js');
     const a = document.createElement('div'), b = document.createElement('div'); document.body.append(a, b);
     let gone = 0;
     const effects = [a, b].map(el => el.animate({ opacity: [1, 0] }, { duration: 10_000, fill: 'both' }));
@@ -106,8 +96,7 @@ test('вся группа native Animation завершена прежде onGon
 
 test('native pickup равен прямому animate, cancel-before-start является различителем', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { createPresenceTransition } = await import('/dist/presence/index.js');
-    const { animate } = await import('/dist/animate/index.js');
+    const { createPresenceTransition, animate } = await import('/browser/.artifacts/scope-recipes.js');
     const els = [0, 1, 2].map(() => { const el = document.createElement('div'); document.body.append(el); return el; });
     const [managed, raw, wrong] = els as [HTMLDivElement, HTMLDivElement, HTMLDivElement];
     const options = { spring: { mass: 1, stiffness: 170, damping: 20 }, now: () => 0 };

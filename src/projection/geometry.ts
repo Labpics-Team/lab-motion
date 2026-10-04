@@ -352,7 +352,7 @@ export interface DriverProjector extends Projector {
   at(p: number, positionBasisValue?: number): readonly ProjectionFrame[];
 }
 
-/** Реализация читает остаточный базис без изменения данных владельца. */
+/** @internal Реализация читает остаточный базис без изменения данных владельца. */
 export function createProjector(nodes: readonly Readonly<DriverProjectionNodeInit>[]): DriverProjector {
   const count = nodes.length;
 

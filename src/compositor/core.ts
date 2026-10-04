@@ -38,6 +38,7 @@
  */
 
 import { MotionParamError } from '../errors.js';
+import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
 import { readSpringUnchecked } from '../internal/read-spring.js';
 import {
   type SpringParams,
@@ -65,7 +66,7 @@ import {
   compileSpringRuntimeExecutionTupleUnchecked,
 } from './execution.js';
 import {
-  animationTimeOrFallback,
+  animationLocalTimeOrFallback,
   sampleSerializedSpringIntoUnchecked,
   scaleSerializedVelocity,
 } from './sample.js';
@@ -436,50 +437,57 @@ type HostOwner = CompositorAnimation | (() => void) | null | undefined;
  * трогает DOM/часы; native time читается только при прерывании.
  */
 export class CompositorSpring {
-  private readonly _spring: SpringParams;
-  private readonly _property: string;
-  private readonly _tolerance: number;
-  private readonly _fill: 'none' | 'forwards' | 'backwards' | 'both';
-  private readonly _composite: 'replace' | 'add' | 'accumulate';
-  private _format: ((v: number) => string | number) | undefined;
-  private _target: WaapiAnimatable | undefined;
-  private _apply: ((value: string | number) => void) | undefined;
-  /** Часы — lifetime-capability: destroy снимает её до любого host cleanup. */
-  private _now: (() => number) | undefined;
-  private _requestFrame: RequestFrameFn | undefined;
-  private readonly _delay: number;
-  private _setTimer: SetTimerFn | undefined;
-  private readonly _tier: CompositorTierCode;
+  declare private _spring: SpringParams;
+  declare private readonly _property: string;
+  declare private readonly _tolerance: number;
+  declare private readonly _fill: 'none' | 'forwards' | 'backwards' | 'both';
+  declare private readonly _composite: 'replace' | 'add' | 'accumulate';
+  declare private _format: ((v: number) => string | number) | undefined;
+  declare private _target: WaapiAnimatable | undefined;
+  /** @internal */
+  declare protected _apply: ((value: string | number) => void) | undefined;
+  /** @internal Часы — lifetime-capability: destroy снимает её до любого host cleanup. */
+  declare protected _now: (() => number) | undefined;
+  declare private _requestFrame: RequestFrameFn | undefined;
+  declare private readonly _delay: number;
+  declare private _setTimer: SetTimerFn | undefined;
+  /** @internal */
+  declare protected readonly _tier: CompositorTierCode;
 
-  private _from: number;
-  private _to: number;
+  /** @internal */
+  declare protected _from: number;
+  /** @internal */
+  declare protected _to: number;
   private _v0Norm = 0;
-  private _startTime!: number;
+  declare private _startTime: number;
   /** Задержка ТЕКУЩЕГО прогона (мс): _delay на первичном start, 0 на retarget/handoff. */
-  private _startDelay!: number;
-  /** Единственный host-owner; null резервирует незавершённый setTimer. */
-  private _host: HostOwner;
+  declare private _startDelay: number;
+  /** @internal Единственный host-owner; null резервирует незавершённый setTimer. */
+  declare protected _host: HostOwner;
   /** Один artifact — SSOT samples и duration текущего compositor-owner. */
-  private _artifact: SpringExecutionArtifactTuple | undefined;
+  declare private _artifact: SpringExecutionArtifactTuple | undefined;
   private readonly _sample = { value: 0, velocity: 0 };
-  private _mv: MotionValue | undefined;
-  /** Монотонный identity-token текущего owner/continuation. */
-  private _epoch = 0;
-  /** Host cleanup блокирует мутации, пока current-owner continuation не выдаст capability. */
-  private _cleaning?: true;
+  /** @internal */
+  declare protected _mv: MotionValue | undefined;
+  /** @internal Монотонный identity-token текущего owner/continuation. */
+  protected _epoch = 0;
+  /** @internal Host cleanup блокирует мутации, пока current-owner continuation не выдаст capability. */
+  declare protected _cleaning?: true;
 
-  /**
+  /** @internal
    * Единый мост «кадр живой пружины → внутреннее значение + apply». Один экземпляр
    * на контроллер, переиспользуется всеми живыми путями (_ensureFallback,
    * compositor→live хендофф, reduced-хендофф) — DRY: правило распространения
    * значения живёт в ОДНОМ месте (иначе тройной дубль тихо расходится). Читает
    * _apply/_format в момент ВЫЗОВА (после конструктора), поэтому bound-поле безопасно.
    */
-  private readonly _onLiveFrame = (v: number): void => {
+  protected readonly _onLiveFrame = (v: number): boolean => {
     const epoch = this._epoch;
     this._from = v;
     const value = this._apply && this._format!(v);
-    if (this._epoch === epoch) this._apply?.(value!);
+    if (this._epoch !== epoch || !this._apply) return false;
+    this._apply(value!);
+    return true;
   };
 
   constructor(opts: CompositorSpringOptions) {
@@ -584,17 +592,32 @@ export class CompositorSpring {
     }
     // Живой rAF-путь (waapi-no-linear / raf / ssr).
     if (!this._ensureFallback(generation)) return;
-    if (this._delay > 0) {
-      // Fallback-каскад: callback атомарно потребляет timer-owner.
-      this._adoptTimer(generation, () => this._setTimer!(() => {
+    if (this._delay === 0) {
+      this._mv!.setTarget(this._to);
+      return;
+    }
+    // Резервируем слот до внешнего вызова; устаревший результат освобождаем отдельно.
+    this._host = null;
+    let host: () => void;
+    try {
+      host = this._setTimer!(() => {
         if (this._epoch === generation) {
           this._host = undefined;
           this._epoch++;
           this._mv!.setTarget(this._to);
         }
-      }, this._delay));
-    } else if (this._epoch === generation) {
-      this._mv!.setTarget(this._to);
+      }, this._delay);
+    } catch (error) {
+      if (this._host === null) {
+        this._host = undefined;
+        this._epoch++;
+      }
+      throw error;
+    }
+    if (this._epoch === generation) {
+      this._host = host;
+    } else {
+      if (this._host !== host) this._cancelHost(host);
     }
   }
 
@@ -606,6 +629,10 @@ export class CompositorSpring {
    * commit-кадр хендоффа); на fallback — MotionValue.setTarget.
    */
   retarget(newTarget: number): void {
+    this._retarget(newTarget);
+  }
+
+  private _retarget(newTarget: number, mv?: MotionValue): void {
     if (!this._now || this._cleaning) return;
     validateFinite(newTarget);
     const generation = ++this._epoch;
@@ -613,11 +640,16 @@ export class CompositorSpring {
     if (this._tier === 3) {
       // reduce активен: снап к новой цели, без анимации.
       this._to = newTarget;
-      this._onLiveFrame(newTarget);
+      // Тот же live-owner теряет старую траекторию до публикации reduced-снапа.
+      const live = this._mv;
+      live?.snapTo(newTarget);
+      // Выданный loan мог быть самостоятельно уничтожен. Старый snapshot не
+      // разрешает потерять новую цель; callback нового intent имеет приоритет.
+      if (!live || (this._epoch === generation && this._from !== newTarget)) this._onLiveFrame(newTarget);
       return;
     }
 
-    if (!this._usesCompositor()) {
+    if (!this._usesCompositor(mv)) {
       // Живой rAF-путь: smooth-pickup MotionValue переносит скорость.
       this._releaseHost(); // retarget = «сейчас»: снимаем delay-owner
       if (this._epoch !== generation || !this._ensureFallback(generation)) return;
@@ -627,7 +659,7 @@ export class CompositorSpring {
     }
 
     // Compositor-путь.
-    if (!this._host) {
+    if (!this._host && !mv) {
       // Ещё не в полёте — просто задаём цель и стартуем свежий прогон.
       this._to = newTarget;
       this.start();
@@ -635,22 +667,33 @@ export class CompositorSpring {
     }
 
     // В полёте: читаем фактическое effect-состояние в момент прерывания (без layout).
-    const read = this._snapshot(generation);
+    const read = mv ?? this._snapshot(generation);
     if (!read) return;
-    const range = newTarget - read.value;
+    this._retargetFrom(read.value, read.velocity, newTarget, generation, mv);
+  }
+
+  /** @internal Продолжение из уже захваченного состояния того же owner. */
+  protected _retargetFrom(
+    from: number, velocity: number, newTarget: number, generation: number, mv?: MotionValue,
+  ): void {
+    const range = newTarget - from;
     const v0Norm = Math.abs(range) > RANGE_EPSILON
-      ? read.velocity / range
-      : read.velocity === 0
+      ? velocity / range
+      : velocity === 0
         ? 0
         : Infinity; // normalized curve cannot represent absolute impulse at zero range
     validateSpringForFrameLoop(this._spring);
-    const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
+    const artifact = this._tier === 0 && tryCompileSpringExecutionArtifactTupleUnchecked(
       this._spring,
       v0Norm,
       this._tolerance,
     );
     if (this._epoch !== generation) return;
     if (!artifact) {
+      if (mv) {
+        this.retarget(newTarget);
+        return;
+      }
       // Без writer live-путь не может сохранить видимый контракт. Ошибка должна
       // случиться ДО cancel: прежний compositor-прогон остаётся владельцем.
       if (!this._apply) {
@@ -660,14 +703,14 @@ export class CompositorSpring {
           this._tolerance,
         );
       }
-      const mv = this._liveCandidate(read.value, read.velocity, generation);
+      const candidate = this._liveCandidate(from, velocity, generation);
       // Новый owner уже активен: отказ hostile host-cancel не должен откатить
       // хендофф или оставить ссылку на прежний Animation.
-      this._adoptLive(mv, newTarget, generation);
+      this._adoptLive(candidate, newTarget, generation);
       return;
     }
     // Donor остаётся owner до успешного возврата successor из animate().
-    this._emitCompositor(read.value, newTarget, v0Norm, artifact, generation);
+    this._emitCompositor(from, newTarget, v0Norm, artifact, generation);
   }
 
   /**
@@ -740,6 +783,18 @@ export class CompositorSpring {
   }
 
   /**
+   * Завершает live/follow-фазу автономным переходом к цели. Пара value/velocity
+   * читается у уже выданного MotionValue; consumer не переносит скорость вручную.
+   * Native successor принимает поверхность до terminal-уборки live donor.
+   * После commit старый MotionValue инертен, а destroy контроллера остаётся
+   * единственной границей lifetime. При неподдержанном native-пути продолжает
+   * тот же live-owner; mode показывает фактическое представление.
+   */
+  handoffToCompositor(newTarget: number = this._to): void {
+    this._retarget(newTarget, this._mv);
+  }
+
+  /**
    * Останавливает прогон (без разрушения контроллера). Позиция прерывания
    * compositor-эффекта НЕ фиксируется: cancel снимает effect, повторный
    * start()/retarget() запускает контроллер заново от последнего известного
@@ -756,20 +811,20 @@ export class CompositorSpring {
   /** Полностью останавливает и освобождает ресурсы. */
   destroy(): void {
     if (!this._now) return;
-    const mv = this._mv;
-    this._mv = undefined;
+    // Инертный handoff не читает пользовательские параметры и не удерживает их метаданные.
+    this._spring = DEFAULT_SPRING;
     // Permanent terminal и retention-разрыв публикуются до недоверенного cleanup.
     this._epoch++;
     this._artifact = this._format = this._setTimer = this._now =
       this._target = this._requestFrame = this._apply = undefined;
+    this._commitOwner();
     this._releaseHost();
-    mv?.destroy();
   }
 
   // ─── Приватное ──────────────────────────────────────────────────────────────
 
-  private _usesCompositor(): boolean {
-    return this._tier === 0 && !this._mv;
+  private _usesCompositor(returningLive?: MotionValue): boolean {
+    return this._tier === 0 && this._mv === returningLive;
   }
 
   private _inertValue(): MotionValue {
@@ -789,8 +844,8 @@ export class CompositorSpring {
     }
   }
 
-  /** Слот снимается до первого недоверенного host-вызова. */
-  private _releaseHost(): void {
+  /** @internal Слот снимается до первого недоверенного host-вызова. */
+  protected _releaseHost(): void {
     const host = this._host;
     this._host = undefined;
     this._cancelHost(host);
@@ -809,31 +864,11 @@ export class CompositorSpring {
     this._cleaning = undefined;
   }
 
-  /** CAS-граница setTimer: stale-return оплачивается, новый owner не стирается. */
-  private _adoptTimer(generation: number, create: () => () => void): void {
-    this._host = null;
-    let host: () => void;
-    try {
-      host = create();
-    } catch (error) {
-      if (this._host === null) {
-        this._host = undefined;
-        this._epoch++;
-      }
-      throw error;
-    }
-    if (this._epoch === generation) {
-      this._host = host;
-    } else {
-      if (this._host !== host) this._cancelHost(host);
-    }
-  }
-
-  /** Фактический piecewise-снимок без style/layout-read. */
-  private _snapshot(generation: number): { value: number; velocity: number } | undefined {
+  /** @internal Фактический piecewise-снимок без style/layout-read. */
+  protected _snapshot(generation: number): { value: number; velocity: number } | undefined {
     const now = this._now!();
     if (this._epoch !== generation) return undefined;
-    const currentTime = animationTimeOrFallback(
+    const currentTime = animationLocalTimeOrFallback(
       this._host as CompositorAnimation,
       now - this._startTime,
     );
@@ -841,7 +876,7 @@ export class CompositorSpring {
     const sample = sampleSerializedSpringIntoUnchecked(
       this._artifact![1],
       this._artifact![2],
-      currentTime,
+      currentTime ?? -1,
       this._startDelay,
       this._sample,
     );
@@ -854,7 +889,9 @@ export class CompositorSpring {
     // Scratch не пересекает публичную границу: оба вызывающих синхронно
     // копируют поля до следующего snapshot. Это убирает allocation на прерывание.
     sample.value = Number.isFinite(rawValue) ? rawValue : this._to;
-    sample.velocity = scaleSerializedVelocity(sample.velocity, this._from, this._to);
+    // Pending local-time ещё не исполняет serialized slope: сохраняем prior
+    // handoff вместо потери скорости при немедленном новом вводе.
+    sample.velocity = scaleSerializedVelocity(currentTime === null ? this._v0Norm : sample.velocity, this._from, this._to);
     return sample;
   }
 
@@ -904,11 +941,14 @@ export class CompositorSpring {
     this._startDelay = delayMs;
     this._startTime = now;
     this._artifact = artifact;
+    // До cleanup прежнего host отзываются input и live capability,
+    // включая уже выданный кадр, доставленный из cleanup timer-owner.
+    this._commitOwner();
     if (donor !== host) this._cancelHost(donor);
   }
 
-  /** Строит live-кандидата; ошибка не меняет metadata действующего donor. */
-  private _liveCandidate(
+  /** @internal Строит live-кандидата; ошибка не меняет metadata действующего donor. */
+  protected _liveCandidate(
     value: number,
     velocity: number,
     generation: number,
@@ -936,8 +976,8 @@ export class CompositorSpring {
     }
   }
 
-  /** CAS-публикация live-owner; stale-кандидат оплачивается здесь же. */
-  private _adoptLive(
+  /** @internal CAS-публикация live-owner; stale-кандидат оплачивается здесь же. */
+  protected _adoptLive(
     mv: MotionValue,
     target: number,
     generation: number,
@@ -945,6 +985,8 @@ export class CompositorSpring {
     if (this._epoch === generation) {
       this._releaseHost();
       if (this._epoch === generation) {
+        // Новый loan не оставляет прежний live-owner за пределами lifetime.
+        this._commitOwner();
         this._to = target;
         this._mv = mv;
         // Commit заканчивается до scheduler-IO: после cancel donor откат уже
@@ -969,6 +1011,13 @@ export class CompositorSpring {
     }
     mv.destroy();
     return false;
+  }
+
+  /** @internal Отзывает прежнее исполнение до публикации нового live-owner или host cleanup. */
+  protected _commitOwner(): void {
+    const mv = this._mv;
+    this._mv = undefined;
+    mv?.destroy();
   }
 }
 

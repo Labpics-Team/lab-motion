@@ -14,11 +14,14 @@
  * surface-executor живёт под приватным путём `@labpics/motion/compiler/surface`
  * (горячий фикс наблюдаемой эквивалентности перевёл его из публичного
  * `./surface` в приватный compiler-неймспейс).
+ * Literal lifecycle/sheet/pager recipes собираются отдельно из полного npm
+ * tarball без motion aliases; scope-recipes.package.json связывает его bytes,
+ * cookbook и браузерный bundle.
  */
 
 import { build } from 'vite';
-import { buildReorderRecipe } from './reorder-recipe.mjs';
 import { buildScopeRecipes } from './scope-recipes.mjs';
+import { buildPackagedCompositorFollowRecipes } from './compositor-follow-recipes.mjs';
 import { readCompilerNanoRecipe } from '../../scripts/compiler-doc-recipe.mjs';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -117,7 +120,7 @@ export default async function globalSetup() {
     if (!/layout:\s*"project"|layout:\s*'project'/.test(surfaceReturn) || /w0:\s*240,\s*w1:\s*360/.test(surfaceReturn)) {
       throw new Error('compile-artifacts: return-форма ошибочно понижена — нарушена наблюдаемая эквивалентность');
     }
-    await buildReorderRecipe(ROOT, OUT);
+    await buildPackagedCompositorFollowRecipes(ROOT, OUT, process.env.LAB_MOTION_TARBALL);
     writeFileSync(resolve(OUT, 'compiled.js'), compiled);
     writeFileSync(resolve(OUT, 'uncompiled.js'), uncompiled);
     writeFileSync(resolve(OUT, 'surface-compiled.js'), surfaceCompiled);

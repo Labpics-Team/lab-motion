@@ -38,6 +38,55 @@ document.querySelector<HTMLElement>('.card')!
 
 ## CompositorSpring: ретаргет и хендофф
 
+Для повторяемого цикла ввода доступен `createCompositorFollow` из
+`@labpics/motion/compositor/follow`. Factory создаёт один spring-controller
+с методами `CompositorSpring` и тремя операциями ввода:
+
+```typescript
+import { createCompositorFollow } from '@labpics/motion/compositor/follow';
+
+const motion = createCompositorFollow({
+  spring: { mass: 1, stiffness: 170, damping: 26 },
+  property: 'transform', from: 0, to: 240, target: el,
+  format: (x) => `translateX(${x}px)`,
+  apply: (value) => { el.style.transform = String(value); },
+});
+motion.start();
+const origin = motion.beginFollow(pointerDown.timeStamp / 1000);
+motion.follow(origin + pointerDelta, pointerMove.timeStamp / 1000);
+motion.settle(destination, pointerUp.timeStamp / 1000);
+```
+
+`beginFollow` забирает actual native value и правый slope, фиксирует underlying
+перед отменой эффекта и возвращает значение для преобразования координат.
+`follow` пишет абсолютное значение в единицах from/to. Значения и timestamps
+конечны; время внутри сессии не убывает. Последний sample одинакового времени
+заменяется. `settle` требует timestamp отпускания: удержание без движения
+погашает устаревшую скорость, немедленное повторное отпускание наследует её.
+Произвольный скачок входного значения не имеет гарантии C¹.
+
+Каждый следующий pickup снова читает исполняемый native effect; новый rAF для
+native pickup/settle не нужен. Непредставимый normalized импульс использует
+прежний live fallback. Reduced motion сохраняет прямой ввод и завершает settle
+немедленной записью цели. `apply` обязателен для beginFollow. Без активной
+сессии follow/settle дают `MotionParamError`; stop отзывает сессию, destroy
+терминален. start/retarget используют текущую tracked velocity без нового sample;
+для учёта времени удержания вызывайте settle. handoffToLive отдаёт тот же state
+живой пружине.
+
+Ошибка format/apply при native pickup оставляет прежний donor, если callback
+не выдал новое намерение. При live pickup старые callbacks отзываются до writer;
+его ошибка оставляет MotionValue остановленным, retarget может продолжить его.
+Уже выполненная внешняя запись не откатывается. Ошибки host cancel сохраняют
+прежний контракт CompositorSpring: после logical detach они поглощаются.
+
+Трекер хранит точки окна 0,1 секунды и последнюю пару при редких событиях.
+Память зависит от плотности различных timestamps; hard sample cap отсутствует.
+Схемы snap, страницы, pointer capture и focus принадлежат приложению —
+[два исполняемых рецепта](recipes.md#прямой-ввод-панель-и-карусель).
+
+### Автономный контроллер
+
 Публичный API один на всех тирах. В effect-space numeric/affine-канала при
 default `fill:'both'` прерывание точно продолжает position и правый slope
 кусочно-линейного сегмента. На самом stop-kink производная неоднозначна — выбран
@@ -62,7 +111,33 @@ panel.retarget(120);
 // значение — follow-фаза). Снимок → живая rAF-пружина продолжает без разрыва.
 const live = panel.handoffToLive();      // продолжить к текущей цели, ИЛИ
 const live2 = panel.handoffToLive(300);  // сразу к новой цели с сохранённой скоростью
+
+// Follow обновляет уже выданное live-значение; анимации WAAPI на вводе не создаются.
+live2.setTarget(260);
+// На release та же пара value/velocity возвращается в автономный путь.
+panel.handoffToCompositor(240);
+// Старый live2 после успешной передачи инертен. Уборка всего движения одна:
+panel.destroy();
 ```
+
+`handoffToCompositor(target?)` завершает live/follow-фазу. Контроллер читает
+позицию и скорость существующего `MotionValue`, создаёт один native successor
+и лишь после принятия этого эффекта уничтожает live donor. Старый выданный
+`MotionValue` затем не записывает значения и не планирует новые кадры.
+Если host отвергнет successor до commit, live donor остаётся управляемым.
+Реентрантный новый intent отзывает возвращающийся stale effect.
+
+Путь выбирается по-прежнему по capability-контракту. В RAF/reduced-среде и при
+невыразимом serialized impulse движение продолжает тот же live-owner; `.mode`
+показывает фактическое представление. Native release не вызывает собственных
+покадровых callbacks. Ранее выданный RAF callback исполняется один раз как
+инертный stale callback: `RequestFrameFn` не предоставляет cancel handle.
+Pending native `currentTime:null` сохраняет исходную пару handoff до первого
+видимого времени, вместо чтения удобного JS clock.
+
+Sheet snap-points, pager index, bounds и keyboard-правила принадлежат
+потребителю. Обратный handoff не добавляет их в generic compositor API и не
+меняет четыре опубликованных headless behavior-контроллера.
 
 Число raw diagnostic-узлов выводится из бюджета реконструкции (допуск
 `DEFAULT_TOLERANCE`, адаптивная сетка + упрощение): жёстче пружина — короче
@@ -117,6 +192,10 @@ list.start();                                 // каскад: N Element.animate
 (character-switch, не hard-off).
 
 ## Fallback-матрица
+
+Матрица предполагает поддержанную JavaScript-среду ES2022 со встроенным
+`WeakRef`. Выбор запасного пути компенсирует отсутствие WAAPI или CSS
+`linear()`, но не отсутствие обязательных возможностей JavaScript.
 
 `CompositorSpring` прозрачно деградирует: публичный API один, точная
 effect-space гарантия ограничена условиями выше — меняется движок под капотом.

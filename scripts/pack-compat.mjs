@@ -37,6 +37,22 @@ const TSC5_BIN = join(ROOT, 'node_modules', 'typescript5', 'bin', 'tsc');
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
 const suppliedTarball = process.argv[2] === undefined ? undefined : resolve(process.argv[2]);
 
+// Один consumer-контракт проверяется всеми поставляемыми ветками деклараций.
+const compositorSubclassContract = `
+class PublicSpringSubclass extends CompositorSpring {
+  readValue(): number { return this.value; }
+  override stop(): void { super.stop(); }
+  private inspectInternals(): void {
+    // @ts-expect-error Внутреннее значение не является subclass API.
+    this._from;
+    // @ts-expect-error Lifetime capability принадлежит владельцу.
+    this._now;
+  }
+  // @ts-expect-error Внутренний commit hook нельзя переопределить потребителю.
+  protected override _commitOwner(): void {}
+}
+`;
+
 /** Субпути с обязательным peer-фреймворком — вне consumer-контракта голого пакета. */
 const PEER_BINDING_SUBPATHS = new Set([
   './react',
@@ -185,17 +201,25 @@ try {
       join(dir, 'consumer.ts'),
       `import { spring, type SpringResult } from '${pkg.name}';\n` +
         `import { readCompositorSpring } from '${pkg.name}/compositor';\n` +
+        `import { createCompositorFollow, type CompositorFollow } from '${pkg.name}/compositor/follow';\n` +
         `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan, type CompositorStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         `import { animate, type AnimateControls } from '${pkg.name}/animate';\n` +
         `import { animate as nanoAnimate, type NanoControls } from '${pkg.name}/nano';\n` +
         `import { createDrag } from '${pkg.name}/gestures';\n` +
         `import { createMotionConfig } from '${pkg.name}/a11y';\n` +
+        compositorSubclassContract +
         `const r: SpringResult = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);\n` +
         `const v: number = r.value + r.velocity;\n` +
         `const plan = compileSpringPlan({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1 });\n` +
         `const staggerPlan: CompositorStaggerPlan = compileStaggerPlan({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1, count: 0 });\n` +
         `const single = new CompositorSpring({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1 });\n` +
         `const group = new CompositorStaggerGroup({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1, targets: [] });\n` +
+        `const follow: CompositorFollow = createCompositorFollow({ spring: { mass: 1, stiffness: 200, damping: 20 }, property: 'opacity', from: 0, to: 1, apply: () => {} });\n` +
+        `follow.beginFollow(0); follow.follow(0.2, 0.01); follow.settle(1, 0.02); follow.destroy();\n` +
+        `// @ts-expect-error Timestamp отпускания обязателен.\n` +
+        `follow.settle(1);\n` +
+        `// @ts-expect-error Внутренние lifecycle hooks не входят в consumer contract.\n` +
+        `follow._commitOwner();\n` +
         `const read = readCompositorSpring({ mass: 1, stiffness: 200, damping: 20 }, { t: 0.1 });\n` +
         `const drag = createDrag({ inertia: false });\n` +
         `const cfg = createMotionConfig({ reducedMotion: 'system' });\n` +
@@ -286,7 +310,8 @@ try {
       `import { spring } from '${pkg.name}';\n` +
         `import { clamp } from '${pkg.name}/utils';\n` +
         `import { animate as nanoAnimate } from '${pkg.name}/nano';\n` +
-        `import { compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
+        `import { CompositorSpring, compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
+        compositorSubclassContract +
         `export const value: number = clamp(0, 1, spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1).value);\n` +
         `export const motion = [nanoAnimate, compileStaggerPlan] as const;\n`,
     );
@@ -349,6 +374,7 @@ try {
       `import { spring, type SpringResult } from '${pkg.name}';\n` +
         `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         `import { animate as nanoAnimate, type NanoControls } from '${pkg.name}/nano';\n` +
+        compositorSubclassContract +
         `const r: SpringResult = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);\n` +
         `const physics = { mass: 1, stiffness: 200, damping: 20 };\n` +
         `const single = new CompositorSpring({ spring: physics, property: 'opacity', from: 0, to: 1 });\n` +
