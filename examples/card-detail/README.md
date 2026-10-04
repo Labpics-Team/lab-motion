@@ -9,6 +9,9 @@ pnpm install --frozen-lockfile
 node examples/card-detail/prepare.mjs
 pnpm exec tsc -p examples/card-detail/tsconfig.json
 pnpm exec vite build --config examples/card-detail/vite.config.mjs
+node examples/card-detail/test.mjs
 ```
+
+Перед проверкой зафиксируйте изменения, затем запустите `prepare.mjs` в чистом рабочем дереве. `test.mjs` требует `sourceDirty: false` в квитанции и совпадения её `source` с текущим `HEAD`; при новом commit подготовку архива нужно повторить.
 
 Для просмотра: `pnpm exec vite --config examples/card-detail/vite.config.mjs`. `prepare.mjs` собирает пакет, сохраняет npm archive в `.artifacts/package.tgz` и устанавливает именно его внутрь примера. `.artifacts/package.json` фиксирует SHA-256 архива, манифеста и используемого экспорта проекции. Нажмите карточку, затем Escape или «К подборке»; попробуйте быстро открыть другую карточку, изменить текст и сузить окно. Кнопка «Без движения» служит контролем полезности перехода.
