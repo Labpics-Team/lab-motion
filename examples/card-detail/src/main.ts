@@ -98,4 +98,4 @@ direction.addEventListener('change', () => {
 window.addEventListener('resize', rebaseGeometry);
 new ResizeObserver(rebaseGeometry).observe(gallery);
 reduced.addEventListener('change', () => { if (reduced.matches) projection.cancel(); });
-window.addEventListener('pagehide', () => { cancelAnimationFrame(geometryFrame); projection.cancel(); });
+window.addEventListener('pagehide', () => { cancelAnimationFrame(geometryFrame); geometryFrame = 0; projection.cancel(); });

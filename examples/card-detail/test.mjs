@@ -3,11 +3,17 @@ import { chromium, firefox, webkit } from '@playwright/test';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const receipt = JSON.parse(readFileSync(new URL('./.artifacts/package.json', import.meta.url)));
-const installed = JSON.parse(readFileSync(new URL('./node_modules/@labpics/motion/package.json', import.meta.url)));
-if (receipt.package !== installed.name || receipt.version !== installed.version || !/^[0-9a-f]{64}$/.test(receipt.archiveSha256)) {
+const installedBytes = readFileSync(new URL('./node_modules/@labpics/motion/package.json', import.meta.url));
+const installed = JSON.parse(installedBytes);
+const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+const digest = createHash('sha256').update(installedBytes).digest('hex');
+if (receipt.source !== head || receipt.sourceDirty !== false || receipt.manifestSha256 !== digest ||
+    receipt.package !== installed.name || receipt.version !== installed.version || !/^[0-9a-f]{64}$/.test(receipt.archiveSha256)) {
   throw new Error('Пример не связан с установленным архивом');
 }
 const server = await createServer({ root, server: { host: '127.0.0.1', port: 0 } });
@@ -44,16 +50,37 @@ try {
       await page.setViewportSize({ width: 390, height: 760 });
       await page.waitForTimeout(180);
       if (await page.evaluate(() => window.__cardMeasures) === 0) throw new Error(`${name}: размер изменился во время полёта без нового замера цели`);
+      await page.evaluate(() => { window.__cardMeasures = 0; });
       if (await light.evaluate(el => el.style.transform === '')) throw new Error(`${name}: resize не испытал активный полёт`);
       await light.locator('textarea').evaluate(el => { el.style.height = '220px'; });
+      await page.waitForTimeout(150);
+      if (await page.evaluate(() => window.__cardMeasures) === 0) throw new Error(`${name}: изменение контента во время полёта не обновило цель`);
       await page.waitForTimeout(1200);
       if (await light.evaluate(el => el.style.transform !== '')) throw new Error(`${name}: изменённая геометрия не завершила полёт`);
       if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error(`${name}: горизонтальный переполненный экран`);
+      await page.keyboard.press('Escape');
+      await light.locator('[data-open]').click();
+      await page.evaluate(() => {
+        window.dispatchEvent(new Event('resize'));
+        window.dispatchEvent(new Event('pagehide'));
+        window.dispatchEvent(new Event('pageshow'));
+        window.__cardMeasures = 0;
+      });
+      await page.keyboard.press('Escape');
+      await page.evaluate(() => { window.__cardMeasures = 0; window.dispatchEvent(new Event('resize')); });
+      await page.waitForTimeout(120);
+      if (await page.evaluate(() => window.__cardMeasures) === 0) throw new Error(`${name}: возврат после pagehide отключил изменение цели`);
       await page.locator('#motion').click();
       if (await page.locator('#motion').getAttribute('aria-pressed') !== 'true') throw new Error(`${name}: контроль движения не включился`);
       if (await light.evaluate(el => el.style.transform !== '')) throw new Error(`${name}: движение не остановлено`);
+      await light.locator('[data-open]').click();
+      await page.setViewportSize({ width: 1040, height: 800 });
       await page.locator('#direction').selectOption('rtl');
+      if (await page.locator('#gallery').getAttribute('dir') !== 'rtl') throw new Error(`${name}: направление не изменилось`);
+      const positions = await page.locator('[data-id="space"], [data-id="color"]').evaluateAll(elements => elements.map(el => el.getBoundingClientRect().x));
+      if (!(positions[0] > positions[1])) throw new Error(`${name}: RTL не поменял геометрию карточек`);
       await page.keyboard.press('Escape');
+      if (!(await light.locator('[data-open]').evaluate(el => el === document.activeElement))) throw new Error(`${name}: RTL нарушил возврат фокуса`);
       await light.locator('[data-open]').click();
       if (await light.evaluate(el => el.style.transform !== '')) throw new Error(`${name}: режим без движения создал полёт`);
       const reducedPage = await browser.newPage({ reducedMotion: 'reduce' });
