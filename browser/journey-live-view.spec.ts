@@ -3,7 +3,7 @@
  * Пакетный импорт отдельно запинен test/journey-package-consumers.test.ts;
  * здесь установленный production tarball проходит настоящий DOM, фокус, ввод и визуальную C0-границу.
  */
-import { expect, test } from './fixtures/harness';
+import { expect, packedJourneyTest as test } from './fixtures/harness';
 
 test('card↔details: вложенная геометрия, перенацеливание в полёте, фокус и режимы без движения', async ({ page }) => {
   const result = await page.evaluate(async () => {

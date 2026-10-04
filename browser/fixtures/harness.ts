@@ -14,6 +14,7 @@
 import { test as base, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { verifyJourneyTuple } from './journey-tuple';
 
 const HARNESS_PATH = '/browser/fixtures/harness.html';
 
@@ -60,6 +61,14 @@ export function browserSubpathUrls(): { subpath: string; url: string }[] {
 export const test = base.extend({
   page: async ({ page }, use) => {
     await page.goto(HARNESS_PATH);
+    await use(page);
+  },
+});
+
+/** Шесть journey consumers разделяют один actual tarball до каждого outcome. */
+export const packedJourneyTest = test.extend({
+  page: async ({ page }, use, info) => {
+    await verifyJourneyTuple(page, info);
     await use(page);
   },
 });

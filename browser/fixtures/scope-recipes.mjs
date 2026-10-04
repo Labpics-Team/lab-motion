@@ -1,41 +1,74 @@
 /** Исполняемые примеры берутся из docs/recipes.md, не копируются в стенд. */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { build, version as esbuildVersion } from 'esbuild';
 import { reorderRecipe } from './reorder-recipe.mjs';
 
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 
+// Исполняем CLI через Node на Windows: .cmd-shell не должен интерпретировать
+// пробелы, кавычки или метасимволы пути временного consumer.
+function npmPack(root, directory) {
+  const windows = process.platform === 'win32';
+  const shim = windows ? execFileSync('where.exe', ['npm.cmd'], { encoding: 'utf8' })
+    .split(/\r?\n/).find(Boolean) : undefined;
+  const cli = shim && join(dirname(shim), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  if (windows && (!cli || !existsSync(cli))) throw new Error('scope-recipes: npm CLI рядом с npm.cmd отсутствует');
+  return JSON.parse(execFileSync(windows ? process.execPath : 'npm', [
+    ...(windows ? [cli] : []), 'pack', '--ignore-scripts', '--json', '--pack-destination', directory,
+  ], { cwd: root, encoding: 'utf8', timeout: 120_000 }));
+}
+
+function fileCount(directory) {
+  return readdirSync(directory, { withFileTypes: true }).reduce((count, entry) =>
+    count + (entry.isDirectory() ? fileCount(join(directory, entry.name)) : entry.isFile() ? 1 : 0), 0);
+}
+
 /** Пакуем полный publish manifest; никакие source/dist aliases не участвуют. */
-export function packScopeRecipePackage(root, directory) {
+export function packScopeRecipePackage(root, directory, suppliedTarball) {
   mkdirSync(directory, { recursive: true });
   // Ближайший package boundary исключает self-reference исходного checkout:
   // без него bare import внутри root разрешается назад в root/dist.
   writeFileSync(join(directory, 'package.json'), JSON.stringify({ name: 'scope-recipes-consumer', private: true, type: 'module' }));
-  const destination = process.platform === 'win32' ? `"${directory}"` : directory;
-  const [receipt] = JSON.parse(execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm',
-    ['pack', '--ignore-scripts', '--json', '--pack-destination', destination],
-    { cwd: root, encoding: 'utf8', timeout: 120_000, shell: process.platform === 'win32' }));
-  const tarball = join(directory, receipt.filename);
+  let packed;
+  let tarball;
+  if (suppliedTarball) {
+    if (!suppliedTarball.endsWith('.tgz')) throw new Error('scope-recipes: supplied package must be a tgz');
+    tarball = join(directory, 'supplied-package.tgz');
+    copyFileSync(resolve(suppliedTarball), tarball);
+  } else {
+    const receipts = npmPack(root, directory);
+    if (receipts.length !== 1) throw new Error('scope-recipes: expected one npm pack receipt');
+    [packed] = receipts;
+    if (!packed?.filename || basename(packed.filename) !== packed.filename) {
+      throw new Error('scope-recipes: npm pack не вернул одно имя архива');
+    }
+    tarball = join(directory, packed.filename);
+  }
   const bytes = readFileSync(tarball);
   const integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`;
-  if (receipt.integrity !== integrity) throw new Error('scope-recipes: tarball integrity расходится с npm receipt');
+  if (packed && packed.integrity !== integrity) throw new Error('scope-recipes: tarball integrity расходится с npm receipt');
   const packageRoot = join(directory, 'node_modules', '@labpics', 'motion');
   rmSync(packageRoot, { recursive: true, force: true });
   mkdirSync(packageRoot, { recursive: true });
-  execFileSync('tar', ['-xzf', tarball, '-C', packageRoot, '--strip-components=1'], { timeout: 120_000 });
+  const tar = process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
+  execFileSync(tar, ['-xzf', tarball, '-C', packageRoot, '--strip-components=1'], { timeout: 120_000 });
   const manifest = readFileSync(join(packageRoot, 'package.json'));
   const pkg = JSON.parse(manifest);
+  const candidate = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
+  if (pkg.name !== candidate.name || pkg.version !== candidate.version) {
+    throw new Error('scope-recipes: packed identity differs from the candidate');
+  }
   const cookbook = readFileSync(join(packageRoot, 'docs/recipes.md'));
   if (!cookbook.equals(readFileSync(join(root, 'docs/recipes.md')))) {
     throw new Error('scope-recipes: cookbook изменился между pack и readback');
   }
-  return { packageRoot, receipt: {
+  return { packageRoot, tarball, receipt: {
     schema: 'scope-recipes-package-v1', package: { name: pkg.name, version: pkg.version },
-    tarball: { filename: receipt.filename, sha256: hash(bytes), integrity },
-    manifest: { sha256: hash(manifest), fileCount: receipt.files.length },
+    tarball: { filename: basename(tarball), sha256: hash(bytes), integrity },
+    manifest: { sha256: hash(manifest), fileCount: fileCount(packageRoot) },
     recipesSha256: hash(cookbook), runtime: { node: process.version, esbuild: esbuildVersion },
   } };
 }
@@ -56,8 +89,8 @@ export function writeScopeRecipeSources(root, directory) {
   writeFileSync(join(directory, 'reorder-component.ts'), reorderRecipe(root));
 }
 
-export async function buildScopeRecipes(root, out, tmp) {
-  const { packageRoot, receipt } = packScopeRecipePackage(root, tmp);
+export async function buildScopeRecipes(root, out, tmp, suppliedTarball) {
+  const { packageRoot, tarball, receipt } = packScopeRecipePackage(root, tmp, suppliedTarball);
   writeScopeRecipeSources(packageRoot, tmp);
   const entry = join(tmp, 'scope-entry.ts');
   writeFileSync(entry, `
@@ -119,11 +152,18 @@ export async function buildScopeRecipes(root, out, tmp) {
   }
   const serverHtml = execFileSync(process.execPath, [serverBundle], { encoding: 'utf8', timeout: 30_000 });
   writeFileSync(join(out, 'scope-react.ssr.html'), serverHtml);
-  writeFileSync(join(out, 'scope-recipes.package.json'), JSON.stringify({ ...receipt,
+  const archivedTarball = 'scope-recipes-package.tgz';
+  copyFileSync(tarball, join(out, archivedTarball));
+  const resultReceipt = { ...receipt,
+    tarball: { ...receipt.tarball, file: archivedTarball },
     motionInputs: motionInputs.map(path => relative(packageRoot, path).split(sep).join('/')).sort(),
+    motionInputSha256: Object.fromEntries(motionInputs.sort().map(path =>
+      [relative(packageRoot, path).split(sep).join('/'), hash(readFileSync(path))])),
     bundleSha256: hash(readFileSync(join(out, 'scope-recipes.js'))),
     ssrHtmlSha256: hash(serverHtml),
     ssrMotionInputs: serverInputs.filter(path => path.startsWith(packageRoot + sep))
       .map(path => relative(packageRoot, path).split(sep).join('/')).sort(),
-  }, null, 2) + '\n');
+  };
+  writeFileSync(join(out, 'scope-recipes.package.json'), JSON.stringify(resultReceipt, null, 2) + '\n');
+  return resultReceipt;
 }
