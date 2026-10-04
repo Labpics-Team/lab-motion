@@ -52,6 +52,7 @@ try {
         };
       });
       await page.waitForFunction(() => document.querySelector('[data-id="light"]').style.transform !== '', null, { timeout: 5_000 });
+      await page.evaluate(() => { window.__cardMeasures = 0; });
       await page.setViewportSize({ width: 390, height: 760 });
       await page.waitForFunction(() => window.__cardMeasures > 0, null, { timeout: 5_000 });
       if (await page.evaluate(() => window.__cardMeasures) === 0) throw new Error(`${name}: размер изменился во время полёта без нового замера цели`);
