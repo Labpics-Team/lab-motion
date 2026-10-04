@@ -1,0 +1,6 @@
+{
+  "name": "@labpics/motion-itinerary-sheet-example",
+  "private": true,
+  "type": "module",
+  "dependencies": { "@labpics/motion": "0.3.0" }
+}

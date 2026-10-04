@@ -21,3 +21,4 @@ blob-report
 .playwright
 browser/.artifacts
 site/dist
+examples/itinerary-sheet/.artifacts
