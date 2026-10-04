@@ -30,7 +30,7 @@ try {
   await page.locator('[data-id="portrait"] [data-minutes]').fill('65');
   await page.locator('[data-id="portrait"] [data-minutes]').blur();
   if (await page.locator('#finish-label').textContent() !== 'Окончание 11:45') throw new Error('Длительность не пересчитала конец дня');
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-id]')].every(element => !element.style.transform));
   const grip = await page.locator('[data-id="window"] [data-grip]').boundingBox();
   const target = await page.locator('[data-id="portrait"]').boundingBox();
   if (!grip || !target) throw new Error('Строки не измерены');
@@ -39,7 +39,7 @@ try {
   if (await rows.first().getAttribute('data-id') === 'window') throw new Error('Pointer не переместил строку');
   if (await title.inputValue() !== 'Портрет — вечерний свет') throw new Error('Правка названия потеряна после перестановки');
   if (await page.locator('[data-id="portrait"] [data-minutes]').getAttribute('aria-label') !== 'Длительность сцены Портрет — вечерний свет в минутах') throw new Error('Перестановка потеряла доступное название');
-  await page.waitForTimeout(450);
+  await page.waitForFunction(() => [...document.querySelectorAll('[data-id]')].every(element => !element.style.transform));
   await page.screenshot({ path: 'examples/call-sheet/.artifacts/desktop.png', fullPage: true });
   await page.locator('#direction').click();
   if (await page.locator('#schedule').getAttribute('dir') !== 'rtl') throw new Error('RTL не применён');
