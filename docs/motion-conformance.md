@@ -82,6 +82,42 @@ x(t) = target + [(from − target) + (v + 10(from − target))t] exp(−10t)
 для всех допустимых параметров библиотеки. Browser-проверки наблюдают DOM при
 управляемом `Animation.currentTime`; S5 наблюдает скринкаст-пиксели.
 
+## Шесть потребителей одного пакета
+
+Браузерные проверки живых представлений, коллекций и непосредственного управления
+исполняют публичные exports установленного архива. `globalSetup` создаёт один tgz
+или принимает его через `LAB_MOTION_TARBALL`; этот же архив обслуживает smart,
+presence, reorder и compositor-рецепты. Исходники рецептов читаются из упакованной
+документации. Сборка отклоняет импорты из `src`/`dist` рабочего checkout.
+
+| Потребитель | Проверка и наблюдаемый результат |
+|---|---|
+| Карточка ↔ подробности | `browser/journey-live-view.spec.ts`: вложенная геометрия, прерывание, тот же input/выделение, живой pointer/keyboard, конечный DOM |
+| Панель ↔ источник | Тот же файл: stable key при пересоздании, обратный ход и повторное открытие; `browser/presence-transition.spec.ts`: native dialog, Escape и передача фокуса |
+| Изменяемый список | `browser/reorder.spec.ts`: pointer/keyboard, app-owned commit, focus, отзыв устаревшего предложения и cleanup |
+| Сетка | `browser/journey-grid.spec.ts`: подтверждение приложения, свежая 2D-геометрия, фильтр/вставка и отзыв отложенного pointer proposal; `browser/reorder.spec.ts`: RTL/LTR и reduced motion |
+| Sheet | `browser/compositor-recipes.spec.ts`: live follow, native release, новый ввод, resize, клавиатура и режим без движения |
+| Pager | Тот же файл: отдельный page-state, перехват, RTL, изменяемые bounds и эквивалентное управление клавиатурой |
+
+Перед каждым outcome fixture читает реальные HTTP-байты архива и браузерных
+бандлов, проверяет digest и целостность, сравнивает оба архивных readback побайтово
+и прикладывает `journey-package-tuple` с версией браузера. Полученный архив всегда
+сверяется с локальными байтами `globalSetup`, включая `PW_REUSE_SERVER=1`;
+при заданном архиве дополнительно проверяется его локальный SHA-256. Зелёный receipt без соответствующих
+полученных bytes не проходит. `motionInputSha256` фиксирует runtime-файлы,
+действительно включённые bundler в consumer.
+
+Прогон после `pnpm site:build` (он также собирает пакет):
+
+```sh
+pnpm exec playwright test browser/journey-live-view.spec.ts browser/journey-grid.spec.ts browser/reorder.spec.ts browser/presence-transition.spec.ts browser/compositor-recipes.spec.ts browser/compositor-follow.spec.ts
+```
+
+Для проверки уже созданного release-кандидата задайте `LAB_MOTION_TARBALL` его
+абсолютным путём. Артефакты остаются в `browser/.artifacts`, а квитанция каждого
+outcome — в Playwright attachment. Эти законченные consumer-сценарии не доказывают
+production adoption, DX-исследование с людьми или физические CPU/GPU/frame budgets.
+
 ## Непокрываемые свойства
 
 Эти проверки не являются доказательством всей программы в proof assistant.

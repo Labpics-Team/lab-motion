@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures/harness';
+import { expect, packedJourneyTest as test } from './fixtures/harness';
 import type { Page } from '@playwright/test';
 
 async function mount(page: Page, grid = false, rtl = false): Promise<void> {

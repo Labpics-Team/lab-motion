@@ -120,12 +120,15 @@ export default async function globalSetup() {
     if (!/layout:\s*"project"|layout:\s*'project'/.test(surfaceReturn) || /w0:\s*240,\s*w1:\s*360/.test(surfaceReturn)) {
       throw new Error('compile-artifacts: return-форма ошибочно понижена — нарушена наблюдаемая эквивалентность');
     }
-    await buildPackagedCompositorFollowRecipes(ROOT, OUT, process.env.LAB_MOTION_TARBALL);
+    const followReceipt = await buildPackagedCompositorFollowRecipes(ROOT, OUT, process.env.LAB_MOTION_TARBALL);
     writeFileSync(resolve(OUT, 'compiled.js'), compiled);
     writeFileSync(resolve(OUT, 'uncompiled.js'), uncompiled);
     writeFileSync(resolve(OUT, 'surface-compiled.js'), surfaceCompiled);
     writeFileSync(resolve(OUT, 'surface-uncompiled.js'), surfaceUncompiled);
-    await buildScopeRecipes(ROOT, OUT, TMP);
+    const scopeReceipt = await buildScopeRecipes(ROOT, OUT, TMP, resolve(OUT, followReceipt.tarball.file));
+    if (scopeReceipt.tarball.sha256 !== followReceipt.tarball.sha256) {
+      throw new Error('compile-artifacts: browser journeys consumed different package bytes');
+    }
   } finally {
     rmSync(TMP, { recursive: true, force: true });
   }

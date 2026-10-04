@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/harness';
+import { packedJourneyTest as test, expect } from './fixtures/harness';
 
 // Буквальный пример и runtime взяты из полного production tarball globalSetup.
 async function mount(page: import('@playwright/test').Page) {

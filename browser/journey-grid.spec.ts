@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures/harness';
+import { expect, packedJourneyTest as test } from './fixtures/harness';
 
 test('grid: приложение подтверждает keyboard reorder и отзывает pointer proposal после фильтра', async ({ page }) => {
   await page.evaluate(async () => {

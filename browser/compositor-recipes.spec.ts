@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, test } from './fixtures/harness';
+import { expect, packedJourneyTest as test } from './fixtures/harness';
 
 const recipeUrl = '/browser/.artifacts/scope-recipes.js';
 type Family = 'sheet' | 'pager';
