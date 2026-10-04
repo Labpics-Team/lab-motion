@@ -1,6 +1,6 @@
 ﻿import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,10 +52,12 @@ try {
     }
   }
   mkdirSync(dirname(receiptPath), { recursive: true });
+  copyFileSync(archive, join(dirname(receiptPath), 'package.tgz'));
+  const projectionSha256 = hash(readFileSync(join(installed, 'dist', 'projection', 'index.js')));
   writeFileSync(receiptPath, JSON.stringify({ source: execFileSync('git', ['rev-parse', 'HEAD'],
     { cwd: root, encoding: 'utf8' }).trim(), sourceDirty: execFileSync('git', ['status', '--porcelain'],
     { cwd: root, encoding: 'utf8' }).trim().length > 0, archiveSha256: hash(bytes),
-    manifestSha256: hash(installedManifest), npmVersion, package: manifest.name, version: manifest.version }, null, 2) + '\n');
+    manifestSha256: hash(installedManifest), projectionSha256, npmVersion, package: manifest.name, version: manifest.version }, null, 2) + '\n');
   process.stdout.write(`Атлас: установлен архив ${hash(bytes)}\n`);
 } finally {
   rmSync(temporary, { recursive: true, force: true });

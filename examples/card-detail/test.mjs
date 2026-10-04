@@ -12,8 +12,12 @@ const installedBytes = readFileSync(new URL('./node_modules/@labpics/motion/pack
 const installed = JSON.parse(installedBytes);
 const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
 const digest = createHash('sha256').update(installedBytes).digest('hex');
+const hash = bytes => createHash('sha256').update(bytes).digest('hex');
+const archiveDigest = hash(readFileSync(new URL('./.artifacts/package.tgz', import.meta.url)));
+const projectionDigest = hash(readFileSync(new URL('./node_modules/@labpics/motion/dist/projection/index.js', import.meta.url)));
 if (receipt.source !== head || receipt.sourceDirty !== false || receipt.manifestSha256 !== digest ||
-    receipt.package !== installed.name || receipt.version !== installed.version || !/^[0-9a-f]{64}$/.test(receipt.archiveSha256)) {
+    receipt.package !== installed.name || receipt.version !== installed.version ||
+    receipt.archiveSha256 !== archiveDigest || receipt.projectionSha256 !== projectionDigest) {
   throw new Error('Пример не связан с установленным архивом');
 }
 const server = await createServer({ root, server: { host: '127.0.0.1', port: 0 } });

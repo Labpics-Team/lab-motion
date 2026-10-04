@@ -11,4 +11,4 @@ pnpm exec tsc -p examples/card-detail/tsconfig.json
 pnpm exec vite build --config examples/card-detail/vite.config.mjs
 ```
 
-Для просмотра: `pnpm exec vite --config examples/card-detail/vite.config.mjs`. `prepare.mjs` собирает пакет, создаёт npm archive и устанавливает именно его внутрь примера. `.artifacts/package.json` фиксирует SHA-256 архивных байтов. Нажмите карточку, затем Escape или «К подборке»; попробуйте быстро открыть другую карточку, изменить текст и сузить окно. Кнопка «Без движения» служит контролем полезности перехода.
+Для просмотра: `pnpm exec vite --config examples/card-detail/vite.config.mjs`. `prepare.mjs` собирает пакет, сохраняет npm archive в `.artifacts/package.tgz` и устанавливает именно его внутрь примера. `.artifacts/package.json` фиксирует SHA-256 архива, манифеста и используемого экспорта проекции. Нажмите карточку, затем Escape или «К подборке»; попробуйте быстро открыть другую карточку, изменить текст и сузить окно. Кнопка «Без движения» служит контролем полезности перехода.
