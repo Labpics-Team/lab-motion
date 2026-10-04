@@ -386,6 +386,16 @@
         "default": "./dist/compositor/index.cjs"
       }
     },
+    "./compositor/follow": {
+      "import": {
+        "types": "./dist/compositor/follow/index.d.ts",
+        "default": "./dist/compositor/follow/index.js"
+      },
+      "require": {
+        "types": "./dist/compositor/follow/index.d.cts",
+        "default": "./dist/compositor/follow/index.cjs"
+      }
+    },
     "./compositor/stagger": {
       "import": {
         "types": "./dist/compositor/stagger/index.d.ts",

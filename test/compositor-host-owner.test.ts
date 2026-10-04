@@ -743,6 +743,45 @@ describe('CompositorSpring host-owner protocol', () => {
     spring.handoffToLive().destroy();
   });
 
+  it('живой контроллер сохраняет наблюдение исходных spring-параметров', () => {
+    const params = { ...SPRING };
+    const spring = controller({ animate: () => ({ cancel() {} }) }, { spring: params });
+    params.mass = 0;
+
+    expect(() => spring.start()).toThrow('LM088');
+    spring.destroy();
+  });
+
+  it('terminal cleanup и инертный handoff не читают spring getters', () => {
+    let closed = false;
+    let frames = 0;
+    const params = {
+      get mass() {
+        if (closed) throw new Error('terminal spring read');
+        return 2;
+      },
+      stiffness: 240,
+      damping: 30,
+    };
+    const spring = controller({ animate: () => ({ cancel() {} }) }, {
+      spring: params,
+      from: 5,
+      requestFrame: () => ++frames,
+    });
+    closed = true;
+
+    expect(() => spring.destroy()).not.toThrow();
+    const inert = spring.handoffToLive();
+    expect(inert.value).toBe(5);
+    expect(inert.velocity).toBe(0);
+    inert.setTarget(12);
+    inert.snapTo(9);
+    expect(inert.value).toBe(5);
+    expect(inert.velocity).toBe(0);
+    expect(frames).toBe(0);
+    expect(() => spring.destroy()).not.toThrow();
+  });
+
   it('restart throw после commit оставляет forward-only live-owner', () => {
     const queue: Array<(timestamp?: number) => void> = [];
     let frames = 0;

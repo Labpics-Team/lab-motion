@@ -38,6 +38,7 @@ import { cubicBezierUnchecked } from '../internal/cubic-bezier.js';
 import {
   DEFAULT_DURATION_MS,
   DEFAULT_SPRING,
+  SNAPPY_SPRING,
   STANDARD_EASING,
   STANDARD_EASING_COORDS,
 } from '../internal/motion-defaults.js';
@@ -216,7 +217,7 @@ export interface SpringTokens {
 export const spring: SpringTokens = {
   default: DEFAULT_SPRING,
   gentle: { mass: 1, stiffness: 120, damping: 30 },
-  snappy: { mass: 1, stiffness: 260, damping: 28 },
+  snappy: SNAPPY_SPRING,
   bounce: { mass: 1, stiffness: 180, damping: 12 },
   // PURE-аннотации: вызовы с константами не бросают (запинено тестом), поэтому
   // честно помечены чистыми — иначе tsup-бандлы соседних субпутей (presets,

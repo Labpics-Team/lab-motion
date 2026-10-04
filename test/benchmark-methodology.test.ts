@@ -377,7 +377,7 @@ describe('benchmark methodology fail-closed contracts', () => {
       const callStartedAtMs = Array.from({ length: calls }, () => 0);
       const checkpointTimes = config.staggerGapMs > 0
         ? [0.2, 0.5, 0.8].map((fraction) => config.staggerGapMs * (config.targetsPerCall - 1) * fraction)
-        : [config.durationMs * 0.25];
+        : [config.durationMs * 0.25, config.durationMs * 0.5, config.durationMs * 0.625];
       const checkpoints = checkpointTimes.map((elapsedMs) => ({
         groups: Array.from({ length: calls }, () => ({
           readStartedMs: elapsedMs,
@@ -470,6 +470,38 @@ describe('benchmark methodology fail-closed contracts', () => {
       ...phaseShifted,
       valid: false,
     })).toThrow(/anime\.s3 run 1.*semantic/i);
+  });
+
+  it.each([
+    { name: '128мс и завершённый последний кадр', times: [32, 64, 140], positions: [75, 150, 300], width: 0.1, duration: 128, expected: true },
+    { name: '128мс и неразрешающие окна чтения', times: [32, 64, 80], positions: [75, 150, 187.5], width: 20, duration: 128, expected: false },
+    { name: '256мс и неразрешающие 32мс окна', times: [88, 136, 184], positions: [103.125, 159.375, 215.625], width: 32, duration: 256, expected: false },
+    { name: '256мс и разрешающие узкие окна', times: [88, 136, 184], positions: [103.125, 159.375, 215.625], width: 0.1, duration: 256, expected: true },
+    { name: 'только завершённые позиции', times: [140, 156, 172], positions: [300, 300, 300], width: 0.1, duration: 128, expected: false },
+  ])('temporal oracle: $name', ({ times, positions, width, duration, expected: accepted }) => {
+    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: duration };
+    // Векторы заданы независимо; ширина окна меняется при том же законе движения.
+    const evidence = { topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: duration, toPx: 300 },
+      callStartedAtMs: [0], checkpoints: times.map((time, index) => ({ frameTimestampMs: time,
+        groups: [{ readStartedMs: time, readEndedMs: time + width,
+          positions: Array(3).fill(positions[index]) }] })),
+      terminal: [[300, 300, 300]] };
+    expect(config.durationMs).toBe(duration);
+    expect(evidence.topology.durationMs).toBe(duration);
+    expect(positions).toEqual(times.map((time) => 300 * Math.min(1, time / duration)));
+    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(accepted);
+    expect(evaluateStartSemanticEvidence(evidence, { ...config, durationMs: duration === 128 ? 256 : 128 }, 1)).toBe(false);
+  });
+
+  it.each([0, 75])('fresh0→300 связывает фазу с API start, offset=%s', (offset) => {
+    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128, fromPx: 0, requireFreshStart: true };
+    const evidence = { topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: 128, toPx: 300 },
+      callStartedAtMs: [0], onset: { before: [{ readStartedMs: 0, readEndedMs: 0, positions: [0, 0, 0] }],
+        after: [{ readStartedMs: 0.025, readEndedMs: 0.05, positions: [offset, offset, offset] }] },
+      checkpoints: [32, 64, 80].map((time) => ({ frameTimestampMs: time,
+        groups: [{ readStartedMs: time, readEndedMs: time + 0.1, positions: Array(3).fill(Math.min(300, offset + 300 * time / 128)) }] })),
+      terminal: [[300, 300, 300]] };
+    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(offset === 0);
   });
 
   it('bootstraps paired independent run clusters reproducibly without flattening rounds', () => {
