@@ -21,3 +21,4 @@ blob-report
 .playwright
 browser/.artifacts
 site/dist
+examples/call-sheet/.artifacts
