@@ -424,17 +424,22 @@ export function animate(
   let natural = 0;
   let setupDone = false;
   let resolveFinished!: (value: void | PromiseLike<void>) => void;
+  let ownedOptions: AnimateOptions | undefined = options;
   // Наружу виден один lifecycle, поэтому один aggregate Promise заменяет N
   // скрытых Unit-deferred и не превращает массовый start в GC-hot-path.
   const maybeComplete = (): void => {
     if (!setupDone || done !== total) return;
     setupDone = false; // та же защёлка гасит повторную terminal-отчётность
     mainBatch = undefined;
+    // Public controls остаются у caller, но terminal aggregate больше не
+    // владеет компонентными callbacks/scheduler из configuration.
+    const completedOptions = ownedOptions!;
+    ownedOptions = undefined;
     // Thenable-adoption даёт промежуточную Promise job: уже поставленная
     // caller-микрозадача остаётся перед finished reactions.
     resolveFinished(ASYNC_FINISH);
     if (natural === total) {
-      try { options.onComplete?.(); } catch (error) {
+      try { completedOptions.onComplete?.(); } catch (error) {
         // Отчёт об ошибке callback не владеет lifecycle: hostile reporter не
         // может спрятать controls или заменить natural completion.
         try {
@@ -450,8 +455,18 @@ export function animate(
   };
   // Чистый compositor/reduced не создаёт main-state. WAAPI handoff и обычные
   // main slots одного aggregate делят kernel и исходный plan capacity.
-  const getMainBatch = (): SurfaceBatch =>
-    mainBatch ??= surfaceBatchFor(options.requestFrame);
+  const getMainBatch = (): SurfaceBatch => {
+    if (mainBatch !== undefined) return mainBatch;
+    const frame = ownedOptions!.requestFrame;
+    // Accessor может выполнить вложенный handoff того же aggregate: уже
+    // опубликованный batch остаётся единственным владельцем его live slots.
+    if (mainBatch !== undefined) return mainBatch;
+    const batch = surfaceBatchFor(frame);
+    // Accessor requestFrame может терминализировать aggregate. Его уже
+    // отозванная configuration не получает новый scheduler root обратно.
+    if (ownedOptions !== undefined) mainBatch = batch;
+    return batch;
+  };
 
   // 4. Фаза commit в исходном target-major порядке. Владелец берётся из
   //    record ЗДЕСЬ, а не сохраняется в плане: повтор цели в списке обязан

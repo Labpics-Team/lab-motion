@@ -7,25 +7,32 @@ import { setImmediate } from 'node:timers/promises';
 const require = createRequire(import.meta.url);
 const specifiers = ['@labpics/motion', '@labpics/motion/frame', '@labpics/motion/compositor',
   '@labpics/motion/bindings', '@labpics/motion/behaviors', '@labpics/motion/behaviors/reorder',
-  '@labpics/motion/compositor/follow'];
+  '@labpics/motion/compositor/follow', '@labpics/motion/presence', '@labpics/motion/animate'];
 const modules = [];
 for (const format of ['esm', 'cjs']) {
   const loaded = [];
   for (const name of specifiers) loaded.push(format === 'esm' ? await import(name) : require(name));
-  const [root, frame, compositor, bindings, behaviors, reorder, follow] = loaded;
-  modules.push({ format, root, frame, compositor, bindings, behaviors, reorder, follow });
+  const [root, frame, compositor, bindings, behaviors, reorder, follow, presence, animate] = loaded;
+  modules.push({ format, root, frame, compositor, bindings, behaviors, reorder, follow, presence, animate });
 }
 const mode = process.argv[2];
 assert.ok(['witness', 'lifecycle', 'retention', 'bytes'].includes(mode), 'неизвестный режим RESOURCE proof');
 const CYCLES = 10_000;
 const SPRING = Object.freeze({ mass: 1, stiffness: 170, damping: 26 });
-const KINDS = ['frame', 'motion-value', 'compositor-native', 'compositor-live',
+const EXISTING_KINDS = ['frame', 'motion-value', 'compositor-native', 'compositor-live',
   'compositor-delay', 'compositor-handoff', 'compositor-roundtrip', 'compositor-reduced-loans', 'binding', 'sheet', 'pager',
   'dismiss', 'pull', 'pull-pending', 'pull-settled', 'reorder',
   'follow-native', 'follow-pickup', 'follow-live'];
-const CASES = modules.flatMap(mod => KINDS.map(kind => ({ mod, kind, name: `${mod.format}/${kind}` })));
+const ADDED_KINDS = ['presence-transition', 'animate-scope-main', 'animate-scope-native'];
+const corpus = process.argv[3] ?? 'combined';
+assert.ok(['existing', 'presence-scope', 'combined'].includes(corpus), 'неизвестный RESOURCE corpus');
+const ALL_CASES = modules.flatMap(mod => [...EXISTING_KINDS, ...ADDED_KINDS]
+  .map(kind => ({ mod, kind, name: `${mod.format}/${kind}` })));
+const CASES = ALL_CASES.filter(({ kind }) => corpus === 'combined'
+  || (corpus === 'existing' ? EXISTING_KINDS : ADDED_KINDS).includes(kind));
 const terminalPromises = [];
 const settledPromises = [];
+const componentPromises = [];
 
 // Array хранится в JS heap: external ArrayBuffer/RSS не подменяют heapUsed.
 function component(id, words = 256) { return { id, publications: 0, refreshes: 0, dismissals: 0, payload: new Array(words).fill(id) }; }
@@ -35,6 +42,14 @@ function scheduler(value, host) { return callback => { void value.id; return hos
 function clock(value, host) { return () => { void value.id; return host.now; }; }
 function completion(value) { return () => { value.dismissals++; }; }
 function refresh(value, deferred) { return () => { value.refreshes++; return deferred.promise; }; }
+const LINEAR = t => t;
+function scopeTarget(value, host, native) {
+  const notify = listener(value);
+  return { marker: value, style: {
+    getPropertyValue: () => '', setProperty: notify, removeProperty: notify,
+  }, ...(native ? { animate: host.animate } : {}) };
+}
+function scopeRoot(value, elements) { return { marker: value, querySelectorAll: () => elements }; }
 function deferred() {
   let resolve;
   // Executor/resolver нейтрален к компоненту. Внешний promise сам по себе
@@ -87,6 +102,11 @@ class ResourceHost {
     this.#frames = undefined;
     for (const callback of batch) callback(this.#now);
   }
+  finishTimers() {
+    const callbacks = [...(this.#timers?.values() ?? [])];
+    this.#timers = undefined;
+    for (const callback of callbacks) callback();
+  }
   drain() {
     let count = 0;
     while (this.pendingFrames) {
@@ -113,6 +133,7 @@ function runCase({ mod, kind, name }, value, terminal) {
   const frame = scheduler(value, host);
   let owners;
   let destroy;
+  let terminalCheck;
   switch (kind) {
     case 'frame': {
       // cancelAll не делает переиспользуемый FrameLoop permanently dead;
@@ -261,6 +282,80 @@ function runCase({ mod, kind, name }, value, terminal) {
       owners = [owner];
       break;
     }
+    case 'presence-transition': {
+      const action = deferred();
+      const phase = () => {
+        notify();
+        return { ...host.animate(), finished: action.promise };
+      };
+      const owner = mod.presence.createPresenceTransition({ enter: phase, exit: phase,
+        onPresent: completion(value), onGone: completion(value) });
+      const enter = owner.setPresent(true);
+      assert.equal(owner.setPresent(true), enter, name + ': повтор цели создал другую фазу');
+      const exit = owner.setPresent(false);
+      const pending = owner.setPresent(true);
+      assert.equal(host.createdEffects, 3, name + ': interruption не создало successor');
+      assert.equal(host.cancelledEffects, 2, name + ': supersede не снял прежние effects');
+      assert.equal(host.activeEffects, 1, name + ': current phase не владеет effect');
+      assert.equal(value.publications, 3, name + ': здоровые factory не выполнены');
+      destroy = () => {
+        owner.destroy();
+        assert.equal(owner.state, 'destroyed');
+        assert.equal(owner.setPresent(false), pending, name + ': terminal input создал Promise');
+      };
+      if (terminal) {
+        terminalCheck = { name, kind, host, owner, pending,
+          earlier: [enter, exit], ref: new WeakRef(value) };
+        componentPromises.push(terminalCheck);
+      }
+      // Нейтральный незавершённый Promise не является consumer callback-root.
+      owners = [owner, enter, exit, pending, action];
+      break;
+    }
+    case 'animate-scope-main':
+    case 'animate-scope-native': {
+      const native = kind === 'animate-scope-native';
+      const elements = [scopeTarget(value, host, native), scopeTarget(value, host, native), scopeTarget(value, host, native)];
+      const root = scopeRoot(value, elements);
+      const owner = mod.animate.createAnimateScope(root);
+      const options = { ...(native ? { spring: SPRING } : { duration: 1000, ease: LINEAR }),
+        requestFrame: frame, now: clock(value, host), setTimer: host.setTimer,
+        onComplete: completion(value) };
+      const initial = owner.animate('.surface', { opacity: [0, 1] }, options);
+      host.step();
+      if (native) {
+        assert.equal(host.activeEffects, 3, name + ': native scope не владеет effects');
+        host.finishTimers();
+        assert.equal(host.activeEffects, 0, name + ': natural completion не освободило effects');
+        assert.equal(value.dismissals, 1, name + ': natural completion callback');
+      }
+      else assert.ok(value.publications > 0, name + ': живой scope не пишет');
+      const active = owner.animate(elements[0], { opacity: [0, 0.8] }, options);
+      const paused = owner.animate(elements[1], { opacity: [0, 0.6] }, options);
+      paused.pause();
+      const delayed = owner.animate(elements[2], { opacity: [0, 0.4] }, { ...options, delay: 1000 });
+      host.step();
+      if (native) assert.equal(host.activeEffects, 2, name + ': current/paused/delayed native ownership');
+      else assert.ok(host.pendingFrames > 0, name + ': active/delayed scope потерял scheduler');
+      destroy = () => {
+        owner.destroy();
+        const before = value.publications;
+        for (const controls of [initial, active, paused, delayed]) {
+          controls.play(); controls.pause(); controls.seek(32); controls.cancel(); controls.stop();
+        }
+        assert.equal(value.publications, before, name + ': terminal control воскресил writer');
+      };
+      if (terminal) {
+        terminalCheck = { name, kind, host, owner,
+          pending: Promise.all([initial.finished, active.finished, paused.finished, delayed.finished]),
+          ref: new WeakRef(value) };
+        componentPromises.push(terminalCheck);
+      }
+      // Scope destroy терминализирует принадлежащие ему runs. Сохранённые
+      // public controls/finished не дают motion право удерживать component.
+      owners = [owner, initial, active, paused, delayed];
+      break;
+    }
     case 'sheet':
     case 'pager': {
       const sheet = kind === 'sheet';
@@ -380,6 +475,7 @@ function runCase({ mod, kind, name }, value, terminal) {
   if (terminal) {
     destroy(); destroy();
     const publications = value.publications;
+    if (terminalCheck) terminalCheck.publications = publications;
     host.terminalDrain();
     assert.equal(value.publications, publications, name + ': terminal listener был вызван');
   }
@@ -390,6 +486,16 @@ function runCase({ mod, kind, name }, value, terminal) {
 
 async function flushTerminalPromises() {
   await Promise.resolve(); await Promise.resolve();
+  for (const check of componentPromises.splice(0)) {
+    const result = await check.pending;
+    if (check.kind === 'presence-transition') {
+      assert.deepEqual(result, { status: 'destroyed', present: true }, check.name + ': terminal result');
+      for (const promise of check.earlier) assert.equal((await promise).status, 'superseded');
+    }
+    check.host.terminalDrain();
+    const value = check.ref.deref();
+    if (value) assert.equal(value.publications, check.publications, check.name + ': deferred cleanup вызвал writer');
+  }
   for (const check of settledPromises.splice(0)) {
     check.host.drain();
     assert.equal(check.owner.state.phase, 'idle', 'refresh не завершил возврат прежде destroy');
@@ -586,7 +692,7 @@ if (mode === 'lifecycle') {
     defaults.clear(); assert.equal(defaults.size, 0);
     return { format: mod.format, isolatedCapacity: cache.capacity, defaultCapacity: defaults.capacity, finalSize: 0 };
   });
-  console.log(JSON.stringify({ status: 'pass', mode, cyclesPerOwner: CYCLES,
+  console.log(JSON.stringify({ status: 'pass', mode, corpus, cyclesPerOwner: CYCLES,
     executions: executions(), terminal: { effects: 0, jobs: 0, publications: 0 }, caches }));
 } else if (mode === 'retention' || mode === 'witness') {
   const count = mode === 'witness' ? 1 : CYCLES;
@@ -652,11 +758,23 @@ if (mode === 'lifecycle') {
     unsubscribedActive: countAlive(unsubscribedRefs), activeOwnersWithHealthySibling: unsubscribedOwners.length,
     promiseRoots: Object.fromEntries(Object.entries(promiseRefs).map(([name, refs]) => [name, countAlive(refs)])),
     healthyPromiseCompletions: modules.length, healthyDismissCompletions: modules.length };
+  // Тот же live scope/presence controller остаётся сильным root после destroy;
+  // прежние 38 controls не меняют свой текущий lifetime premise.
+  const addedLiveRefs = [];
+  for (let index = 0; index < CASES.length; index++) if (ADDED_KINDS.includes(CASES[index].kind)) {
+    const [host, owner] = liveOwners[index];
+    owner.destroy(); host.terminalDrain();
+    addedLiveRefs.push(liveRefs[index]);
+  }
+  await flushTerminalPromises(); await collect(16);
+  controls.addedLiveReleased = countAlive(addedLiveRefs);
+  controls.addedLiveReleaseControls = addedLiveRefs.length;
   const passed = inheritedFailures.length === 0 && retainedComponentReferences === 0 && controls.live === CASES.length
     && controls.dropped === 0 && controls.deliberate === 1 && controls.unsubscribedActive === 0
     && controls.promiseRoots.live === 2 && controls.promiseRoots.terminal === 0
-    && controls.promiseRoots['promise-only'] === 0 && controls.promiseRoots['user-owned'] === 2;
-  const report = { status: passed ? 'pass' : 'fail', mode, cyclesPerOwner: count, executions: executions(),
+    && controls.promiseRoots['promise-only'] === 0 && controls.promiseRoots['user-owned'] === 2
+    && controls.addedLiveReleased === 0;
+  const report = { status: passed ? 'pass' : 'fail', mode, corpus, cyclesPerOwner: count, executions: executions(),
     retainedComponentReferences, retainedComponentPayloadBytes: retainedComponentReferences === 0 ? 0 : null, owners, controls };
   console.log(JSON.stringify(report));
   assert.deepEqual(inheritedFailures, [], 'spring/callback/follow reference contract нарушен');
@@ -669,6 +787,7 @@ if (mode === 'lifecycle') {
   assert.equal(controls.promiseRoots['promise-only'], 0, 'motion continuation удерживает компонент через нейтральный внешний Promise');
   assert.equal(controls.promiseRoots['user-owned'], 2, 'внешний пользовательский Promise callback не различается');
   assert.equal(retainedComponentReferences, 0, 'terminal controls удерживают уничтоженные компоненты');
+  assert.equal(controls.addedLiveReleased, 0, 'тот же уничтоженный live scope/presence удерживает компонент');
 } else {
   // До candidate фиксированы измеримость и правило отказа. Полоса — разрешение
   // стенда, не новый budget продукта: шире 256 KiB калибровка не принимается.
@@ -687,7 +806,7 @@ if (mode === 'lifecycle') {
   const low = Math.min(...calibration), high = Math.max(...calibration);
   const band = high - low + READOUT_ALLOWANCE;
   const baseline = { low, high, band, maximumResolvableBand: MAX_RESOLVABLE_BAND, samples: calibration };
-  console.log(JSON.stringify({ phase: 'baseline', mode, baseline }));
+  console.log(JSON.stringify({ phase: 'baseline', mode, corpus, baseline }));
   assert.ok(band <= MAX_RESOLVABLE_BAND, 'named gap: A/A heap baseline не разрешает 256 KiB; candidate admission не запущен');
 
   let deliberate = [component(1, CONTROL_WORDS)];
@@ -699,7 +818,9 @@ if (mode === 'lifecycle') {
   const releasedControl = await heap();
   assert.ok(releasedControl <= high + band, 'deliberate control не вернулся в baseline после release');
 
-  let live = [setup(CASES.find(testCase => testCase.name === 'esm/compositor-native'), 2, false, false, CONTROL_WORDS).owners];
+  const liveCase = CASES.find(testCase => testCase.name ===
+    (corpus === 'presence-scope' ? 'esm/presence-transition' : 'esm/compositor-native'));
+  let live = [setup(liveCase, 2, false, false, CONTROL_WORDS).owners];
   globalThis.__resourceBytesControls = live;
   const liveHeap = await heap();
   const liveSignal = liveHeap - high;
@@ -716,7 +837,7 @@ if (mode === 'lifecycle') {
     samples.push({ cyclesPerOwner: prefix, ...measured });
   }
   const excess = samples.map(sample => Math.max(0, sample.heapUsed - high - band));
-  const report = { status: excess.every(bytes => bytes === 0) ? 'pass' : 'fail', mode, cyclesPerOwner: CYCLES,
+  const report = { status: excess.every(bytes => bytes === 0) ? 'pass' : 'fail', mode, corpus, cyclesPerOwner: CYCLES,
     executions: executions(), baseline,
     controls: { deliberateHeap, deliberateSignal, releasedControl, liveHeap, liveSignal, droppedControl }, samples, excess,
     accounting: { componentPayload: 'JS Array', boundedCaches: 'warmed before A/A',
