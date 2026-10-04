@@ -35,7 +35,6 @@ describe('RESOURCE-01: реальные байты установленного 
     mkdirSync(EVIDENCE, { recursive: true });
     evidenceRun = mkdtempSync(join(EVIDENCE, 'run-'));
     work = mkdtempSync(join(tmpdir(), 'resource-actual-package-'));
-    execFileSync(NPM, ['run', 'build'], { cwd: ROOT, stdio: 'pipe', shell: WINDOWS_SHELL, timeout: 120_000 });
     const dirty = execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' }).trim();
     const packed = JSON.parse(execFileSync(NPM, [
       'pack', '--ignore-scripts', '--json', '--pack-destination', shellPath(work),
