@@ -86,7 +86,10 @@ function mountSheet() {
   const finish = (event: PointerEvent, cancelled: boolean) => {
     if (event.pointerId !== pointer || !live) return;
     if (!cancelled) follow(event);
-    const rest = createDecay({ from: live.value, velocity: live.velocity }).rest;
+    // Быстрое отпускание может случиться до следующего кадра spring: value ещё
+    // отражает старую позицию, а последняя координата указателя уже известна.
+    const releaseGoal = bounded(anchor + event.clientY);
+    const rest = createDecay({ from: releaseGoal, velocity: live.velocity }).rest;
     const next = cancelled ? selected : points.reduce((best, value, index) =>
       Math.abs(value - rest) < Math.abs(points[best]! - rest) ? index : best, 0);
     select(next);

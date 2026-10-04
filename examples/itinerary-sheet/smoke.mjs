@@ -1,6 +1,9 @@
-import { chromium } from '@playwright/test';
+import { chromium, firefox, webkit } from '@playwright/test';
 
-const browser = await chromium.launch({ headless: true });
+const engineName = process.env.MOTION_BROWSER ?? 'chromium';
+const engine = { chromium, firefox, webkit }[engineName];
+if (!engine) throw new Error(`Неизвестный браузер: ${engineName}`);
+const browser = await engine.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 1100, height: 850 } });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
@@ -33,6 +36,29 @@ try {
   await page.setViewportSize({ width: 430, height: 650 });
   await page.locator('[data-snap="2"]').click();
   await page.waitForTimeout(500);
+  async function upwardDrag(dwellMs) {
+    const box = await page.locator('#handle').boundingBox();
+    if (!box) throw new Error('Ручка не видна');
+    const dragX = box.x + box.width / 3, dragY = box.y + box.height / 2;
+    await page.mouse.move(dragX, dragY); await page.mouse.down();
+    await page.mouse.move(dragX, dragY - 220, { steps: 8 });
+    if (dwellMs) await page.waitForTimeout(dwellMs);
+    await page.mouse.up();
+    if (await state.textContent() === 'Панель закрыта') throw new Error(`Жест 220px с ожиданием ${dwellMs}ms оставил панель закрытой`);
+  }
+  await upwardDrag(0);
+  await page.locator('[data-snap="2"]').click(); await page.waitForTimeout(500);
+  await upwardDrag(100);
+  await page.locator('[data-snap="2"]').click(); await page.waitForTimeout(500);
+  const cancelBox = await page.locator('#handle').boundingBox();
+  if (!cancelBox) throw new Error('Ручка не видна для отмены');
+  const cancelX = cancelBox.x + cancelBox.width / 3, cancelY = cancelBox.y + cancelBox.height / 2;
+  await page.locator('#handle').evaluate(element => element.addEventListener('pointerdown', event => { window.__dragPointer = event.pointerId; }, { once: true }));
+  await page.mouse.move(cancelX, cancelY); await page.mouse.down();
+  await page.mouse.move(cancelX, cancelY - 220, { steps: 8 });
+  await page.locator('#handle').evaluate(element => element.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: window.__dragPointer })));
+  await page.mouse.up();
+  if (await state.textContent() !== 'Панель закрыта') throw new Error('Отмена жеста изменила выбранное положение');
   const handle = await page.locator('#handle').boundingBox();
   if (!handle) throw new Error('Ручка не видна');
   const x = handle.x + handle.width / 3, y = handle.y + handle.height / 2;
@@ -73,5 +99,5 @@ try {
     if (await page.locator('#note').inputValue() !== 'Увидеть старую оранжерею') throw new Error('Реальный bfcache-возврат потерял заметку');
   }
   if (errors.length) throw new Error(`Ошибки страницы: ${errors.join('; ')}`);
-  process.stdout.write(`Itinerary sheet smoke: PASS; bfcache persisted=${persisted}; reasons=${restoration}\n`);
+  process.stdout.write(`Itinerary sheet smoke (${engineName}): PASS; bfcache persisted=${persisted}; reasons=${restoration}\n`);
 } finally { await browser.close(); }
