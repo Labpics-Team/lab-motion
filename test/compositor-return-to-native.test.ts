@@ -199,22 +199,97 @@ describe('CompositorSpring: обратная передача единствен
     expect(s.queue).toHaveLength(0);
   });
 
-  it('реентрантный live intent отзывает возвращающийся native effect', () => {
-    let cancelled = 0;
-    let controller!: CompositorSpring;
+  it.each([
+    'retarget', 'setTarget', 'snapTo', 'setTarget(value)', 'snapTo(value)', 'setTarget ABA',
+  ])('%s: новый live intent отзывает возвращающийся native effect', action => {
+    const cancel = vi.fn();
+    let reenter = () => {};
     const s = scene({ target: { animate() {
-      controller.retarget(40);
-      return { currentTime: null, cancel() { cancelled++; } };
+      reenter();
+      return { currentTime: null, cancel };
     } } });
-    controller = s.controller;
-    const live = controller.handoffToLive(80);
-    s.step();
-    controller.handoffToCompositor(200);
-    expect(cancelled).toBe(1);
-    expect(controller.mode).toBe('fallback');
+    const live = s.controller.handoffToLive(80);
+    for (let i = 0; i < 4; i++) s.step();
+    const from = live.value;
+    expect(from).not.toBe(0);
+    expect(live.velocity).not.toBe(0);
+    const target = action.endsWith('(value)') ? from : action === 'setTarget ABA' ? 80 : 40;
+    reenter = () => {
+      if (action === 'retarget') s.controller.retarget(target);
+      else if (action === 'setTarget ABA') {
+        live.setTarget(40);
+        live.setTarget(80);
+      } else if (action.startsWith('setTarget')) live.setTarget(target);
+      else live.snapTo(target);
+    };
+
+    s.controller.handoffToCompositor(200);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(s.controller.mode).toBe('fallback');
     for (let i = 0; i < 200 && s.queue.length; i++) s.step();
-    expect(live.value).toBe(40);
-    controller.destroy();
+    expect(live.value).toBe(target);
+    expect(s.controller.value).toBe(target);
+    expect(s.seen.at(-1)).toBe(target);
+
+    live.setTarget(-20);
+    for (let i = 0; i < 200 && s.queue.length; i++) s.step();
+    expect(s.controller.value).toBe(-20);
+    s.controller.destroy();
+    s.step();
+    expect(s.queue).toHaveLength(0);
+  });
+
+  it.each(['stop', 'destroy'] as const)('%s live donor отзывает ещё не принятый native effect', action => {
+    const cancel = vi.fn();
+    let reenter = () => {};
+    const s = scene({ target: { animate() {
+      reenter();
+      return { currentTime: null, cancel };
+    } } });
+    const live = s.controller.handoffToLive(80);
+    for (let i = 0; i < 4; i++) s.step();
+    const value = live.value;
+    const writes = s.seen.length;
+    reenter = () => live[action]();
+
+    s.controller.handoffToCompositor(200);
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(s.controller.mode).toBe('fallback');
+    s.step();
+    expect(s.controller.value).toBe(value);
+    expect(s.seen).toHaveLength(writes);
+    expect(s.queue).toHaveLength(0);
+    s.controller.destroy();
+  });
+
+  it.each([
+    { method: 'setTarget', resting: false },
+    { method: 'setTarget', resting: true },
+    { method: 'snapTo', resting: true },
+  ] as const)('$method: no-op повтор цели не отменяет native release, resting=$resting', ({ method, resting }) => {
+    const cancel = vi.fn();
+    let reenter = () => {};
+    const s = scene({ target: { animate() {
+      reenter();
+      return { currentTime: null, cancel };
+    } } });
+    const live = s.controller.handoffToLive(80);
+    for (let i = 0; i < 4; i++) s.step();
+    if (resting) live.snapTo(80);
+    const from = live.value;
+    reenter = () => live[method](80);
+
+    s.controller.handoffToCompositor(200);
+    expect(cancel).not.toHaveBeenCalled();
+    expect(s.controller.mode).toBe('compositor');
+    expect(s.controller.value).toBe(from);
+    const writes = s.seen.length;
+    live.setTarget(-20);
+    s.step();
+    expect(s.seen).toHaveLength(writes);
+    expect(s.queue).toHaveLength(0);
+    s.controller.destroy();
+    expect(cancel).toHaveBeenCalledTimes(1);
   });
 
   it('reduced и RAF сохраняют endpoint без притворного native эффекта', () => {
