@@ -40,6 +40,7 @@
 import { MotionParamError } from '../errors.js';
 import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
 import { readSpringUnchecked } from '../internal/read-spring.js';
+import { finiteOr } from '../internal/finite.js';
 import {
   type SpringParams,
   validateSpringForFrameLoop,
@@ -676,6 +677,7 @@ export class CompositorSpring {
   protected _retargetFrom(
     from: number, velocity: number, newTarget: number, generation: number, mv?: MotionValue,
   ): void {
+    const revision = mv?._epoch;
     const range = newTarget - from;
     const v0Norm = Math.abs(range) > RANGE_EPSILON
       ? velocity / range
@@ -688,7 +690,7 @@ export class CompositorSpring {
       v0Norm,
       this._tolerance,
     );
-    if (this._epoch !== generation) return;
+    if (this._epoch !== generation || mv?._epoch !== revision) return;
     if (!artifact) {
       if (mv) {
         this.retarget(newTarget);
@@ -888,7 +890,7 @@ export class CompositorSpring {
         : (1 - progress) * this._from + progress * this._to;
     // Scratch не пересекает публичную границу: оба вызывающих синхронно
     // копируют поля до следующего snapshot. Это убирает allocation на прерывание.
-    sample.value = Number.isFinite(rawValue) ? rawValue : this._to;
+    sample.value = finiteOr(rawValue, this._to);
     // Pending local-time ещё не исполняет serialized slope: сохраняем prior
     // handoff вместо потери скорости при немедленном новом вводе.
     sample.velocity = scaleSerializedVelocity(currentTime === null ? this._v0Norm : sample.velocity, this._from, this._to);
@@ -903,6 +905,7 @@ export class CompositorSpring {
     generation: number,
     delayMs = 0,
   ): void {
+    const revision = this._mv?._epoch;
     const plan = compileSpringRuntimeExecutionTupleUnchecked(
       this._spring,
       this._property,
@@ -915,9 +918,9 @@ export class CompositorSpring {
       this._format,
       artifact,
     );
-    if (this._epoch !== generation) return;
+    if (this._epoch !== generation || this._mv?._epoch !== revision) return;
     const now = this._now!();
-    if (this._epoch !== generation) return;
+    if (this._epoch !== generation || this._mv?._epoch !== revision) return;
     const donor = this._host;
     const host = this._target!.animate(plan[0], {
       duration: plan[2],
@@ -929,7 +932,7 @@ export class CompositorSpring {
       // планирует старт off-main-thread — каскад stagger без работы main-потока.
       ...(delayMs > 0 ? { delay: delayMs } : {}),
     }) as CompositorAnimation;
-    if (this._epoch !== generation) {
+    if (this._epoch !== generation || this._mv?._epoch !== revision) {
       if (this._host !== host) this._cancelHost(host);
       return;
     }
