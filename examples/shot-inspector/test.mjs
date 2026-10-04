@@ -12,7 +12,8 @@ const receipt = JSON.parse(readFileSync(new URL('./.artifacts/package.json', imp
 const installedBytes = readFileSync(new URL('./node_modules/@labpics/motion/package.json', import.meta.url));
 const installed = JSON.parse(installedBytes);
 const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
-if (receipt.source !== head || receipt.sourceDirty !== false ||
+const currentChanges = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: root, encoding: 'utf8' }).trim();
+if (receipt.source !== head || receipt.sourceDirty !== false || currentChanges !== '' ||
     receipt.manifestSha256 !== hash(installedBytes) ||
     receipt.archiveSha256 !== hash(readFileSync(new URL('./.artifacts/package.tgz', import.meta.url))) ||
     receipt.projectionSha256 !== hash(readFileSync(new URL('./node_modules/@labpics/motion/dist/projection/index.js', import.meta.url))) ||
