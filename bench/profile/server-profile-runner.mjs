@@ -16,12 +16,14 @@ import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPack
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
 import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './server-thread-cpu-clock.mjs';
 import { compactServerCpuEvidence, compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
-  serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration, writeServerArtifact } from './server-profile-contract.mjs';
+  serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration } from './server-profile-contract.mjs';
+import { writeServerArtifact } from './server-profile-artifact.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const BENCH = path.join(ROOT, 'bench/compare');
 const requireBench = createRequire(path.join(BENCH, 'package.json'));
 const HARNESS_FILES = ['bench/profile/server-profile-registration.mjs', 'bench/profile/server-profile-contract.mjs',
+  'bench/profile/server-profile-artifact.mjs',
   'bench/profile/server-profile-runner.mjs', 'bench/profile/server-profile-retention.mjs',
   'bench/profile/server-thread-cpu-clock.mjs', ...Object.keys(SERVER_PROFILE.clockError.nativeSourceFiles),
   'scripts/bench-transform-support.mjs', 'scripts/bench-support.mjs', 'scripts/bench.mjs', 'bench/compare/bench.mjs',

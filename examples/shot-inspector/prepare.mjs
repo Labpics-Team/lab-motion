@@ -62,4 +62,3 @@ try {
 } finally {
   rmSync(temporary, { recursive: true, force: true });
 }
-

@@ -1,12 +1,8 @@
 import { isDeepStrictEqual, types } from 'node:util';
-import { closeSync, openSync, readFileSync, writeSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 import { assertBalancedRunBlocks, assertRealmTimerStep, binary64Ulp, deriveRealmTimerStep, evaluateStartSemanticEvidence,
   exactBinomialOrderStatisticBounds, makeRoundRobinOrders, nextDown, nextUp, summarizeSamples } from '../compare/methodology.mjs';
 import { validateStockMotionValueBatch } from '../compare/methodology.mjs';
-import { sha256Bytes } from '../compare/provenance.mjs';
 import { TRANSFORM_PAIR_PROFILE, createTransformLifecycleValidator, validateTransformLifecycleSample } from '../../scripts/bench-transform-support.mjs';
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from './server-profile-registration.mjs';
 
@@ -738,19 +734,6 @@ export function* serverArtifactChunks(artifact) {
   yield* valueChunks(artifact); yield '\n';
 }
 
-export function writeServerArtifact(file, artifact) {
-  const descriptor = openSync(file, 'wx'), hash = createHash('sha256');
-  let bytes = 0;
-  try {
-    for (const chunk of serverArtifactChunks(artifact)) {
-      const buffer = Buffer.from(chunk); hash.update(buffer); bytes += buffer.length;
-      let offset = 0;
-      while (offset < buffer.length) offset += writeSync(descriptor, buffer, offset, buffer.length - offset);
-    }
-  } finally { closeSync(descriptor); }
-  return { sha256: hash.digest('hex'), bytes };
-}
-
 // JSON carrier делится только между полными values. Строки, escape sequences
 // и числа разбирает native JSON.parse; весь artifact не становится строкой V8.
 export function parseServerJsonBytes(bytes, chunkBytes = 32 * 1024 * 1024) {
@@ -947,17 +930,4 @@ export function validateServerJournal(artifact, records, rawDigest) {
 export function serverDescriptiveTiming(stage) {
   return serverMetricCells().map(({ id, scene, metric }) => ({ id, ...summarizeSamples(stage.rows.filter((x) => x.scene === scene)
     .flatMap((row) => IDS.map((id) => row.samples[id][metric])), { strict: true }) }));
-}
-
-if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
-  try {
-    const args = process.argv.slice(2);
-    invariant(args.length === 6 && args[0] === '--raw' && args[2] === '--digest' && args[4] === '--journal',
-      'нужны --raw <json> --digest <внешний sha256> --journal <ndjson>');
-    const raw = readFileSync(args[1]); invariant(SHA256.test(args[3]) && sha256Bytes(raw) === args[3], 'не совпал внешний digest raw');
-    const artifact = parseServerJsonBytes(raw);
-    const records = parseServerJournalBytes(readFileSync(args[5]));
-    const chronology = validateServerJournal(artifact, records, args[3]);
-    process.stdout.write(`${JSON.stringify({ ...validateServerArtifact(artifact), ...chronology })}\n`);
-  } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; }
 }

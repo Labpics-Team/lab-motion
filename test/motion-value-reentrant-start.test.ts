@@ -36,6 +36,70 @@ function makeClock(syncSuccessor = false) {
 }
 
 describe('MotionValue: guard принадлежит текущему запуску', () => {
+  it.each([[false, 0], [true, 0], [false, 5e-11], [true, 5e-11]] as const)(
+    'возврат к достигнутой цели отзывает ожидающий кадр (clamp=%s, v0=%s)', (clamp, initialVelocity) => {
+    const clock = makeClock();
+    const value = new MotionValue({
+      initial: 0, initialVelocity, spring: SPRING,
+      clamp, requestFrame: clock.requestFrame,
+    });
+    const emissions: number[] = [];
+    value.onChange(current => emissions.push(current));
+    value.setTarget(100);
+    value.setTarget(0);
+
+    expect([value.value, value.velocity]).toEqual([0, 0]);
+    expect(emissions).toEqual([0]);
+    clock.next();
+    expect([value.value, value.velocity]).toEqual([0, 0]);
+    expect(emissions).toEqual([0]);
+    expect(clock.pending()).toBe(0);
+
+    value.setTarget(100);
+    clock.next();
+    expect(value.value).toBeGreaterThan(0);
+    clock.drain();
+    expect([value.value, value.velocity]).toEqual([100, 0]);
+    value.destroy();
+  });
+
+  it.each([100, -50])('цель %s из getter сохраняет только согласованный кадр и живой цикл', (target) => {
+    const clock = makeClock();
+    let armed = false;
+    const value: MotionValue = new MotionValue({
+      initial: 0, clamp: false, requestFrame: clock.requestFrame,
+      spring: {
+        get mass() {
+          if (armed) { armed = false; value.setTarget(target); }
+          return 1;
+        },
+        stiffness: 200, damping: 20,
+      },
+    });
+    const emissions: number[] = [];
+    value.onChange(current => emissions.push(current));
+    value.setTarget(100);
+    clock.next();
+    const before = [value.value, value.velocity];
+    const emitted = emissions.length;
+    armed = true;
+    clock.next();
+
+    if (target === 100) {
+      // Повтор цели не меняет траекторию и не должен съедать здоровый кадр.
+      expect(value.value).toBeGreaterThan(before[0]!);
+      expect(emissions).toHaveLength(emitted + 1);
+    } else {
+      expect([value.value, value.velocity]).toEqual(before);
+      expect(emissions).toHaveLength(emitted);
+    }
+    expect(clock.pending()).toBe(1);
+    clock.drain();
+    expect([value.value, value.velocity]).toEqual([target, 0]);
+    expect(clock.pending()).toBe(0);
+    value.destroy();
+  });
+
   it.each(['getter', 'listener'] as const)(
     'сохраняет one-shot кадр преемника из %s после возврата requestFrame',
     (site) => {

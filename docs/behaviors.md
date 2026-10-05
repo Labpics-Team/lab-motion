@@ -19,8 +19,8 @@
 
 `createBottomSheet`, `createDragDismiss`, `createCarousel` и
 `createPullToRefresh` сохраняются как ранее опубликованная совместимая
-поверхность. Новые component factories сюда не добавляются. Для нового UI
-используйте универсальный [follow-controller](compositor.md) и локальную
+поверхность. Новые фабрики компонентов сюда не добавляются. Для нового интерфейса
+используйте универсальный [контроллер следования](compositor.md) и локальную
 политику компонента из [рецептов](recipes.md#прямой-ввод-панель-и-карусель).
 
 - **`createBottomSheet`** — snap-точки, rubber-band за крайними snap,

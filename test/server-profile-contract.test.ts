@@ -9,7 +9,8 @@ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPo
 import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
   compactServerCpuEvidence, expandServerCpuEvidence, compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
   parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal,
-  verifyServerClockRegistration, writeServerArtifact } from '../bench/profile/server-profile-contract.mjs';
+  verifyServerClockRegistration } from '../bench/profile/server-profile-contract.mjs';
+import { writeServerArtifact } from '../bench/profile/server-profile-artifact.mjs';
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
 import { measureServerBrowser, measureServerEngine, runServerProfile, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
 import * as threadCpuClock from '../bench/profile/server-thread-cpu-clock.mjs';

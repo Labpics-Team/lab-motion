@@ -143,7 +143,7 @@ await moves.finished;
 | `…/waapi` | Низкоуровневый native-мост: `compileWaapi`/`animateWaapi`; `animateScrollWaapi`/`animateViewWaapi` отдают scroll/view-progress → property нативным progress timelines без собственного покадрового JS и без скрытого fallback; capability probes явные |
 | `…/compositor` | Базовый compositor-компилятор: `compileSpringLinear`, `compileSpringPlan`, `CompositorSpring`, ретаргет, хендофф и fallback-матрица. Подробно — [compositor.md](compositor.md) |
 | `…/compositor/stagger` | Самодостаточный групповой compositor-фасад: `compileStaggerPlan`, `CompositorStaggerGroup` и связанные `compileSpringPlan`/`CompositorSpring` из одного entry |
-| `…/compositor/follow` | Универсальные direct follow, native settle и повторный pickup: `createCompositorFollow`; `compileSpringPlan` для того же consumer-графа |
+| `…/compositor/follow` | Прямое следование за вводом, нативная доводка и повторный перехват: `createCompositorFollow`; `compileSpringPlan` для того же графа зависимостей потребителя |
 | `…/tokens` | Motion-токены: `duration`, `easing`, `spring`, `staggerGap`, `distanceScale`. Подробно — [tokens.md](tokens.md) |
 
 ## Build-tool
@@ -160,7 +160,10 @@ await moves.finished;
 перенаправляет существующее значение из последней опубликованной пары
 `value`/`velocity`, сохраняя временную координату этого снимка. Следующий кадр
 учитывает уже прошедший интервал; поток новых целей перед каждым кадром не
-останавливает движение. На самой границе `setTarget` значение и скорость не меняются.
+останавливает движение. При таком перенаправлении на самой границе `setTarget`
+значение и скорость не меняются. Исключение — возврат к уже достигнутому значению
+при `|velocity| < 1e-10`: он завершает движение и обнуляет остаточную скорость
+без дополнительного `onChange`.
 
 Повтор активной цели — no-op. Несколько разных целей между кадрами не эмитят
 промежуточные значения и не планируют дополнительные callbacks: действует последняя.
