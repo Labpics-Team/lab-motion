@@ -597,7 +597,7 @@ describe('animate: жизненный цикл WAAPI-юнита', () => {
     });
     armed = true;
     controls.seek(crossingMs);
-    expect(requests).toBeGreaterThan(0);
+    expect(requests).toBe(1);
     controls.cancel();
     await controls.finished;
     expect(target.cancels).toBe(1);
