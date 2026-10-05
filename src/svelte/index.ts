@@ -96,15 +96,11 @@ export function springStore(
 ): SpringStore {
   const mv = createBoundValue({ initial, spring, requestFrame });
 
-  // Maintain a snapshot of current value for immediate emission on subscribe.
-  let currentValue: number = initial;
-
   // Subscriber registry (mirrors Svelte store contract).
   const subscribers = new Set<(value: number) => void>();
 
   // Listen to MotionValue changes and broadcast to all Svelte subscribers.
   mv.onChange((v) => {
-    currentValue = v;
     for (const run of subscribers) {
       run(v);
     }
@@ -114,7 +110,7 @@ export function springStore(
     subscribe(run) {
       subscribers.add(run);
       // Emit current value immediately (Svelte store contract).
-      run(currentValue);
+      run(mv.value);
       return () => {
         subscribers.delete(run);
       };

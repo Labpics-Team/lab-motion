@@ -21,13 +21,20 @@ env:
 
 jobs:
   conformance:
-    name: ${{ matrix.browser }}
+    name: ${{ matrix.browser }} · ${{ matrix.shard }}/${{ matrix.shards }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
+      # Один browser worker на машине сохраняет изоляцию freeze/RAF-проверок.
+      # Делим только измеренный критический путь; полный CI занимает до 8 jobs одновременно.
+      max-parallel: 4
       matrix:
-        browser: [chromium, firefox, webkit]
+        include:
+          - { browser: chromium, shard: 1, shards: 1 }
+          - { browser: firefox, shard: 1, shards: 1 }
+          - { browser: webkit, shard: 1, shards: 2 }
+          - { browser: webkit, shard: 2, shards: 2 }
 
     steps:
       - name: Checkout
@@ -65,7 +72,7 @@ jobs:
         run: pnpm site:build
 
       - name: Run conformance (${{ matrix.browser }})
-        run: pnpm exec playwright test --project=${{ matrix.browser }}
+        run: pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }} --fail-on-flaky-tests
 
       # Trace/video/screenshot пишутся только on-failure (playwright.config) —
       # выгружаем их лишь когда шаг упал.
@@ -73,7 +80,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: browser-conformance-${{ matrix.browser }}-${{ github.run_id }}
+          name: browser-conformance-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.run_id }}
           path: |
             test-results/
             playwright-report/
