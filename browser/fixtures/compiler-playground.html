@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lab Motion compiler playground</title>
+  </head>
+  <body>
+    <main>
+      <h1>Compiled docs recipe</h1>
+      <p data-compiler-status role="status">ready</p>
+      <div data-preview="compiler-object" aria-label="Compiled docs recipe playground">target</div>
+      <button type="button" data-action="run-compiler-recipe">Run recipe</button>
+    </main>
+    <script type="module">
+      import { play } from '../.artifacts/compiled.js';
+
+      const target = document.querySelector('[data-preview="compiler-object"]');
+      const button = document.querySelector('[data-action="run-compiler-recipe"]');
+      const status = document.querySelector('[data-compiler-status]');
+      let generation = 0;
+
+      button.addEventListener('click', () => {
+        const currentGeneration = ++generation;
+        target.style.removeProperty('opacity');
+        status.textContent = 'running';
+        button.disabled = true;
+        const controls = play(target);
+        void controls.finished.then(
+          () => {
+            if (generation !== currentGeneration) return;
+            status.textContent = 'complete';
+            button.disabled = false;
+          },
+          () => {
+            if (generation !== currentGeneration) return;
+            status.textContent = 'error';
+            button.disabled = false;
+          },
+        );
+      });
+    </script>
+  </body>
+</html>

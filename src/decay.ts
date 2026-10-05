@@ -124,11 +124,10 @@ function finiteOr(raw: number, fallback: number): number {
  * конечной границе double, сохраняя знак направления движения.
  * Все входы (power/velocity/timeConstant) уже провалидированы конечными —
  * ampRaw может быть только конечным числом или ±Infinity (никогда NaN),
- * поэтому единственный edge-case — знаковое переполнение произведения.
+ * поэтому sign сохраняет ровно тот же overflow-инвариант без второй ветки.
  */
 function clampAmplitude(ampRaw: number): number {
-  if (Number.isFinite(ampRaw)) return ampRaw;
-  return ampRaw > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
+  return finiteOr(ampRaw, Math.sign(ampRaw) * Number.MAX_VALUE);
 }
 
 /**
@@ -140,8 +139,10 @@ function clampAmplitude(ampRaw: number): number {
 export function projectDefaultDecayRest(from: number, velocity: number): number {
   if (!Number.isFinite(from)) throw new MotionParamError('LM021');
   if (!Number.isFinite(velocity)) throw new MotionParamError('LM022');
-  const amplitude = clampAmplitude(DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT);
-  return finiteOr(from + amplitude, amplitude > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE);
+  return Math.max(
+    -Number.MAX_VALUE,
+    Math.min(Number.MAX_VALUE, from + DEFAULT_POWER * velocity * DEFAULT_TIME_CONSTANT),
+  );
 }
 
 // ─── createDecay ──────────────────────────────────────────────────────────────

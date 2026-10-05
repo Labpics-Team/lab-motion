@@ -106,3 +106,43 @@ test('pointercancel: системный перехват → carousel детер
   expect(Number.isInteger(r.index)).toBe(true);
   expect(Math.abs(r.value - r.index * 200)).toBeLessThanOrEqual(0.5);
 });
+
+test('mutable sheet/pager constraints retarget the same real-browser owner without a boundary jump', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { createBottomSheet, createCarousel } = await import('/dist/behaviors/index.js');
+    const frame = (cb: (ts?: number) => void): number => requestAnimationFrame((ts) => cb(ts));
+
+    const sheet = createBottomSheet({ snapPoints: [0, 300, 600], requestFrame: frame });
+    sheet.snapTo(2);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    const sheetBefore = { value: sheet.state.value, velocity: sheet.state.velocity };
+    sheet.update([0, 200, 400]);
+    const sheetBoundary = {
+      value: sheet.state.value,
+      velocity: sheet.state.velocity,
+      phase: sheet.state.phase,
+    };
+
+    const pager = createCarousel({ pageCount: 4, pageSize: 200, requestFrame: frame, rtl: true });
+    pager.goTo(3);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    const pagerBefore = { value: pager.state.value, velocity: pager.state.velocity };
+    pager.update(4, 120);
+    const pagerBoundary = {
+      value: pager.state.value,
+      velocity: pager.state.velocity,
+      phase: pager.state.phase,
+    };
+
+    return { sheetBefore, sheetBoundary, pagerBefore, pagerBoundary };
+  });
+
+  expect(result.sheetBoundary.phase).toBe('release');
+  expect(result.sheetBoundary.value).toBe(result.sheetBefore.value);
+  expect(result.sheetBoundary.velocity).toBe(result.sheetBefore.velocity);
+  expect(Math.abs(result.sheetBefore.velocity)).toBeGreaterThan(0);
+  expect(result.pagerBoundary.phase).toBe('release');
+  expect(result.pagerBoundary.value).toBe(result.pagerBefore.value);
+  expect(result.pagerBoundary.velocity).toBe(result.pagerBefore.velocity);
+  expect(Math.abs(result.pagerBefore.velocity)).toBeGreaterThan(0);
+});

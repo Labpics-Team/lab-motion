@@ -28,6 +28,7 @@ import { gzipSync } from 'node:zlib';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readCompilerNanoRecipe } from './compiler-doc-recipe.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = resolve(ROOT, 'dist');
@@ -43,7 +44,7 @@ const ALIAS = {
 
 /** dist-модуль (не entry, не bare peer) в графе — нормализованный к dist-relative id. */
 function distModules(chunk) {
-  // Vite сообщает id с '/', а resolve() на Windows даёт '\': без нормализации
+  // Vite сообщает id с '/', а resolve() на Windows даёт '\\': без нормализации
   // startsWith никогда не совпадёт и граф dist-модулей будет ложно пустым.
   const distSlash = DIST.replaceAll('\\', '/');
   return Object.keys(chunk.modules)
@@ -96,8 +97,9 @@ export function Play(props: { el: Element }): unknown {
 }`;
 
 // Статическая opacity — единственная форма в скоупе lowering (#208 §core).
-const LOWERABLE = `import { animate } from '@labpics/motion/nano';
-export function play(el) { return animate(el, { opacity: 0.5 }); }`;
+// Это буквальный runnable-рецепт документации: acceptance и browser proof
+// не владеют отдельными копиями входа.
+const LOWERABLE = readCompilerNanoRecipe(ROOT);
 // Динамическая opacity — вне скоупа: плагин обязан отказать (positive control).
 const DYNAMIC = `import { animate } from '@labpics/motion/nano';
 export function play(el, v) { return animate(el, { opacity: v }); }`;
@@ -137,7 +139,38 @@ const SURFACE_COMPILED_MAX_GZ = 2470;
 
 const failures = [];
 const notes = [];
+const traceRecords = [];
+const TRACE = process.argv.includes('--trace');
+const TRACE_SCHEMA_VERSION = 1;
 const check = (ok, message) => { if (!ok) failures.push(message); };
+
+function recordTrace(id, goal, result, refusal) {
+  if (!TRACE) return;
+  const owners = [
+    [RUNTIME_MODULE, '@labpics/motion/compiler/runtime', 'compiled'],
+    [SURFACE_MODULE, '@labpics/motion/compiler/surface', 'compiled'],
+    [NANO_MODULE, '@labpics/motion/nano', 'runtime'],
+    [ANIMATE_MODULE, '@labpics/motion/animate', 'runtime'],
+  ].filter(([module]) => result.modules.includes(module));
+  if (owners.length !== 1) {
+    failures.push(`tooling trace ${id}: ожидался один owner, получено ${owners.length}`);
+    return;
+  }
+  const [module, owner, execution] = owners[0];
+  if (execution === 'runtime' && (typeof refusal !== 'string' || refusal.trim().length === 0)) {
+    failures.push(`tooling trace ${id}: runtime refusal обязателен и не может быть пустым`);
+    return;
+  }
+  traceRecords.push({
+    schemaVersion: TRACE_SCHEMA_VERSION,
+    id,
+    goal,
+    owner,
+    path: `dist/${module}`,
+    execution,
+    refusal: execution === 'runtime' ? refusal : null,
+  });
+}
 
 async function run() {
   if (!existsSync(DIST)) {
@@ -204,6 +237,8 @@ async function run() {
     );
     notes.push(`no-op контроль: динамическая opacity сохранила рантаймовый путь (${NANO_MODULE})`);
     notes.push(`граф compiled: ${compiled.modules.join(', ') || '(только entry)'}`);
+    recordTrace('nano-static', 'static opacity=0.5', compiled);
+    recordTrace('nano-dynamic', 'dynamic opacity', control, 'opacity is not build-known');
 
     // ── Surface lowering: layout:'project' реально стирает фасад ───────────────
     const surfaceBaseline = await buildFixture('surface-uncompiled', SURFACE, false, 'surface');
@@ -282,6 +317,9 @@ async function run() {
       `плагин ошибочно понизил surface-вызов с onFrame (граф: ${surfaceOnFrame.modules.join(', ')})`,
     );
     notes.push('surface no-op контроль: динамические концы и onFrame сохранили рантаймовый путь');
+    recordTrace('surface-static', "static width [240,360], layout='project'", surfaceCompiled);
+    recordTrace('surface-dynamic', "dynamic width endpoint, layout='project'", surfaceDynamic, 'endpoint is not build-known');
+    recordTrace('surface-on-frame', "static width, layout='project', onFrame", surfaceOnFrame, 'onFrame requires runtime observation');
 
     // ── TypeScript acceptance (бриф, этап C) ────────────────────────────────
     // Плагин обязан нижать TS/TSX-вход реального Vite-приложения. На
@@ -319,6 +357,9 @@ run().then(() => {
     console.error('compiler-acceptance: FAIL');
     for (const failure of failures) console.error(`  - ${failure}`);
     process.exit(1);
+  }
+  if (TRACE) {
+    for (const record of traceRecords) console.log(`tooling-trace ${JSON.stringify(record)}`);
   }
   console.log('compiler-acceptance: PASS — solver/parser/compiler элиминированы из бандла потребителя');
 }).catch((error) => {

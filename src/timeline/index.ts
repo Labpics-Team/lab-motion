@@ -207,14 +207,12 @@ interface ComputedSegment {
 
 // ─── Построение скомпилированных сегментов ───────────────────────────────────
 
-function buildSegments(configs: readonly SegmentConfig[], initialLabels: Map<string, number> = new Map()): ComputedSegment[] {
+function buildSegments(configs: readonly SegmentConfig[], labels: ReadonlyMap<string, number>): ComputedSegment[] {
   const result: ComputedSegment[] = [];
   let prevEndTime = 0;
   let prevStartTime = 0;
-  const labels = new Map(initialLabels); // copy for this build
-
-  // First pass: collect numeric labels from segments if they define at as pure number with label intent (simple: we resolve later)
-  // For creation labels we support via initialLabels.
+  // Метки только читаются при компиляции: start/endTime материализуются значениями,
+  // поэтому последующие runtime-мутации этого же Map не меняют готовые сегменты.
 
   for (let i = 0; i < configs.length; i++) {
     const cfg = configs[i]!;
@@ -273,7 +271,7 @@ function buildSegments(configs: readonly SegmentConfig[], initialLabels: Map<str
   return result;
 }
 
-function resolvePosition(p: string, l: Map<string, number>, e: number, s: number): number {
+function resolvePosition(p: string, l: ReadonlyMap<string, number>, e: number, s: number): number {
   const t = p.trim();
   if (l.has(t)) return l.get(t)!;
   if (t === '<') return s;
@@ -350,17 +348,17 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
   }
 
   // Подготовка начальных меток
-  const initialLabels = new Map<string, number>();
+  const _labels = new Map<string, number>();
   if (initialLabelsRaw) {
     for (const [k, v] of Object.entries(initialLabelsRaw)) {
       if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
-        initialLabels.set(k, v);
+        _labels.set(k, v);
       }
     }
   }
 
   // ── Компиляция сегментов (с валидацией полей + позиций) ────────────────────
-  const segments = buildSegments(segConfigs, initialLabels);
+  const segments = buildSegments(segConfigs, _labels);
 
   // ── Суммарная длительность = max(segment.endTime) ────────────────────────
   let _totalDuration = 0;
@@ -401,9 +399,6 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
   let _useTimeoutFallback = false;
   /** Счётчик кадров (safety cap). */
   let _frameCount = 0;
-
-  /** Метки (имя -> время). Поддержка label() + seek('name') + позиций в at (шаг 2). */
-  const _labels = new Map<string, number>(initialLabels);
 
   // ── Promise ───────────────────────────────────────────────────────────────
   let _resolve!: () => void;
@@ -476,7 +471,7 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
     }
   }
 
-  function label(name: string, at?: number | string): void {
+  const label = (name: string, at?: number | string): void => {
     if (!name || typeof name !== 'string') return;
     let t: number;
     if (at === undefined) {
@@ -489,7 +484,7 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
       t = _vt;
     }
     _labels.set(name, t);
-  }
+  };
 
   // ── Frame loop ────────────────────────────────────────────────────────────
 
@@ -637,20 +632,7 @@ export function createTimeline(opts: TimelineOptions): TimelineControls {
       emit(_vt);
     },
 
-    label(name: string, at?: number | string): void {
-      if (!name || typeof name !== 'string') return;
-      let t: number;
-      if (at === undefined) {
-        t = _vt;
-      } else if (typeof at === 'number') {
-        t = Number.isFinite(at) ? Math.max(0, at) : _vt;
-      } else if (typeof at === 'string') {
-        t = _labels.has(at) ? _labels.get(at)! : _vt;
-      } else {
-        t = _vt;
-      }
-      _labels.set(name, t);
-    },
+    label,
 
     complete(): void {
       if (_settled) return;
