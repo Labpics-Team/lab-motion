@@ -571,7 +571,7 @@
     }
   },
   "devDependencies": {
-    "@angular/core": "22.2.0",
+    "@angular/core": "22.2.1",
     "@builder.io/qwik": "1.20.1",
     "@playwright/test": "1.63.0",
     "@stryker-mutator/core": "9.6.1",
