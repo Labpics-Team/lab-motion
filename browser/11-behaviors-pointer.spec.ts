@@ -149,7 +149,7 @@ test('mutable sheet/pager constraints retarget the same real-browser owner witho
   expect(Math.abs(result.pagerBefore.velocity)).toBeGreaterThan(0);
 });
 
-test('bottom sheet завершает прерванный release к независимому сроку без оставшихся кадров', async ({ page }) => {
+test('нижняя панель завершает прерванный release к независимому сроку без оставшихся кадров', async ({ page }) => {
   const frameStepMs = 16;
   const interruptAtMs = 700;
   const target = 300;
@@ -160,7 +160,7 @@ test('bottom sheet завершает прерванный release к незав
   // отклонение z удовлетворяет z'' + 26z' + 170z = 0 (корни -13 ± i).
   // Первый release: x(t)=600-exp(-13t)(340cos(t)+3420sin(t)),
   // v(t)=exp(-13t)(1000cos(t)+44800sin(t)). При t=0.164 s получаем
-  // 490 < x < 600 и 0 < v < 1000; эти предпосылки ниже проверяются на consumer.
+  // 490 < x < 600 и 0 < v < 1000; эти предпосылки ниже проверяются на потребителе.
   // После retarget в 300: u=v/(x-300) <= 1000/190. Огибающие |z|/|z(0)|
   // и |z'|/|z(0)| ограничены exp(-13t) * hypot(1,13+u) и
   // exp(-13t) * hypot(u,170+13u). Допуски: 0.005 и 0.005/s соответственно.
