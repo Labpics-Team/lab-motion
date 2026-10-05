@@ -22,6 +22,7 @@
 import { build } from 'vite';
 import { buildScopeRecipes } from './scope-recipes.mjs';
 import { buildPackagedCompositorFollowRecipes } from './compositor-follow-recipes.mjs';
+import { buildPresenceScopeResource } from './presence-scope-resource.mjs';
 import { readCompilerNanoRecipe } from '../../scripts/compiler-doc-recipe.mjs';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -128,6 +129,11 @@ export default async function globalSetup() {
     const scopeReceipt = await buildScopeRecipes(ROOT, OUT, TMP, resolve(OUT, followReceipt.tarball.file));
     if (scopeReceipt.tarball.sha256 !== followReceipt.tarball.sha256) {
       throw new Error('compile-artifacts: browser journeys consumed different package bytes');
+    }
+    const resourceReceipt = await buildPresenceScopeResource(ROOT, OUT, resolve(TMP, 'resource-owners'),
+      resolve(OUT, followReceipt.tarball.file));
+    if (resourceReceipt.tarball.sha256 !== followReceipt.tarball.sha256) {
+      throw new Error('compile-artifacts: presence/scope resource consumed different package bytes');
     }
   } finally {
     rmSync(TMP, { recursive: true, force: true });

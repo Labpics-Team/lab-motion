@@ -16,14 +16,18 @@ const shellPath = (value: string): string => WINDOWS_SHELL ? `"${value}"` : valu
 const RUNTIME_FILES = [
   'index', 'frame/index', 'compositor/index', 'bindings/index',
   'behaviors/index', 'behaviors/reorder/index', 'compositor/follow/index',
+  'presence/index', 'animate/index',
 ].flatMap(entry => [`dist/${entry}.js`, `dist/${entry}.cjs`]);
 const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
-const EXPECTED_OWNERS = ['esm', 'cjs'].flatMap(format => [
+const EXISTING_KINDS = [
   'frame', 'motion-value', 'compositor-native', 'compositor-live', 'compositor-delay',
   'compositor-handoff', 'compositor-roundtrip', 'compositor-reduced-loans', 'binding', 'sheet', 'pager',
   'dismiss', 'pull', 'pull-pending', 'pull-settled', 'reorder',
   'follow-native', 'follow-pickup', 'follow-live',
-].map(owner => `${format}/${owner}`));
+];
+const ADDED_KINDS = ['presence-transition', 'animate-scope-main', 'animate-scope-native'];
+const ownerNames = (kinds: string[]) => ['esm', 'cjs'].flatMap(format => kinds.map(owner => `${format}/${owner}`));
+const EXPECTED_OWNERS = ownerNames([...EXISTING_KINDS, ...ADDED_KINDS]);
 
 describe('RESOURCE-01: реальные байты установленного production tarball', () => {
   let work: string | undefined;
@@ -72,8 +76,9 @@ describe('RESOURCE-01: реальные байты установленного 
   // Удаляется только временный установленный пакет; evidenceRun сохраняет доказательства.
   afterAll(() => { if (work !== undefined) rmSync(work, { recursive: true, force: true }); });
 
-  function probe(mode: string, forcedGc = false): Record<string, unknown> {
-    const args = [...(forcedGc ? ['--expose-gc'] : []), entry, mode];
+  function probe(mode: string, forcedGc = false, corpus = 'combined'): Record<string, unknown> {
+    const args = [...(forcedGc ? ['--expose-gc'] : []), entry, mode, corpus];
+    const receiptName = corpus === 'combined' ? mode : `${mode}-${corpus}`;
     let output: string;
     try {
       output = execFileSync(process.execPath, args, {
@@ -81,20 +86,32 @@ describe('RESOURCE-01: реальные байты установленного 
       });
     } catch (error) {
       const result = error as Error & { stdout?: string; stderr?: string };
-      writeFileSync(join(evidenceRun, `${mode}.stdout.log`), result.stdout ?? '');
-      writeFileSync(join(evidenceRun, `${mode}.stderr.log`), result.stderr ?? result.message);
+      writeFileSync(join(evidenceRun, `${receiptName}.stdout.log`), result.stdout ?? '');
+      writeFileSync(join(evidenceRun, `${receiptName}.stderr.log`), result.stderr ?? result.message);
       throw error;
     }
-    writeFileSync(join(evidenceRun, `${mode}.stdout.log`), output);
-    return JSON.parse(output.trim().split('\n').at(-1)!) as Record<string, unknown>;
+    writeFileSync(join(evidenceRun, `${receiptName}.stdout.log`), output);
+    const result = JSON.parse(output.trim().split('\n').at(-1)!) as Record<string, unknown>;
+    expect(result.corpus).toBe(corpus);
+    return result;
   }
 
-  function completeCycles(result: Record<string, unknown>): void {
+  function completeCycles(result: Record<string, unknown>, owners = EXPECTED_OWNERS): void {
     expect(result.cyclesPerOwner).toBe(10_000);
     const measured = result.executions as Array<{ name: string; cycles: number }>;
-    expect(measured.map(owner => owner.name)).toEqual(EXPECTED_OWNERS);
+    expect(measured.map(owner => owner.name)).toEqual(owners);
     expect(measured.every(owner => owner.cycles === 10_000)).toBe(true);
   }
+
+  it('packed ESM/CJS сохраняют один frame clock после getter reentry и частичного host failure', () => {
+    const result = probe('reentry');
+    expect(result.status).toBe('pass');
+    const checks = result.checks as Array<{ format: string; scenario: string }>;
+    expect(checks.map(check => `${check.format}/${check.scenario}`)).toEqual(
+      ['esm', 'cjs'].flatMap(format => ['control', 'nested-failure', 'cancel', 'pause']
+        .map(scenario => `${format}/${scenario}`)),
+    );
+  }, 120_000);
 
   it('terminal owner не удерживает компонент: дешёвый различающий witness', () => {
     expect(probe('witness', true).status).toBe('pass');
@@ -115,8 +132,17 @@ describe('RESOURCE-01: реальные байты установленного 
   }, 120_000);
 
   it('dropped owners возвращают heap в заранее разрешённую A/A baseline-полосу без роста по циклам', () => {
-    const result = probe('bytes', true);
+    const result = probe('bytes', true, 'existing');
     expect(result.status).toBe('pass');
-    completeCycles(result);
+    completeCycles(result, ownerNames(EXISTING_KINDS));
+  }, 120_000);
+
+  it('presence/scope после 10 000 циклов имеет стабильный terminal tail в своей A/A baseline-полосе', () => {
+    const result = probe('bytes', true, 'presence-scope');
+    expect(result.status).toBe('pass');
+    completeCycles(result, ownerNames(ADDED_KINDS));
+    const tailExcess = result.tailExcess as number[];
+    expect(tailExcess).toHaveLength(4);
+    expect(tailExcess.every(bytes => bytes === 0)).toBe(true);
   }, 120_000);
 });
