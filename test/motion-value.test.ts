@@ -26,7 +26,7 @@
  *                   zero-DOM import test fails.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { MotionValue, type MotionValueOptions } from '../src/index.js';
 import { MotionParamError } from '../src/index.js';
 
@@ -379,17 +379,51 @@ describe('MotionValue animation correctness', () => {
     mv.destroy();
   });
 
+  it('при handle=0 настоящий таймер вызывает асинхронный тик', async () => {
+    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: () => 0 });
+    const values: number[] = [];
+    let deadline: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const firstTick = new Promise<number>((resolve, reject) => {
+        deadline = setTimeout(() => reject(new Error('настоящий таймер не вызвал тик')), 3000);
+        mv.onChange((value) => {
+          values.push(value);
+          if (value !== 0) resolve(value);
+        });
+      });
+      mv.setTarget(50);
+      expect(values).toEqual([0]);
+      const value = await firstTick;
+      expect(value).toBeGreaterThan(0);
+      expect(value).toBeLessThan(50);
+    } finally {
+      clearTimeout(deadline);
+      mv.destroy();
+    }
+  });
+
   it('works with handle=0 non-draining clock via setTimeout fallback', async () => {
     // requestFrame returns 0 without invoking cb. MotionValue installs setTimeout(0) fallback.
     const nonDraining = (_cb: (ts?: number) => void): number => 0;
-    const mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: nonDraining });
-    const values: number[] = [];
-    mv.onChange((v) => values.push(v));
-    mv.setTarget(50);
-    // Wait for the setTimeout fallback chain to run to completion.
-    await new Promise<void>((resolve) => setTimeout(resolve, 3000));
-    mv.destroy();
-    expect(values[values.length - 1]).toBe(50);
+    let mv: MotionValue | undefined;
+    try {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      mv = new MotionValue({ initial: 0, spring: STD_SPRING, requestFrame: nonDraining });
+      const values: number[] = [];
+      mv.onChange((v) => values.push(v));
+      mv.setTarget(50);
+      // Исполняем весь исходный интервал в 3 секунды. Каждый callback
+      // сдвигает физику на FIXED_DT_S независимо от настенных часов.
+      await vi.advanceTimersByTimeAsync(3000);
+      expect(values[values.length - 1]).toBe(50);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      try {
+        mv?.destroy();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
   }, 10_000);
 });
 
