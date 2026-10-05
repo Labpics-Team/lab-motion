@@ -7,6 +7,10 @@
 ## [Unreleased]
 
 ### Исправлено
+- `animate`: завершённые controls освобождают исполнителей, а завершённый
+  compositor-слот освобождает кривую и live-delegate даже при активном sibling.
+  Вложенный handoff из getter `requestFrame` сохраняет один кадровый цикл
+  после частичного host-отказа и в минифицированном npm-пакете.
 - `MotionValue` и подписки `./behaviors`: уничтожение освобождает внедрённый
   scheduler и callback компонента даже при сохранённых controller/off handles.
   Живые подписки сохраняют дедупликацию callback; `stop()` остаётся возобновляемым.

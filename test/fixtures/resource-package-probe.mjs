@@ -16,7 +16,7 @@ for (const format of ['esm', 'cjs']) {
   modules.push({ format, root, frame, compositor, bindings, behaviors, reorder, follow, presence, animate });
 }
 const mode = process.argv[2];
-assert.ok(['witness', 'lifecycle', 'retention', 'bytes'].includes(mode), 'неизвестный режим RESOURCE proof');
+assert.ok(['witness', 'lifecycle', 'retention', 'bytes', 'reentry'].includes(mode), 'неизвестный режим RESOURCE proof');
 const CYCLES = 10_000;
 const SPRING = Object.freeze({ mass: 1, stiffness: 170, damping: 26 });
 const EXISTING_KINDS = ['frame', 'motion-value', 'compositor-native', 'compositor-live',
@@ -676,7 +676,91 @@ async function collect(rounds = 4) {
 }
 const countAlive = refs => refs.reduce((count, ref) => count + (ref.deref() === undefined ? 0 : 1), 0);
 
-if (mode === 'lifecycle') {
+// Host getter может принять вложенный handoff и вернуть управление после
+// частичного отказа sibling. Проверяется реальный packed API, не source alias.
+async function packedReentry(animate, scenario) {
+  const rejectedWrite = new Error('reentry witness: rejected host write');
+  const makeTarget = () => {
+    const values = new Map();
+    const state = { writes: 0, cancels: 0, rejectNextWrite: false, calls: [] };
+    state.target = { style: {
+      getPropertyValue: name => values.get(name) ?? '',
+      setProperty(name, value) {
+        if (state.rejectNextWrite) { state.rejectNextWrite = false; throw rejectedWrite; }
+        state.writes++; values.set(name, value);
+      },
+    }, animate(keyframes, timing) {
+      state.calls.push({ keyframes, timing });
+      return { cancel() { state.cancels++; } };
+    } };
+    return state;
+  };
+  const targets = [makeTarget(), makeTarget(), makeTarget()];
+  let queue = [], requests = 0, armed = false, caught = 0, completions = 0, crossing;
+  let controls;
+  const requestFrame = callback => { queue.push(callback); return ++requests; };
+  controls = animate(targets.map(item => item.target), { opacity: [0, 1] }, {
+    spring: { mass: 1, stiffness: 100, damping: 10 },
+    now: () => 0, setTimer: () => () => {}, onComplete: () => { completions++; },
+    get requestFrame() {
+      if (armed) {
+        armed = false;
+        if (scenario === 'nested-failure') {
+          targets[1].rejectNextWrite = true;
+          try { controls.seek(crossing); }
+          catch (error) { assert.equal(error, rejectedWrite); caught++; }
+        } else if (scenario === 'cancel') controls.cancel();
+        else if (scenario === 'pause') controls.pause();
+      }
+      return requestFrame;
+    },
+  });
+  assert.ok(targets.every(item => item.calls.length === 1), 'healthy native start must be reached');
+  const timing = targets[0].calls[0].timing;
+  // Время crossing выводится из фактически отданной host кривой, а не из
+  // независимого solver с иной сериализацией/допуском.
+  assert.ok(timing.easing.startsWith('linear('));
+  const stops = timing.easing.slice(7, -1).split(',').map(stop =>
+    stop.trim().split(/\s+/).map(parseFloat));
+  for (let i = 0; i + 1 < stops.length; i++) {
+    const [p0, t0] = stops[i], [p1, t1] = stops[i + 1];
+    if (p0 < 1 && p1 >= 1) {
+      crossing = (t0 + (1 - p0) / (p1 - p0) * (t1 - t0)) / 100 * timing.duration;
+      break;
+    }
+  }
+  assert.ok(Number.isFinite(crossing), 'positive target crossing is required');
+  armed = scenario !== 'control';
+  controls.seek(crossing);
+  const initialRequests = requests;
+  if (scenario === 'cancel' || scenario === 'pause') assert.equal(requests, 0);
+  else assert.equal(requests, 1, 'one aggregate created multiple frame clocks after getter reentry');
+  assert.equal(caught, scenario === 'nested-failure' ? 1 : 0);
+  if (scenario === 'pause') {
+    controls.play(); assert.equal(requests, 1, 'accepted pause must remain resumable');
+  }
+  controls.cancel(); await controls.finished;
+  assert.ok(targets.every(item => item.cancels === 1), 'every original native effect must be released once');
+  const writes = targets.map(item => item.writes), requested = requests;
+  controls.play(); controls.pause(); controls.seek(32); controls.stop();
+  const pending = queue; queue = [];
+  for (const callback of pending) callback(16);
+  assert.deepEqual(targets.map(item => item.writes), writes, 'terminal controls published stale writes');
+  assert.equal(requests, requested, 'terminal aggregate rearmed a frame');
+  assert.equal(queue.length, 0);
+  assert.equal(completions, 0);
+  return { scenario, caught, initialRequests, requests, nativeCancels: targets.map(item => item.cancels) };
+}
+
+if (mode === 'reentry') {
+  const checks = [];
+  for (const mod of modules) {
+    for (const scenario of ['control', 'nested-failure', 'cancel', 'pause']) {
+      checks.push({ format: mod.format, ...await packedReentry(mod.animate.animate, scenario) });
+    }
+  }
+  console.log(JSON.stringify({ status: 'pass', mode, corpus, checks }));
+} else if (mode === 'lifecycle') {
   resetExecutions();
   for (const testCase of CASES) for (let cycle = 0; cycle < CYCLES; cycle++) setup(testCase, cycle, true, false, 0);
   await flushTerminalPromises();

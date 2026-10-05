@@ -624,6 +624,10 @@ export class WaapiUnit implements GroupOwner {
     this._done = true;
     const o = this._o!;
     if (o._record._owner === this) o._record._owner = undefined;
+    // Завершённый слот может оставаться в ещё живом aggregate. Его trajectory
+    // и handoff executor больше не нужны ни одному terminal control.
+    this._samples = undefined;
+    this._delegate = undefined;
     this._o = undefined;
     o._onDone(natural);
   }

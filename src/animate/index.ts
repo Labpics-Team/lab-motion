@@ -430,6 +430,9 @@ export function animate(
   const maybeComplete = (): void => {
     if (!setupDone || done !== total) return;
     setupDone = false; // та же защёлка гасит повторную terminal-отчётность
+    // После последнего terminal report controls больше не владеют исполнителями.
+    // Освобождение до callback не затрагивает successor из onComplete.
+    units.length = 0;
     mainBatch = undefined;
     // Public controls остаются у caller, но terminal aggregate больше не
     // владеет компонентными callbacks/scheduler из configuration.
@@ -457,7 +460,9 @@ export function animate(
   // main slots одного aggregate делят kernel и исходный plan capacity.
   const getMainBatch = (): SurfaceBatch => {
     if (mainBatch !== undefined) return mainBatch;
-    const frame = ownedOptions!.requestFrame;
+    // Внешний getter является эффектом. Reflect.get сохраняет эту границу
+    // и в minified artifact: pure_getters не вправе перенести её за reentry guard.
+    const frame: AnimateOptions['requestFrame'] = Reflect.get(ownedOptions!, 'requestFrame');
     // Accessor может выполнить вложенный handoff того же aggregate: уже
     // опубликованный batch остаётся единственным владельцем его live slots.
     if (mainBatch !== undefined) return mainBatch;

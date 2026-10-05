@@ -103,6 +103,16 @@ describe('RESOURCE-01: реальные байты установленного 
     expect(measured.every(owner => owner.cycles === 10_000)).toBe(true);
   }
 
+  it('packed ESM/CJS сохраняют один frame clock после getter reentry и частичного host failure', () => {
+    const result = probe('reentry');
+    expect(result.status).toBe('pass');
+    const checks = result.checks as Array<{ format: string; scenario: string }>;
+    expect(checks.map(check => `${check.format}/${check.scenario}`)).toEqual(
+      ['esm', 'cjs'].flatMap(format => ['control', 'nested-failure', 'cancel', 'pause']
+        .map(scenario => `${format}/${scenario}`)),
+    );
+  }, 120_000);
+
   it('terminal owner не удерживает компонент: дешёвый различающий witness', () => {
     expect(probe('witness', true).status).toBe('pass');
   }, 120_000);
