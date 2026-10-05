@@ -10,10 +10,11 @@ type Packed = { readonly root: string; readonly tarball: string; readonly sha256
 
 function packOnce(
   runPack: (root: string) => string = (root) => execFileSync('npm', [
-    'pack', '--ignore-scripts', '--json', '--pack-destination', root,
-  ], { cwd: resolve('.'), encoding: 'utf8', timeout: 30_000 }),
+    'pack', '--ignore-scripts', '--json', '--pack-destination', process.platform === 'win32' ? `"${root}"` : root,
+  ], { cwd: resolve('.'), encoding: 'utf8', timeout: 30_000, shell: process.platform === 'win32' }),
 ): Packed {
-  const root = mkdtempSync(join(tmpdir(), 'journey-direct-package-'));
+  // Пробел выявляет потерю границы аргумента в Windows shell.
+  const root = mkdtempSync(join(tmpdir(), 'journey direct package-'));
   try {
     const packed = JSON.parse(runPack(root)) as Array<{ filename: string }>;
     expect(packed).toHaveLength(1);

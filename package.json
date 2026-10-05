@@ -386,6 +386,16 @@
         "default": "./dist/compositor/index.cjs"
       }
     },
+    "./compositor/follow": {
+      "import": {
+        "types": "./dist/compositor/follow/index.d.ts",
+        "default": "./dist/compositor/follow/index.js"
+      },
+      "require": {
+        "types": "./dist/compositor/follow/index.d.cts",
+        "default": "./dist/compositor/follow/index.cjs"
+      }
+    },
     "./compositor/stagger": {
       "import": {
         "types": "./dist/compositor/stagger/index.d.ts",
@@ -511,7 +521,7 @@
     "typecheck": "tsc --noEmit",
     "typecheck:browser": "tsc --noEmit -p tsconfig.browser.json",
     "typecheck:motion-program": "tsc -p tsconfig.motion-program.json",
-    "test": "node scripts/check-docs-drift.mjs && vitest run",
+    "test": "pnpm build && node scripts/check-docs-drift.mjs && vitest run",
     "test:journey:behaviors-pareto": "pnpm build && vitest run test/journey-behaviors-pareto-budget.test.ts",
     "test:watch": "vitest",
     "naming:inventory": "node scripts/naming-inventory.mjs",

@@ -21,3 +21,7 @@ blob-report
 .playwright
 browser/.artifacts
 site/dist
+examples/reading-shelf/.artifacts
+examples/itinerary-sheet/.artifacts
+examples/call-sheet/.artifacts
+examples/audio-cue/.artifacts

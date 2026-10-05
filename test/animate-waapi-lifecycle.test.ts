@@ -548,6 +548,98 @@ describe('animate: жизненный цикл WAAPI-юнита', () => {
     controls.cancel();
   });
 
+  it('отмена из getter requestFrame при lazy handoff остаётся terminal без новых jobs', async () => {
+    const target = fakeEl({}, true);
+    const physics = { mass: 1, stiffness: 100, damping: 10 };
+    const clock = makeClock();
+    let armed = false, requests = 0;
+    let controls: ReturnType<typeof animate>;
+    const frame = (callback: (timestamp?: number) => void): number => {
+      requests++; return clock.requestFrame(callback);
+    };
+    controls = animate(target.el, { opacity: [0, 1] }, {
+      spring: physics, now: () => 0, setTimer: () => () => {},
+      get requestFrame() {
+        if (armed) { armed = false; controls.cancel(); }
+        return frame;
+      },
+    });
+    expect(target.animateCalls).toHaveLength(1);
+    armed = true;
+    expect(() => controls.seek(firstSerializedTargetCrossingMs(physics))).not.toThrow();
+    await controls.finished;
+    expect(target.cancels).toBe(1);
+    expect(requests).toBe(0);
+    const before = target.writes.length;
+    controls.play(); controls.pause(); controls.seek(32); controls.stop();
+    clock.drain();
+    expect(target.writes).toHaveLength(before);
+    expect(requests).toBe(0);
+  });
+
+  it('вложенный crossing seek из getter requestFrame не оставляет writer после terminal cancel', async () => {
+    const target = fakeEl({}, true);
+    const physics = { mass: 1, stiffness: 100, damping: 10 };
+    const crossingMs = firstSerializedTargetCrossingMs(physics);
+    const clock = makeClock();
+    let armed = false, requests = 0, completes = 0;
+    let controls: ReturnType<typeof animate>;
+    const frame = (callback: (timestamp?: number) => void): number => {
+      requests++; return clock.requestFrame(callback);
+    };
+    controls = animate(target.el, { opacity: [0, 1] }, {
+      spring: physics, now: () => 0, setTimer: () => () => {},
+      onComplete: () => { completes++; },
+      get requestFrame() {
+        if (armed) { armed = false; controls.seek(crossingMs); }
+        return frame;
+      },
+    });
+    armed = true;
+    controls.seek(crossingMs);
+    expect(requests).toBe(1);
+    controls.cancel();
+    await controls.finished;
+    expect(target.cancels).toBe(1);
+    const before = target.writes.length;
+    const requested = requests;
+    controls.play(); controls.pause(); controls.seek(32); controls.stop();
+    clock.drain();
+    expect(target.writes).toHaveLength(before);
+    expect(requests).toBe(requested);
+    expect(completes).toBe(0);
+  });
+
+  it('принятая pause из getter requestFrame сохраняется после crossing seek до явного play', async () => {
+    const target = fakeEl({}, true);
+    const physics = { mass: 1, stiffness: 100, damping: 10 };
+    const clock = makeClock();
+    let armed = false, requests = 0, completes = 0;
+    let controls: ReturnType<typeof animate>;
+    const frame = (callback: (timestamp?: number) => void): number => {
+      requests++; return clock.requestFrame(callback);
+    };
+    controls = animate(target.el, { opacity: [0, 1] }, {
+      spring: physics, now: () => 0, setTimer: () => () => {},
+      onComplete: () => { completes++; },
+      get requestFrame() {
+        if (armed) { armed = false; controls.pause(); }
+        return frame;
+      },
+    });
+    armed = true;
+    controls.seek(firstSerializedTargetCrossingMs(physics));
+    expect(target.cancels).toBe(1);
+    const before = target.writes.length;
+    clock.drain();
+    expect(requests).toBe(0);
+    expect(target.writes).toHaveLength(before);
+    controls.play();
+    expect(requests).toBe(1);
+    controls.cancel(); await controls.finished;
+    expect(completes).toBe(0);
+  });
+
   it('pause → seek(target crossing) не тикает до play и продолжает C1 в live', async () => {
     const target = fakeEl({}, true);
     const physics = { mass: 1, stiffness: 100, damping: 10 };

@@ -1,0 +1,11 @@
+<!doctype html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Монтажная шкала</title></head><body>
+<main class="app"><header><strong class="brand">◉ &nbsp; Кадр / звук</strong><span>Рабочий лист интервью</span></header>
+<section class="intro"><p class="eyebrow">Монтаж / эпизод 04</p><h1>Голос <em>города.</em></h1><p>Проверьте границы фрагментов интервью. Перемещайте курсор по шкале, переходите между репликами и сохраняйте точку монтажа.</p></section>
+<section class="board" aria-labelledby="board-title"><div class="board-head"><div><p class="eyebrow">Звуковая дорожка</p><h2 id="board-title">Черновой монтаж</h2></div><div class="board-options"><button id="direction" type="button" aria-pressed="false">Справа налево</button><button id="quiet" type="button" aria-pressed="false">Без движения</button></div></div>
+<div class="meta"><span>Положение <strong id="position">00:00</strong></span><span>Длительность 03:00</span></div>
+<div class="track" id="track"><div class="segments" aria-hidden="true"><span>Вступление</span><span>Мастерская</span><span>Набережная</span><span>Финал</span></div><div id="cursor" aria-hidden="true"></div></div>
+<label for="seek">Курсор монтажа</label><input id="seek" type="range" min="0" max="180" value="0" step="1" aria-valuetext="00:00, Вступление">
+<div class="controls"><button id="previous" type="button">Предыдущий фрагмент</button><button id="next" type="button">Следующий фрагмент</button><button id="mark" type="button">Сохранить точку</button></div>
+<div class="details"><p class="eyebrow">Текущий фрагмент</p><h3 id="cue-title"></h3><p id="cue-copy"></p><label for="note">Заметка монтажёра</label><textarea id="note" rows="3" placeholder="Что поправить в этой реплике?"></textarea></div>
+<div class="marks"><h3>Точки монтажа</h3><ol id="marks"></ol><p id="empty">Пока нет сохранённых точек.</p></div><p id="status" role="status" aria-live="polite"></p></section>
+<footer>Черновик хранится только до закрытия страницы.</footer></main><script type="module" src="/src/main.ts"></script></body></html>

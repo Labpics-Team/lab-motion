@@ -56,11 +56,11 @@ export function scheduleStagger(
   const numericOrigin = Number.isFinite(fromInput)
     ? Math.max(0, Math.min(count - 1, Math.round(fromInput as number)))
     : 0;
+  const fromEdges = fromInput === 'edges';
   let maxDistance = 0;
 
   if (gridColumns) {
     const rows = Math.ceil(count / gridColumns);
-    const fromEdges = fromInput === 'edges';
     let originRow = 0;
     let originColumn = 0;
     if (!fromEdges) {
@@ -96,15 +96,11 @@ export function scheduleStagger(
     return result;
   }
 
-  const fromEdges = fromInput === 'edges';
-  let origin = 0;
-  if (!fromEdges) {
-    origin = fromInput === 'last'
-      ? count - 1
-      : fromInput === 'center'
-        ? (count - 1) / 2
-        : numericOrigin;
-  }
+  const origin = fromInput === 'last'
+    ? count - 1
+    : fromInput === 'center'
+      ? (count - 1) / 2
+      : numericOrigin;
   maxDistance = fromEdges
     ? Math.floor((count - 1) / 2)
     : Math.max(origin, count - 1 - origin);

@@ -73,7 +73,7 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
   const config = START_SCENARIO_MANIFEST[scenario];
   const checkpointTimes = config.staggerGapMs > 0
     ? [0.2, 0.5, 0.8].map((fraction) => config.staggerGapMs * (config.targetsPerCall - 1) * fraction)
-    : [config.durationMs * 0.25];
+    : [0.25, 0.5, 0.625].map((fraction) => config.durationMs * fraction);
   const evidence: any = {
     topology: {
       calls,
@@ -84,6 +84,7 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
     },
     callStartedAtMs: Array.from({ length: calls }, () => 0),
     checkpoints: checkpointTimes.map((elapsedMs) => ({
+      frameTimestampMs: elapsedMs,
       groups: Array.from({ length: calls }, () => ({
         readStartedMs: elapsedMs,
         readEndedMs: elapsedMs,
@@ -485,19 +486,25 @@ function freeze25To65(): MotionPoint[] {
 }
 
 describe('schema 10 motion conformance admission', () => {
-  it('публикация требует качества и не позволяет ослабить требования вызывающему', () => {
-    const report = motionFixture();
-    expect(() => validateBenchmarkReportForPublication(report)).not.toThrow();
-    expect(() => validateBenchmarkReportForPublication(fixture())).toThrow(/motion conformance/);
-    report.payload.results['motion-mini'].raw.freeze[0].evidence.blocked = freeze25To65();
-    refreshMotionReport(report);
-    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
-    expect(() => validateBenchmarkReportForPublication({ ...report, motionRequirements: undefined }))
-      .toThrow(/motion-mini\.blocked = fail/);
-    expect(() => validateBenchmarkReportForPublication({
-      ...report, motionRequirements: { baseline: ['lab'], blocked: [] },
-    })).toThrow(/motion-mini\.blocked = fail/);
+  it('публикация принимает отчёт с обязательным качеством движения', () => {
+    expect(() => validateBenchmarkReportForPublication(motionFixture())).not.toThrow();
   });
+
+  it('публикация требует motion conformance', () => {
+    expect(() => validateBenchmarkReportForPublication(fixture())).toThrow(/motion conformance/);
+  });
+
+  it.each([undefined, { baseline: ['lab'], blocked: [] }])(
+    'публикация не позволяет ослабить требования вызывающему (%j)',
+    (motionRequirements) => {
+      const report = motionFixture();
+      report.payload.results['motion-mini'].raw.freeze[0].evidence.blocked = freeze25To65();
+      refreshMotionReport(report);
+      expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+      expect(() => validateBenchmarkReportForPublication({ ...report, motionRequirements }))
+        .toThrow(/motion-mini\.blocked = fail/);
+    },
+  );
 
   it('CI и release reader используют обязательный допуск публикации', () => {
     const reader = readFileSync('scripts/check-docs-facts.mjs', 'utf8');
@@ -815,9 +822,8 @@ describe('paired comparative benchmark report', () => {
     })).toThrow(/motion conformance/i);
   });
 
-  it('accepts a clean paired report whose summaries and freeze evidence recompute', () => {
-    expect(() => validateBenchmarkReportPair(fixture())).not.toThrow();
-    expect(() => validateBenchmarkReportPair(fixture(40))).not.toThrow();
+  it.each([20, 40])('accepts a clean paired report whose summaries and freeze evidence recompute (%i runs)', (startRuns) => {
+    expect(() => validateBenchmarkReportPair(fixture(startRuns))).not.toThrow();
   });
 
   it('rejects a fully self-consistent report when any start topology is unproved', () => {

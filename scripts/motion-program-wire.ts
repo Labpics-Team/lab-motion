@@ -395,6 +395,7 @@ export function decodeMotionProgramV1(input: Uint8Array): MotionProgramV1 {
 
   const strings = new Array<string>(stringCount);
   let utf8Bytes = 0;
+  let codeUnits = 0;
   for (let i = 0; i < stringCount; i++) {
     const count = reader.u32();
     utf8Bytes = checkedSize(utf8Bytes, count);
@@ -406,6 +407,8 @@ export function decodeMotionProgramV1(input: Uint8Array): MotionProgramV1 {
     } catch {
       wireFailure();
     }
+    codeUnits += decoded.length;
+    if (codeUnits > MOTION_PROGRAM_LIMITS_V1.maxStringCodeUnits) limitFailure();
     // Даже fatal UTF-8 допускает хостовую обработку BOM; точный re-encode
     // оставляет для одной последовательности скаляров единственное представление.
     if (!sameBytes(UTF8.encode(decoded), encoded)) wireFailure();

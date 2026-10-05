@@ -25,7 +25,8 @@
  *   SSR-safe: no window/document access on import.
  */
 
-import { ref, watch, onUnmounted, type Ref, type ObjectDirective } from 'vue';
+import { ref, watch, onUnmounted, getCurrentInstance, type Ref, type ObjectDirective } from 'vue';
+import * as Vue from 'vue';
 import type { MotionValue, MotionValueOptions, RequestFrameFn } from '../motion-value.js';
 import { createBoundValue } from '../internal/binding-value.js';
 import { renderTemplateValue } from '../internal/template.js';
@@ -41,7 +42,8 @@ function prefersReducedMotion(): boolean {
 // ─── useMotionValue ───────────────────────────────────────────────────────
 
 /**
- * Creates a stable MotionValue instance, cleaned up on component unmount.
+ * Создаёт MotionValue с уборкой при остановке текущего Vue scope.
+ * Вне scope владелец вызывает destroy() явно.
  *
  * @param initial - Initial numeric value. Must be finite.
  * @param spring  - Spring physics parameters.
@@ -60,13 +62,12 @@ export function useMotionValue(
 ): MotionValue {
   const mv = createBoundValue({ initial, spring, requestFrame });
 
-  try {
-    onUnmounted(() => {
-      mv.destroy();
-    });
-  } catch {
-    // Called outside component context (e.g. tests) — no lifecycle hook available.
-  }
+  // Effect scope может закончиться раньше компонента. Vue 3.0/3.1 ещё не
+  // экспортирует scope API: для этих поддерживаемых версий остаётся unmount.
+  const registerCleanup = Vue.getCurrentScope?.()
+    ? Vue.onScopeDispose
+    : getCurrentInstance() ? onUnmounted : undefined;
+  registerCleanup?.(() => mv.destroy());
 
   return mv;
 }
@@ -119,17 +120,9 @@ export function useSpring(
   const value = ref<number>(initial);
 
   // Subscribe to MotionValue changes.
-  const unsub = mv.onChange((v) => {
+  mv.onChange((v) => {
     value.value = v;
   });
-
-  try {
-    onUnmounted(() => {
-      unsub();
-    });
-  } catch {
-    // Outside component context — subscriber will be cleaned up by mv.destroy().
-  }
 
   // Watch target changes and drive animation.
   const targetGetter = typeof target === 'function' ? target : () => target.value;

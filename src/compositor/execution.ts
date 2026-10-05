@@ -8,6 +8,7 @@
  */
 
 import type { SpringParams } from '../spring.js';
+import { finiteOr } from '../internal/finite.js';
 import {
   clearSpringExecutionArtifactCacheUnchecked,
   compileSpringExecutionArtifactTupleUnchecked,
@@ -62,7 +63,7 @@ function explicitKeyframes(
     // Для p∈[0,1] взвешенная форма остаётся конечной даже когда `to-from`
     // переполняется. Нефинитность здесь возможна только у реального overshoot,
     // вышедшего за представимый диапазон; CSS-safe политика снапает его в цель.
-    const value = Number.isFinite(raw) ? raw : to;
+    const value = finiteOr(raw, to);
     frames[i] = {
       offset: i === 0 ? 0 : i === last ? 1 : samples[i * 2]! / 100,
       [property]: format == null ? value : format(value),

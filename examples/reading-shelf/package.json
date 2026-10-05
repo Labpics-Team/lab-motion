@@ -1,0 +1,8 @@
+{
+  "name": "@labpics/motion-reading-shelf-example",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@labpics/motion": "0.3.0"
+  }
+}
