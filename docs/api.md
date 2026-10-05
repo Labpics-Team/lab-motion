@@ -143,7 +143,7 @@ await moves.finished;
 | `…/waapi` | Низкоуровневый native-мост: `compileWaapi`/`animateWaapi`; `animateScrollWaapi`/`animateViewWaapi` отдают scroll/view-progress → property нативным progress timelines без собственного покадрового JS и без скрытого fallback; capability probes явные |
 | `…/compositor` | Базовый compositor-компилятор: `compileSpringLinear`, `compileSpringPlan`, `CompositorSpring`, ретаргет, хендофф и fallback-матрица. Подробно — [compositor.md](compositor.md) |
 | `…/compositor/stagger` | Самодостаточный групповой compositor-фасад: `compileStaggerPlan`, `CompositorStaggerGroup` и связанные `compileSpringPlan`/`CompositorSpring` из одного entry |
-| `…/compositor/follow` | Универсальные direct follow, native settle и повторный pickup: `createCompositorFollow`; `compileSpringPlan` для того же consumer-графа |
+| `…/compositor/follow` | Прямое следование за вводом, нативная доводка и повторный перехват: `createCompositorFollow`; `compileSpringPlan` для того же графа зависимостей потребителя |
 | `…/tokens` | Motion-токены: `duration`, `easing`, `spring`, `staggerGap`, `distanceScale`. Подробно — [tokens.md](tokens.md) |
 
 ## Build-tool
