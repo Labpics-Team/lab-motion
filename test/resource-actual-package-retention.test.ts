@@ -137,9 +137,12 @@ describe('RESOURCE-01: реальные байты установленного 
     completeCycles(result, ownerNames(EXISTING_KINDS));
   }, 120_000);
 
-  it('presence/scope corpus имеет собственную A/A baseline-полосу и не наследует измерение прежних owners', () => {
+  it('presence/scope после 10 000 циклов имеет стабильный terminal tail в своей A/A baseline-полосе', () => {
     const result = probe('bytes', true, 'presence-scope');
     expect(result.status).toBe('pass');
     completeCycles(result, ownerNames(ADDED_KINDS));
+    const tailExcess = result.tailExcess as number[];
+    expect(tailExcess).toHaveLength(4);
+    expect(tailExcess.every(bytes => bytes === 0)).toBe(true);
   }, 120_000);
 });
