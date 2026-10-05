@@ -81,13 +81,9 @@ export interface MotionValueOptions {
 import { CONVERGENCE_THRESHOLD, MAX_FRAMES, FIXED_DT_S } from './internal/constants.js';
 
 /**
- * Порог численной стабильности: величины меньше него трактуются как ноль.
- * Две роли (обе — защита от вырождения, значение общее): (1) «покой» — скорость
- * ниже EPSILON считается нулевой (snap-if-at-rest в setTarget); (2) знаменатель —
- * |range| ниже EPSILON вырожден, деление на него дало бы ±∞/NaN, поэтому диапазон
- * либо снапается, либо floor'ится к EPSILON. Локален модулю: деления на range в
- * drive/driver защищены early-exit `from === to` (absRange > 0 гарантирован
- * статически), им epsilon-пол не нужен — потому в общий internal/constants не вынесен.
+ * Порог покоя и вырожденного диапазона. При живом импульсе setTarget расширяет
+ * узкий range до представимой величины; из покоя такой диапазон снапается.
+ * После деления finiteOr отдельно отсекает переполнение нормализованной скорости.
  */
 const EPSILON = 1e-10;
 
@@ -266,17 +262,21 @@ export class MotionValue {
 
     // Повтор цели сохраняет подготовленную траекторию и её часы. Проверка
     // активного цикла важна: stop() не запрещает снова двигаться к той же цели.
-    const settled = target === this._value && Math.abs(this._velocity) < EPSILON;
+    const currentVelocity = this._velocity;
+    const settled = target === this._value && Math.abs(currentVelocity) < EPSILON;
     if (target === this._target && (this._run || settled)) return;
     this._epoch++;
     this._target = target;
-    if (settled) return;
+    if (settled) {
+      this._run = null;
+      this._velocity = 0;
+      return;
+    }
 
     // ── Smooth pickup: capture current velocity before resetting run state ──
-    const currentVelocity = this._velocity; // units/s
     const targetRange = target - this._value;
     const range =
-      !(Math.abs(targetRange) > EPSILON) && currentVelocity !== 0
+      Math.abs(targetRange) <= EPSILON && currentVelocity !== 0
         ? Math.sign(currentVelocity) * Math.max(
             EPSILON,
             Math.abs(this._value) * Number.EPSILON,
@@ -297,14 +297,12 @@ export class MotionValue {
     this._startTs = this._run && this._startTs !== undefined
       ? this._startTs + this._elapsed * 1000
       : undefined;
-    this._elapsed = 0;
-    this._frameCount = 0;
+    this._frameCount = this._elapsed = 0;
 
     // ── Start frame loop (idempotent: only one loop runs at a time) ──────
     if (!this._run) {
       this._useTimeoutFallback = false;
-      this._run = {};
-      this._schedule(this._run);
+      this._schedule(this._run = {});
     }
     // If already running, the active loop will pick up the new _target/_from/_v0Normalized
     // on its next tick (because it re-reads these fields). The loop is already scheduled.
@@ -422,32 +420,30 @@ export class MotionValue {
 
     const range = this._range;
     const absRange = Math.abs(range);
+    const epoch = this._epoch;
 
     // Общий солвер (internal/solver.ts) + стражи этого модуля инлайн
     // (value→1, velocity→0 — политика отличается от clampFinite spring.ts).
     const raw = solveSpring(this._spring!, this._elapsed, this._v0Normalized, solverSample);
-    // Getter мог завершить владельца или сменить цикл внутри solver.
-    if (run !== this._run) return;
-    const normPos = finiteOr(raw.value, 1);
-    const normVel = finiteOr(raw.velocity, 0);
-
+    // Getter мог сменить цель без нового run. Старый sample не публикуется,
+    // а единственный следующий кадр остаётся у живого владельца.
+    if (epoch !== this._epoch) return this._schedule(run);
     // Denormalize: absolute value and velocity.
-    const rawValue = this._from + normPos * range;
-    const rawVelocity = normVel * range; // units/s
+    const rawValue = this._from + finiteOr(raw.value, 1) * range;
+    const rawVelocity = finiteOr(raw.velocity, 0) * range; // units/s
 
     // Check convergence or hard cap.
-    // Единый epsilon-пол знаменателя (двойной Math.max свёрнут в const — ужим).
-    const denom = Math.max(absRange, EPSILON);
+    // Узкий span из покоя завершает выражение до деления; при импульсе
+    // setTarget уже расширил range до EPSILON.
     const converged =
       // Frame-cap страхует только застывший host-clock. При растущем времени
       // большой переносимый v0 вправе оседать дольше rest-бюджета.
       (this._frameCount >= MAX_FRAMES && this._elapsed <= 0) ||
-      !Number.isFinite(range) || // unrepresentable span: |from|+|target| overflowed past MAX_VALUE
       // Реально крошечный span из покоя снапается как раньше. При живом
       // импульсе _range синтетически представим и эта ветка не съедает скорость.
       (absRange < EPSILON && this._v0Normalized === 0) ||
-      (Math.abs(rawValue - (this._from + range)) / denom < CONVERGENCE_THRESHOLD &&
-        Math.abs(rawVelocity) / denom < CONVERGENCE_THRESHOLD);
+      (Math.abs(rawValue - (this._from + range)) / absRange < CONVERGENCE_THRESHOLD &&
+        Math.abs(rawVelocity) / absRange < CONVERGENCE_THRESHOLD);
 
     // Emit value. bounded=true (default): CSS-safe clamp to [from, target].
     // bounded=false: honest trajectory — underdamped overshoot is emitted.
@@ -464,8 +460,7 @@ export class MotionValue {
     // бит-в-бит прежняя, ужим под размерный гейт ядра (срез #93).
     if (converged || !Number.isFinite(clampedValue) || !Number.isFinite(rawVelocity)) {
       this._run = null;
-      this._emit(this._target);
-      return;
+      return this._emit(this._target);
     }
 
     try {
