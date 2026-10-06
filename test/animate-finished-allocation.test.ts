@@ -35,7 +35,7 @@ function countPromises(run: () => void): number {
   return allocations;
 }
 
-describe.sequential('animate finished: O(1) library Promise constructors', () => {
+describe('animate finished: O(1) library Promise constructors', { concurrent: false }, () => {
   it('full main-path: N=1000 создаёт только aggregate finished', () => {
     const targets = Array.from({ length: N }, () => fakeEl().el);
     const allocations = countPromises(() => {

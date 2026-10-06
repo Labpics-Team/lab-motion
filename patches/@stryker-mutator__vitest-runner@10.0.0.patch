@@ -1,0 +1,32 @@
+diff --git a/dist/src/test-helpers.js b/dist/src/test-helpers.js
+--- a/dist/src/test-helpers.js
++++ b/dist/src/test-helpers.js
+@@ -10,3 +10,3 @@
+     }
+-    return nameParts.join(' ').trim();
++    return nameParts.join(' > ');
+ }
+diff --git a/dist/src/stryker-setup.js b/dist/src/stryker-setup.js
+--- a/dist/src/stryker-setup.js
++++ b/dist/src/stryker-setup.js
+@@ -65,3 +65,3 @@
+     }
+-    return nameParts.join(' ').trim();
++    return nameParts.join(' > ');
+ }
+diff --git a/src/test-helpers.ts b/src/test-helpers.ts
+--- a/src/test-helpers.ts
++++ b/src/test-helpers.ts
+@@ -19,3 +19,3 @@
+   }
+-  return nameParts.join(' ').trim();
++  return nameParts.join(' > ');
+ }
+diff --git a/src/stryker-setup.ts b/src/stryker-setup.ts
+--- a/src/stryker-setup.ts
++++ b/src/stryker-setup.ts
+@@ -87,3 +87,3 @@
+   }
+-  return nameParts.join(' ').trim();
++  return nameParts.join(' > ');
+ }

@@ -14,3 +14,5 @@ pmOnFail: error
 peerDependencyRules:
   allowedVersions:
     "@builder.io/qwik>vite": "8"
+patchedDependencies:
+  "@stryker-mutator/vitest-runner@10.0.0": patches/@stryker-mutator__vitest-runner@10.0.0.patch
