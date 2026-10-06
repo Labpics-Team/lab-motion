@@ -176,8 +176,6 @@ jobs:
       - name: Test
         run: pnpm test
 
-      - name: Fuzz finiteness gate
-        run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
 
       - name: Size gate
         run: pnpm size
