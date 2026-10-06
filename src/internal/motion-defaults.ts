@@ -1,9 +1,10 @@
-/** SSOT дефолтов фасада и публичных motion-токенов. */
+/** SSOT дефолтов фасада, поведений и публичных motion-токенов. */
 
 import type { SpringParams } from './types.js';
 
 export const DEFAULT_DURATION_MS = 200;
 export const DEFAULT_SPRING: SpringParams = { mass: 1, stiffness: 170, damping: 26 };
+export const SNAPPY_SPRING = { mass: 1, stiffness: 260, damping: 28 } as const;
 export const STANDARD_EASING_COORDS = [0.2, 0, 0, 1] as const;
 
 /**

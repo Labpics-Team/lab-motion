@@ -209,8 +209,8 @@ export interface CompositorStaggerGroupOptions extends StaggerPlanBase {
  * CompositorSpring (execution-snapshot + reseed скорости).
  */
 export class CompositorStaggerGroup {
-  private readonly _plan: CompositorStaggerPlan;
-  private readonly _springs: CompositorSpring[];
+  declare private readonly _plan: CompositorStaggerPlan;
+  declare private readonly _springs: CompositorSpring[];
 
   constructor(opts: CompositorStaggerGroupOptions) {
     if (!Array.isArray(opts.targets)) {
@@ -224,7 +224,7 @@ export class CompositorStaggerGroup {
 
     const delays = this._plan.delays;
     const apply = opts.apply;
-    const springs = new Array<CompositorSpring>(count);
+    const springs = this._springs = new Array<CompositorSpring>(count);
     // CompositorSpring синхронно захватывает значения опций и не удерживает
     // объект. Один переиспользуемый carrier убирает N краткоживущих option-
     // объектов перед первым кадром большого каскада.
@@ -250,7 +250,6 @@ export class CompositorStaggerGroup {
       child.apply = apply && ((value: string | number): void => apply(i, value));
       springs[i] = new CompositorSpring(child);
     }
-    this._springs = springs;
   }
 
   /** Путь исполнения группы (по первому элементу; пустая группа → 'fallback'). */

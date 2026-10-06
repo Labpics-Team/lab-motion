@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="ru">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Съёмочный день — Lab Motion</title></head>
+  <body>
+    <main class="app">
+      <header class="top"><div class="brand"><span class="brand-mark" aria-hidden="true">◉</span> Кадр</div><span class="top-meta">План студии на один день</span></header>
+      <section class="intro" aria-labelledby="title"><div><p class="eyebrow">План съёмки / суббота</p><h1 id="title">Съёмочный <em>день.</em></h1><p class="intro-copy">Меняйте порядок сцен: время каждой следующей пересчитается. Название и длительность можно править прямо в строке.</p></div><div class="summary"><span>Начало</span><strong>08:30</strong><span id="finish-label">Окончание 00:00</span></div></section>
+      <section class="workspace" aria-labelledby="schedule-title">
+        <div class="workspace-head"><div><p class="eyebrow">Монтажный лист</p><h2 id="schedule-title">Очередь сцен</h2></div><div class="controls"><label for="filter">Показать <select id="filter"><option value="all">Все</option><option value="ready">В работе</option><option value="done">Снято</option></select></label><button id="direction" type="button" aria-pressed="false">Справа налево</button><button id="quiet" type="button" aria-pressed="false">Без движения</button></div></div>
+        <form id="add-form"><label for="new-scene">Новая сцена</label><input id="new-scene" maxlength="90" required placeholder="Например, свет в мастерской" /><label for="new-minutes">Минут</label><input id="new-minutes" type="number" min="5" max="240" value="30" required /><button type="submit">Добавить сцену</button></form>
+        <p class="guide">На ручке «Переместить»: Enter или пробел, затем стрелки; Enter закрепляет порядок, Escape отменяет жест. Кнопки в строке дают одиночный шаг.</p>
+        <div class="column-head" aria-hidden="true"><span>Время</span><span>Сцена и площадка</span><span>Длительность</span><span>Действия</span></div>
+        <div id="schedule" class="schedule" aria-label="Очередь сцен"></div>
+        <p id="empty" class="empty" hidden>В этом представлении сцен нет. Выберите другой фильтр или добавьте новую сцену.</p>
+        <p id="status" role="status" aria-live="polite"></p>
+      </section>
+      <footer>Данные сохраняются только до закрытия страницы.</footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

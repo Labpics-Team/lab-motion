@@ -1,0 +1,121 @@
+name: PROFILE-01 — проверка размерного протокола
+
+# Размерный вектор вызывается вручную через ci.yml в той же среде, что обычный CI
+# публичного репозитория. Время/GPU/энергия этой машины не являются device proof.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+  PROFILE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Получить точный источник измерителя
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Настроить Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: '24'
+
+      - name: Активировать закреплённый pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Проверить точную версию протокола
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PROFILE_SOURCE_SHA"
+          node --input-type=module <<'NODE'
+          import { PROFILE_01, preregistrationDigest, verifyPreregistration } from './bench/profile/profile-01-preregistration.mjs';
+          verifyPreregistration(PROFILE_01);
+          if (PROFILE_01.candidateSamplesObservedAtRegistration !== false) {
+            throw new Error('preregistration обязана предшествовать samples');
+          }
+          console.log(`preregistration digest: ${preregistrationDigest(PROFILE_01)}`);
+          NODE
+
+      - name: Установить зависимости
+        run: pnpm install --frozen-lockfile
+
+      - name: Измерить прежний размерный вектор
+        id: probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/profile-01-raw"
+          node bench/profile/probe-profile-01.mjs \
+            --mode old-vector \
+            --cells all \
+            --out "$RUNNER_TEMP/profile-01-raw"
+
+      - name: Независимо перепроверить raw-артефакт
+        if: ${{ !cancelled() && steps.probe.outcome != 'skipped' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for raw in "$RUNNER_TEMP"/profile-01-raw/*.json; do
+            test -f "$raw"
+            node bench/profile/validate-profile-01.mjs --raw "$raw"
+          done
+
+      - name: Проверить отказ внешнего validator на подменах настоящего результата
+        if: ${{ !cancelled() && steps.probe.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import { spawnSync } from 'node:child_process';
+          import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+          import { tmpdir } from 'node:os';
+          import { join } from 'node:path';
+          const rawDirectory = join(process.env.RUNNER_TEMP, 'profile-01-raw');
+          const files = readdirSync(rawDirectory).filter(name => name.endsWith('.json'));
+          assert.equal(files.length, 1);
+          const original = JSON.parse(readFileSync(join(rawDirectory, files[0]), 'utf8'));
+          const directory = mkdtempSync(join(tmpdir(), 'profile-replay-mutations-'));
+          try {
+            const cases = [
+              ['число', value => { value.costVector.scenarios[0].gzBytes += 1; }, 'scenarios не воспроизводится'],
+              ['identity', value => { value.head = '0'.repeat(40); }, 'baseProof не покрывает'],
+              ['клетки', value => { value.cellsUnproven = []; }, 'неизмеренные клетки потеряны'],
+            ];
+            for (const [name, mutate, rejection] of cases) {
+              const value = structuredClone(original);
+              mutate(value);
+              const path = join(directory, 'mutated.json');
+              writeFileSync(path, JSON.stringify(value));
+              const run = spawnSync(process.execPath, ['bench/profile/validate-profile-01.mjs', '--raw', path],
+                { encoding: 'utf8', timeout: 180_000, maxBuffer: 8 * 1024 * 1024 });
+              assert.equal(run.status, 1, `${name}: ${run.error ?? run.stderr}`);
+              assert.ok(run.stderr.includes(rejection), `${name}: неверная причина отказа: ${run.stderr}`);
+              console.log(`${name}: ожидаемый предметный отказ подтверждён`);
+            }
+          } finally {
+            rmSync(directory, { recursive: true, force: true });
+          }
+          NODE
+
+      - name: Опубликовать raw-артефакт
+        # Отрицательный результат сохраняется даже после отказа измерителя.
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: profile-01-raw-${{ env.PROFILE_SOURCE_SHA }}
+          path: ${{ runner.temp }}/profile-01-raw/
+          retention-days: 90

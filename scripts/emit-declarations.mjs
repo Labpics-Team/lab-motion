@@ -25,6 +25,8 @@ const OPTIONS = {
   strict: true,
   verbatimModuleSyntax: false,
   isolatedDeclarations: true,
+  // Внутренние hooks не обещают потребителю имена, переименованные runtime-сборкой.
+  stripInternal: true,
 };
 
 /** Относительные .js-спецификаторы → .cjs (для require-ветки деклараций). */

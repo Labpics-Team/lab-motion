@@ -6,6 +6,11 @@ on:
   pull_request:
   merge_group:
   workflow_dispatch:
+    inputs:
+      profile_baseline:
+        description: 'Снять зарегистрированный размерный baseline PROFILE-01'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -21,6 +26,12 @@ env:
   COREPACK_DEFAULT_TO_LATEST: "0"
 
 jobs:
+  # Только явный baseline-запрос: обычный кандидат может менять runtime и
+  # не обязан совпадать с зарегистрированным старым источником PROFILE-01.
+  profile-baseline:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}
+    uses: ./.github/workflows/profile-01.yml
+
   verify:
     name: typecheck · build · size · package
     runs-on: ubuntu-latest
@@ -174,11 +185,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      # Глоб вместо ручного списка: новый test/*-finiteness-fuzz.test.ts попадает в
-      # гейт автоматически (класс дрейфа «забытый файл в трёх копиях списка» закрыт;
-      # находка ревью #101 — потеря projection-fuzz при наивном разрешении конфликта).
-      - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
-        run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
+      # Проверяем настоящий C/header/API на зарегистрированном Node, сохраняя
+      # обычный suite выше на текущем Node24. Это не performance calibration.
+      - name: Setup registered native-clock Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: "24.19.0"
+
+      - name: Native CPU clock · actual source and refusal controls
+        run: node test/fixtures/server-thread-cpu-clock-check.mjs
 
   mutation:
     name: driver mutation

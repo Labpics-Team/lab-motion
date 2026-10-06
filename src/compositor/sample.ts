@@ -1,6 +1,6 @@
 /** Точный sampler фактически исполняемых serialized stops. */
 
-import { finiteOrZero } from '../internal/finite.js';
+import { finiteOr, finiteOrZero } from '../internal/finite.js';
 import type { SpringSerializedSamples } from './curve.js';
 
 export interface SerializedSpringSample {
@@ -18,16 +18,27 @@ export interface AnimationTimeSource {
  * Реальный `null` означает unresolved/pending local time: effect ещё не имеет
  * видимого времени и должен читаться как pre-start, а не догонять JS clock.
  * Duck-объект без свойства сохраняет детерминированный fallback старых seams.
+ * Числовые callers сохраняют -1 для pre-start; nullable reader нужен для
+ * отличия actual null от известного отрицательного numeric local time.
  */
+/** Числовая pre-start совместимость прежних sampler callers. */
 export function animationTimeOrFallback(
   animation: AnimationTimeSource | undefined,
   fallbackMs: number,
 ): number {
+  return animationLocalTimeOrFallback(animation, fallbackMs) ?? -1;
+}
+
+/** Настоящий null остаётся отличимым от любого конечного numeric local time. */
+export function animationLocalTimeOrFallback(
+  animation: AnimationTimeSource | undefined,
+  fallbackMs: number,
+): number | null {
   try {
     if (animation !== undefined && 'currentTime' in animation) {
       const current = animation.currentTime;
-      if (current === null) return -1;
-      if (typeof current === 'number' && Number.isFinite(current)) return current;
+      // Number.isFinite не приводит strings/objects и уже проверяет type.
+      if (current === null || Number.isFinite(current)) return current as number | null;
     }
   } catch {
     // Отказ host-getter/in-trap не блокирует monotonic fallback clock.
@@ -95,7 +106,7 @@ export function sampleSerializedSpringIntoUnchecked(
   const q = (percent - x0) / (x1 - x0);
   const value = (1 - q) * p0 + q * p1;
   const velocity = (p1 - p0) / ((x1 - x0) * durationMs / 100_000);
-  result.value = Number.isFinite(value) ? value : p1;
+  result.value = finiteOr(value, p1);
   result.velocity = finiteOrZero(velocity);
   return result;
 }

@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { describe, expect, it } from 'vitest';
 import { createStateCascade, type StateCascadeLayer } from '../src/behaviors/index.js';
 import { MotionValue } from '../src/motion-value.js';
@@ -45,16 +46,16 @@ describe('каскад: независимая модель и настоящи�
       // Иная модель: полный shallow merge всех слоёв; не повторяет affected-key scan.
       const expected = Object.assign(Object.create(null) as Values, ...slots.map(slot => slot.target));
       const actual = state.snapshot();
-      expect(Object.keys(actual).sort()).toEqual(Object.keys(expected).sort());
-      expect(Object.keys(mirror).sort()).toEqual(Object.keys(expected).sort());
+      assert.deepEqual(Object.keys(actual).sort(), Object.keys(expected).sort());
+      assert.deepEqual(Object.keys(mirror).sort(), Object.keys(expected).sort());
       for (const key of keys) {
-        expect(Object.is(actual[key], expected[key])).toBe(true);
-        expect(Object.is(mirror[key], expected[key])).toBe(true);
-        expect(Object.is(state.get(key), expected[key])).toBe(true);
+        assert.equal(Object.is(actual[key], expected[key]), true);
+        assert.equal(Object.is(mirror[key], expected[key]), true);
+        assert.equal(Object.is(state.get(key), expected[key]), true);
       }
     }
     state.destroy();
-    expect(slots.every(slot => !slot.handle.active)).toBe(true);
+    assert.equal(slots.every(slot => !slot.handle.active), true);
   });
 
   it('настоящий MotionValue получает последний target, скрытые updates не перезапускают его', () => {
