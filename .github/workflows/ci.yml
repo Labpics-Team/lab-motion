@@ -185,12 +185,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      # Глоб вместо ручного списка: новый test/*-finiteness-fuzz.test.ts попадает в
-      # гейт автоматически (класс дрейфа «забытый файл в трёх копиях списка» закрыт;
-      # находка ревью #101 — потеря projection-fuzz при наивном разрешении конфликта).
-      - name: Fuzz · finiteness gate (virtual-time, seeded LCG, zero-dep)
-        run: pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts
-
       # Проверяем настоящий C/header/API на зарегистрированном Node, сохраняя
       # обычный suite выше на текущем Node24. Это не performance calibration.
       - name: Setup registered native-clock Node

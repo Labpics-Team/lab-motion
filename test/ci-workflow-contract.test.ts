@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { parse, stringify } from 'yaml';
+import vitestConfig from '../vitest.config.js';
 
 type Step = {
   uses?: string;
@@ -95,7 +96,6 @@ const testCommands = [
   'pnpm install --frozen-lockfile',
   'pnpm build',
   vitestCommand,
-  'pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts',
   'node test/fixtures/server-thread-cpu-clock-check.mjs',
 ];
 const mutationCommands = [
@@ -240,7 +240,7 @@ const requiredActions = {
       }
     },
     {
-      "index": 8,
+      "index": 7,
       "name": "Setup registered native-clock Node",
       "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
       "with": {
@@ -553,6 +553,21 @@ describe('нативный граф CI', () => {
       }
     } finally {
       rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+
+describe('Единый полный набор Vitest', () => {
+  it('сохраняет автоматический выбор fuzz-файлов без второго запуска', () => {
+    const root = fileURLToPath(new URL('../test/', import.meta.url));
+    const fuzz = readdirSync(root).filter(name => name.endsWith('finiteness-fuzz.test.ts'));
+    expect(fuzz.length).toBeGreaterThan(0);
+    expect(vitestConfig.test?.include).toEqual(['test/**/*.test.ts']);
+    expect(vitestConfig.test?.exclude).toBeUndefined();
+    expect(vitestConfig.test?.testNamePattern).toBeUndefined();
+    for (const name of ['ci.yml', 'release.yml']) {
+      expect(sources().get(name)).not.toContain('pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts');
     }
   });
 });
