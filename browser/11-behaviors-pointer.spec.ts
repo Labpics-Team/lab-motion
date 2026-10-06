@@ -11,6 +11,8 @@
  * Детерминизм follow: value = grab + (clientY − grabPointerY) — от времени НЕ
  * зависит; t берём из монотонного счётчика. Точную инерцию числом НЕ ассертим —
  * только терминальное оседание в snap (аналитический purpose пружины).
+ * Отдельный сценарий в конце задаёт виртуальные кадры и проверяет аналитический
+ * срок завершения прерванного release. Он не измеряет реальную частоту экрана.
  */
 
 import { expect, test } from './fixtures/harness';
@@ -145,4 +147,112 @@ test('mutable sheet/pager constraints retarget the same real-browser owner witho
   expect(result.pagerBoundary.value).toBe(result.pagerBefore.value);
   expect(result.pagerBoundary.velocity).toBe(result.pagerBefore.velocity);
   expect(Math.abs(result.pagerBefore.velocity)).toBeGreaterThan(0);
+});
+
+test('нижняя панель завершает прерванный release к независимому сроку без оставшихся кадров', async ({ page }) => {
+  const frameStepMs = 16;
+  const interruptAtMs = 700;
+  const target = 300;
+  const minReturnFrom = 490;
+  const maxReturnVelocity = 1000;
+
+  // Сцена #444, но без копии solver/settleTimeUpperBound. Для m=1,k=170,c=26
+  // отклонение z удовлетворяет z'' + 26z' + 170z = 0 (корни -13 ± i).
+  // Первый release: x(t)=600-exp(-13t)(340cos(t)+3420sin(t)),
+  // v(t)=exp(-13t)(1000cos(t)+44800sin(t)). При t=0.164 s получаем
+  // 490 < x < 600 и 0 < v < 1000; эти предпосылки ниже проверяются на потребителе.
+  // После retarget в 300: u=v/(x-300) <= 1000/190. Огибающие |z|/|z(0)|
+  // и |z'|/|z(0)| ограничены exp(-13t) * hypot(1,13+u) и
+  // exp(-13t) * hypot(u,170+13u). Допуски: 0.005 и 0.005/s соответственно.
+  const maxNormalizedVelocity = maxReturnVelocity / (minReturnFrom - target);
+  const positionBoundSec = Math.log(Math.hypot(1, 13 + maxNormalizedVelocity) / 0.005) / 13;
+  const velocityBoundSec = Math.log(Math.hypot(maxNormalizedVelocity, 170 + 13 * maxNormalizedVelocity) / 0.005) / 13;
+  const settleBoundMs = Math.max(positionBoundSec, velocityBoundSec) * 1000;
+  // Первый callback может только закрепить timestamp. Затем нужен кадр строго
+  // за границей огибающей: runtime использует строгое сравнение с порогом.
+  const terminalAtMs = interruptAtMs + frameStepMs
+    + (Math.floor(settleBoundMs / frameStepMs) + 1) * frameStepMs;
+  expect(terminalAtMs).toBe(1548);
+
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const result = await page.evaluate(async ({ frameStepMs, interruptAtMs, terminalAtMs }) => {
+    const { createBottomSheet } = await import('/dist/behaviors/index.js');
+    let now = 520;
+    let handle = 0;
+    let queue: Array<(timestamp?: number) => void> = [];
+    const advanceTo = (deadline: number): void => {
+      while (now < deadline) {
+        now = Math.min(deadline, now + frameStepMs);
+        const batch = queue;
+        queue = [];
+        for (const callback of batch) callback(now);
+      }
+    };
+    const sheet = createBottomSheet({
+      snapPoints: [0, 300, 600],
+      spring: { mass: 1, stiffness: 170, damping: 26 },
+      requestFrame: (callback) => {
+        queue.push(callback);
+        return ++handle;
+      },
+    });
+    try {
+      sheet.pointerDown({ x: 0, y: 0, t: 0 });
+      sheet.pointerMove({ x: 0, y: 80, t: 0.16 });
+      sheet.pointerMove({ x: 0, y: 180, t: 0.32 });
+      sheet.pointerMove({ x: 0, y: 260, t: 0.48 });
+      sheet.pointerUp({ x: 0, y: 300, t: 0.52 });
+      const release = { ...sheet.state };
+      advanceTo(520 + frameStepMs);
+      const movementBefore = { ...sheet.state };
+      advanceTo(520 + frameStepMs * 2);
+      const movementAfter = { ...sheet.state };
+      advanceTo(interruptAtMs);
+      const beforeInterrupt = { ...sheet.state };
+      sheet.snapTo(1);
+      const afterInterrupt = { ...sheet.state };
+      advanceTo(interruptAtMs + frameStepMs);
+      const replacementStart = { ...sheet.state };
+      advanceTo(terminalAtMs);
+      return {
+        release,
+        movementBefore,
+        movementAfter,
+        beforeInterrupt,
+        afterInterrupt,
+        replacementStart,
+        terminal: { state: { ...sheet.state }, pending: queue.length, atMs: now },
+      };
+    } finally {
+      // Состояние и очередь сняты до cleanup; после deadline кадры не исполняются.
+      sheet.destroy();
+    }
+  }, { frameStepMs, interruptAtMs, terminalAtMs });
+
+  expect(result.release).toMatchObject({ phase: 'release', value: 260, snapIndex: 2 });
+  expect(result.movementBefore.velocity).toBeCloseTo(1000, 9);
+  expect(result.movementAfter.value).toBeGreaterThan(result.movementBefore.value);
+  expect(result.beforeInterrupt.phase).toBe('release');
+  expect(result.beforeInterrupt.value).toBeGreaterThanOrEqual(minReturnFrom);
+  expect(result.beforeInterrupt.value).toBeLessThan(600);
+  expect(result.beforeInterrupt.velocity).toBeGreaterThan(0);
+  expect(result.beforeInterrupt.velocity).toBeLessThanOrEqual(maxReturnVelocity);
+  expect(result.afterInterrupt).toMatchObject({
+    phase: 'release',
+    value: result.beforeInterrupt.value,
+    velocity: result.beforeInterrupt.velocity,
+    snapIndex: 1,
+  });
+  // Проверяем скорость уже нового callback, а не только сохранённый public state.
+  expect(result.replacementStart).toMatchObject({
+    phase: 'release', value: result.afterInterrupt.value, snapIndex: 1,
+  });
+  // Нормирование скорости и обратное умножение на range допускают округление.
+  expect(Math.abs(result.replacementStart.velocity - result.afterInterrupt.velocity))
+    .toBeLessThanOrEqual(4 * Number.EPSILON * Math.abs(result.afterInterrupt.velocity));
+  expect(result.terminal).toEqual({
+    state: { phase: 'settle', value: target, velocity: 0, snapIndex: 1 },
+    pending: 0,
+    atMs: terminalAtMs,
+  });
 });
