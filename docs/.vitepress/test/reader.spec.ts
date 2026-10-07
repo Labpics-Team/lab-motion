@@ -46,7 +46,10 @@ test('search finds an API and returns to the reader', async ({ page }) => {
   await expect(page).toHaveURL(new URL(destination!, page.url()).href);
   await expect(search).toBeHidden();
   await expect(page.locator('main')).toContainText('MotionValue');
-  await expect(page.locator(':target')).toBeFocused();
+  // SPA history changes do not update the browser's :target state.
+  const targetId = decodeURIComponent(new URL(destination!, page.url()).hash.slice(1));
+  expect(targetId).not.toBe('');
+  await expect(page.locator(`[id=${JSON.stringify(targetId)}]`)).toBeFocused();
   await expect(page.getByRole('button', { name: 'Поиск по документации', exact: true })).not.toBeFocused();
 });
 
