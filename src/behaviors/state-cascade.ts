@@ -38,6 +38,7 @@ export interface StateCascade<T extends object> {
    * Синхронные effective deltas в порядке коммитов. Реентрантный commit сразу
    * виден get/snapshot; его уведомление ждёт окончания текущего уведомления.
    * Набор получателей фиксируется при commit. destroy пресекает всю доставку.
+   * Один callback делит активную регистрацию и off; старый off инертен после переподписки.
    * Синхронные ошибки listeners выбрасываются после доставки (несколько — AggregateError).
    */
   subscribe(listener: (patch: StateCascadePatch<T>) => void): () => void;
@@ -88,7 +89,7 @@ export function createStateCascade<
   type Listener = (patch: StateCascadePatch<T>) => void;
   const layers: Slot[] = [];
   let resolved = nullObject<Partial<T>>();
-  const listeners = new Set<Listener>();
+  const listeners = new Map<Listener, () => void>();
   const empty = freezePatch<T>(nullObject<Partial<T>>(), []);
   let destroyed = false;
   let notifying = false;
@@ -99,7 +100,7 @@ export function createStateCascade<
   // Уже доставленные сообщения не удерживаются до конца длинной цепочки.
   const publish = (patch: StateCascadePatch<T>): StateCascadePatch<T> => {
     if (listeners.size === 0) return patch;
-    notices.set(patch, [...listeners]);
+    notices.set(patch, [...listeners.keys()]);
     if (notifying) return patch;
 
     notifying = true;
@@ -227,13 +228,16 @@ export function createStateCascade<
     },
     subscribe(listener) {
       if (destroyed) return () => {};
-      listeners.add(listener);
-      // Callback принадлежит активной подписке, а не сохранённой функции отписки.
+      const active = listeners.get(listener);
+      if (active) return active;
+      // Callback принадлежит активной регистрации; старый off не отзывает новую.
       const reference = new WeakRef(listener);
-      return () => {
+      const off = () => {
         const current = reference.deref();
-        if (current) listeners.delete(current);
+        if (current && listeners.get(current) === off) listeners.delete(current);
       };
+      listeners.set(listener, off);
+      return off;
     },
     destroy() {
       if (destroyed) return;

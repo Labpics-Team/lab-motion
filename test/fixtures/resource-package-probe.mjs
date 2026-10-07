@@ -363,6 +363,7 @@ function runCase({ mod, kind, name }, value, terminal) {
       layer.set({ x: 2 });
       assert.equal(value.publications, 1, name + ': отписка не сняла callback');
       const again = owner.subscribe(notify);
+      off();
       layer.set({ x: 3 });
       assert.equal(value.publications, 2, name + ': повторная подписка не действует');
       destroy = () => { owner.destroy(); layer.set({ x: 4 }); };
@@ -694,6 +695,13 @@ if (mode === 'reentry') {
   const retainedComponentReferences = owners.reduce((total, owner) => total + owner.retained, 0);
   const inheritedFailures = inheritedChecks.filter(({ ref, alive }) => (ref.deref() !== undefined) !== alive)
     .map(({ label }) => label);
+  for (const [owner, off, layer, host, progress] of unsubscribedOwners) {
+    const before = progress.publications;
+    off(); off();
+    if (layer) layer.set({ x: 2 });
+    else { owner.setTarget(2); host.step(); }
+    assert.ok(progress.publications > before, 'off после GC остановил соседнюю подписку');
+  }
   const controls = { inheritedChecks: inheritedChecks.length, inheritedFailures,
     live: countAlive(liveRefs), expectedLive: CASES.length,
     dropped: countAlive(droppedRefs), deliberate: countAlive(deliberateRefs),
@@ -735,19 +743,36 @@ if (mode === 'reentry') {
   // стенда, не новый budget продукта: шире 256 KiB калибровка не принимается.
   // Контрольный Array содержит 131 072 элемента; измеренный сигнал должен
   // различаться минимум в 4× band независимо от представления элементов V8.
+  const optimizer = process.execArgv.includes('--no-concurrent-recompilation') ? 'foreground' : 'concurrent';
+  assert.equal(optimizer, 'foreground', 'heap-срез требует --no-concurrent-recompilation');
   const MAX_RESOLVABLE_BAND = 256 * 1024;
   const READOUT_ALLOWANCE = 8 * 1024;
   const CONTROL_WORDS = 128 * 1024;
+  const BATCH_CYCLES = 2000;
   const batch = cycles => { for (let i = 0; i < cycles; i++) for (const testCase of CASES) setup(testCase, i, true, false); };
-  const memory = async () => { await flushTerminalPromises(); await collect(); return process.memoryUsage(); };
+  const memory = async () => {
+    await flushTerminalPromises();
+    // Полная сборка завершает работу VM и освобождает compilation caches.
+    // Все byte-samples используют одну границу; живые roots проверяются отдельно.
+    for (let round = 0; round < 4; round++) {
+      await setImmediate();
+      const completion = globalThis.gc({ type: 'major', execution: 'async', flavor: 'last-resort' });
+      assert.equal(typeof completion?.then, 'function', 'async major GC недоступен');
+      await completion;
+    }
+    return process.memoryUsage();
+  };
   const heap = async () => (await memory()).heapUsed;
-  batch(256);
+  // Одинаковая нагрузка между чтениями в прогреве, A/A и измеряемых префиксах.
+  batch(BATCH_CYCLES);
   await heap();
   const calibration = [];
-  for (let i = 0; i < 8; i++) { batch(128); calibration.push(await heap()); }
+  for (let i = 0; i < 8; i++) { batch(BATCH_CYCLES); calibration.push(await heap()); }
   const low = Math.min(...calibration), high = Math.max(...calibration);
   const band = high - low + READOUT_ALLOWANCE;
-  const baseline = { low, high, band, maximumResolvableBand: MAX_RESOLVABLE_BAND, samples: calibration };
+  const baseline = { low, high, band, maximumResolvableBand: MAX_RESOLVABLE_BAND,
+    warmupCyclesPerOwner: BATCH_CYCLES, calibrationCyclesPerSample: BATCH_CYCLES,
+    workloadCyclesPerSample: BATCH_CYCLES, collector: 'major/async/last-resort', optimizer, samples: calibration };
   console.log(JSON.stringify({ phase: 'baseline', mode, corpus, baseline }));
   assert.ok(band <= MAX_RESOLVABLE_BAND, 'named gap: A/A heap baseline не разрешает 256 KiB; candidate admission не запущен');
 
@@ -773,19 +798,12 @@ if (mode === 'reentry') {
 
   const samples = [];
   resetExecutions();
-  for (let prefix = 2000; prefix <= CYCLES; prefix += 2000) {
-    batch(2000);
+  for (let prefix = BATCH_CYCLES; prefix <= CYCLES; prefix += BATCH_CYCLES) {
+    batch(BATCH_CYCLES);
     const measured = await memory();
     samples.push({ cyclesPerOwner: prefix, ...measured });
   }
-  // Префиксы сохраняют форму churn, но не являются terminal retention:
-  // V8 может держать уже недостижимые allocation/WeakMap backing stores между
-  // major GC и затем вернуть их без нового product work. Поэтому старый
-  // every-prefix критерий отвергал здоровый corpus на 4k/6k, хотя 10k и
-  // последующий quiescent tail стабильно возвращались ниже той же A/A полосы.
-  // M-07 требует возврат retained bytes после terminal boundary и отсутствие
-  // растущего retained хвоста. Число tail-read фиксировано, каждый использует
-  // тот же memory()/forced-GC oracle; устойчивый retained owner остаётся выше.
+  // Фиксированный terminal tail дополняет все пять промежуточных измерений.
   const upper = high + band;
   const excess = samples.map(sample => Math.max(0, sample.heapUsed - upper));
   const terminalTail = [];
@@ -808,5 +826,5 @@ if (mode === 'reentry') {
       process: 'heapUsed, heapTotal, external, arrayBuffers и rss показаны отдельно',
       nativeGpuBytes: 'не измерены этим Node host' } };
   console.log(JSON.stringify(report));
-  assert.ok(retained, 'retained heap не вернулся в baseline-полосу на terminal tail');
+  assert.ok(retained, `retained heap выше ${upper} B: prefixes=${JSON.stringify(samples.map((sample, i) => [sample.cyclesPerOwner, excess[i]]))}; tail=${tailExcess.join(',')}`);
 }

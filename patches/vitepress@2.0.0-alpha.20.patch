@@ -1,0 +1,46 @@
+diff --git a/dist/client/theme-default/components/VPLocalSearchBox.vue b/dist/client/theme-default/components/VPLocalSearchBox.vue
+--- a/dist/client/theme-default/components/VPLocalSearchBox.vue
++++ b/dist/client/theme-default/components/VPLocalSearchBox.vue
+@@ -26,11 +26,15 @@
+ 	});
+ }
+ const vitePressData = useData();
+-const { activate } = useFocusTrap(el, {
++// Capture the invoker before mounting moves focus into the search input.
++const returnFocus = typeof document === "undefined" ? null : document.activeElement;
++let returnToInvoker = true;
++const { activate, deactivate } = useFocusTrap(el, {
+ 	immediate: true,
+ 	allowOutsideClick: true,
+ 	clickOutsideDeactivates: true,
+-	escapeDeactivates: true
++	escapeDeactivates: true,
++	setReturnFocus: () => returnToInvoker && returnFocus?.isConnected ? returnFocus : false
+ });
+ const { localeIndex, theme } = vitePressData;
+ const isSearchIndexLoading = ref(false);
+@@ -267,6 +271,7 @@
+ 		return;
+ 	}
+ 	if (selectedPackage) {
++		returnToInvoker = false;
+ 		router.go(withBase(selectedPackage.id));
+ 		emit("close");
+ 	}
+@@ -312,6 +317,7 @@
+ 	});
+ });
+ onBeforeUnmount(() => {
++	deactivate({ returnFocus: returnToInvoker });
+ 	isLocked.value = false;
+ });
+ function resetSearch() {
+@@ -440,7 +446,7 @@
+               :aria-label="[...p.titles, p.title].join(' > ')"
+               @mouseenter="!disableMouseOver && (selectedIndex = index)"
+               @focusin="selectedIndex = index"
+-              @click="$emit('close')"
++              @click="returnToInvoker = $event.ctrlKey || $event.metaKey || $event.shiftKey || $event.altKey; $emit('close')"
+               :data-index="index"
+             >
+               <div>

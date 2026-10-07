@@ -8,10 +8,14 @@
 
 | Прежний API | Подключение |
 | --- | --- |
-| `createBottomSheet` | `createCompositorFollow`; точки остановки, выбранная точка и ограничения принадлежат компоненту. [Рецепт панели](recipes.md#sheet-живая-фаза-и-автономный-snap) |
-| `createCarousel` | Тот же `createCompositorFollow`; приложение переводит страницу и направление в координату. [Рецепт страниц](recipes.md#pager-страницы-и-rtl-принадлежат-компоненту) |
+| `createBottomSheet` | `createCompositorFollow`; точки остановки, выбранная точка и ограничения принадлежат компоненту. [Прямой ввод панели](recipes.md#прямой-ввод-панель-и-карусель) |
+| `createCarousel` | Тот же `createCompositorFollow`; приложение переводит страницу и направление в координату. [Прямой ввод страниц](recipes.md#прямой-ввод-панель-и-карусель) |
 | `createDragDismiss` | Жест распознаётся через `createPan`; приложение решает, достигнут ли порог, и передаёт цель в `follow.settle`. Видимость и завершение ухода координирует [presence](presence.md) |
 | `createPullToRefresh` | Компонент владеет порогом, запросом обновления и состоянием ожидания; `createCompositorFollow` ведёт значение и доводит его до выбранной позиции |
+
+Для явной передачи движения между живым и нативным исполнением доступны
+отдельные рецепты на `CompositorSpring`: [панель](recipes.md#sheet-живая-фаза-и-автономный-snap)
+и [страницы](recipes.md#pager-страницы-и-rtl-принадлежат-компоненту).
 
 `createStateCascade` остаётся в `./behaviors`, `createReorder` в
 `./behaviors/reorder`. Основные импорты `./animate`, `./nano`, `./compositor/follow`

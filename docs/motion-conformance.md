@@ -107,7 +107,7 @@ x(t) = target + [(from − target) + (v + 10(from − target))t] exp(−10t)
 без соответствующих полученных байтов не проходит. `motionInputSha256` фиксирует файлы
 исполняемого кода, действительно включённые сборщиком в потребителя.
 
-Прогон после `pnpm site:build` (он также собирает пакет):
+Прогон после сборки пакета командой `pnpm build`:
 
 ```sh
 pnpm exec playwright test browser/journey-live-view.spec.ts browser/journey-grid.spec.ts browser/reorder.spec.ts browser/presence-transition.spec.ts browser/compositor-recipes.spec.ts browser/compositor-follow.spec.ts

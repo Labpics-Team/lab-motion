@@ -132,3 +132,24 @@ pnpm mutation
 Автор PR и агент, создавший изменение, не считаются независимыми reviewers. Автоматический reviewer дополняет, но не заменяет профильный human review для security-critical и release-critical изменений.
 
 Мерж запрещён при незакрытом P0/P1-дефекте в затронутом контракте, неразрешённом review thread, недостоверном performance-утверждении или отсутствии обязательного независимого review.
+
+## Документация
+
+Редактируйте Markdown в `docs/`. VitePress использует эти же файлы для сайта;
+страницы из `package.json#files` входят в публичную документацию.
+Оформление и навигация находятся в `docs/.vitepress/`.
+
+```bash
+pnpm docs:dev
+pnpm docs:build
+pnpm docs:preview
+```
+
+Для проверки навигации, поиска и мобильного чтения установите браузеры
+командой `pnpm exec playwright install --with-deps chromium firefox webkit`,
+затем выполните `pnpm docs:build && pnpm docs:test` на тестовом runner.
+Для размещения в подпапке задайте `DOCS_BASE=/имя/` при сборке и preview.
+Результат сборки находится в `docs/.vitepress/dist`.
+
+Браузерные проверки библиотеки в `browser/` требуют только её `dist`.
+Сборка сайта выполняется отдельно и не входит в npm-публикацию.

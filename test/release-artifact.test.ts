@@ -58,6 +58,8 @@ function releaseMetadata() {
       'docs/compositor.md',
       'docs/errors.md',
       'docs/future-layout.md',
+      'docs/index.md',
+      'docs/getting-started.md',
       'docs/migration.md',
       'docs/motion-conformance.md',
       'docs/presence.md',
