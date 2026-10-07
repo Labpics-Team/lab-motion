@@ -1,0 +1,70 @@
+import { readFileSync } from 'node:fs';
+import { expect, test } from '@playwright/test';
+
+const pkg = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'));
+
+// The same Markdown is served online and included in the package.
+test('every packaged documentation page is readable', async ({ request }) => {
+  const pages: string[] = pkg.files.filter((file: string) => file.startsWith('docs/'));
+  for (const file of pages) {
+    const response = await request.get(file.slice(5).replace(/\.md$/, '.html'));
+    expect(response.status(), file).toBe(200);
+    expect(await response.text(), file).toContain('<main');
+  }
+});
+
+test('start, read and navigate without runtime failures', async ({ page, baseURL }, info) => {
+  const failures: string[] = [];
+  page.on('pageerror', (error) => failures.push(error.message));
+  page.on('request', (request) => {
+    if (new URL(request.url()).origin !== new URL(baseURL!).origin) failures.push(request.url());
+  });
+  await page.goto('');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'ru-RU');
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Анимация для интерфейсов.');
+  await page.screenshot({ path: info.outputPath('home.png'), fullPage: true });
+  await page.getByRole('link', { name: 'Начать', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Первый переход');
+  await expect(page.locator('main')).toContainText('pnpm add @labpics/motion');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: info.outputPath('guide.png'), fullPage: true });
+  await page.locator('main').getByRole('link', { name: 'справочнике API' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Справочник API');
+  expect(failures).toEqual([]);
+});
+
+test('search finds an API and returns to the reader', async ({ page }) => {
+  await page.goto('getting-started.html');
+  await page.getByRole('button', { name: 'Поиск по документации', exact: true }).click();
+  const search = page.locator('.VPLocalSearchBox');
+  await search.locator('input').fill('MotionValue');
+  const results = search.locator('a[href]');
+  await expect(results.first()).toBeVisible();
+  await results.first().click();
+  await expect(search).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+});
+
+test('content remains available with JavaScript disabled', async ({ browser, baseURL }) => {
+  const context = await browser.newContext({ javaScriptEnabled: false });
+  try {
+    const page = await context.newPage();
+    await page.goto(new URL('getting-started.html', baseURL).href);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Первый переход');
+    await expect(page.locator('main')).toContainText('createAnimateScope');
+    await page.locator('main').getByRole('link', { name: 'справочнике API' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Справочник API');
+  } finally {
+    await context.close();
+  }
+});
+
+test('dark and reduced-motion preferences keep the page usable', async ({ page }, info) => {
+  await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
+  await page.goto('getting-started.html');
+  await expect(page.locator('html')).toHaveClass(/dark/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Первый переход');
+  expect(await page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === 'running').length)).toBe(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: info.outputPath('guide-dark.png'), fullPage: true });
+});

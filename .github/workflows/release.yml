@@ -161,8 +161,8 @@ jobs:
       - name: Issue forms schema
         run: node scripts/check-issue-forms.mjs
 
-      - name: Build library and showcase
-        run: pnpm site:build
+      - name: Build
+        run: pnpm build
 
       - name: Install browser conformance engines
         run: pnpm exec playwright install --with-deps chromium firefox webkit

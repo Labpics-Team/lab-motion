@@ -1,0 +1,54 @@
+name: Documentation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+  COREPACK_DEFAULT_TO_LATEST: "0"
+  DOCS_BASE: /docs-preview/
+
+jobs:
+  reader:
+    name: build and reader journeys
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+
+      - name: Activate pinned pnpm
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build documentation
+        run: pnpm docs:build
+
+      - name: Install browsers
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Reader journeys
+        run: pnpm docs:test
+
+      - name: Upload reader screenshots and diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: documentation-${{ github.run_id }}
+          path: test-results/docs/
+          if-no-files-found: ignore
+          retention-days: 1

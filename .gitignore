@@ -20,7 +20,8 @@ playwright-report
 blob-report
 .playwright
 browser/.artifacts
-site/dist
+docs/.vitepress/dist
+docs/.vitepress/cache
 examples/reading-shelf/.artifacts
 examples/itinerary-sheet/.artifacts
 examples/call-sheet/.artifacts

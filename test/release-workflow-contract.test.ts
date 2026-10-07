@@ -386,16 +386,6 @@ describe('release workflow: граница тега и npm OIDC', () => {
       .toContain('node scripts/check-release.mjs "$RELEASE_TAG" "$RELEASE_DATE"');
   });
 
-  it('готовит showcase до browser conformance релиза', () => {
-    const verify = job('verify');
-    const build = namedStep(verify, 'Build library and showcase');
-    const browser = namedStep(verify, 'Browser conformance');
-
-    expect(build).toContain('        run: pnpm site:build');
-    expect(verify.indexOf(build)).toBeLessThan(verify.indexOf(browser));
-    expect(verify).not.toContain('      - name: Build\n        run: pnpm build\n');
-  });
-
   it('сверяет выбранную release date с CHANGELOG до упаковки', () => {
     const resolve = job('resolve');
     const verify = job('verify');

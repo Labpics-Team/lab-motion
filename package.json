@@ -508,6 +508,8 @@
     "docs/compositor.md",
     "docs/errors.md",
     "docs/future-layout.md",
+    "docs/index.md",
+    "docs/getting-started.md",
     "docs/migration.md",
     "docs/motion-conformance.md",
     "docs/presence.md",
@@ -552,8 +554,10 @@
     "mutation": "stryker run",
     "typecheck:native": "tsgo --noEmit",
     "check:native-gate": "node scripts/check-native-gate.mjs",
-    "site:build": "pnpm build && vite build --config site/vite.config.mjs site",
-    "site:preview": "vite preview --config site/vite.config.mjs site"
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
+    "docs:test": "playwright test --config docs/.vitepress/playwright.config.ts --fail-on-flaky-tests"
   },
   "peerDependencies": {
     "@angular/core": ">=16.0.0",
@@ -614,6 +618,7 @@
     "typescript": "6.0.3",
     "typescript5": "npm:typescript@5.9.3",
     "vite": "^8.1.3",
+    "vitepress": "1.6.4",
     "vitest": "5.0.2",
     "vue": "3.5.43",
     "yaml": "2.9.1"
