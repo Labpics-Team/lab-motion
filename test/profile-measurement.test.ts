@@ -116,15 +116,20 @@ describe('PROFILE: происхождение подтверждает наст�
 });
 
 describe('PROFILE: замороженный протокол проверяется целиком', () => {
-  it('исполняемый size-gate сохраняет все потолки зарегистрированного baseline', async () => {
+  it('исполняемый size-gate сохраняет потолки действующих сценариев baseline', async () => {
     const gate = await import('../scripts/size-gate.mjs');
     const registered = PROFILE_01.oldCostVectorGzipBytes;
-    // Новые opt-in клетки не дописываются в исторический baseline. Каждый его
-    // ключ и точный потолок остаются обязательными в текущем измерителе.
+    // Историческая регистрация сохраняет снятый sheet consumer. Для остальных
+    // сценариев и всех публичных субпутей действуют прежние точные потолки.
+    const { 'behaviors-sheet-one-liner': retiredSheet, ...retained } = registered.scenarios;
+    expect(retiredSheet).toBe(3700);
     expect(gate.BESPOKE_SUBPATH_GATES).toMatchObject(registered.bespoke);
-    expect(Object.fromEntries(
+    const scenarios = Object.fromEntries(
       gate.IMPORT_COST_SCENARIOS.map(({ name, gate: ceiling }) => [name, ceiling]),
-    )).toMatchObject(registered.scenarios);
+    );
+    expect(scenarios).toMatchObject(retained);
+    expect(scenarios).not.toHaveProperty('behaviors-sheet-one-liner');
+    expect(scenarios['state-cascade']).toBe(1024);
     expect(registered.core).toBe(gate.CORE_GATE_BYTES);
     expect(registered.subpath).toBe(gate.SUBPATH_GATE_BYTES);
     expect(registered.fullCoreConsumer).toBe(gate.FULL_CORE_CONSUMER_GATE_BYTES);

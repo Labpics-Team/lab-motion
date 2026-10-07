@@ -9,6 +9,18 @@
 
 ## [0.4.0] — 2026-10-07
 
+### Исправления
+
+- Каскад целей освобождает снятые callbacks, включая сохранённые функции отписки.
+
+### Несовместимые изменения
+
+- Удалены `createBottomSheet`, `createCarousel`, `createDragDismiss`,
+  `createPullToRefresh` и их типы из `./behaviors`. Правила компонентов
+  остаются в потребительских рецептах; движение выполняют общие примитивы.
+  `createStateCascade` и `./behaviors/reorder` сохранены.
+  Порядок перехода описан в [руководстве миграции](docs/migration.md).
+
 ### Добавлено
 
 - `CompositorSpring.handoffToCompositor(target)` для передачи интерактивного движения

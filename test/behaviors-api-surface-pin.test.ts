@@ -1,149 +1,94 @@
-/**
- * test/behaviors-api-surface-pin.test.ts — пин публичной поверхности ./behaviors.
- * Класс: Б (contract pin). Пин в ОБЕ стороны (North-инвариант): пропавший И
- * лишний runtime-экспорт = красный. Ровно 5 runtime-фабрик; типы (BehaviorState,
- * SheetController, …) стираются в рантайме и в Object.keys не попадают.
- *
- * RED PROOF (2026-07-10, заглушка src/behaviors `export {}`): «missing»-ассерт
- * первого блока падал своим сообщением (все 4 фабрики отсутствуют). Shape-блоки —
- * «createBottomSheet is not a function»: RED for the right reason.
- */
-
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import * as behaviors from '../src/behaviors/index.js';
-import { MotionParamError } from '../src/errors.js';
-import { pt } from './behaviors-helpers.js';
 
-const EXPECTED_EXPORTS = [
-  'createBottomSheet',
-  'createCarousel',
-  'createDragDismiss',
-  'createPullToRefresh',
-  'createStateCascade',
-] as const;
+const factories = ['createBottomSheet', 'createCarousel', 'createDragDismiss', 'createPullToRefresh'];
+const types = ['SheetState', 'SheetOptions', 'SheetController', 'CarouselState', 'CarouselOptions',
+  'CarouselController', 'DismissState', 'DismissOptions', 'DismissController', 'PullState',
+  'PullOptions', 'PullController', 'BehaviorState', 'BehaviorPhase', 'BehaviorPoint', 'BehaviorAxis'];
+const retired = new RegExp(`\\b(?:${[...factories, ...types].join('|')})\\b`);
+const root = resolve('.');
 
-describe('./behaviors public API surface pin (в обе стороны)', () => {
-  it('экспортирует ровно 5 контрактных runtime-фабрик — ни больше, ни меньше', () => {
-    const exported = new Set(Object.keys(behaviors));
-    const expected = new Set<string>(EXPECTED_EXPORTS);
-
-    const missing = [...expected].filter((n) => !exported.has(n));
-    expect(missing, `Отсутствующие экспорты: ${missing.join(', ')}`).toHaveLength(0);
-
-    const extra = [...exported].filter((n) => !expected.has(n));
-    expect(extra, `Неконтрактные новые экспорты: ${extra.join(', ')}`).toHaveLength(0);
-
-    expect(Object.keys(behaviors).sort()).toEqual([...EXPECTED_EXPORTS]);
+describe('граница motion-пакета и UI-компонентов', () => {
+  it('behaviors экспортирует только каскад произвольных целей', () => {
+    expect(Object.keys(behaviors)).toEqual(['createStateCascade']);
+    const state = behaviors.createStateCascade<{ position: number }>();
+    const base = state.createLayer({ position: 1 });
+    const transient = state.createLayer({ position: 2 });
+    expect(state.get('position')).toBe(2);
+    base.set({ position: 3 });
+    transient.clear();
+    expect(state.get('position')).toBe(3);
+    state.destroy();
   });
 
-  it('каждый экспорт — функция-фабрика', () => {
-    for (const name of EXPECTED_EXPORTS) {
-      expect(typeof (behaviors as Record<string, unknown>)[name]).toBe('function');
+  it('установленный tarball сохраняет общие ESM/CJS/types и исключает компонентные API', () => {
+    const work = mkdtempSync(join(tmpdir(), 'motion boundary-'));
+    try {
+      const windows = process.platform === 'win32';
+      const [archive] = JSON.parse(execFileSync(windows ? 'npm.cmd' : 'npm', [
+        'pack', '--ignore-scripts', '--json', '--pack-destination', windows ? `"${work}"` : work,
+      ], { cwd: root, encoding: 'utf8', shell: windows, timeout: 30_000 }));
+      const installed = join(work, 'node_modules', '@labpics', 'motion');
+      mkdirSync(installed, { recursive: true });
+      execFileSync('tar', ['-xzf', join(work, archive.filename), '-C', installed, '--strip-components=1']);
+      writeFileSync(join(work, 'package.json'), '{"type":"module"}');
+      expect(readFileSync(join(installed, 'package.json'))).toEqual(readFileSync(join(root, 'package.json')));
+
+      // Проверяется содержимое поставки, включая декларации внутренних файлов:
+      // удаление только barrel-экспорта не скроет оставшийся компонентный runtime.
+      const dist = join(installed, 'dist');
+      const files = readdirSync(dist, { recursive: true, withFileTypes: true }).filter(entry => entry.isFile());
+      expect(files.some(entry => entry.name === 'index.d.ts')).toBe(true);
+      for (const entry of files) {
+        const file = join(entry.parentPath, entry.name);
+        expect(readFileSync(file, 'utf8').match(retired), file).toBeNull();
+      }
+      for (const esm of [true, false]) {
+        const load = (name: string): string => esm ? `await import('${name}')` : `require('${name}')`;
+        const script = `const assert = ${load('node:assert/strict')};
+          const behaviors = ${load('@labpics/motion/behaviors')};
+          assert.deepEqual(Object.keys(behaviors), ['createStateCascade']);
+          const state = behaviors.createStateCascade();
+          const layer = state.createLayer({ x: 0 }); layer.set({ x: 12 });
+          assert.equal(state.get('x'), 12); state.destroy();
+          const { createCompositorFollow } = ${load('@labpics/motion/compositor/follow')};
+          const motion = createCompositorFollow({ spring: { mass: 1, stiffness: 170, damping: 26 },
+            property: 'opacity', from: 0, to: 1, apply() {}, matchMedia: () => ({ matches: true }) });
+          motion.beginFollow(0); motion.follow(0.25, 0.1); motion.settle(1, 0.1);
+          assert.equal(motion.value, 1); motion.destroy();
+          const { createReorder } = ${load('@labpics/motion/behaviors/reorder')};
+          const order = createReorder({ items: [], onReorder() {} }); order.destroy();`;
+        execFileSync(process.execPath, [...(esm ? ['--input-type=module'] : []), '-e', script],
+          { cwd: work, encoding: 'utf8', timeout: 30_000 });
+      }
+      const missing = [
+        ...factories.map((name, i) => `// @ts-expect-error компонентная фабрика удалена\ntype Factory${i} = typeof import('@labpics/motion/behaviors').${name};`),
+        ...types.map((name, i) => `// @ts-expect-error компонентный тип удалён\ntype Retired${i} = import('@labpics/motion/behaviors').${name};`),
+      ].join('\n');
+      for (const extension of ['mts', 'cts']) {
+        const file = join(work, `consumer.${extension}`);
+        writeFileSync(file, `import { createStateCascade, type StateCascade } from '@labpics/motion/behaviors';
+          import { createCompositorFollow, type CompositorFollow } from '@labpics/motion/compositor/follow';
+          import { createReorder, type ReorderController } from '@labpics/motion/behaviors/reorder';
+          const state: StateCascade<{ x: number }> = createStateCascade();
+          state.createLayer({ x: 1 }); state.destroy();
+          const motion: CompositorFollow = createCompositorFollow({
+            spring: { mass: 1, stiffness: 170, damping: 26 }, property: 'opacity', from: 0, to: 1 });
+          motion.destroy();
+          const order: ReorderController<'a'> = createReorder({ items: [{ key: 'a' }], onReorder() {} });
+          order.destroy();\n${missing}`);
+        const program = ts.createProgram([file], { noEmit: true, strict: true, skipLibCheck: true,
+          target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.NodeNext,
+          moduleResolution: ts.ModuleResolutionKind.NodeNext, types: [], lib: ['lib.es2022.d.ts', 'lib.dom.d.ts'] });
+        expect(ts.getPreEmitDiagnostics(program).map(d => ts.flattenDiagnosticMessageText(d.messageText, '\n'))).toEqual([]);
+      }
+    } finally {
+      rmSync(work, { recursive: true, force: true });
     }
-  });
-
-  it('mutable geometry остаётся у существующих sheet/pager owners', () => {
-    expect(typeof behaviors.createBottomSheet({ snapPoints: [0, 100] }).update).toBe('function');
-    expect(typeof behaviors.createCarousel({ pageCount: 2, pageSize: 100 }).update).toBe('function');
-  });
-
-  it('новый strict update не меняет legacy normalization конструкторов', () => {
-    const sheet = behaviors.createBottomSheet({ snapPoints: [Number.NaN, Number.POSITIVE_INFINITY] });
-    sheet.snapTo(1);
-    expect(sheet.state.value).toBe(Number.MAX_VALUE);
-    expect(() => sheet.update([0, Number.POSITIVE_INFINITY])).toThrowError(MotionParamError);
-
-    const carousel = behaviors.createCarousel({ pageCount: 2.5, pageSize: Number.POSITIVE_INFINITY });
-    carousel.goTo(2);
-    expect(carousel.state.index).toBe(1);
-    expect(() => carousel.update(2.5, 100)).toThrowError(MotionParamError);
-  });
-});
-
-describe('./behaviors: единый контракт BehaviorState { value, velocity, phase }', () => {
-  it('все четыре поведения выдают BehaviorState c общими ключами', () => {
-    const sheet = behaviors.createBottomSheet({ snapPoints: [0, 100] }).state;
-    const dismiss = behaviors.createDragDismiss({ distanceThreshold: 50 }).state;
-    const carousel = behaviors.createCarousel({ pageCount: 3, pageSize: 200 }).state;
-    const pull = behaviors.createPullToRefresh({ threshold: 60 }).state;
-    for (const s of [sheet, dismiss, carousel, pull]) {
-      expect(typeof s.value).toBe('number');
-      expect(typeof s.velocity).toBe('number');
-      expect(['idle', 'follow', 'release', 'settle']).toContain(s.phase);
-    }
-    // Специфичные расширения состояния.
-    expect(typeof sheet.snapIndex).toBe('number');
-    expect(typeof dismiss.dismissed).toBe('boolean');
-    expect(typeof carousel.index).toBe('number');
-    expect(typeof pull.pending).toBe('boolean');
-  });
-});
-
-describe('./behaviors: cancel()/destroy() обрывают ЖИВОЙ жест во всех четырёх машинах (B3)', () => {
-  // Follow-lifetime принадлежит общей state machine: после cancel/destroy
-  // следующий pointerMove обязан быть инертным независимо от конкретной фабрики.
-  type Point = ReturnType<typeof pt>;
-  interface Draggable {
-    pointerDown(p: Point): void;
-    pointerMove(p: Point): void;
-    cancel(): void;
-    destroy(): void;
-    readonly state: { readonly value: number; readonly phase: string };
-  }
-  const makers: ReadonlyArray<readonly [string, () => Draggable]> = [
-    ['bottomSheet', () => behaviors.createBottomSheet({ snapPoints: [0, 300, 600] })],
-    ['dragDismiss', () => behaviors.createDragDismiss({ distanceThreshold: 120 })],
-    ['carousel', () => behaviors.createCarousel({ pageCount: 3, pageSize: 200 })],
-    ['pullToRefresh', () => behaviors.createPullToRefresh({ threshold: 60 })],
-  ];
-
-  for (const [name, make] of makers) {
-    it(`${name}: destroy() посреди жеста делает pointerMove инертным`, () => {
-      const c = make();
-      c.pointerDown(pt(0, 0, 0));
-      const before = c.state.value;
-      c.destroy();
-      c.pointerMove(pt(0, 200, 0.1));
-      expect(c.state.value).toBe(before);
-    });
-
-    it(`${name}: cancel() посреди жеста оставляет phase idle, pointerMove — no-op`, () => {
-      const c = make();
-      c.pointerDown(pt(0, 0, 0));
-      c.pointerMove(pt(0, 80, 0.05));
-      c.cancel();
-      expect(c.state.phase).toBe('idle');
-      const resting = c.state.value;
-      c.pointerMove(pt(0, 240, 0.1));
-      expect(c.state.value).toBe(resting);
-      expect(c.state.phase).toBe('idle');
-    });
-  }
-});
-
-describe('./behaviors: fail-fast валидация параметров (MotionParamError в фабрике)', () => {
-  it('пустые snapPoints → MotionParamError', () => {
-    expect(() => behaviors.createBottomSheet({ snapPoints: [] })).toThrowError(MotionParamError);
-  });
-  it('невалидный distanceThreshold → MotionParamError', () => {
-    expect(() => behaviors.createDragDismiss({ distanceThreshold: 0 })).toThrowError(
-      MotionParamError,
-    );
-  });
-  it('pageCount < 1 → MotionParamError', () => {
-    expect(() => behaviors.createCarousel({ pageCount: 0, pageSize: 100 })).toThrowError(
-      MotionParamError,
-    );
-  });
-  it('threshold <= 0 → MotionParamError', () => {
-    expect(() => behaviors.createPullToRefresh({ threshold: -1 })).toThrowError(MotionParamError);
-  });
-  it('невалидная пружина → MotionParamError В ФАБРИКЕ (даже без матчмедиа)', () => {
-    expect(() =>
-      behaviors.createBottomSheet({
-        snapPoints: [0, 100],
-        spring: { mass: -1, stiffness: 200, damping: 24 },
-      }),
-    ).toThrowError(MotionParamError);
-  });
+  }, 60_000);
 });

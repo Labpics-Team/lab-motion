@@ -385,37 +385,6 @@ hue(370);                                // 10
 const toProgress = pipe(clamp(0, 300), (x) => x / 300); // композиция слева-направо
 ```
 
-## Bottom sheet (behaviors, DOM-адаптер)
-
-Совместимый DOM-адаптер задаёт transform по состоянию `createBottomSheet`.
-Для нового компонента используйте [универсальный follow](#прямой-ввод-панель-и-карусель).
-
-```ts
-import { createBottomSheet } from '@labpics/motion/behaviors';
-
-const el = document.querySelector('.sheet') as HTMLElement;
-const sheet = createBottomSheet({
-  snapPoints: [0, 320, 640],       // px оффсеты закрыт/полу/раскрыт
-  matchMedia: window.matchMedia.bind(window), // reduced-motion = снап
-  onChange: (s) => {               // единственный канал вывода
-    el.style.transform = `translateY(${s.value}px)`;
-  },
-});
-
-el.addEventListener('pointerdown', (e) => {
-  el.setPointerCapture(e.pointerId);
-  sheet.pointerDown({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 });
-});
-el.addEventListener('pointermove', (e) =>
-  sheet.pointerMove({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 }));
-el.addEventListener('pointerup', (e) =>
-  sheet.pointerUp({ x: e.clientX, y: e.clientY, t: e.timeStamp / 1000 }));
-el.addEventListener('pointercancel', () => sheet.pointerCancel());
-
-// программно раскрыть до верхнего snap (единый clock, C¹ из текущей скорости):
-document.querySelector('.expand')?.addEventListener('click', () => sheet.snapTo(2));
-```
-
 ## Sheet: живая фаза и автономный snap
 
 Нужны панель `[data-sheet-panel]`, кнопка `[data-sheet-handle]` с

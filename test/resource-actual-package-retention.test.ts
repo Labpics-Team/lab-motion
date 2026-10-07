@@ -21,8 +21,7 @@ const RUNTIME_FILES = [
 const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
 const EXISTING_KINDS = [
   'frame', 'motion-value', 'compositor-native', 'compositor-live', 'compositor-delay',
-  'compositor-handoff', 'compositor-roundtrip', 'compositor-reduced-loans', 'binding', 'sheet', 'pager',
-  'dismiss', 'pull', 'pull-pending', 'pull-settled', 'reorder',
+  'compositor-handoff', 'compositor-roundtrip', 'compositor-reduced-loans', 'binding', 'state-cascade', 'reorder',
   'follow-native', 'follow-pickup', 'follow-live',
 ];
 const ADDED_KINDS = ['presence-transition', 'animate-scope-main', 'animate-scope-native'];

@@ -228,7 +228,12 @@ export function createStateCascade<
     subscribe(listener) {
       if (destroyed) return () => {};
       listeners.add(listener);
-      return () => { listeners.delete(listener); };
+      // Callback принадлежит активной подписке, а не сохранённой функции отписки.
+      const reference = new WeakRef(listener);
+      return () => {
+        const current = reference.deref();
+        if (current) listeners.delete(current);
+      };
     },
     destroy() {
       if (destroyed) return;

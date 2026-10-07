@@ -84,7 +84,9 @@ Lit и Web Components.
 | Минимальный WAAPI-путь | `@labpics/motion/nano` |
 | Живые значения | `@labpics/motion`, `@labpics/motion/value` |
 | Drag, pan, press, hover | `@labpics/motion/gestures` |
-| Bottom sheet, carousel, dismiss, reorder | `@labpics/motion/behaviors` |
+| Приоритеты визуальных целей | `@labpics/motion/behaviors` |
+| Управляемая перестановка | `@labpics/motion/behaviors/reorder` |
+| Прямой ввод и автономная доводка | `@labpics/motion/compositor/follow` |
 | FLIP и layout transitions | `@labpics/motion/flip`, `@labpics/motion/projection`, `@labpics/motion/smart` |
 | Presence | `@labpics/motion/presence` |
 | Scroll и in-view | `@labpics/motion/scroll`, `@labpics/motion/in-view` |
@@ -114,7 +116,7 @@ FLIP, presence, scroll, bottom sheet, carousel, reorder, React и Solid lifecycl
 | --- | --- |
 | [API](docs/api.md) | Публичные входы и контракты |
 | [Рецепты](docs/recipes.md) | Готовые схемы интеграции |
-| [Behaviors](docs/behaviors.md) | Sheet, carousel, dismiss, reorder |
+| [Behaviors](docs/behaviors.md) | Каскад целей и управляемая перестановка |
 | [Presence](docs/presence.md) | Появление, уход и прерывание |
 | [Projection](docs/projection.md) | Вложенные layout-переходы |
 | [Smart](docs/smart.md) | Shared-element переходы по ключу |
