@@ -1,19 +1,19 @@
 ---
-layout: home
+layout: doc
+sidebar: false
+aside: false
+prev: false
+next: false
+pageClass: motion-home
 title: Lab Motion
 titleTemplate: false
-hero:
-  name: Lab Motion
-  text: Анимация для интерфейсов.
-  tagline: Пружины, жесты и переходы между состояниями. JavaScript, TypeScript и ваш фреймворк.
-  actions:
-    - theme: brand
-      text: Начать
-      link: /getting-started
-    - theme: alt
-      text: Справочник API
-      link: /api
 ---
+
+# Анимация для интерфейсов.
+
+Пружины, жесты и переходы между состояниями. JavaScript, TypeScript и ваш фреймворк.
+
+[Начать](getting-started.md) [Справочник API](api.md)
 
 ## Первый переход
 

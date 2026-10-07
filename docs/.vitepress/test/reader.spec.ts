@@ -4,12 +4,13 @@ import { expect, test } from '@playwright/test';
 const pkg = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'));
 
 // The same Markdown is served online and included in the package.
-test('every packaged documentation page is readable', async ({ request }) => {
+test('every packaged documentation page is readable', async ({ page }) => {
   const pages: string[] = pkg.files.filter((file: string) => file.startsWith('docs/'));
   for (const file of pages) {
-    const response = await request.get(file.slice(5).replace(/\.md$/, '.html'));
-    expect(response.status(), file).toBe(200);
-    expect(await response.text(), file).toContain('<main');
+    const response = await page.goto(file.slice(5).replace(/\.md$/, '.html'));
+    expect(response?.status(), file).toBe(200);
+    await expect(page.getByRole('main'), file).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1 }), file).toBeVisible();
   }
 });
 
@@ -42,7 +43,7 @@ test('search finds an API and returns to the reader', async ({ page }) => {
   await expect(results.first()).toBeVisible();
   await results.first().click();
   await expect(search).toBeHidden();
-  await expect(page.locator('main')).toBeVisible();
+  await expect(page.locator('main')).toContainText('MotionValue');
 });
 
 test('content remains available with JavaScript disabled', async ({ browser, baseURL }) => {
@@ -67,4 +68,30 @@ test('dark and reduced-motion preferences keep the page usable', async ({ page }
   expect(await page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === 'running').length)).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: info.outputPath('guide-dark.png'), fullPage: true });
+});
+
+test('search opens from the keyboard and Escape restores focus', async ({ page }) => {
+  await page.goto('getting-started.html');
+  const button = page.getByRole('button', { name: 'Поиск по документации', exact: true });
+  await button.focus();
+  await page.keyboard.press('Enter');
+  const search = page.locator('.VPLocalSearchBox');
+  await expect(search.locator('input')).toBeFocused();
+  await page.keyboard.type('MotionValue');
+  await expect(search.locator('a[href]').first()).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(search).toBeHidden();
+  await expect(button).toBeFocused();
+});
+
+test('section navigation works on desktop and mobile', async ({ page }) => {
+  await page.goto('getting-started.html');
+  const sidebar = page.locator('.VPSidebar');
+  if (!await sidebar.isVisible()) {
+    await page.getByRole('button', { name: 'Разделы', exact: true }).click();
+  }
+  await sidebar.getByRole('link', { name: 'Рецепты', exact: true }).click();
+  await expect(page).toHaveURL(/recipes\.html$/);
+  await expect(page.getByRole('main')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
 });

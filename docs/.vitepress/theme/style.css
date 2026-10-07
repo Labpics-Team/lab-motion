@@ -13,8 +13,6 @@
   --vp-c-text-2: #555c68;
   --vp-c-text-3: #69717e;
   --vp-c-divider: #e8eaf0;
-  --vp-home-hero-name-color: var(--vp-c-brand-1);
-  --vp-home-hero-name-background: none;
   --vp-button-brand-text: #ffffff;
   --vp-button-brand-hover-text: #ffffff;
   --vp-button-brand-active-text: #ffffff;
@@ -40,19 +38,37 @@
 }
 
 .VPNavBarTitle .title { font-weight: 650; letter-spacing: -0.04em; }
-.VPHomeHero .name { font-size: 22px; line-height: 1.4; letter-spacing: -0.025em; }
-.VPHomeHero .text {
-  margin-top: 20px;
+/* The introduction uses the document layout, including its main landmark. */
+.motion-home .VPDoc { padding: 72px 24px 96px; }
+.motion-home .VPDoc .container { max-width: 752px; }
+.motion-home .VPDoc .content { padding: 0; }
+.motion-home .VPDoc .content-container { max-width: none; }
+.motion-home .vp-doc h1 {
   font-size: clamp(42px, 6.2vw, 76px);
   line-height: 1.04;
   letter-spacing: -0.055em;
   text-wrap: balance;
 }
-.VPHomeHero .tagline { max-width: 580px; margin-top: 24px; font-size: 20px; line-height: 1.55; }
-.VPHomeHero .actions { padding-top: 30px; }
-.VPButton { border-radius: 10px !important; }
-.VPHome .vp-doc { max-width: 800px; margin: 0 auto; padding: 0 24px 72px; }
-.VPHome .vp-doc h2 { border: 0; padding-top: 0; margin-top: 48px; }
+.motion-home .vp-doc h1 + p { max-width: 600px; margin-top: 24px; font-size: 20px; line-height: 1.55; }
+.motion-home .vp-doc h1 + p + p { display: flex; flex-wrap: wrap; gap: 12px; margin: 32px 0 0; }
+.motion-home .vp-doc h1 + p + p a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 10px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.motion-home .vp-doc h1 + p + p a:first-child { background: var(--vp-button-brand-bg); color: #ffffff; }
+.motion-home .vp-doc h1 + p + p a:hover { background: var(--vp-c-divider); }
+.motion-home .vp-doc h1 + p + p a:first-child:hover { background: var(--vp-button-brand-hover-bg); }
+.motion-home .vp-doc h2 { border: 0; padding-top: 0; margin-top: 48px; }
+.motion-home .vp-doc h1 + p + p + h2 { margin-top: 72px; }
 .vp-doc { font-size: 16px; line-height: 1.75; }
 .vp-doc h1 { letter-spacing: -0.04em; line-height: 1.2; }
 .vp-doc h2 { letter-spacing: -0.025em; }
@@ -60,14 +76,9 @@
 .vp-doc a { text-underline-offset: 3px; }
 :focus-visible { outline: 2px solid var(--vp-c-brand-1); outline-offset: 2px; }
 
-@media (min-width: 960px) {
-  .VPHomeHero .main { max-width: 800px; }
-  .VPHomeHero .container { max-width: 752px; }
-  .VPHomeHero { padding-top: 88px; padding-bottom: 32px; }
-}
 @media (max-width: 639px) {
-  .VPHomeHero .tagline { font-size: 18px; }
-  .VPHome .vp-doc { padding-bottom: 48px; }
+  .motion-home .VPDoc { padding-top: 56px; padding-bottom: 64px; }
+  .motion-home .vp-doc h1 + p { font-size: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

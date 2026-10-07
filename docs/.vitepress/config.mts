@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
+import { sep } from 'node:path';
 import { defineConfig } from 'vitepress';
 
 const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
@@ -12,8 +13,9 @@ export default defineConfig({
   description: 'Анимация веб-интерфейсов: установка, API и примеры интеграции.',
   base: process.env.DOCS_BASE ?? '/',
   lastUpdated: false,
-  srcExclude: ['adr/**', ...readdirSync(new URL('../', import.meta.url))
-    .filter((path) => path.endsWith('.md') && !publishedPages.has(path))],
+  srcExclude: readdirSync(new URL('../', import.meta.url), { recursive: true })
+    .map((path) => path.split(sep).join('/'))
+    .filter((path) => path.endsWith('.md') && !publishedPages.has(path)),
   themeConfig: {
     nav: [
       { text: 'Документация', link: '/getting-started' },
