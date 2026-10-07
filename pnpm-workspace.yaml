@@ -16,4 +16,5 @@ peerDependencyRules:
   allowedVersions:
     "@builder.io/qwik>vite": "8"
 patchedDependencies:
+  vitepress@2.0.0-alpha.20: patches/vitepress@2.0.0-alpha.20.patch
   "@stryker-mutator/vitest-runner@10.0.0": patches/@stryker-mutator__vitest-runner@10.0.0.patch

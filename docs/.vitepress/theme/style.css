@@ -1,0 +1,86 @@
+/* Reading, navigation and code share the same quiet surface. */
+:root {
+  --vp-font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --vp-font-family-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --vp-c-brand-1: #005dcc;
+  --vp-c-brand-2: #006be6;
+  --vp-c-brand-3: #0064d5;
+  --vp-c-brand-soft: #007aff12;
+  --vp-c-bg: #ffffff;
+  --vp-c-bg-alt: #f7f8fa;
+  --vp-c-bg-soft: #f4f5f7;
+  --vp-c-text-1: #181a20;
+  --vp-c-text-2: #555c68;
+  --vp-c-text-3: #69717e;
+  --vp-c-divider: #e8eaf0;
+  --vp-button-brand-text: #ffffff;
+  --vp-button-brand-hover-text: #ffffff;
+  --vp-button-brand-active-text: #ffffff;
+  --vp-button-brand-bg: #0064d5;
+  --vp-button-brand-hover-bg: #0058bd;
+  --vp-button-brand-active-bg: #004caa;
+  --vp-nav-height: 72px;
+}
+
+.dark {
+  --vp-c-brand-1: #8bbcff;
+  --vp-c-brand-2: #76b0ff;
+  --vp-c-brand-3: #0064d5;
+  --vp-c-brand-soft: #007aff20;
+  --vp-c-bg: #141519;
+  --vp-c-bg-alt: #111216;
+  --vp-c-bg-soft: #1c1e24;
+  --vp-c-bg-elv: #1c1e24;
+  --vp-c-text-1: #f2f3f7;
+  --vp-c-text-2: #b1b6c1;
+  --vp-c-text-3: #959caa;
+  --vp-c-divider: #2b2e36;
+}
+
+.VPNavBarTitle .title { font-weight: 650; letter-spacing: -0.04em; }
+/* The introduction uses the document layout, including its main landmark. */
+.motion-home .VPDoc { padding: 72px 24px 96px; }
+.motion-home .VPDoc .container { max-width: 752px; }
+.motion-home .VPDoc .content { padding: 0; }
+.motion-home .VPDoc .content-container { max-width: none; }
+.motion-home .vp-doc h1 {
+  font-size: clamp(42px, 6.2vw, 76px);
+  line-height: 1.04;
+  letter-spacing: -0.055em;
+  text-wrap: balance;
+}
+.motion-home .vp-doc h1 + p { max-width: 600px; margin-top: 24px; font-size: 20px; line-height: 1.55; }
+.motion-home .vp-doc h1 + p + p { display: flex; flex-wrap: wrap; gap: 12px; margin: 32px 0 0; }
+.motion-home .vp-doc h1 + p + p a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 10px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.motion-home .vp-doc h1 + p + p a:first-child { background: var(--vp-button-brand-bg); color: #ffffff; }
+.motion-home .vp-doc h1 + p + p a:hover { background: var(--vp-c-divider); }
+.motion-home .vp-doc h1 + p + p a:first-child:hover { background: var(--vp-button-brand-hover-bg); }
+.motion-home .vp-doc h2 { border: 0; padding-top: 0; margin-top: 48px; }
+.motion-home .vp-doc h1 + p + p + h2 { margin-top: 72px; }
+.vp-doc { font-size: 16px; line-height: 1.75; }
+.vp-doc h1 { letter-spacing: -0.04em; line-height: 1.2; }
+.vp-doc h2 { letter-spacing: -0.025em; }
+.vp-doc div[class*='language-'] { border-radius: 12px; }
+.vp-doc a { text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--vp-c-brand-1); outline-offset: 2px; }
+
+@media (max-width: 639px) {
+  .motion-home .VPDoc { padding-top: 56px; padding-bottom: 64px; }
+  .motion-home .vp-doc h1 + p { font-size: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition-duration: 0s !important; }
+}

@@ -1,8 +1,7 @@
 # Lab Motion
 
-**Headless motion engine for interruptible interface animation.** Lab Motion keeps
-position and velocity when a target changes, has no runtime dependencies, and can
-hand suitable work to the browser instead of running JavaScript on every frame.
+Библиотека анимаций для веб-интерфейсов: пружины, жесты, переходы между
+состояниями и управление движением. JavaScript и TypeScript, без runtime-зависимостей.
 
 [![npm](https://img.shields.io/npm/v/%40labpics%2Fmotion)](https://www.npmjs.com/package/@labpics/motion)
 [![CI](https://github.com/Labpics-Team/lab-motion/actions/workflows/ci.yml/badge.svg)](https://github.com/Labpics-Team/lab-motion/actions/workflows/ci.yml)
@@ -14,131 +13,59 @@ hand suitable work to the browser instead of running JavaScript on every frame.
 pnpm add @labpics/motion
 ```
 
-Для серверного использования нужен Node 22 или новее. Браузерный runtime рассчитан
-на ES2022 и `WeakRef`. Пакет поставляет ESM, CJS и TypeScript-типы. Биндинги
-фреймворков подключаются как optional peer dependencies.
+ESM, CommonJS и типы TypeScript включены. Для серверного использования нужен
+Node.js 22 или новее; для браузерного runtime нужны ES2022 и `WeakRef`.
+Биндинги подключают фреймворк через optional peer dependency.
 
 ## Первый переход
 
 ```typescript
 import { animate } from '@labpics/motion/animate';
 
-const controls = animate('.card', { x: 240, opacity: 1 }, {
+const controls = animate('.card', { x: 160, opacity: 1 }, {
   spring: { mass: 1, stiffness: 170, damping: 26 },
-  stagger: 40,
 });
 
 await controls.finished;
 ```
 
-`animate` подходит для обычных DOM-переходов: transforms, opacity, CSS-свойства,
-spring или tween, задержки и stagger. Controls можно остановить, приостановить,
-продолжить или перемотать.
+`animate` принимает элемент или CSS-селектор. Возвращённые controls позволяют
+приостановить, продолжить или отменить переход. Для новой цели вызовите
+`animate` снова.
 
-## Цель меняется во время движения
-
-```typescript
-import { MotionValue } from '@labpics/motion';
-
-const x = new MotionValue({
-  initial: 0,
-  spring: { mass: 1, stiffness: 200, damping: 20 },
-});
-
-x.onChange((value) => {
-  el.style.transform = `translateX(${value}px)`;
-});
-
-x.setTarget(240);
-x.setTarget(80);
-```
-
-Второй `setTarget` продолжает движение из текущего состояния. Для drag, навигации
-и других прерываемых интерфейсов не нужно вручную переносить скорость между
-анимациями.
-
-## React
-
-```tsx
-import { useSpring } from '@labpics/motion/react';
-
-function Card({ open }: { open: boolean }) {
-  const x = useSpring(open ? 240 : 0, {
-    mass: 1,
-    stiffness: 200,
-    damping: 20,
-  });
-
-  return <div style={{ transform: `translateX(${x}px)` }} />;
-}
-```
-
-Те же примитивы доступны для React, Preact, Vue, Svelte, Solid, Angular, Qwik,
-Lit и Web Components.
+Подробнее: [начало работы](docs/getting-started.md), [API](docs/api.md), [рецепты](docs/recipes.md).
 
 ## Что импортировать
 
 | Задача | Импорт |
 | --- | --- |
-| Обычная DOM-анимация | `@labpics/motion/animate` |
-| Минимальный WAAPI-путь | `@labpics/motion/nano` |
-| Живые значения | `@labpics/motion`, `@labpics/motion/value` |
-| Drag, pan, press, hover | `@labpics/motion/gestures` |
-| Bottom sheet, carousel, dismiss, reorder | `@labpics/motion/behaviors` |
-| FLIP и layout transitions | `@labpics/motion/flip`, `@labpics/motion/projection`, `@labpics/motion/smart` |
-| Presence | `@labpics/motion/presence` |
-| Scroll и in-view | `@labpics/motion/scroll`, `@labpics/motion/in-view` |
-| Build-time оптимизация | `@labpics/motion/compiler/vite` |
+| DOM-анимация с управлением | `@labpics/motion/animate` |
+| Минимальный нативный WAAPI-путь | `@labpics/motion/nano` |
+| Анимируемое числовое значение | `MotionValue` из `@labpics/motion` |
+| Жесты | `@labpics/motion/gestures` |
+| Появление и уход элементов | `@labpics/motion/presence` |
+| Изменение расположения | `@labpics/motion/projection`, `@labpics/motion/smart` |
+| Реакция на прокрутку и видимость | `@labpics/motion/scroll`, `@labpics/motion/in-view` |
 
-Полная карта экспортов и сигнатур находится в [справочнике API](docs/api.md).
-
-## Поведение
-
-- Повторная цель продолжает активное движение вместо старта с нулевой скорости.
-- Подходящие автономные переходы могут исполняться через WAAPI. Если capability
-  недоступна, публичный контракт сохраняется на JS-пути.
-- `prefers-reduced-motion` меняет характер перехода и сохраняет функциональный
-  результат.
-- DOM, layout, gestures и framework bindings используют общее ядро, поэтому
-  компоненту не нужен отдельный scheduler или копия физики.
-- Возможности разделены по субпутям, чтобы bundler мог вырезать неиспользуемое.
-
-## Рецепты
-
-Практические интеграции собраны в [recipes.md](docs/recipes.md): drag с инерцией,
-FLIP, presence, scroll, bottom sheet, carousel, reorder, React и Solid lifecycle.
+Биндинги доступны для React, Preact, Vue, Svelte, Solid, Angular, Qwik, Lit
+и Web Components. Сигнатуры и требования находятся в [справочнике](docs/api.md).
 
 ## Документация
 
-| Раздел | Для чего |
-| --- | --- |
-| [API](docs/api.md) | Публичные входы и контракты |
-| [Рецепты](docs/recipes.md) | Готовые схемы интеграции |
-| [Behaviors](docs/behaviors.md) | Sheet, carousel, dismiss, reorder |
-| [Presence](docs/presence.md) | Появление, уход и прерывание |
-| [Projection](docs/projection.md) | Вложенные layout-переходы |
-| [Smart](docs/smart.md) | Shared-element переходы по ключу |
-| [Compositor](docs/compositor.md) | WAAPI-путь и fallback |
-| [Compiler](docs/compiler.md) | Vite build-time оптимизация |
-| [Tokens](docs/tokens.md) | Motion-токены и преобразования |
-| [Ошибки](docs/errors.md) | Коды `MotionParamError` |
-| [Миграция](docs/migration.md) | Перенос с Motion JS и Anime.js |
-| [Архитектура](docs/architecture.md) | Устройство движка |
-| [Бенчмарки](docs/benchmark.md) | Методика измерений и размер |
+[Руководства и справочник](docs/index.md) помогают выбрать API, настроить
+переходы и подключить движение к жизненному циклу компонента.
+[Миграция](docs/migration.md) описывает перенос с Motion и Anime.js.
 
-## Размер и производительность
+Для `animate` предусмотрен JS-путь при недоступности подходящего нативного
+исполнения. У `nano` собственные требования к WAAPI;
+[проверьте их перед выбором](docs/api.md#контракт-nano).
 
-Размер проверяется отдельно для публичных entrypoints. Актуальные числа не
-копируются в Markdown: в исходном репозитории их печатает `pnpm size`, а методика
-сравнения описана в [benchmark.md](docs/benchmark.md).
+Размер зависит от импортов. В исходном репозитории команда `pnpm size` измеряет
+отдельные входы. Методика описана в [руководстве по бенчмаркам](docs/benchmark.md).
 
 ## Разработка
 
-Правила участия находятся в
-[CONTRIBUTING.md](https://github.com/Labpics-Team/lab-motion/blob/main/CONTRIBUTING.md).
-Уязвимости сообщаются по
-[SECURITY.md](https://github.com/Labpics-Team/lab-motion/blob/main/SECURITY.md).
+[Участие в проекте](https://github.com/Labpics-Team/lab-motion/blob/main/CONTRIBUTING.md).
+[Сообщить об уязвимости](https://github.com/Labpics-Team/lab-motion/blob/main/SECURITY.md).
 
-## Лицензия
-
-MIT
+MIT. Labpics.

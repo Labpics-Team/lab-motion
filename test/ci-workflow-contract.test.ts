@@ -56,12 +56,12 @@ const events = (value: unknown): string[] => {
 };
 const bash = process.platform === 'win32'
   ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git/bin/bash.exe') : 'bash';
-const peers = ['verify', 'tests', 'mutation', 'node-floor', 'browser-static'];
+const peers = ['verify', 'tests', 'mutation', 'node-floor', 'browser-static', 'documentation'];
 const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
   + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
-  + '[[ "$NODE_FLOOR_RESULT" == success ]]\n[[ "$BROWSER_RESULT" == success ]]';
+  + '[[ "$NODE_FLOOR_RESULT" == success ]]\n[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]';
 const actionlintCommand = [
   'archive="$RUNNER_TEMP/actionlint.tar.gz"',
   'install_dir="$RUNNER_TEMP/actionlint"',
@@ -109,7 +109,7 @@ const browserCommands = [
   'pnpm install --frozen-lockfile',
   'pnpm exec playwright install --with-deps ${{ matrix.browser }}',
   'pnpm typecheck:browser',
-  'pnpm site:build',
+  'pnpm build',
   'pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }} --fail-on-flaky-tests',
 ];
 const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
@@ -300,7 +300,7 @@ function assertNativeGraph(files: Map<string, string>) {
     } } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'mutation', 'node-floor', 'profile-baseline', 'tests', 'verify']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'node-floor', 'profile-baseline', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}",
     uses: './.github/workflows/profile-01.yml',
@@ -325,6 +325,12 @@ function assertNativeGraph(files: Map<string, string>) {
     expect(job.if).toBeUndefined();
   }
   expect(ci.jobs['browser-static']).toEqual({ uses: './.github/workflows/browser.yml' });
+  expect(ci.jobs.documentation).toEqual({ uses: './.github/workflows/docs.yml' });
+  expect(workflows.get('docs.yml')!.on).toEqual({ workflow_call: null });
+  const reader = workflows.get('docs.yml')!.jobs.reader!;
+  expect(reader['runs-on']).toBe('ubuntu-latest');
+  assertCommands(reader, [activatePnpm, 'pnpm install --frozen-lockfile', 'pnpm docs:build',
+    'pnpm exec playwright install --with-deps chromium firefox webkit', 'pnpm docs:test']);
   // Нет ложных последовательных зависимостей: всё сходится только в CI.
   for (const job of [verify, tests, mutation]) expect(job.needs).toBeUndefined();
   expect(floor.needs).toEqual(['verify']);
@@ -376,6 +382,7 @@ function assertNativeGraph(files: Map<string, string>) {
       MUTATION_RESULT: '${{ needs.mutation.result }}',
       NODE_FLOOR_RESULT: '${{ needs.node-floor.result }}',
       BROWSER_RESULT: '${{ needs.browser-static.result }}',
+      DOCS_RESULT: '${{ needs.documentation.result }}',
     },
     run: `${gateCommand}\n`,
   }]);
@@ -519,14 +526,14 @@ describe('нативный граф CI', () => {
     }
   });
 
-  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'NODE_FLOOR_RESULT', 'BROWSER_RESULT']
+  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'NODE_FLOOR_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT']
     .flatMap((key) => ['success', 'failure', 'cancelled', 'skipped', 'neutral', 'pending', '', undefined]
       .map((result) => ({ key, result }))))('shell итога проверяет $key=$result', ({ key, result }) => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
     const program = ci.jobs.CI!.steps![0]!.run!;
     const env: NodeJS.ProcessEnv = {
       ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
-      MUTATION_RESULT: 'success', NODE_FLOOR_RESULT: 'success', BROWSER_RESULT: 'success',
+      MUTATION_RESULT: 'success', NODE_FLOOR_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
     };
     delete env[key];
     if (result !== undefined) env[key] = result;
