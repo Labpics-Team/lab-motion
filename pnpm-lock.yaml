@@ -17,6 +17,7 @@ overrides:
 
 patchedDependencies:
   '@stryker-mutator/vitest-runner@10.0.0': 39d4ef8de3f151bbda7db935c4d39b4fd05faf9e1eca2565c7c35abaab6ba4ae
+  vitepress@2.0.0-alpha.20: 68cb3e146094dba489a3c0c5422192ce921b41cf04f53b1f7fd114ea1543056e
 
 importers:
 
@@ -90,7 +91,7 @@ importers:
         version: 8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1)
       vitepress:
         specifier: 2.0.0-alpha.20
-        version: 2.0.0-alpha.20(@types/node@26.6.4)(esbuild@0.28.2)(postcss@8.5.28)(terser@5.51.2)(typescript@6.0.3)(yaml@2.9.1)
+        version: 2.0.0-alpha.20(patch_hash=68cb3e146094dba489a3c0c5422192ce921b41cf04f53b1f7fd114ea1543056e)(@types/node@26.6.4)(esbuild@0.28.2)(postcss@8.5.28)(terser@5.51.2)(typescript@6.0.3)(yaml@2.9.1)
       vitest:
         specifier: 5.0.2
         version: 5.0.2(@types/node@26.6.4)(jsdom@30.1.1)(vite@8.3.2(@types/node@26.6.4)(esbuild@0.28.2)(terser@5.51.2)(yaml@2.9.1))
@@ -4631,7 +4632,7 @@ snapshots:
       terser: 5.51.2
       yaml: 2.9.1
 
-  vitepress@2.0.0-alpha.20(@types/node@26.6.4)(esbuild@0.28.2)(postcss@8.5.28)(terser@5.51.2)(typescript@6.0.3)(yaml@2.9.1):
+  vitepress@2.0.0-alpha.20(patch_hash=68cb3e146094dba489a3c0c5422192ce921b41cf04f53b1f7fd114ea1543056e)(@types/node@26.6.4)(esbuild@0.28.2)(postcss@8.5.28)(terser@5.51.2)(typescript@6.0.3)(yaml@2.9.1):
     dependencies:
       '@docsearch/css': 4.7.1
       '@docsearch/js': 4.7.1

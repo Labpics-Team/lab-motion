@@ -41,9 +41,12 @@ test('search finds an API and returns to the reader', async ({ page }) => {
   await search.locator('input').fill('MotionValue');
   const results = search.locator('a[href]');
   await expect(results.first()).toBeVisible();
+  const destination = await results.first().getAttribute('href');
   await results.first().click();
+  await expect(page).toHaveURL(new URL(destination!, page.url()).href);
   await expect(search).toBeHidden();
   await expect(page.locator('main')).toContainText('MotionValue');
+  await expect(page.getByRole('button', { name: 'Поиск по документации', exact: true })).not.toBeFocused();
 });
 
 test('content remains available with JavaScript disabled', async ({ browser, baseURL }) => {
@@ -70,26 +73,39 @@ test('dark and reduced-motion preferences keep the page usable', async ({ page }
   await page.screenshot({ path: info.outputPath('guide-dark.png'), fullPage: true });
 });
 
-test('search opens from the keyboard and Escape restores focus', async ({ page }) => {
-  await page.goto('getting-started.html');
-  const button = page.getByRole('button', { name: 'Поиск по документации', exact: true });
-  await button.focus();
-  await page.keyboard.press('Enter');
-  const search = page.locator('.VPLocalSearchBox');
-  await expect(search.locator('input')).toBeFocused();
-  await page.keyboard.type('MotionValue');
-  await expect(search.locator('a[href]').first()).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(search).toBeHidden();
-  await expect(button).toBeFocused();
-});
+for (const [opening, dismissal] of [
+  ['button', 'Escape'], ['shortcut', 'Escape'], ['button', 'pointer'],
+] as const) {
+  test(`${opening} search restores focus after ${dismissal}`, async ({ page }) => {
+    await page.goto('getting-started.html');
+    const button = page.getByRole('button', { name: 'Поиск по документации', exact: true });
+    const origin = opening === 'button'
+      ? button
+      : page.locator('main').getByRole('link', { name: 'справочнике API', exact: true });
+    await origin.focus();
+    await page.keyboard.press(opening === 'button' ? 'Enter' : 'Control+k');
+    const search = page.locator('.VPLocalSearchBox');
+    await expect(search.locator('input')).toBeFocused();
+    await page.keyboard.type('MotionValue');
+    await expect(search.locator('a[href]').first()).toBeVisible();
+    if (dismissal === 'Escape') {
+      await page.keyboard.press('Escape');
+    } else {
+      const close = search.getByRole('button', { name: 'Закрыть поиск', exact: true });
+      if (await close.isVisible()) await close.click();
+      else await search.locator('.backdrop').click({ position: { x: 4, y: 4 } });
+    }
+    await expect(search).toBeHidden();
+    await expect(origin).toBeFocused();
+  });
+}
 
 test('section navigation works on desktop and mobile', async ({ page }) => {
   await page.goto('getting-started.html');
   const sidebar = page.locator('.VPSidebar');
-  if (!await sidebar.isVisible()) {
-    await page.getByRole('button', { name: 'Разделы', exact: true }).click();
-  }
+  const menu = page.getByRole('button', { name: 'Разделы', exact: true });
+  if (await menu.isVisible()) await menu.click();
+  await expect(sidebar.getByRole('link', { name: 'Рецепты', exact: true })).toBeInViewport();
   await sidebar.getByRole('link', { name: 'Рецепты', exact: true }).click();
   await expect(page).toHaveURL(/recipes\.html$/);
   await expect(page.getByRole('main')).toBeVisible();
