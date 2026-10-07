@@ -105,8 +105,8 @@ export function createMotionBinding<Model, Goals extends MotionBindingGoals>(
     }
     if (state !== 'active') return;
     let count = roles.length;
-    const keys: string[][] = [];
-    const goals: MotionBindingGoal[] = [];
+    const keys = propertyKeys ?? [];
+    let goals: MotionBindingGoal[] | undefined;
     for (let i = 0; i < roles.length; i++) {
       const input = value[roles[i]!];
       if (state !== 'active') return;
@@ -120,19 +120,34 @@ export function createMotionBinding<Model, Goals extends MotionBindingGoals>(
         throw new MotionParamError('LM180');
       }
       if (state !== 'active') return;
-      const goal: Record<string, number | string> = Object.create(null);
-      for (const key of names) {
+      const previous = previousGoals?.[i];
+      let goal: Record<string, number | string> | undefined;
+      for (let j = 0; j < names.length; j++) {
+        const key = names[j]!;
         const value = input[key];
         if (state !== 'active') return;
         if (typeof value !== 'string' && !(typeof value === 'number' && Number.isFinite(value))) {
           throw new MotionParamError('LM180');
         }
-        goal[key] = value;
+        if (!goal && (!previous || !Object.is(value, previous[key]))) {
+          goal = Object.create(null) as Record<string, number | string>;
+          // Префикс уже прочитан и совпал: копируем его из immutable снимка,
+          // сохраняя порядок ключей и не вызывая getters входа повторно.
+          for (let prefix = 0; prefix < j; prefix++) {
+            const key = names[prefix]!;
+            goal[key] = previous![key]!;
+          }
+        }
+        if (goal) goal[key] = value;
       }
-      keys.push(names); goals.push(Object.freeze(goal));
+      if (!propertyKeys) keys.push(names);
+      if (goal) {
+        goals ??= previousGoals ? previousGoals.slice() : [];
+        goals[i] = Object.freeze(goal);
+      }
     }
     propertyKeys ??= keys;
-    return goals;
+    return goals ?? previousGoals;
   }
 
   function capture(value: MotionBindingHandle | void): Effect | undefined {
@@ -157,6 +172,8 @@ export function createMotionBinding<Model, Goals extends MotionBindingGoals>(
         goals = snapshot(value);
       } finally { projecting = false; }
       if (state !== 'active' || !goals) return;
+      // Вложенная цель ждёт текущую запись, даже когда возвращает прежнее состояние.
+      if (!draining && goals === previousGoals) return;
       pending.push(goals);
       if (draining) return;
       draining = true;
@@ -168,7 +185,10 @@ export function createMotionBinding<Model, Goals extends MotionBindingGoals>(
           try {
             for (let i = 0; i < roles.length && state === 'active'; i++) {
               const goal = next[i]!;
-              if (previousGoals && propertyKeys![i]!.every(key => Object.is(goal[key], previousGoals![i]![key]))) continue;
+              // Первый снимок уже сравнен с текущими целями. Вложенные снимки
+              // доставляются после более ранних переходов и требуют сравнения заново.
+              if (previousGoals && (goal === previousGoals[i] || cursor > 0 &&
+                propertyKeys![i]!.every(key => Object.is(goal[key], previousGoals![i]![key])))) continue;
               const before = active[i];
               const apply = ports[i]!;
               const effect = capture(apply(goal as Goals[string]));
