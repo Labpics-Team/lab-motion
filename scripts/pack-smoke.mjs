@@ -284,39 +284,53 @@ try {
   }
   log(`структура OK: ${checked} условных export-целей на месте`);
 
-  // 5. Метаданные и документы, на которые ссылается README, должны доехать
-  // до потребителя без отдельного источника истины вне npm-артефакта.
-  for (const file of [
-    'LICENSE',
-    'README.md',
-    'package.json',
-    'docs/errors.md',
-    'docs/benchmark.md',
-    'docs/motion-conformance.md',
-    'docs/recipes.md',
-  ]) {
+  // 5. Публичная документация является частью npm-артефакта. README задаёт
+  // вход в неё, package#files задаёт опубликованную поверхность.
+  const sourceReadme = readFileSync(join(ROOT, 'README.md'), 'utf8');
+  const readmeDocs = [...new Set(
+    [...sourceReadme.matchAll(/\]\((docs\/[^)#]+\.md)(?:#[^)]+)?\)/g)].map((match) => match[1]),
+  )].sort();
+  const declaredDocs = (installedPackage.files ?? [])
+    .filter((file) => typeof file === 'string' && /^docs\/[^*]+\.md$/.test(file))
+    .sort();
+
+  for (const file of ['LICENSE', 'README.md', 'package.json', ...declaredDocs]) {
     if (!existsSync(join(installedRoot, file))) {
       failed = true;
       log(`FAIL: ${file} не в артефакте`);
     }
   }
-  const installedErrors = join(installedRoot, 'docs', 'errors.md');
-  if (existsSync(installedErrors)
-    && readFileSync(installedErrors, 'utf8') !== readFileSync(join(ROOT, 'docs', 'errors.md'), 'utf8')) {
-    failed = true;
-    log('FAIL: docs/errors.md в артефакте расходится с каталогом исходников');
+
+  for (const file of readmeDocs) {
+    if (!declaredDocs.includes(file)) {
+      failed = true;
+      log(`FAIL: README ссылается на ${file}, но package#files его не публикует`);
+    }
   }
+
+  for (const file of declaredDocs) {
+    const installedDocument = join(installedRoot, file);
+    const sourceDocument = join(ROOT, file);
+    if (!existsSync(sourceDocument)) {
+      failed = true;
+      log(`FAIL: package#files объявляет отсутствующий исходный документ ${file}`);
+      continue;
+    }
+    if (
+      existsSync(installedDocument)
+      && readFileSync(installedDocument, 'utf8') !== readFileSync(sourceDocument, 'utf8')
+    ) {
+      failed = true;
+      log(`FAIL: ${file} в артефакте расходится с исходником`);
+    }
+  }
+
   const installedBenchmark = join(installedRoot, 'docs', 'benchmark.md');
   const installedMotionContract = join(installedRoot, 'docs', 'motion-conformance.md');
   if (existsSync(installedMotionContract)
     && readFileSync(installedMotionContract, 'utf8') !== readFileSync(join(ROOT, 'docs', 'motion-conformance.md'), 'utf8')) {
     failed = true;
     log('FAIL: docs/motion-conformance.md в артефакте расходится с контрактом исходников');
-  }
-  if (existsSync(installedBenchmark)
-    && readFileSync(installedBenchmark, 'utf8') !== readFileSync(join(ROOT, 'docs', 'benchmark.md'), 'utf8')) {
-    failed = true;
-    log('FAIL: docs/benchmark.md в артефакте расходится с методологией исходников');
   }
   if (existsSync(installedBenchmark)) {
     const benchmarkDocument = readFileSync(installedBenchmark, 'utf8');
@@ -327,12 +341,6 @@ try {
       failed = true;
       log(`FAIL: пакетная методология: ${error?.message ?? String(error)}`);
     }
-  }
-  const installedRecipes = join(installedRoot, 'docs', 'recipes.md');
-  if (existsSync(installedRecipes)
-    && readFileSync(installedRecipes, 'utf8') !== readFileSync(join(ROOT, 'docs', 'recipes.md'), 'utf8')) {
-    failed = true;
-    log('FAIL: docs/recipes.md в артефакте расходится с исходником');
   }
 
   // 6. Карты исключены package#files-контрактом. Runtime-файлы также не должны

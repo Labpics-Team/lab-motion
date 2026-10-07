@@ -4,22 +4,31 @@ import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
 const smoke = readFileSync(new URL('../scripts/pack-smoke.mjs', import.meta.url), 'utf8');
+const publishedDocs = pkg.files.filter((file: string) => /^docs\/[^*]+\.md$/.test(file));
 
 describe('packed release boundary', () => {
-  it('ships every referenced support document', () => {
-    expect(pkg.files).toContain('docs/errors.md');
-    expect(pkg.files).toContain('docs/benchmark.md');
-    expect(pkg.files).toContain('docs/motion-conformance.md');
-    expect(pkg.files).toContain('docs/recipes.md');
-    expect(smoke).toContain("'docs/benchmark.md'");
-    expect(smoke).toContain("'docs/motion-conformance.md'");
-    expect(smoke).toContain("readFileSync(installedMotionContract, 'utf8') !== readFileSync");
-    expect(smoke).toContain("'docs/recipes.md'");
-    expect(smoke).toContain("readFileSync(installedRecipes, 'utf8') !== readFileSync");
-    expect(smoke).toContain("readFileSync(installedBenchmark, 'utf8') !== readFileSync");
-    expect(smoke).toContain('parseBenchmarkDocumentationState(benchmarkDocument, installedPackage)');
-    expect(smoke).not.toContain('/bench/compare/results/`;');
+  it('публикует все документы, на которые ведёт публичная документация', () => {
+    const readmeDocs = [...new Set(
+      [...readme.matchAll(/\]\((docs\/[^)#]+\.md)(?:#[^)]+)?\)/g)].map((match) => match[1]),
+    )];
+    expect(readmeDocs.length).toBeGreaterThan(0);
+    for (const file of readmeDocs) expect(publishedDocs).toContain(file);
+
+    for (const file of publishedDocs) {
+      const document = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+      for (const match of document.matchAll(/\]\(([^)#]+\.md)(?:#[^)]+)?\)/g)) {
+        const href = match[1]!;
+        if (/^[a-z]+:/i.test(href)) continue;
+        const target = posix.normalize(posix.join(posix.dirname(file), href));
+        if (target.startsWith('docs/')) expect(publishedDocs).toContain(target);
+      }
+    }
+
+    expect(smoke).toContain('const readmeDocs =');
+    expect(smoke).toContain('const declaredDocs =');
+    expect(smoke).toContain('README ссылается на');
   });
 
   it('ссылка на контракт движения разрешается в реально поставляемый документ', () => {
@@ -28,7 +37,7 @@ describe('packed release boundary', () => {
     expect(links).toHaveLength(1);
     const target = posix.normalize(posix.join('docs', links[0]![1]!));
     expect(target).toBe('docs/motion-conformance.md');
-    expect(pkg.files).toContain(target);
+    expect(publishedDocs).toContain(target);
     expect(readFileSync(new URL(`../${target}`, import.meta.url), 'utf8').length).toBeGreaterThan(0);
   });
 
@@ -38,7 +47,6 @@ describe('packed release boundary', () => {
       const end = smoke.indexOf('  if (existsSync(installedBenchmark)', start);
       expect(start).toBeGreaterThan(0);
       expect(end).toBeGreaterThan(start);
-      // Исполняется реальный readback-блок; ожидание задано независимо от его условия.
       const files = new Map([
         [join('/source', 'docs', 'motion-conformance.md'), 'контракт-v1'],
         [join('/archive', 'docs', 'motion-conformance.md'), packed],
