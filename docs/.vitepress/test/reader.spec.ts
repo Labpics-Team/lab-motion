@@ -46,6 +46,7 @@ test('search finds an API and returns to the reader', async ({ page }) => {
   await expect(page).toHaveURL(new URL(destination!, page.url()).href);
   await expect(search).toBeHidden();
   await expect(page.locator('main')).toContainText('MotionValue');
+  await expect(page.locator(':target')).toBeFocused();
   await expect(page.getByRole('button', { name: 'Поиск по документации', exact: true })).not.toBeFocused();
 });
 
