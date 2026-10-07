@@ -64,6 +64,7 @@ function makeClock() {
         this.step(16);
       }
     },
+    now() { return now; },
     pending() { return queue.length; },
     calls() { return calls; },
   };
@@ -71,53 +72,44 @@ function makeClock() {
 
 const sheetConsumer = String.raw`
 import assert from 'node:assert/strict';
-import { createBottomSheet } from '@labpics/motion/behaviors';
+import { createCompositorFollow } from '@labpics/motion/compositor/follow';
 ${clockSource}
 const clock = makeClock();
-const sheet = createBottomSheet({ snapPoints: [0, 300, 600], requestFrame: clock.requestFrame });
-sheet.pointerDown({ x: 0, y: 0, t: 0 });
-sheet.pointerMove({ x: 0, y: 180, t: 0.05 });
-sheet.pointerUp({ x: 0, y: 180, t: 0.05 });
+let snaps = [0, 300, 600], selected = 2, writes = 0;
+const motion = createCompositorFollow({
+  spring: { mass: 1, stiffness: 170, damping: 26 }, property: 'transform',
+  from: 0, to: 0, apply() { writes++; }, now: clock.now, requestFrame: clock.requestFrame,
+});
+motion.beginFollow(0); motion.follow(180, 0.05); motion.settle(snaps[selected], 0.05);
 clock.step(); clock.step();
-assert.equal(sheet.state.phase, 'release');
-const boundary = { value: sheet.state.value, velocity: sheet.state.velocity };
-assert.notEqual(boundary.velocity, 0);
-const pendingBeforeUpdate = clock.pending();
-sheet.update([0, 200, 400]);
-assert.equal(clock.pending(), pendingBeforeUpdate + 1);
-assert.equal(sheet.state.value, boundary.value);
-assert.equal(sheet.state.velocity, boundary.velocity);
-// Фальсификатор снятого токена поколения: физически остаются старый и новый
-// кадры, но после одного шага публиковать состояние вправе только новый.
-let publications = 0;
-const stop = sheet.subscribe(() => { publications++; });
-clock.step();
-stop();
-assert.equal(publications, 1);
-assert.notEqual(sheet.state.velocity, 0);
-// Новый ввод перехватывает того же владельца и гасит старое поколение.
-sheet.pointerDown({ x: 0, y: sheet.state.value, t: 1 });
-assert.equal(sheet.state.phase, 'follow');
-const takeoverValue = sheet.state.value;
+assert.ok(motion.value > 180, 'release не продолжил движение');
+const beforeResize = motion.value;
+snaps = [0, 200, 400]; motion.retarget(snaps[selected]);
+assert.equal(motion.value, beforeResize, 'новая геометрия вызвала скачок');
+clock.step(); clock.step();
+const beforePickup = motion.value;
+assert.equal(motion.beginFollow(1), beforePickup);
+motion.follow(beforePickup + 20, 1.05);
+const inputValue = motion.value, afterInputWrites = writes;
 clock.drain();
-assert.equal(sheet.state.phase, 'follow');
-assert.equal(sheet.state.value, takeoverValue);
+assert.equal(motion.value, inputValue, 'старый release изменил новый ввод');
+assert.equal(writes, afterInputWrites, 'старый callback получил право записи');
 assert.equal(clock.pending(), 0);
-sheet.pointerCancel(); clock.drain();
-// Клавиатурному адаптеру достаточно публичного вызова намерения: без ручной
-// передачи скорости, токена поколения, набора отмен или второго владельца состояния.
-sheet.snapTo(2); clock.drain();
-assert.equal(sheet.state.value, 400);
-assert.equal(sheet.state.snapIndex, 2);
-sheet.destroy();
+motion.settle(snaps[selected], 1.05); clock.drain();
+assert.equal(motion.value, 400);
+selected = 1; motion.retarget(snaps[selected]); clock.drain();
+assert.equal(motion.value, 200);
+selected = 2; motion.retarget(snaps[selected]); clock.drain();
+assert.equal(motion.value, 400);
+motion.destroy();
 
 const reducedClock = makeClock();
-const reduced = createBottomSheet({
-  snapPoints: [0, 200, 400], requestFrame: reducedClock.requestFrame,
-  matchMedia: () => ({ matches: true }),
+const reduced = createCompositorFollow({
+  spring: { mass: 1, stiffness: 170, damping: 26 }, property: 'transform', from: 0, to: 0,
+  apply() {}, requestFrame: reducedClock.requestFrame, matchMedia: () => ({ matches: true }),
 });
-reduced.snapTo(2);
-assert.equal(reduced.state.value, 400);
+reduced.retarget(snaps[selected]);
+assert.equal(reduced.value, 400);
 assert.equal(reducedClock.calls(), 0);
 assert.equal(reducedClock.pending(), 0);
 reduced.destroy();
@@ -126,64 +118,55 @@ console.log('journey-sheet-package: PASS');
 
 const pagerConsumer = String.raw`
 import assert from 'node:assert/strict';
-import { createCarousel } from '@labpics/motion/behaviors';
+import { createCompositorFollow } from '@labpics/motion/compositor/follow';
 ${clockSource}
-const clock = makeClock();
-const pager = createCarousel({ pageCount: 4, pageSize: 200, index: 1, rtl: true, requestFrame: clock.requestFrame });
-pager.goTo(3); clock.step(); clock.step();
-assert.equal(pager.state.phase, 'release');
-const boundary = { value: pager.state.value, velocity: pager.state.velocity };
-assert.notEqual(boundary.velocity, 0);
-const pendingBeforeUpdate = clock.pending();
-pager.update(4, 120);
-assert.equal(clock.pending(), pendingBeforeUpdate + 1);
-assert.equal(pager.state.value, boundary.value);
-assert.equal(pager.state.velocity, boundary.velocity);
-// Тот же исполняемый фальсификатор токена поколения: старый кадр остаётся в
-// очереди, но публикация на шаге должна принадлежать только новой доводке.
-let publications = 0;
-const stop = pager.subscribe(() => { publications++; });
-clock.step();
-stop();
-assert.equal(publications, 1);
-assert.notEqual(pager.state.velocity, 0);
-clock.drain();
-assert.equal(pager.state.index, 3);
-assert.equal(pager.state.value, 360);
-// Эквивалентные клавиатурные намерения используют того же владельца и те же часы.
-pager.prev(); clock.drain();
-assert.equal(pager.state.index, 2);
-pager.next(); clock.drain();
-assert.equal(pager.state.index, 3);
-// Фальсификатор знака RTL: один и тот же левый жест от страницы 1 обязан
-// расходиться с LTR-контролем в противоположные стороны.
-pager.goTo(1); clock.drain();
-pager.pointerDown({ x: 0, y: 0, t: 1 });
-pager.pointerMove({ x: -120, y: 0, t: 1.05 });
-pager.pointerUp({ x: -120, y: 0, t: 1.05 });
-clock.drain();
-assert.equal(pager.state.index, 0);
-const ltrClock = makeClock();
-const ltr = createCarousel({ pageCount: 4, pageSize: 120, index: 1, requestFrame: ltrClock.requestFrame });
-ltr.pointerDown({ x: 0, y: 0, t: 1 });
-ltr.pointerMove({ x: -120, y: 0, t: 1.05 });
-ltr.pointerUp({ x: -120, y: 0, t: 1.05 });
-ltrClock.drain();
-assert.equal(ltr.state.index, 2);
-ltr.destroy();
-pager.destroy();
+function pager(rtl, reduced = false) {
+  const clock = makeClock();
+  const direction = rtl ? 1 : -1;
+  let size = 200, selected = 1;
+  const motion = createCompositorFollow({
+    spring: { mass: 1, stiffness: 170, damping: 26 }, property: 'transform',
+    from: direction * size, to: direction * size, apply() {},
+    now: clock.now, requestFrame: clock.requestFrame, matchMedia: () => ({ matches: reduced }),
+  });
+  const target = () => direction * selected * size;
+  return { motion, clock,
+    get selected() { return selected; },
+    select(index) { selected = Math.max(0, Math.min(3, index)); motion.retarget(target()); },
+    resize(nextSize) { size = nextSize; motion.retarget(target()); },
+    drag(delta) {
+      const origin = motion.beginFollow(1);
+      motion.follow(origin + delta, 1.05);
+      selected = Math.max(0, Math.min(3, Math.round(motion.value / (direction * size))));
+      motion.settle(target(), 1.05);
+    },
+  };
+}
+const rtl = pager(true);
+rtl.select(3); rtl.clock.step(); rtl.clock.step();
+assert.ok(rtl.motion.value > 200);
+const beforeResize = rtl.motion.value;
+rtl.resize(120);
+assert.equal(rtl.motion.value, beforeResize);
+rtl.clock.drain();
+assert.equal(rtl.selected, 3); assert.equal(rtl.motion.value, 360);
+rtl.select(rtl.selected - 1); rtl.clock.drain();
+assert.equal(rtl.motion.value, 240);
+rtl.select(rtl.selected + 1); rtl.clock.drain();
+assert.equal(rtl.motion.value, 360);
+rtl.select(1); rtl.clock.drain(); rtl.drag(-120); rtl.clock.drain();
+assert.equal(rtl.selected, 0); assert.equal(rtl.motion.value, 0);
 
-const reducedClock = makeClock();
-const reduced = createCarousel({
-  pageCount: 3, pageSize: 100, requestFrame: reducedClock.requestFrame,
-  matchMedia: () => ({ matches: true }),
-});
-reduced.next();
-assert.equal(reduced.state.index, 1);
-assert.equal(reduced.state.value, 100);
-assert.equal(reducedClock.calls(), 0);
-assert.equal(reducedClock.pending(), 0);
-reduced.destroy();
+const ltr = pager(false);
+ltr.resize(120); ltr.clock.drain(); ltr.drag(-120); ltr.clock.drain();
+assert.equal(ltr.selected, 2); assert.equal(ltr.motion.value, -240);
+rtl.motion.destroy(); ltr.motion.destroy();
+
+const reduced = pager(false, true);
+reduced.resize(100); reduced.select(2);
+assert.equal(reduced.selected, 2); assert.equal(reduced.motion.value, -200);
+assert.equal(reduced.clock.calls(), 0); assert.equal(reduced.clock.pending(), 0);
+reduced.motion.destroy();
 console.log('journey-pager-package: PASS');
 `;
 
@@ -287,6 +270,7 @@ function makeSmartClock() {
         this.step(16);
       }
     },
+    now() { return now; },
     pending() { return queue.length; },
     calls() { return calls; },
   };

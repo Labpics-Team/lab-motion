@@ -118,7 +118,8 @@ await moves.finished;
 | Импорт | Что даёт |
 |---|---|
 | `…/gestures` | `createPress` (tap + клавиатурный путь Enter/Space), `createHover`, `createPan`, `createDrag` (границы + rubber-band + инерция + reduced-motion) |
-| `…/behaviors` | Headless state machines типовых мобильных взаимодействий: `createBottomSheet`, `createDragDismiss`, `createCarousel`, `createPullToRefresh`. Их общий контракт `BehaviorState { value, velocity, phase }`; отдельный `createStateCascade` разрешает цели конкурирующих визуальных намерений по свойствам. Подробно — [behaviors.md](behaviors.md) |
+| `…/behaviors` | `createStateCascade`: приоритетные слои целевых значений без DOM, часов и физики. [Контракт](behaviors.md) |
+| `…/behaviors/reorder` | `createReorder`: предложения перестановки по ключам и геометрии; порядок подтверждает приложение |
 | `…/scroll` | Headless-прогресс страницы/target-с-офсетами (семантика Motion), чистая in-view машина, скорость, scrub-клей к timeline |
 | `…/in-view` | Нативный `IntersectionObserver`-адаптер: selector/Element/список, custom root/margin/amount, one-shot либо парный enter/leave cleanup; возвращает idempotent `stop` |
 | `…/presence` | [Управляемый вход/выход](presence.md): `createPresenceTransition`, группа исполнителей и одна цель видимости; ручной `createPresence`, `swapPresence` (wait/sync) |

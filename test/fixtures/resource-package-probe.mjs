@@ -20,8 +20,7 @@ assert.ok(['witness', 'lifecycle', 'retention', 'bytes', 'reentry'].includes(mod
 const CYCLES = 10_000;
 const SPRING = Object.freeze({ mass: 1, stiffness: 170, damping: 26 });
 const EXISTING_KINDS = ['frame', 'motion-value', 'compositor-native', 'compositor-live',
-  'compositor-delay', 'compositor-handoff', 'compositor-roundtrip', 'compositor-reduced-loans', 'binding', 'sheet', 'pager',
-  'dismiss', 'pull', 'pull-pending', 'pull-settled', 'reorder',
+  'compositor-delay', 'compositor-handoff', 'compositor-roundtrip', 'compositor-reduced-loans', 'binding', 'state-cascade', 'reorder',
   'follow-native', 'follow-pickup', 'follow-live'];
 const ADDED_KINDS = ['presence-transition', 'animate-scope-main', 'animate-scope-native'];
 const corpus = process.argv[3] ?? 'combined';
@@ -30,18 +29,16 @@ const ALL_CASES = modules.flatMap(mod => [...EXISTING_KINDS, ...ADDED_KINDS]
   .map(kind => ({ mod, kind, name: `${mod.format}/${kind}` })));
 const CASES = ALL_CASES.filter(({ kind }) => corpus === 'combined'
   || (corpus === 'existing' ? EXISTING_KINDS : ADDED_KINDS).includes(kind));
-const terminalPromises = [];
-const settledPromises = [];
 const componentPromises = [];
 
 // Array хранится в JS heap: external ArrayBuffer/RSS не подменяют heapUsed.
-function component(id, words = 256) { return { id, publications: 0, refreshes: 0, dismissals: 0, payload: new Array(words).fill(id) }; }
+function component(id, words = 256) { return { id, publications: 0, completions: 0, payload: new Array(words).fill(id) }; }
 function listener(value) { return () => { value.publications++; }; }
 function formatter(value) { return number => { void value.id; return number; }; }
 function scheduler(value, host) { return callback => { void value.id; return host.requestFrame(callback); }; }
 function clock(value, host) { return () => { void value.id; return host.now; }; }
-function completion(value) { return () => { value.dismissals++; }; }
-function refresh(value, deferred) { return () => { value.refreshes++; return deferred.promise; }; }
+function completion(value) { return () => { value.completions++; }; }
+function pendingEffect(action) { return () => ({ finished: action.promise, cancel() {} }); }
 const LINEAR = t => t;
 function scopeTarget(value, host, native) {
   const notify = listener(value);
@@ -327,7 +324,7 @@ function runCase({ mod, kind, name }, value, terminal) {
         assert.equal(host.activeEffects, 3, name + ': native scope не владеет effects');
         host.finishTimers();
         assert.equal(host.activeEffects, 0, name + ': natural completion не освободило effects');
-        assert.equal(value.dismissals, 1, name + ': natural completion callback');
+        assert.equal(value.completions, 1, name + ': natural completion callback');
       }
       else assert.ok(value.publications > 0, name + ': живой scope не пишет');
       const active = owner.animate(elements[0], { opacity: [0, 0.8] }, options);
@@ -356,105 +353,21 @@ function runCase({ mod, kind, name }, value, terminal) {
       owners = [owner, initial, active, paused, delayed];
       break;
     }
-    case 'sheet':
-    case 'pager': {
-      const sheet = kind === 'sheet';
-      const owner = sheet
-        ? mod.behaviors.createBottomSheet({ snapPoints: [0, 100, 200], requestFrame: frame, onChange: notify })
-        : mod.behaviors.createCarousel({ pageCount: 3, pageSize: 100, requestFrame: frame, onChange: notify });
+    case 'state-cascade': {
+      const owner = mod.behaviors.createStateCascade();
+      const layer = owner.createLayer({ x: 0 });
       const off = owner.subscribe(notify);
-      owner.pointerDown({ x: 0, y: 0, t: 0 });
-      owner.pointerMove({ x: -60, y: 60, t: 0.05 });
-      owner.pointerUp({ x: -60, y: 60, t: 0.1 });
-      host.step();
+      layer.set({ x: 1 });
+      assert.equal(value.publications, 1, name + ': новое намерение не доставлено');
       off(); off();
-      const before = value.publications;
-      host.step();
-      assert.equal(value.publications, before, name + ': unsubscribe не снял listener живого owner');
+      layer.set({ x: 2 });
+      assert.equal(value.publications, 1, name + ': отписка не сняла callback');
       const again = owner.subscribe(notify);
-      if (sheet) owner.update([0, 80, 160]); else owner.update(3, 80);
-      // Новый ввод должен отозвать старую release-очередь того же владельца.
-      owner.pointerDown({ x: 0, y: 0, t: 1 });
-      owner.pointerMove({ x: -20, y: 20, t: 1.05 });
-      owner.pointerCancel();
-      assert.ok(host.pendingFrames > 0, name + ': release не создал job');
-      assert.ok(value.publications > 0, name + ': подписка не работает');
-      destroy = () => { owner.destroy(); owner.pointerDown({ x: 0, y: 0, t: 2 }); };
-      owners = [owner, off, again];
-      break;
-    }
-    case 'dismiss': {
-      const owner = mod.behaviors.createDragDismiss({
-        distanceThreshold: 40, spring: SPRING, requestFrame: frame,
-        onChange: notify, onDismiss: completion(value),
-      });
-      const off = owner.subscribe(notify);
-      owner.pointerDown({ x: 0, y: 0, t: 0 });
-      owner.pointerMove({ x: 0, y: 60, t: 0.2 });
-      owner.pointerUp({ x: 0, y: 60, t: 0.4 });
-      host.step();
-      assert.ok(host.pendingFrames > 0, name + ': release не запустил runner');
-      // Новый ввод отменяет уход прежде onDismiss и возвращает ту же машину.
-      owner.pointerDown({ x: 0, y: 0, t: 1 });
-      owner.pointerMove({ x: 0, y: 20, t: 1.2 });
-      owner.pointerCancel();
-      assert.equal(value.dismissals, 0, name + ': отменённый dismiss вызвал completion');
-      destroy = () => { owner.destroy(); owner.pointerDown({ x: 0, y: 0, t: 2 }); };
-      owners = [owner, off];
-      break;
-    }
-    case 'pull':
-    case 'pull-pending':
-    case 'pull-settled': {
-      const action = deferred();
-      const owner = mod.behaviors.createPullToRefresh({
-        threshold: 40, resistance: 1, pendingPosition: 60, spring: SPRING,
-        requestFrame: frame, onChange: notify, onRefresh: refresh(value, action),
-      });
-      const off = owner.subscribe(notify);
-      owner.pointerDown({ x: 0, y: 0, t: 0 });
-      owner.pointerMove({ x: 0, y: 20, t: 0.1 });
-      owner.pointerUp({ x: 0, y: 20, t: 0.2 });
-      host.step();
-      assert.ok(host.pendingFrames > 0, name + ': возврат не запустил runner');
-      owner.pointerDown({ x: 0, y: 0, t: 1 });
-      owner.pointerMove({ x: 0, y: 60, t: 1.2 });
-      if (kind !== 'pull') {
-        // value === pendingPosition позволяет достигнуть Promise-владения
-        // синхронно; старый выданный возврат остаётся stale и дрейнится ниже.
-        owner.pointerUp({ x: 0, y: 60, t: 1.4 });
-        assert.equal(owner.state.pending, true, name + ': pending не достигнут');
-        assert.equal(value.refreshes, 1, name + ': onRefresh не вызван ровно один раз');
-        const pending = owner.state;
-        owner.pointerDown({ x: 0, y: 0, t: 2 });
-        assert.equal(owner.state, pending, name + ': pending потерял единственного владельца');
-      } else {
-        owner.pointerCancel();
-        assert.equal(value.refreshes, 0, name + ': pointerCancel запустил refresh');
-      }
-      let released = false;
-      destroy = () => {
-        if (kind === 'pull-settled') {
-          if (!released) {
-            released = true;
-            settledPromises.push({ host, owner, ref: new WeakRef(value), terminal: true });
-            action.resolve();
-          }
-          return;
-        }
-        owner.destroy(); owner.pointerDown({ x: 0, y: 0, t: 3 });
-        if (!released && kind === 'pull-pending') {
-          released = true;
-          terminalPromises.push({ host, owner, state: owner.state,
-            ref: new WeakRef(value), publications: value.publications });
-          action.resolve();
-        }
-      };
-      if (!terminal && kind === 'pull-settled') {
-        settledPromises.push({ host, owner, ref: new WeakRef(value), terminal: false });
-        action.resolve();
-      }
-      owners = [owner, off, action];
+      off();
+      layer.set({ x: 3 });
+      assert.equal(value.publications, 2, name + ': повторная подписка не действует');
+      destroy = () => { owner.destroy(); layer.set({ x: 4 }); };
+      owners = [owner, layer, off, again];
       break;
     }
     case 'reorder': {
@@ -496,30 +409,6 @@ async function flushTerminalPromises() {
     const value = check.ref.deref();
     if (value) assert.equal(value.publications, check.publications, check.name + ': deferred cleanup вызвал writer');
   }
-  for (const check of settledPromises.splice(0)) {
-    check.host.drain();
-    assert.equal(check.owner.state.phase, 'idle', 'refresh не завершил возврат прежде destroy');
-    assert.equal(check.owner.state.pending, false);
-    assert.equal(check.owner.state.value, 0);
-    const value = check.ref.deref();
-    assert.ok(value, 'живой controller потерял component callback до завершения refresh');
-    assert.equal(value.refreshes, 1);
-    if (check.terminal) {
-      const publications = value.publications, state = check.owner.state;
-      check.owner.destroy(); check.owner.destroy();
-      check.owner.pointerDown({ x: 0, y: 0, t: 3 });
-      check.host.terminalDrain();
-      assert.equal(value.publications, publications, 'settled destroy вызвал terminal listener');
-      assert.equal(check.owner.state, state, 'settled destroy был отменён поздним вводом');
-    }
-  }
-  for (const check of terminalPromises.splice(0)) {
-    assert.equal(check.owner.state, check.state, 'поздний refresh изменил terminal state');
-    check.host.terminalDrain();
-    assert.equal(check.owner.state, check.state, 'поздний refresh-frame изменил terminal state');
-    const value = check.ref.deref();
-    if (value) assert.equal(value.publications, check.publications, 'поздний refresh вызвал terminal listener');
-  }
 }
 
 function setup(testCase, id, terminal, weak, words = 256) {
@@ -534,47 +423,27 @@ function resetExecutions() { for (const testCase of CASES) testCase.completed = 
 function executions() { return CASES.map(testCase => ({ name: testCase.name, cycles: testCase.completed })); }
 
 function activeUnsubscribe(mod, kind) {
-  const value = component(4);
-  const ref = new WeakRef(value);
-  const host = makeHost();
-  const progress = { publications: 0 };
-  const notify = listener(value);
-  const constructorListener = kind.endsWith('-constructor');
-  const behaviorKind = kind.replace('-constructor', '');
-  let owner, off;
+  const value = component(4), ref = new WeakRef(value), host = makeHost();
+  const progress = { publications: 0 }, notify = listener(value);
+  let owner, off, layer;
   if (kind === 'motion-value') {
     owner = new mod.root.MotionValue({ initial: 0, spring: SPRING, requestFrame: host.requestFrame });
     off = owner.onChange(notify);
     owner.onChange(listener(progress));
     off(); off();
     owner.setTarget(1); host.step();
-    assert.ok(progress.publications > 1, 'unsubscribe остановил соседний listener живого MotionValue');
+    assert.ok(progress.publications > 1, 'отписка остановила соседний listener MotionValue');
   } else {
-    owner = behaviorKind === 'sheet'
-      ? mod.behaviors.createBottomSheet({ snapPoints: [0, 100], requestFrame: host.requestFrame,
-          onChange: constructorListener ? notify : undefined })
-      : behaviorKind === 'pager'
-        ? mod.behaviors.createCarousel({ pageCount: 2, pageSize: 100, requestFrame: host.requestFrame,
-            onChange: constructorListener ? notify : undefined })
-        : kind === 'dismiss'
-          ? mod.behaviors.createDragDismiss({ distanceThreshold: 40, requestFrame: host.requestFrame })
-          : mod.behaviors.createPullToRefresh({ threshold: 40, resistance: 1, requestFrame: host.requestFrame });
-    // Даже callback из constructor-options использует ту же Set identity:
-    // off повторной subscribe снимает запись и не удерживает receiver options.
+    assert.equal(kind, 'state-cascade');
+    owner = mod.behaviors.createStateCascade();
+    layer = owner.createLayer({ x: 0 });
     off = owner.subscribe(notify);
     owner.subscribe(listener(progress));
     off(); off();
-    if (behaviorKind === 'sheet') owner.snapTo(1);
-    else if (behaviorKind === 'pager') owner.goTo(1);
-    else {
-      owner.pointerDown({ x: 0, y: 0, t: 0 });
-      owner.pointerMove({ x: 0, y: 20, t: 0.1 });
-      owner.pointerUp({ x: 0, y: 20, t: 0.2 });
-    }
-    host.step();
-    assert.ok(progress.publications > 0, 'unsubscribe остановил соседний listener живого behavior');
+    layer.set({ x: 1 });
+    assert.equal(progress.publications, 1, 'отписка остановила соседний listener каскада');
   }
-  return { ref, owners: [owner, off, host, progress] };
+  return { ref, owners: [owner, off, layer, host, progress] };
 }
 
 function promiseRoot(mod, kind) {
@@ -583,19 +452,13 @@ function promiseRoot(mod, kind) {
     action.promise.then(listener(value));
     return { ref, owners: [action] };
   }
-  const host = makeHost();
-  const owner = mod.behaviors.createPullToRefresh({
-    threshold: 40, resistance: 1, pendingPosition: 60,
-    requestFrame: host.requestFrame, onRefresh: refresh(value, action),
+  const owner = mod.presence.createPresenceTransition({
+    enter: pendingEffect(action), onPresent: listener(value),
   });
-  const off = owner.subscribe(listener(value));
-  owner.pointerDown({ x: 0, y: 0, t: 0 });
-  owner.pointerMove({ x: 0, y: 60, t: 0.1 });
-  owner.pointerUp({ x: 0, y: 60, t: 0.2 });
-  assert.equal(owner.state.pending, true);
-  assert.equal(value.refreshes, 1);
-  if (kind !== 'live') { owner.destroy(); host.terminalDrain(); }
-  return { ref, owners: kind === 'promise-only' ? [action] : [owner, off, action, host] };
+  owner.setPresent(true);
+  assert.equal(owner.state, 'entering');
+  if (kind !== 'live') owner.destroy();
+  return { ref, owners: kind === 'promise-only' ? [action] : [owner, action] };
 }
 
 // Узкие witnesses прежнего follow proof: scheduler/listeners уже входят в
@@ -642,34 +505,31 @@ function followEffectRoot(mod, pickup, terminal) {
 }
 
 async function promiseHealthy(mod) {
-  const value = component(6), action = deferred(), host = makeHost();
-  const owner = mod.behaviors.createPullToRefresh({
-    threshold: 40, resistance: 1, pendingPosition: 60, requestFrame: host.requestFrame,
-    onRefresh: refresh(value, action), onChange: listener(value),
+  const value = component(6), action = deferred();
+  const owner = mod.presence.createPresenceTransition({
+    enter: pendingEffect(action), onPresent: completion(value), onGone: completion(value),
   });
-  owner.pointerDown({ x: 0, y: 0, t: 0 });
-  owner.pointerMove({ x: 0, y: 60, t: 0.1 });
-  owner.pointerUp({ x: 0, y: 60, t: 0.2 });
-  assert.equal(owner.state.pending, true);
-  assert.equal(value.refreshes, 1);
-  assert.equal(host.pendingFrames, 0);
-  action.resolve(); await Promise.resolve(); await Promise.resolve();
-  assert.ok(host.pendingFrames > 0, 'healthy Promise не продолжил возврат');
-  host.drain();
-  assert.equal(owner.state.phase, 'idle'); assert.equal(owner.state.pending, false);
-  assert.equal(owner.state.value, 0);
-  owner.destroy(); host.terminalDrain();
-  const dismiss = mod.behaviors.createDragDismiss({
-    distanceThreshold: 40, dismissTarget: 80, matchMedia: () => ({ matches: true }),
-    requestFrame: host.requestFrame, onDismiss: completion(value),
+  const pending = owner.setPresent(true);
+  assert.equal(owner.state, 'entering');
+  assert.equal(value.completions, 0);
+  action.resolve();
+  assert.deepEqual(await pending, { status: 'finished', present: true });
+  assert.equal(value.completions, 1, 'завершение принятого Promise не доставлено');
+  assert.deepEqual(await owner.setPresent(false), { status: 'finished', present: false });
+  assert.equal(value.completions, 2, 'завершение ухода не доставлено');
+  owner.destroy();
+
+  const late = deferred();
+  const cancelled = mod.presence.createPresenceTransition({
+    enter: pendingEffect(late), onPresent: completion(value),
   });
-  dismiss.pointerDown({ x: 0, y: 0, t: 0 });
-  dismiss.pointerMove({ x: 0, y: 60, t: 0.1 });
-  dismiss.pointerUp({ x: 0, y: 60, t: 0.2 });
-  assert.equal(value.dismissals, 1, 'healthy onDismiss не выполнен');
-  assert.equal(dismiss.state.dismissed, true);
-  dismiss.destroy(); host.terminalDrain();
+  const ended = cancelled.setPresent(true);
+  cancelled.destroy(); late.resolve();
+  assert.deepEqual(await ended, { status: 'destroyed', present: true });
+  await Promise.resolve(); await Promise.resolve();
+  assert.equal(value.completions, 2, 'поздний Promise вызвал отменённое завершение');
 }
+
 async function collect(rounds = 4) {
   assert.equal(typeof globalThis.gc, 'function', '--expose-gc отсутствует');
   for (let round = 0; round < rounds; round++) { await setImmediate(); globalThis.gc(); }
@@ -809,8 +669,7 @@ if (mode === 'reentry') {
       promiseOwners.push(result.owners); promiseRefs[kind].push(result.ref);
     }
   }
-  for (const mod of modules) for (const kind of ['motion-value', 'sheet', 'sheet-constructor',
-    'pager', 'pager-constructor', 'dismiss', 'pull']) {
+  for (const mod of modules) for (const kind of ['motion-value', 'state-cascade']) {
     const result = activeUnsubscribe(mod, kind);
     unsubscribedOwners.push(result.owners); unsubscribedRefs.push(result.ref);
   }
@@ -836,14 +695,21 @@ if (mode === 'reentry') {
   const retainedComponentReferences = owners.reduce((total, owner) => total + owner.retained, 0);
   const inheritedFailures = inheritedChecks.filter(({ ref, alive }) => (ref.deref() !== undefined) !== alive)
     .map(({ label }) => label);
+  for (const [owner, off, layer, host, progress] of unsubscribedOwners) {
+    const before = progress.publications;
+    off(); off();
+    if (layer) layer.set({ x: 2 });
+    else { owner.setTarget(2); host.step(); }
+    assert.ok(progress.publications > before, 'off после GC остановил соседнюю подписку');
+  }
   const controls = { inheritedChecks: inheritedChecks.length, inheritedFailures,
     live: countAlive(liveRefs), expectedLive: CASES.length,
     dropped: countAlive(droppedRefs), deliberate: countAlive(deliberateRefs),
     unsubscribedActive: countAlive(unsubscribedRefs), activeOwnersWithHealthySibling: unsubscribedOwners.length,
     promiseRoots: Object.fromEntries(Object.entries(promiseRefs).map(([name, refs]) => [name, countAlive(refs)])),
-    healthyPromiseCompletions: modules.length, healthyDismissCompletions: modules.length };
+    healthyPromiseCompletions: modules.length, healthyGoneCompletions: modules.length };
   // Тот же live scope/presence controller остаётся сильным root после destroy;
-  // прежние 38 controls не меняют свой текущий lifetime premise.
+  // живые controls сохраняют callbacks до явного завершения владельца.
   const addedLiveRefs = [];
   for (let index = 0; index < CASES.length; index++) if (ADDED_KINDS.includes(CASES[index].kind)) {
     const [host, owner] = liveOwners[index];
@@ -867,7 +733,7 @@ if (mode === 'reentry') {
   assert.equal(controls.deliberate, 1, 'deliberate-retention control не обнаружен');
   assert.equal(controls.unsubscribedActive, 0, 'retained off удерживает компонент при живом owner');
   assert.equal(controls.promiseRoots.live, 2, 'live Promise control потерял компонент');
-  assert.equal(controls.promiseRoots.terminal, 0, 'terminal controller удерживает onRefresh при нейтральном внешнем Promise');
+  assert.equal(controls.promiseRoots.terminal, 0, 'terminal controller удерживает onPresent при нейтральном внешнем Promise');
   assert.equal(controls.promiseRoots['promise-only'], 0, 'motion continuation удерживает компонент через нейтральный внешний Promise');
   assert.equal(controls.promiseRoots['user-owned'], 2, 'внешний пользовательский Promise callback не различается');
   assert.equal(retainedComponentReferences, 0, 'terminal controls удерживают уничтоженные компоненты');
@@ -877,19 +743,36 @@ if (mode === 'reentry') {
   // стенда, не новый budget продукта: шире 256 KiB калибровка не принимается.
   // Контрольный Array содержит 131 072 элемента; измеренный сигнал должен
   // различаться минимум в 4× band независимо от представления элементов V8.
+  const optimizer = process.execArgv.includes('--no-concurrent-recompilation') ? 'foreground' : 'concurrent';
+  assert.equal(optimizer, 'foreground', 'heap-срез требует --no-concurrent-recompilation');
   const MAX_RESOLVABLE_BAND = 256 * 1024;
   const READOUT_ALLOWANCE = 8 * 1024;
   const CONTROL_WORDS = 128 * 1024;
+  const BATCH_CYCLES = 2000;
   const batch = cycles => { for (let i = 0; i < cycles; i++) for (const testCase of CASES) setup(testCase, i, true, false); };
-  const memory = async () => { await flushTerminalPromises(); await collect(); return process.memoryUsage(); };
+  const memory = async () => {
+    await flushTerminalPromises();
+    // Полная сборка завершает работу VM и освобождает compilation caches.
+    // Все byte-samples используют одну границу; живые roots проверяются отдельно.
+    for (let round = 0; round < 4; round++) {
+      await setImmediate();
+      const completion = globalThis.gc({ type: 'major', execution: 'async', flavor: 'last-resort' });
+      assert.equal(typeof completion?.then, 'function', 'async major GC недоступен');
+      await completion;
+    }
+    return process.memoryUsage();
+  };
   const heap = async () => (await memory()).heapUsed;
-  batch(256);
+  // Одинаковая нагрузка между чтениями в прогреве, A/A и измеряемых префиксах.
+  batch(BATCH_CYCLES);
   await heap();
   const calibration = [];
-  for (let i = 0; i < 8; i++) { batch(128); calibration.push(await heap()); }
+  for (let i = 0; i < 8; i++) { batch(BATCH_CYCLES); calibration.push(await heap()); }
   const low = Math.min(...calibration), high = Math.max(...calibration);
   const band = high - low + READOUT_ALLOWANCE;
-  const baseline = { low, high, band, maximumResolvableBand: MAX_RESOLVABLE_BAND, samples: calibration };
+  const baseline = { low, high, band, maximumResolvableBand: MAX_RESOLVABLE_BAND,
+    warmupCyclesPerOwner: BATCH_CYCLES, calibrationCyclesPerSample: BATCH_CYCLES,
+    workloadCyclesPerSample: BATCH_CYCLES, collector: 'major/async/last-resort', optimizer, samples: calibration };
   console.log(JSON.stringify({ phase: 'baseline', mode, corpus, baseline }));
   assert.ok(band <= MAX_RESOLVABLE_BAND, 'named gap: A/A heap baseline не разрешает 256 KiB; candidate admission не запущен');
 
@@ -915,27 +798,19 @@ if (mode === 'reentry') {
 
   const samples = [];
   resetExecutions();
-  for (let prefix = 2000; prefix <= CYCLES; prefix += 2000) {
-    batch(2000);
+  for (let prefix = BATCH_CYCLES; prefix <= CYCLES; prefix += BATCH_CYCLES) {
+    batch(BATCH_CYCLES);
     const measured = await memory();
     samples.push({ cyclesPerOwner: prefix, ...measured });
   }
-  // Префиксы сохраняют форму churn, но не являются terminal retention:
-  // V8 может держать уже недостижимые allocation/WeakMap backing stores между
-  // major GC и затем вернуть их без нового product work. Поэтому старый
-  // every-prefix критерий отвергал здоровый corpus на 4k/6k, хотя 10k и
-  // последующий quiescent tail стабильно возвращались ниже той же A/A полосы.
-  // M-07 требует возврат retained bytes после terminal boundary и отсутствие
-  // растущего retained хвоста. Число tail-read фиксировано, каждый использует
-  // тот же memory()/forced-GC oracle; устойчивый retained owner остаётся выше.
+  // Фиксированный terminal tail дополняет все пять промежуточных измерений.
   const upper = high + band;
   const excess = samples.map(sample => Math.max(0, sample.heapUsed - upper));
   const terminalTail = [];
   for (let i = 0; i < 4; i++) terminalTail.push(await memory());
   const tailExcess = terminalTail.map(sample => Math.max(0, sample.heapUsed - upper));
-  // Historical existing-38 guard не ослабляется: его префиксы уже являются
-  // устойчивым доказанным contract. Новый presence/scope corpus использует
-  // свой независимый terminal-tail admission после обнаруженного V8 false RED.
+  // Основной corpus проверяется на каждом префиксе. Presence/scope использует
+  // свою прежнюю terminal-tail границу; численные допуски обоих наборов сохранены.
   const prefixRequired = corpus !== 'presence-scope';
   const retained = tailExcess.every(bytes => bytes === 0)
     && (!prefixRequired || excess.every(bytes => bytes === 0));
@@ -951,5 +826,5 @@ if (mode === 'reentry') {
       process: 'heapUsed, heapTotal, external, arrayBuffers и rss показаны отдельно',
       nativeGpuBytes: 'не измерены этим Node host' } };
   console.log(JSON.stringify(report));
-  assert.ok(retained, 'retained heap не вернулся в baseline-полосу на terminal tail');
+  assert.ok(retained, `retained heap выше ${upper} B: prefixes=${JSON.stringify(samples.map((sample, i) => [sample.cyclesPerOwner, excess[i]]))}; tail=${tailExcess.join(',')}`);
 }

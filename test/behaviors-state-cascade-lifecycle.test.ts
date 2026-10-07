@@ -294,3 +294,75 @@ it.each([
   } });
   expect(state.get('x')).toBe(9);
 });
+
+
+describe('каскад: принадлежность отписки регистрации', () => {
+  it('сохранённый off не снимает повторную регистрацию callback', () => {
+    const state = createStateCascade<Visual>();
+    const layer = state.createLayer();
+    const seen: number[] = [];
+    const callback = ({ changed }: { changed: Readonly<Partial<Visual>> }) => { seen.push(changed.x!); };
+    const oldOff = state.subscribe(callback);
+    oldOff();
+    const currentOff = state.subscribe(callback);
+    oldOff();
+    layer.set({ x: 1 });
+    expect(seen).toEqual([1]);
+    currentOff(); layer.set({ x: 2 });
+    expect(seen).toEqual([1]);
+    state.destroy();
+  });
+
+  it('дубликаты делят одну активную регистрацию, старые handles не отменяют следующую', () => {
+    const state = createStateCascade<Visual>();
+    const layer = state.createLayer();
+    const seen: number[] = [];
+    const callback = ({ changed }: { changed: Readonly<Partial<Visual>> }) => { seen.push(changed.x!); };
+    const first = state.subscribe(callback);
+    const duplicate = state.subscribe(callback);
+    expect(first).toBe(duplicate);
+    duplicate();
+    const current = state.subscribe(callback);
+    first(); duplicate();
+    layer.set({ x: 1 });
+    expect(seen).toEqual([1]);
+    current(); state.destroy();
+  });
+
+  it('отписка сохраняет уже принятое уведомление, но исключает следующий commit', () => {
+    const state = createStateCascade<Visual>();
+    const layer = state.createLayer();
+    const seen: string[] = [];
+    let off = () => {};
+    state.subscribe(({ changed }) => {
+      seen.push(`a${changed.x}`);
+      if (changed.x === 1) { layer.set({ x: 2 }); off(); layer.set({ x: 3 }); }
+    });
+    off = state.subscribe(({ changed }) => { seen.push(`b${changed.x}`); });
+    layer.set({ x: 1 });
+    expect(seen).toEqual(['a1', 'b1', 'a2', 'b2', 'a3']);
+    state.destroy();
+  });
+
+  it('перерегистрация внутри callback сохраняет FIFO и изолирует старый off', () => {
+    const state = createStateCascade<Visual>();
+    const layer = state.createLayer();
+    const seen: number[] = [];
+    let currentOff = () => {};
+    const callback = ({ changed }: { changed: Readonly<Partial<Visual>> }) => {
+      seen.push(changed.x!);
+      if (changed.x === 1) {
+        oldOff();
+        currentOff = state.subscribe(callback);
+        oldOff();
+        layer.set({ x: 2 });
+      }
+    };
+    const oldOff = state.subscribe(callback);
+    layer.set({ x: 1 }); layer.set({ x: 3 });
+    expect(seen).toEqual([1, 2, 3]);
+    currentOff(); layer.set({ x: 4 });
+    expect(seen).toEqual([1, 2, 3]);
+    state.destroy();
+  });
+});

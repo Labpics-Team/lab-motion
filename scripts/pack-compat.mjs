@@ -266,13 +266,13 @@ try {
         `import type { DragOptions } from '${pkg.name}/gestures';\n` +
         `import type { PresenceOptions } from '${pkg.name}/presence';\n` +
         `import type { FlipOptions } from '${pkg.name}/flip';\n` +
-        `import type { SheetOptions } from '${pkg.name}/behaviors';\n` +
+        `import type { StateCascade } from '${pkg.name}/behaviors';\n` +
         `const matchMedia = (_query: string) => ({ matches: false });\n` +
         `const spring = { mass: 1, stiffness: 200, damping: 20 };\n` +
         `const root: DriveOptions = { from: 0, to: 1, spring, onStep() {}, matchMedia };\n` +
         `const driver: DriverOptions = { ...root };\n` +
         `const decay: DecayOptions = { from: 0, velocity: 1, matchMedia };\n` +
-        `export const contracts: [DragOptions, PresenceOptions, FlipOptions, SheetOptions] | undefined = undefined;\n` +
+        `export const contracts: [DragOptions, PresenceOptions, FlipOptions, StateCascade<{ value: number }>] | undefined = undefined;\n` +
         `drive(root); createDriver(driver); createDecay(decay);\n`,
     );
     execSync(`node "${TSC_BIN}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });

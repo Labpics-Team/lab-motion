@@ -38,7 +38,7 @@ it('публичный nested entry: ESM/CJS/types и буквальный DOM-�
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 
-it('метафайл: reorder не тянет solver/scheduler/DOM, старый behaviors не тянет reorder', async () => {
+it('метафайл: reorder не тянет solver/scheduler/DOM, каскад целей не тянет reorder', async () => {
   const emit = async (name: string, entry: string) => {
     const file = join(root, `dist/${entry}/index.js`);
     expect(existsSync(file), 'сначала build').toBe(true);
@@ -46,8 +46,9 @@ it('метафайл: reorder не тянет solver/scheduler/DOM, старый
       bundle: true, minify: true, format: 'esm', platform: 'browser', write: false, metafile: true });
     return { code: out.outputFiles[0]!.text, inputs: Object.keys(out.metafile!.inputs) };
   };
-  const optional = await emit('createReorder', 'behaviors/reorder'); const prior = await emit('createBottomSheet', 'behaviors');
+  const optional = await emit('createReorder', 'behaviors/reorder'); const prior = await emit('createStateCascade', 'behaviors');
   expect(optional.inputs.filter(p => !p.includes('<stdin>'))).toEqual(['dist/behaviors/reorder/index.js']);
   expect(optional.code).not.toMatch(/requestAnimationFrame|document\.|getBoundingClientRect|setTimeout|MotionValue/);
+  expect(prior.code).not.toMatch(/requestAnimationFrame|document\.|getBoundingClientRect|setTimeout|MotionValue/);
   expect(optional.code).toContain('reorder:'); expect(prior.code).not.toContain('reorder:');
 });

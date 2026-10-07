@@ -276,19 +276,7 @@ export const BESPOKE_SUBPATH_GATES = {
   './compiler/surface': 1024,
   // Native IntersectionObserver capability; exact first-implementation ratchet.
   './in-view': IN_VIEW_GATE_BYTES,
-  // ./behaviors — headless state machines типовых мобильных взаимодействий
-  // (bottom sheet / drag-to-dismiss / carousel / pull-to-refresh) поверх
-  // ПЕРЕИСПОЛЬЗУЕМЫХ примитивов: createVelocityTracker (./gestures), createDecay
-  // (./decay, проекция момента), solveSpring ядра (доводка value→target),
-  // токены ./tokens (дефолтные пружины). splitting:false ⇒ субпуть несёт срез
-  // velocity-tracker (+ trimSlidingWindow), decay и solver — честная цена
-  // самодостаточного субпутя; ничего не дублировано (импорты, не копии).
-  // Хронология факта/порога (дисциплина ./compositor: порог ОТ ФАКТА):
-  //   2026-07-10: факт первой сборки 4475 gz shipped → порог 4600 (~2.8% люфт).
-  //   ИМЕННОЙ потолок ТЕСНЕЕ общего SUBPATH_GATE_BYTES (4608): субпуть сидит
-  //   вплотную к общему зонту, и точечный порог — ровно тот регрессионный класс,
-  //   что общий 4608 бы пропустил на +130 gz. Люфт скромный (не 4%) осознанно:
-  //   рост тут — новая capability, не шум минификатора. Поднимать только осознанно.
+  // Каскад целей сохраняет прежний потолок независимого entry.
   './behaviors': 4600,
 };
 
@@ -419,15 +407,9 @@ export const IMPORT_COST_SCENARIOS = [
     gate: 15_700,
   },
   {
-    // ПРАВДА потребительской цены поведения + СТРАЖ переиспользования: одна
-    // фабрика ./behaviors должна тянуть ТОЛЬКО срез velocity-tracker+decay+solver,
-    // а не весь пакет. Если бы behaviors утянул ./compositor-компилятор или
-    // ./value, число скакнуло бы к порядку full-фасада (~10 KB).
-    name: 'behaviors-sheet-one-liner',
-    code: `import { createBottomSheet } from '%DIST%/../behaviors/index.js'; const s = createBottomSheet({ snapPoints: [0, 300] }); s.pointerDown({ x: 0, y: 0, t: 0 }); console.log(typeof s.cancel);`,
-    // Факт первой сборки 2026-07-10: 3542 gz + ~4% люфт. Заметно < shipped 4475 —
-    // машинное доказательство, что одна фабрика трясётся (не тянет весь субпуть).
-    gate: 3700,
+    name: 'state-cascade',
+    code: `import { createStateCascade } from '%DIST%/../behaviors/index.js'; const state = createStateCascade(); const layer = state.createLayer({ x: 0 }); layer.set({ x: 1 }); console.log(state.snapshot()); state.destroy();`,
+    gate: 1024,
   },
 ];
 

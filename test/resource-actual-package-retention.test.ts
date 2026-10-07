@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -21,13 +21,19 @@ const RUNTIME_FILES = [
 const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
 const EXISTING_KINDS = [
   'frame', 'motion-value', 'compositor-native', 'compositor-live', 'compositor-delay',
-  'compositor-handoff', 'compositor-roundtrip', 'compositor-reduced-loans', 'binding', 'sheet', 'pager',
-  'dismiss', 'pull', 'pull-pending', 'pull-settled', 'reorder',
+  'compositor-handoff', 'compositor-roundtrip', 'compositor-reduced-loans', 'binding', 'state-cascade', 'reorder',
   'follow-native', 'follow-pickup', 'follow-live',
 ];
 const ADDED_KINDS = ['presence-transition', 'animate-scope-main', 'animate-scope-native'];
 const ownerNames = (kinds: string[]) => ['esm', 'cjs'].flatMap(format => kinds.map(owner => `${format}/${owner}`));
 const EXPECTED_OWNERS = ownerNames([...EXISTING_KINDS, ...ADDED_KINDS]);
+
+// Heap-срез измеряется после завершённой работы компилятора VM. Остальные
+// lifecycle/reference проверки сохраняют обычный оптимизирующий runtime.
+const vmFlags = (mode: string, forcedGc: boolean): string[] => [
+  ...(forcedGc ? ['--expose-gc'] : []),
+  ...(mode === 'bytes' ? ['--no-concurrent-recompilation'] : []),
+];
 
 describe('RESOURCE-01: реальные байты установленного production tarball', () => {
   let work: string | undefined;
@@ -77,7 +83,7 @@ describe('RESOURCE-01: реальные байты установленного 
   afterAll(() => { if (work !== undefined) rmSync(work, { recursive: true, force: true }); });
 
   function probe(mode: string, forcedGc = false, corpus = 'combined'): Record<string, unknown> {
-    const args = [...(forcedGc ? ['--expose-gc'] : []), entry, mode, corpus];
+    const args = [...vmFlags(mode, forcedGc), entry, mode, corpus];
     const receiptName = corpus === 'combined' ? mode : `${mode}-${corpus}`;
     let output: string;
     try {
@@ -135,6 +141,43 @@ describe('RESOURCE-01: реальные байты установленного 
     const result = probe('bytes', true, 'existing');
     expect(result.status).toBe('pass');
     completeCycles(result, ownerNames(EXISTING_KINDS));
+    expect(result.baseline).toMatchObject({ warmupCyclesPerOwner: 2000,
+      calibrationCyclesPerSample: 2000, workloadCyclesPerSample: 2000,
+      collector: 'major/async/last-resort', optimizer: 'foreground', maximumResolvableBand: 262144 });
+    expect(result.excess).toEqual([0, 0, 0, 0, 0]);
+    expect(result.tailExcess).toEqual([0, 0, 0, 0]);
+  }, 120_000);
+
+  it.each(['prefix', 'growing'] as const)('измеритель обнаруживает %s удержание в установленном пакете', (kind) => {
+    const source = readFileSync(entry, 'utf8');
+    const boundary = '    const measured = await memory();';
+    expect(source.split(boundary)).toHaveLength(2);
+    const injection = kind === 'prefix'
+      ? 'globalThis.__resourceChurnControl = prefix === BATCH_CYCLES ? component(prefix, CONTROL_WORDS) : undefined;'
+      : '(globalThis.__resourceChurnControl ??= []).push(component(prefix, CONTROL_WORDS));';
+    const mutant = join(app, `retained-${kind}.mjs`);
+    writeFileSync(mutant, source.replace(boundary, `    ${injection}\n${boundary}`));
+    const run = spawnSync(process.execPath, [...vmFlags('bytes', true), mutant, 'bytes', 'existing'], {
+      cwd: app, encoding: 'utf8', timeout: 90_000, maxBuffer: 4 * 1024 * 1024,
+    });
+    writeFileSync(join(evidenceRun, `retained-${kind}.stdout.log`), run.stdout ?? '');
+    writeFileSync(join(evidenceRun, `retained-${kind}.stderr.log`), run.stderr ?? '');
+    expect(run.error).toBeUndefined();
+    expect(run.status, run.stderr).toBe(1);
+    const result = JSON.parse(run.stdout.trim().split('\n').at(-1)!) as Record<string, unknown>;
+    expect(result.status).toBe('fail');
+    completeCycles(result, ownerNames(EXISTING_KINDS));
+    const excess = result.excess as number[];
+    expect(excess).toHaveLength(5);
+    expect(excess[0]).toBeGreaterThan(0);
+    if (kind === 'prefix') {
+      expect(excess.slice(1)).toEqual([0, 0, 0, 0]);
+      expect(result.tailExcess).toEqual([0, 0, 0, 0]);
+    } else {
+      expect(excess.every(bytes => bytes > 0)).toBe(true);
+      expect(excess.at(-1)).toBeGreaterThan(excess[0]!);
+      expect((result.tailExcess as number[]).every(bytes => bytes > 0)).toBe(true);
+    }
   }, 120_000);
 
   it('presence/scope после 10 000 циклов имеет стабильный terminal tail в своей A/A baseline-полосе', () => {
