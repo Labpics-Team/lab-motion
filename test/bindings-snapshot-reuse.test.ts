@@ -190,3 +190,47 @@ it('вложенные равные снимки сравниваются с у�
   expect(seen).toEqual([0, 1, 2]);
   binding.destroy();
 });
+
+
+it('вложенный возврат сохраняет текущий порядок ключей', () => {
+  const seen: Array<{ x: number; keys: string[] }> = [];
+  const binding = createMotionBinding((model: { x: number; y: number }) => ({ role: model }), {
+    role: goal => {
+      seen.push({ x: goal.x, keys: Object.keys(goal) });
+      if (goal.x === 1) binding.update({ y: 0, x: 0 });
+    },
+  });
+  binding.update({ x: 0, y: 0 });
+  binding.update({ y: 0, x: 1 });
+  expect(seen).toEqual([
+    { x: 0, keys: ['x', 'y'] },
+    { x: 1, keys: ['y', 'x'] },
+    { x: 0, keys: ['y', 'x'] },
+  ]);
+  binding.destroy();
+});
+
+it('очередь из cancel сохраняет порядок свойств при возврате через другую цель', () => {
+  const seen: Array<{ x: number; keys: string[] }> = [];
+  let queued = false;
+  const binding = createMotionBinding((model: { x: number; y: number }) => ({ role: model }), {
+    role: goal => {
+      seen.push({ x: goal.x, keys: Object.keys(goal) });
+      return { cancel() {
+        if (goal.x !== 0 || queued) return;
+        queued = true;
+        binding.update({ x: 2, y: 0 });
+        binding.update({ x: 1, y: 0 });
+      } };
+    },
+  });
+  binding.update({ x: 0, y: 0 });
+  binding.update({ y: 0, x: 1 });
+  expect(seen).toEqual([
+    { x: 0, keys: ['x', 'y'] },
+    { x: 1, keys: ['y', 'x'] },
+    { x: 2, keys: ['x', 'y'] },
+    { x: 1, keys: ['x', 'y'] },
+  ]);
+  binding.destroy();
+});

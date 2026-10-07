@@ -9,7 +9,7 @@ it('публичные witnesses различают неверные реали�
   const report = JSON.parse(output);
   expect(report.records.map((item: { name: string }) => item.name)).toEqual([
     'restart-unchanged', 'mutable-goal', 'aliased-goal', 'partial-cleanup',
-    'cancel-successor', 'overwrite-destroy', 'recursive-project', 'read-after-revoke', 'skip-queued-restore', 'restart-queued-duplicate',
+    'cancel-successor', 'overwrite-destroy', 'recursive-project', 'read-after-revoke', 'skip-queued-restore', 'reuse-queued-key-order', 'restart-queued-duplicate',
   ]);
   expect(report.records.every((item: { killed: boolean }) => item.killed)).toBe(true);
   expect(report.baselineTests).toBeGreaterThan(0);

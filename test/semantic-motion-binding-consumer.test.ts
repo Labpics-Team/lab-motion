@@ -41,6 +41,16 @@ for (const module of [esm, cjs]) {
   assert.throws(() => view.update(NaN), e => e instanceof module.MotionParamError && e.code === 'LM180');
   view.destroy(); view.update(0);
   assert.equal(cancels, 1); assert.equal(writes, 1); assert.equal(view.state, 'destroyed');
+  const seen = [];
+  const restoring = module.createMotionBinding(model => ({ role: model }), {
+    role: goal => {
+      seen.push(Object.keys(goal));
+      if (goal.x === 1) restoring.update({ y: 0, x: 0 });
+    },
+  });
+  restoring.update({ x: 0, y: 0 }); restoring.update({ y: 0, x: 1 });
+  assert.deepEqual(seen, [['x', 'y'], ['y', 'x'], ['y', 'x']]);
+  restoring.destroy();
 }
 console.log('semantic-binding-consumer: PASS');
 `);

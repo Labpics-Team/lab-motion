@@ -21,7 +21,8 @@ const cases = [
   ['overwrite-destroy', "if (state === 'active') state = outcome;", 'state = outcome;', 'ошибка после destroy не перезаписывает'],
   ['recursive-project', "if (projecting) throw new MotionParamError('LM181');", '', 'проекция не может рекурсивно записывать'],
   ['read-after-revoke', "if (state !== 'active') return true;", '', 'отзыв во время проверки принадлежности поля'],
-  ['skip-queued-restore', 'if (!draining && goals === previousGoals) return;', 'if (goals === previousGoals) return;', 'вложенное возвращение к прежней цели'],
+  ['skip-queued-restore', 'pending.push(goals);', 'if (draining) return; pending.push(goals);', 'вложенное возвращение к прежней цели'],
+  ['reuse-queued-key-order', 'const previous = draining ? undefined : previousGoals?.[i];', 'const previous = previousGoals?.[i];', 'вложенный возврат сохраняет текущий порядок ключей'],
   ['restart-queued-duplicate', 'cursor > 0 &&', 'false &&', 'вложенные равные снимки сравниваются'],
 ];
 const work = mkdtempSync(join(tmpdir(), 'motion-binding-mutations-'));

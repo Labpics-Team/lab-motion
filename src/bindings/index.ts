@@ -120,7 +120,9 @@ export function createMotionBinding<Model, Goals extends MotionBindingGoals>(
         throw new MotionParamError('LM180');
       }
       if (state !== 'active') return;
-      const previous = previousGoals?.[i];
+      // Цель в очереди имеет собственный порядок ключей, независимо от состояний
+      // до и после текущего вызова исполнителя.
+      const previous = draining ? undefined : previousGoals?.[i];
       let goal: Record<string, number | string> | undefined;
       for (let j = 0; j < names.length; j++) {
         const key = names[j]!;
