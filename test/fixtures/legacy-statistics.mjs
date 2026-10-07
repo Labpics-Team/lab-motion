@@ -333,26 +333,6 @@ export function exactBinomialOrderStatisticBounds(values, probabilityFraction, a
     throw new Error('exact order statistics: невалидные rational probabilities');
   }
   const sorted = [...values].sort((a, b) => a - b), n = sorted.length;
-  // Ранги зависят только от размера выборки и рациональной политики.
-  // Наблюдения и их значения остаются у вызова; удерживается не более восьми пар рангов.
-  const key = [n, numerator, denominator, alphaNumerator, alphaDenominator].join('/');
-  let ranks = binomialRanks.get(key);
-  if (!ranks) {
-    ranks = exactBinomialRanks(n, numerator, denominator, alphaNumerator, alphaDenominator);
-    if (binomialRanks.size === 8) binomialRanks.delete(binomialRanks.keys().next().value);
-    binomialRanks.set(key, ranks);
-  }
-  const { lowRank, highRank } = ranks;
-  const probability = Number(numerator) / Number(denominator), alphaPerTail = Number(alphaNumerator) / Number(alphaDenominator);
-  const estimateRank = Number((BigInt(n) * numerator + denominator - 1n) / denominator);
-  return { estimate: sorted[Math.min(n - 1, estimateRank - 1)],
-    low: lowRank === 0 ? 0 : sorted[lowRank - 1], high: highRank === null ? null : sorted[highRank - 1],
-    lowRank, highRank, observations: n, probability, alphaPerTail,
-    minimumFiniteUpperBlocks: Math.ceil(Math.log(alphaPerTail) / Math.log(probability)), noTailObservationProbability: probability ** n };
-}
-
-const binomialRanks = new Map();
-function exactBinomialRanks(n, numerator, denominator, alphaNumerator, alphaDenominator) {
   const populationDenominator = denominator ** BigInt(n), pmf = [];
   let mass = (denominator - numerator) ** BigInt(n);
   for (let count = 0; count <= n; count++) {
@@ -370,7 +350,12 @@ function exactBinomialRanks(n, numerator, denominator, alphaNumerator, alphaDeno
     if (cumulative[rank - 1] * alphaDenominator <= populationDenominator * alphaNumerator) lowRank = rank;
     if (highRank === null && survival[rank] * alphaDenominator <= populationDenominator * alphaNumerator) highRank = rank;
   }
-  return { lowRank, highRank };
+  const probability = Number(numerator) / Number(denominator), alphaPerTail = Number(alphaNumerator) / Number(alphaDenominator);
+  const estimateRank = Number((BigInt(n) * numerator + denominator - 1n) / denominator);
+  return { estimate: sorted[Math.min(n - 1, estimateRank - 1)],
+    low: lowRank === 0 ? 0 : sorted[lowRank - 1], high: highRank === null ? null : sorted[highRank - 1],
+    lowRank, highRank, observations: n, probability, alphaPerTail,
+    minimumFiniteUpperBlocks: Math.ceil(Math.log(alphaPerTail) / Math.log(probability)), noTailObservationProbability: probability ** n };
 }
 
 function deriveRealmTimerBounds(name, evidence) {
@@ -961,43 +946,8 @@ export function pairedClusterBootstrap(
   const p50Ratios = [];
   const p95Ratios = [];
   let nullAtLeastAsFavorable = 0;
-  // Один исходный порядок и кратности выбранных кластеров заменяют три
-  // сортировки каждой реплики. Порядок draws, число реплик и binary64 median сохранены.
-  const weighted = Number.isFinite(observedP50Ratio) && observedP50Ratio > 0
-    && allLab.every(value => Number.isFinite(value / observedP50Ratio));
-  const order = clusters => clusters.flatMap((cluster, index) =>
-    cluster.samples.map(value => ({ value, cluster: index }))).sort((a, b) => a.value - b.value);
-  const labOrder = weighted ? order(lab) : null;
-  const competitorOrder = weighted ? order(competitor) : null;
-  const multiplicities = new Float64Array(lab.length);
-  const sampleCount = allLab.length;
-  const middleLow = Math.ceil(sampleCount / 2), middleHigh = Math.floor(sampleCount / 2) + 1;
-  const tail = Math.ceil(sampleCount * 0.95);
-  const summary = ordered => {
-    let count = 0, low, high, p95;
-    for (const observation of ordered) {
-      count += multiplicities[observation.cluster];
-      if (low === undefined && count >= middleLow) low = observation.value;
-      if (high === undefined && count >= middleHigh) high = observation.value;
-      if (count >= tail) { p95 = observation.value; break; }
-    }
-    return { p50: sampleCount % 2 ? low : (low + high) / 2, p95, low, high };
-  };
 
   for (let iteration = 0; iteration < iterations; iteration++) {
-    if (weighted) {
-      multiplicities.fill(0);
-      for (let cluster = 0; cluster < lab.length; cluster++) {
-        multiplicities[Math.floor(random() * lab.length)]++;
-      }
-      const labSample = summary(labOrder), competitorSample = summary(competitorOrder);
-      p50Ratios.push(labSample.p50 / competitorSample.p50);
-      p95Ratios.push(labSample.p95 / competitorSample.p95);
-      const nullMedian = sampleCount % 2 ? labSample.low / observedP50Ratio
-        : (labSample.low / observedP50Ratio + labSample.high / observedP50Ratio) / 2;
-      if (nullMedian / competitorSample.p50 <= observedP50Ratio) nullAtLeastAsFavorable++;
-      continue;
-    }
     const sampledLab = [];
     const sampledCompetitor = [];
     const nullLab = [];
@@ -1247,3 +1197,6 @@ export function assertFreezeMatrix(matrix, controlId) {
     }
   }
 }
+
+// Exact pre-optimization module; aliases expose the reference API.
+export { pairedClusterBootstrap as legacyBootstrap, exactBinomialOrderStatisticBounds as legacyBounds };
