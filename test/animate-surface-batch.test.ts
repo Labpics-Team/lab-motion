@@ -349,10 +349,17 @@ describe('SurfaceBatch: потолок подписок', () => {
     const host = reentrantSubscribeHarness(hostError, () => reenter());
     const batch = new SurfaceBatch(host.frame);
     const a = mainUnit(batch, 'a', true);
+    const removed = mainUnit(batch, 'removed', true);
     const completions: boolean[] = [];
     const b = mainUnit(batch, 'b', true, (natural) => completions.push(natural));
     reenter = () => {
+      expect(b._batchSlot).toBe(2);
       a.cancel();
+      removed.cancel();
+      // Добавление пересекает порог и меняет адрес ещё создаваемого failed-c.
+      const temporary = mainUnit(batch, 'temporary', true);
+      expect(b._batchSlot).toBe(0);
+      temporary.cancel();
       b.play();
     };
 

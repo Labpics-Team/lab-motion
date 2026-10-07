@@ -189,6 +189,9 @@ if (!navigationRecipe) throw new Error('Отсутствует исполняе�
 const navigationCode = transformSync(navigationRecipe, { loader: 'ts', format: 'esm', target: 'es2022' }).code;
 
 for (const direction of ['ltr', 'rtl']) test(`навигация: фокус не перезапускает выбор, геометрия обновляется (${direction})`, async ({ page }) => {
+  // Native-позу задаёт currentTime; wall clock не завершает переход между действиями теста.
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'));
   await page.evaluate(async ({ source, direction }) => {
     document.body.innerHTML = `<nav style="position:relative;display:flex;gap:8px;width:360px;direction:${direction}">
       <button data-key="a" style="width:100px">Обзор</button>
