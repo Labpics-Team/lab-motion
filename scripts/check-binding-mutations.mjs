@@ -10,16 +10,20 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourcePath = join(root, 'src/bindings/index.ts');
 const testPath = 'test/semantic-motion-binding.test.ts';
+const reuseTestPath = 'test/bindings-snapshot-reuse.test.ts';
 const source = readFileSync(sourcePath, 'utf8');
 const cases = [
-  ['restart-unchanged', 'if (previousGoals && propertyKeys!', 'if (false && propertyKeys!', 'обновляет только изменившиеся визуальные роли'],
-  ['mutable-goal', 'goals.push(Object.freeze(goal))', 'goals.push(goal)', 'снимает неизменяемые цели'],
-  ['aliased-goal', 'goals.push(Object.freeze(goal))', 'goals.push(input as MotionBindingGoal)', 'снимает неизменяемые цели'],
+  ['restart-unchanged', 'if (previousGoals && (goal ===', 'if (false && (goal ===', 'обновляет только изменившиеся визуальные роли'],
+  ['mutable-goal', 'goals[i] = Object.freeze(goal)', 'goals[i] = goal', 'снимает неизменяемые цели'],
+  ['aliased-goal', 'goals[i] = Object.freeze(goal)', 'goals[i] = input as MotionBindingGoal', 'снимает неизменяемые цели'],
   ['partial-cleanup', 'for (const effect of effects) {', 'for (const effect of effects.slice(0, 1)) {', 'destroy отменяет всё несмотря на исключение'],
   ['cancel-successor', 'protectedHandles.has(effect.identity) || ', '', 'переданный в следующий результат тот же handle'],
   ['overwrite-destroy', "if (state === 'active') state = outcome;", 'state = outcome;', 'ошибка после destroy не перезаписывает'],
   ['recursive-project', "if (projecting) throw new MotionParamError('LM181');", '', 'проекция не может рекурсивно записывать'],
   ['read-after-revoke', "if (state !== 'active') return true;", '', 'отзыв во время проверки принадлежности поля'],
+  ['skip-queued-restore', 'pending.push(goals);', 'if (draining) return; pending.push(goals);', 'вложенное возвращение к прежней цели'],
+  ['reuse-queued-key-order', 'const previous = draining ? undefined : previousGoals?.[i];', 'const previous = previousGoals?.[i];', 'вложенный возврат сохраняет текущий порядок ключей'],
+  ['restart-queued-duplicate', 'cursor > 0 &&', 'false &&', 'вложенные равные снимки сравниваются'],
 ];
 const work = mkdtempSync(join(tmpdir(), 'motion-binding-mutations-'));
 const digest = text => createHash('sha256').update(text).digest('hex');
@@ -27,6 +31,7 @@ try {
   for (const dir of ['src/bindings', 'test']) mkdirSync(join(work, dir), { recursive: true });
   copyFileSync(join(root, 'src/errors.ts'), join(work, 'src/errors.ts'));
   copyFileSync(join(root, testPath), join(work, testPath));
+  copyFileSync(join(root, reuseTestPath), join(work, reuseTestPath));
   symlinkSync(join(root, 'node_modules'), join(work, 'node_modules'), 'junction');
   writeFileSync(join(work, 'package.json'), '{"type":"module"}');
   writeFileSync(join(work, 'vitest.config.mjs'), 'export default {test:{include:["test/*.test.ts"],environment:"node"}};');
@@ -50,7 +55,10 @@ try {
   const records = [];
   for (const [name, before, after, witness] of cases) {
     assert.equal(source.split(before).length, 2, `Мутант ${name}: требуется один точный участок`);
-    const candidate = execute(source.replace(before, after));
+    const modified = source.replace(before, after);
+    const candidate = execute(name === 'restart-unchanged'
+      ? modified.replace('if (!draining && goals === previousGoals) return;', '')
+      : modified);
     assert.equal(candidate.child.status, 1, `Мутант ${name} не дал ожидаемый отказ теста`);
     assert.equal(candidate.tests.length, baseline.tests.length, 'Изменился проверяемый набор');
     assert.deepEqual(candidate.tests.map(test => test.fullName), baseline.tests.map(test => test.fullName));
@@ -64,5 +72,5 @@ try {
   assert.equal(restored.child.status, 0, 'Положительный контроль после мутаций обязан пройти');
   assert.equal(readFileSync(sourcePath, 'utf8'), source, 'Исходник checkout не изменяется');
   console.log(JSON.stringify({ sourceSHA256: digest(source), testSHA256: digest(readFileSync(join(root, testPath))),
-    node: process.version, baselineTests: baseline.tests.length, restoredTests: restored.tests.length, records }));
+    reuseTestSHA256: digest(readFileSync(join(root, reuseTestPath))), node: process.version, baselineTests: baseline.tests.length, restoredTests: restored.tests.length, records }));
 } finally { rmSync(work, { recursive: true, force: true }); }

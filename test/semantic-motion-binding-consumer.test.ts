@@ -31,11 +31,26 @@ for (const module of [esm, cjs]) {
   const view = module.createMotionBinding(n => ({ panel: { opacity: n } }), {
     panel: () => { writes++; return {cancel() {cancels++;}}; }
   });
-  view.update(1); view.update(1);
+  view.update(1);
+  const freeze = Object.freeze;
+  let copies = 0;
+  Object.freeze = value => { copies++; return freeze(value); };
+  try { view.update(1); } finally { Object.freeze = freeze; }
+  assert.equal(copies, 0, 'unchanged targets allocate no frozen copies');
   assert.equal(writes, 1);
   assert.throws(() => view.update(NaN), e => e instanceof module.MotionParamError && e.code === 'LM180');
   view.destroy(); view.update(0);
   assert.equal(cancels, 1); assert.equal(writes, 1); assert.equal(view.state, 'destroyed');
+  const seen = [];
+  const restoring = module.createMotionBinding(model => ({ role: model }), {
+    role: goal => {
+      seen.push(Object.keys(goal));
+      if (goal.x === 1) restoring.update({ y: 0, x: 0 });
+    },
+  });
+  restoring.update({ x: 0, y: 0 }); restoring.update({ y: 0, x: 1 });
+  assert.deepEqual(seen, [['x', 'y'], ['y', 'x'], ['y', 'x']]);
+  restoring.destroy();
 }
 console.log('semantic-binding-consumer: PASS');
 `);
@@ -45,7 +60,9 @@ console.log('semantic-binding-consumer: PASS');
     expect(recipe).toBeTruthy(); writeFileSync(join(work, 'recipe.ts'), recipe!);
     const navigation = docs.match(/```typescript\n([^`]*?export function bindNavigationMotion[^]*?)\n```/)?.[1];
     expect(navigation).toBeTruthy(); writeFileSync(join(work, 'navigation.ts'), navigation!);
-    expect(readFileSync(join(installed, 'docs/bindings.md'), 'utf8')).toContain('createMotionBinding');
+    const bindingDocs = readFileSync(join(installed, 'docs/bindings.md'), 'utf8');
+    const start = bindingDocs.match(/```typescript\n([^`]*?export function bindProgressMotion[^]*?)\n```/)?.[1];
+    expect(start).toBeTruthy(); writeFileSync(join(work, 'start.ts'), start!);
     expect(readFileSync(join(installed, 'dist/bindings/index.d.ts'), 'utf8')).not.toContain('NoInfer');
     writeFileSync(join(work, 'consumer.ts'), `
 import {createMotionBinding, type MotionBindingControls} from '@labpics/motion/bindings';
@@ -79,7 +96,7 @@ createMotionBinding((n: number) => ({a: {x:[0,n]}}), {a: () => {}});
 createMotionBinding((n: number) => ({a: {x:n}}), {a: async () => ({cancel(){}})});
 `);
     for (const compiler of ['typescript', 'typescript5']) {
-      execFileSync(process.execPath, [resolve(`node_modules/${compiler}/bin/tsc`), '--noEmit', '--strict', '--module', 'NodeNext', '--target', 'ES2022', '--skipLibCheck', 'false', join(work, 'consumer.ts'), join(work, 'recipe.ts'), join(work, 'navigation.ts')], { cwd: work, encoding: 'utf8', timeout: 30_000 });
+      execFileSync(process.execPath, [resolve(`node_modules/${compiler}/bin/tsc`), '--noEmit', '--strict', '--module', 'NodeNext', '--target', 'ES2022', '--skipLibCheck', 'false', join(work, 'consumer.ts'), join(work, 'recipe.ts'), join(work, 'navigation.ts'), join(work, 'start.ts')], { cwd: work, encoding: 'utf8', timeout: 30_000 });
     }
   } finally { rmSync(work, { recursive: true, force: true }); }
 }, 60_000);
