@@ -1,7 +1,17 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { exactBinomialOrderStatisticBounds, pairedClusterBootstrap } from '../bench/compare/methodology.mjs';
 
 import { legacyBootstrap, legacyBounds } from './fixtures/legacy-statistics.mjs';
+
+it('сохраняет независимый reference побайтно равным исходному Git blob 393c0f5895d53a891c9c857f70cbae7f8cde953c', () => {
+  const fixture = readFileSync(new URL('./fixtures/legacy-statistics.mjs', import.meta.url));
+  const aliasSuffix = Buffer.from("\n// Exact pre-optimization module; aliases expose the reference API.\nexport { pairedClusterBootstrap as legacyBootstrap, exactBinomialOrderStatisticBounds as legacyBounds };\n");
+  expect(fixture.subarray(-aliasSuffix.length)).toEqual(aliasSuffix);
+  expect(createHash('sha256').update(fixture.subarray(0, -aliasSuffix.length)).digest('hex'))
+    .toBe('a6440e56752573684809765ba992ce01b0993a889e130f16eb870cd1fcbcda87');
+});
 
 describe('точная статистика после устранения повторных сортировок', () => {
   for (const seed of [0, 1, 4294967295, 2 ** 40 + 1]) {
