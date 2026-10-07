@@ -87,7 +87,11 @@ describe('массовая смена владельцев поверхност�
     const live = Array.from({ length: 128 }, (_, id) => host.unit(id, true));
     for (let id = 0; id < 100; id++) host.batch._remove(live[id]!, true);
     const tail = live.slice(100);
+    const addresses = tail.map(entry => entry._batchSlot);
+    const writes = host.writes;
     for (const entry of tail) host.batch._activate(entry);
+    expect(tail.map(entry => entry._batchSlot)).toEqual(addresses);
+    expect(host.writes).toBe(writes);
     host.tick();
     const ids = Array.from({ length: 28 }, (_, id) => 100 + id);
     expect(host.events).toEqual([...ids.map(id => `u${id}`), ...ids.map(id => `r${id}`)]);
