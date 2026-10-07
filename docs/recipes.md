@@ -1161,3 +1161,34 @@ pnpm build && node scripts/compiler-acceptance.mjs --trace
 версия схемы и правило fail-closed определены в [контракте компилятора](compiler.md#контракт-диагностической-трассировки).
 Если acceptance падает, trace не считается доказательством и не должен разбираться
 как частичный успешный результат.
+
+## Независимые цели для группы элементов
+
+Одинаковую цель можно передать всему списку одним вызовом `animate`. Для разных
+координат используйте обычный цикл внутри одной области компонента:
+
+```typescript
+import { createAnimateScope } from '@labpics/motion/animate';
+
+export function mountGroupMotion(root: HTMLElement) {
+  const motion = createAnimateScope(root);
+  return {
+    move(items: readonly { element: HTMLElement; x: number; y: number }[]) {
+      for (const { element, x, y } of items) {
+        motion.animate(element, { x, y }, { duration: 240, ease: t => t });
+      }
+    },
+    destroy: () => motion.destroy(),
+  };
+}
+```
+
+Передавайте готовые координаты в `move`. Следующий вызов переназначает цели,
+сохраняя текущее положение. При удалении компонента вызовите `destroy`.
+Позиции и их расчёт остаются у приложения; `x` и `y` задают смещение в пикселях.
+
+Обычные вызовы `animate` разделяют общий цикл: сначала вычисляются значения всех
+активных поверхностей, затем записываются стили. Дополнительный `requestAnimationFrame`
+вокруг цикла не нужен. Если координаты зависят от размеров DOM, сначала выполните
+все измерения, затем передайте готовый список.
+
