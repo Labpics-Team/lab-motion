@@ -526,14 +526,14 @@ describe('нативный граф CI', () => {
     }
   });
 
-  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'NODE_FLOOR_RESULT', 'BROWSER_RESULT']
+  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'NODE_FLOOR_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT']
     .flatMap((key) => ['success', 'failure', 'cancelled', 'skipped', 'neutral', 'pending', '', undefined]
       .map((result) => ({ key, result }))))('shell итога проверяет $key=$result', ({ key, result }) => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
     const program = ci.jobs.CI!.steps![0]!.run!;
     const env: NodeJS.ProcessEnv = {
       ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
-      MUTATION_RESULT: 'success', NODE_FLOOR_RESULT: 'success', BROWSER_RESULT: 'success',
+      MUTATION_RESULT: 'success', NODE_FLOOR_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
     };
     delete env[key];
     if (result !== undefined) env[key] = result;
