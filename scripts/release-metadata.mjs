@@ -8,7 +8,7 @@ export const RELEASE_REPOSITORY = Object.freeze({
 
 const EXACT_FIELDS = Object.freeze({
   private: false,
-  description: 'Headless zero-dependency motion engine: analytic spring solver, keyframes, timeline, FLIP, gestures, WAAPI compositor path, 9 framework bindings.',
+  description: 'Zero-dependency headless motion engine for interruptible UI animation, browser-native playback, and 9 framework bindings.',
   author: 'Labpics',
   keywords: [
     'animation',
@@ -38,12 +38,23 @@ const EXACT_FIELDS = Object.freeze({
   },
   files: [
     'dist',
-    'docs/errors.md',
+    'docs/api.md',
+    'docs/architecture.md',
+    'docs/behaviors.md',
     'docs/benchmark.md',
-    'docs/motion-conformance.md',
-    'docs/recipes.md',
-    '!dist/**/*.map',
     'docs/bindings.md',
+    'docs/compiler.md',
+    'docs/compositor.md',
+    'docs/errors.md',
+    'docs/future-layout.md',
+    'docs/migration.md',
+    'docs/motion-conformance.md',
+    'docs/presence.md',
+    'docs/projection.md',
+    'docs/recipes.md',
+    'docs/smart.md',
+    'docs/tokens.md',
+    '!dist/**/*.map',
   ],
   publishConfig: { access: 'public' },
   sideEffects: [

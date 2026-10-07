@@ -1,24 +1,26 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { collectInventory, ROOT } from '../scripts/naming-inventory.mjs';
 
-describe('README: проверяемые факты публичной поверхности', () => {
-  it('число exports выводится из package.json, а не живёт устаревающим литералом', () => {
-    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-    const { subpaths } = collectInventory(ROOT);
-    const nestedSubpaths = subpaths.filter((subpath) => subpath !== '.').length;
+const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-    const form = new Intl.PluralRules('ru').select(nestedSubpaths);
-    const noun = form === 'one' ? 'субпуть' : form === 'few' ? 'субпути' : 'субпутей';
-    expect(readme).toContain(
-      'Корневой экспорт + ' + nestedSubpaths + ' ' + noun + ' (входов `exports` в `package.json` — ' + subpaths.length + ')'
-    );
+describe('README: публичная поверхность', () => {
+  it('каждый импорт из примеров существует в package exports', () => {
+    const imports = [...readme.matchAll(/from ['"](@labpics\/motion(?:\/[^'"]+)?)['"]/g)]
+      .map((match) => match[1]);
+    expect(imports.length).toBeGreaterThan(0);
+
+    for (const name of imports) {
+      const subpath = name === '@labpics/motion'
+        ? '.'
+        : `./${name.slice('@labpics/motion/'.length)}`;
+      expect(pkg.exports).toHaveProperty(subpath);
+    }
   });
 
-  it('не обещает вручную скопированную таблицу динамических размеров', () => {
-    const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-
+  it('не копирует динамический инвентарь и таблицы размеров в стартовую страницу', () => {
+    expect(readme).not.toMatch(/Корневой экспорт \+ \d+/);
     expect(readme).not.toContain('полная таблица всех');
-    expect(readme).toContain('Актуальные числа не копируются в Markdown');
+    expect(readme).toContain('pnpm size');
   });
 });

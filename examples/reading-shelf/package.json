@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@labpics/motion": "0.3.0"
+    "@labpics/motion": "0.4.0"
   }
 }

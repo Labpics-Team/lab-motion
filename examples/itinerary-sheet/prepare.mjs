@@ -31,7 +31,10 @@ try {
   const archive = join(temporary, packed.filename);
   const bytes = readFileSync(archive);
   const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-  if (manifest.version !== '0.3.0') throw new Error('Версия примера не совпадает с корневым пакетом');
+  const consumer = JSON.parse(readFileSync(join(app, 'package.json'), 'utf8'));
+  if (consumer.dependencies?.[manifest.name] !== manifest.version) {
+    throw new Error('Версия примера не совпадает с корневым пакетом');
+  }
   rmSync(installed, { recursive: true, force: true });
   mkdirSync(installed, { recursive: true });
   const tar = process.platform === 'win32' ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe') : 'tar';
