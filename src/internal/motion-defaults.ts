@@ -7,6 +7,10 @@ export const DEFAULT_SPRING: SpringParams = { mass: 1, stiffness: 170, damping: 
 export const SNAPPY_SPRING = { mass: 1, stiffness: 260, damping: 28 } as const;
 export const STANDARD_EASING_COORDS = [0.2, 0, 0, 1] as const;
 
+/** Последняя внутренняя фаза общая для стандартных кривых одного кадра. */
+let lastInput = NaN;
+let lastValue = 0;
+
 /**
  * Развёрнутый solver ровно для cubic-bezier(0.2, 0, 0, 1).
  * Кусочно-линейное начальное приближение ограничивает худшую ошибку, поэтому
@@ -15,11 +19,13 @@ export const STANDARD_EASING_COORDS = [0.2, 0, 0, 1] as const;
 export const STANDARD_EASING = (input: number): number => {
   if (!(input > 0)) return 0;
   if (input >= 1) return 1;
+  if (input === lastInput) return lastValue;
   let u = Math.min(1, input / 0.6);
   for (let i = 0; i < 5; i++) {
     const x = u * (0.6 + u * (-1.2 + 1.6 * u));
     const dx = 0.6 + u * (-2.4 + 4.8 * u);
     u -= (x - input) / dx;
   }
-  return u * u * (3 - 2 * u);
+  lastInput = typeof input === 'number' ? input : NaN;
+  return lastValue = u * u * (3 - 2 * u);
 };
