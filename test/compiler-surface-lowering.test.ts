@@ -246,8 +246,8 @@ animate(el, { width: [240, w] }, { layout: 'project' });
     ['без layout — обычный width-tween', `import { animate } from '@labpics/motion/animate';
 animate(el, { width: [240, 360] }, {});
 `],
-    ['alias-импорт', `import { animate as anim } from '@labpics/motion/animate';
-anim(el, { width: [240, 360] }, { layout: 'project' });
+    ['косвенная ссылка на импорт', `import { animate as source } from '@labpics/motion/animate';
+const anim = source; anim(el, { width: [240, 360] }, { layout: 'project' });
 `],
     ['shadowing локальным объявлением', `import { animate } from '@labpics/motion/animate';
 const animate = null;

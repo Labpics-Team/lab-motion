@@ -1,9 +1,9 @@
 /**
- * compiler/vite.ts — Vite/Rollup-адаптер build-time lowering (#208).
+ * compiler/vite.ts — специализация анимаций при сборке Vite/Rollup.
  *
  * `motionCompiler()` — build-tool entry (не runtime-tier): transform-hook
- * парсит модуль штатным `this.parse` (acorn Rollup), передаёт ESTree ядру
- * (§13.5: ядро parse-независимо) и применяет байтовые правки.
+ * парсит модуль штатным `this.parse`, передаёт ESTree ядру
+ * и применяет байтовые правки.
  *
  * Sourcemap строится двухуказательным проходом по отсортированным правкам:
  * сохранённые байты исходника идут сегмент-в-сегмент (включая многострочные
@@ -173,15 +173,20 @@ export function motionCompiler(): MotionCompilerPlugin {
         return undefined;
       }
       const ast = program as AstNode;
-      // Оба планировщика требуют прямой импорт с одним локальным именем `animate`.
-      // Валидный ESM не может объявить его дважды, поэтому применим максимум один план;
-      // его правки уже отсортированы ядром, в том числе для вложенных вызовов.
-      const plan = planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral)
-        ?? planSurfaceLowering(ast, code);
-      if (plan === undefined) return undefined;
-      const edits = plan.edits;
-      const transformed = applyEdits(code, edits)
-        + `\nimport { ${plan.importName} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};\n`;
+      const nano = planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral);
+      // Разные локальные имена позволяют обоим публичным импортам жить в модуле.
+      // Одиночный Nano сохраняет короткий путь без обхода чужого планировщика.
+      const surface = !nano || QUICK_FILTERS.every(source => code.includes(source))
+        ? planSurfaceLowering(ast, code) : undefined;
+      const plans = [nano, surface].filter(plan => plan !== undefined);
+      if (plans.length === 0) return undefined;
+      const edits = plans.length === 1 ? plans[0]!.edits
+        : plans.flatMap(plan => plan.edits).sort((a, b) => a.start - b.start);
+      for (let i = 1; i < edits.length; i++) {
+        if (edits[i]!.start < edits[i - 1]!.end) throw new Error('lab-motion compiler: пересекающиеся правки');
+      }
+      const imports = plans.map(plan => `import { ${plan.importName} as ${plan.importLocal} } from ${JSON.stringify(plan.importSource)};`);
+      const transformed = applyEdits(code, edits) + `\n${imports.join(' ')}\n`;
       return { code: transformed, map: buildMap(code, edits, id) };
     },
   };

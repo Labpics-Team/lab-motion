@@ -152,7 +152,7 @@ animate(b, { opacity: level });
 describe('консервативный отказ: источник остаётся семантически исходным', () => {
   // Модульные отказы: план undefined целиком (доверять нечему).
   const MODULE_CASES: readonly [name: string, code: string][] = [
-    ['alias-импорт', `import { animate as go } from '@labpics/motion/nano'; go(el, { opacity: 1 });`],
+    ['косвенная ссылка на импорт', `import { animate as run } from '@labpics/motion/nano'; const go = run; go(el, { opacity: 1 });`],
     ['namespace-импорт', `import * as nano from '@labpics/motion/nano'; nano.animate(el, { opacity: 1 });`],
     ['чужой пакет', `import { animate } from 'other-motion'; animate(el, { opacity: 1 });`],
     ['shadowing функцией', `import { animate } from '@labpics/motion/nano';

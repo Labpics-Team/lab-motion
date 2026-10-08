@@ -22,6 +22,7 @@
 import { build } from 'vite';
 import { buildScopeRecipes } from './scope-recipes.mjs';
 import { buildPackagedCompositorFollowRecipes } from './compositor-follow-recipes.mjs';
+import { buildCompilerProject } from './compiler-project.mjs';
 import { buildPresenceScopeResource } from './presence-scope-resource.mjs';
 import { readCompilerNanoRecipe } from '../../scripts/compiler-doc-recipe.mjs';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -126,6 +127,7 @@ export default async function globalSetup() {
     writeFileSync(resolve(OUT, 'uncompiled.js'), uncompiled);
     writeFileSync(resolve(OUT, 'surface-compiled.js'), surfaceCompiled);
     writeFileSync(resolve(OUT, 'surface-uncompiled.js'), surfaceUncompiled);
+    await buildCompilerProject(ROOT, OUT, resolve(TMP, 'compiler-project'), resolve(OUT, followReceipt.tarball.file));
     const scopeReceipt = await buildScopeRecipes(ROOT, OUT, TMP, resolve(OUT, followReceipt.tarball.file));
     if (scopeReceipt.tarball.sha256 !== followReceipt.tarball.sha256) {
       throw new Error('compile-artifacts: browser journeys consumed different package bytes');

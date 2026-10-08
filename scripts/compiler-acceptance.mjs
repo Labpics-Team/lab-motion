@@ -28,7 +28,7 @@ import { gzipSync } from 'node:zlib';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readCompilerNanoRecipe } from './compiler-doc-recipe.mjs';
+import { readCompilerNanoRecipe, readCompilerProjectRecipe } from './compiler-doc-recipe.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = resolve(ROOT, 'dist');
@@ -317,6 +317,17 @@ async function run() {
       `плагин ошибочно понизил surface-вызов с onFrame (граф: ${surfaceOnFrame.modules.join(', ')})`,
     );
     notes.push('surface no-op контроль: динамические концы и onFrame сохранили рантаймовый путь');
+    // Прямые импорты с локальными именами и оба исполнителя в одном TS-модуле.
+    const projectSource = readCompilerProjectRecipe(ROOT);
+    const projectBaseline = await buildFixture('project-uncompiled', projectSource, false, 'project', 'ts');
+    const projectCompiled = await buildFixture('project-compiled', projectSource, true, 'project', 'ts');
+    check(projectBaseline.modules.includes(ANIMATE_MODULE) && projectBaseline.modules.includes(NANO_MODULE),
+      'project baseline должен содержать оба публичных runtime');
+    check(JSON.stringify([...projectCompiled.modules].sort()) === JSON.stringify([RUNTIME_MODULE, SURFACE_MODULE].sort()),
+      'project compiled содержит чужой runtime или потерял один из исполнителей');
+    check(!SPRING_MATH.test(projectCompiled.code), 'project compiled сохранил runtime-solver');
+    notes.push(`project imports: ${gzipSync(projectBaseline.code).length} B gz → ${gzipSync(projectCompiled.code).length} B gz`);
+
     recordTrace('surface-static', "static width [240,360], layout='project'", surfaceCompiled);
     recordTrace('surface-dynamic', "dynamic width endpoint, layout='project'", surfaceDynamic, 'endpoint is not build-known');
     recordTrace('surface-on-frame', "static width, layout='project', onFrame", surfaceOnFrame, 'onFrame requires runtime observation');

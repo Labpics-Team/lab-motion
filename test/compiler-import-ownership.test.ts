@@ -48,7 +48,7 @@ async function instrument(code: string) {
 for (const { source, call, plan } of planners) {
   describe(`владение импортом ${source}`, () => {
     it('не обходит вложенный AST без прямого импорта animate', async () => {
-      const code = `import { animate as other } from '${source}';
+      const code = `import * as other from '${source}';
 function unrelated(value) { return value + 1; }
 ${call}`;
       const probe = await instrument(code);

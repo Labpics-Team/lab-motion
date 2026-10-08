@@ -197,8 +197,8 @@ function bindsName(node: AstNode, parent: AstNode | undefined, name: string): bo
  * обходить вложенные выражения. После доказанного импорта общий проход
  * сохраняет консервативную проверку затенения и коллизии executor-биндинга.
  */
-function canLowerImport(program: AstNode, sourceName: string, importLocal: string): boolean {
-  let importedPlain = false;
+function canLowerImport(program: AstNode, sourceName: string, importLocal: string): ReadonlySet<string> | undefined {
+  const bindings = new Set<string>();
   const importNodes = new Set<AstNode>();
   for (const node of program.body as AstNode[]) {
     if (node.type !== 'ImportDeclaration') continue;
@@ -210,27 +210,28 @@ function canLowerImport(program: AstNode, sourceName: string, importLocal: strin
         spec.type === 'ImportSpecifier' &&
         (spec.imported as AstNode).type === 'Identifier' &&
         (spec.imported as AstNode).name === 'animate' &&
-        (spec.local as AstNode).name === 'animate'
+        (spec.local as AstNode).type === 'Identifier'
       ) {
-        importedPlain = true;
+        bindings.add((spec.local as AstNode).name as string);
       }
     }
   }
-  if (!importedPlain) return false;
+  if (bindings.size === 0) return undefined;
 
   let doubt = false;
   walk(program, (node, parent) => {
-    if (node.type === 'Identifier' && node.name === importLocal) doubt = true;
+    if (node.type !== 'Identifier') return;
+    if (node.name === importLocal) doubt = true;
     if (
-      node.name === 'animate' &&
+      bindings.has(node.name as string) &&
       !importNodes.has(parent as AstNode) &&
       parent?.type !== 'ImportSpecifier' &&
-      bindsName(node, parent, 'animate')
+      bindsName(node, parent, node.name as string)
     ) {
       doubt = true;
     }
   });
-  return !doubt;
+  return doubt ? undefined : bindings;
 }
 
 /**
@@ -248,7 +249,8 @@ export function planNanoOpacityLowering(
   code: string,
   artifactLiteral: (opacity: number) => string,
 ): NanoLoweringPlan | undefined {
-  if (!canLowerImport(program, NANO_SOURCE, IMPORT_LOCAL)) return undefined;
+  const bindings = canLowerImport(program, NANO_SOURCE, IMPORT_LOCAL);
+  if (!bindings) return undefined;
 
   const edits: NanoLoweringEdit[] = [];
   let runtimeCalls = 0;
@@ -256,7 +258,7 @@ export function planNanoOpacityLowering(
   walk(program, (node) => {
     if (node.type !== 'CallExpression') return;
     const callee = node.callee as AstNode;
-    if (callee.type !== 'Identifier' || callee.name !== 'animate') return;
+    if (callee.type !== 'Identifier' || !bindings.has(callee.name as string)) return;
     if (node.optional === true) { runtimeCalls++; return; }
     const args = node.arguments as AstNode[];
     if (args.length !== 2) { runtimeCalls++; return; }
@@ -402,7 +404,7 @@ export function lowerSurfaceCall(input: SurfaceCallInput): SurfaceLoweringResult
   if (input === null || typeof input !== 'object') return reject('input-not-call');
   if (input.callee !== 'animate') return reject('callee-not-animate');
 
-  // Optional call / alias / namespace import выражаются не-plain callee.
+  // Идентичность прямого импорта, включая локальное имя, устанавливает AST-планировщик.
   const target = input.target;
   if (!isPlainRecord(target) || target['kind'] !== 'identifier' || typeof target['name'] !== 'string') {
     return reject('target-dynamic');
@@ -599,7 +601,8 @@ export function planSurfaceLowering(
   program: AstNode,
   code: string,
 ): NanoLoweringPlan | undefined {
-  if (!canLowerImport(program, ANIMATE_SOURCE, SURFACE_LOCAL)) return undefined;
+  const bindings = canLowerImport(program, ANIMATE_SOURCE, SURFACE_LOCAL);
+  if (!bindings) return undefined;
 
   const edits: NanoLoweringEdit[] = [];
   let runtimeCalls = 0;
@@ -607,7 +610,7 @@ export function planSurfaceLowering(
   walk(program, (node, parent) => {
     if (node.type !== 'CallExpression') return;
     const callee = node.callee as AstNode;
-    if (callee.type !== 'Identifier' || callee.name !== 'animate') return;
+    if (callee.type !== 'Identifier' || !bindings.has(callee.name as string)) return;
     // Наблюдаемая эквивалентность контролов compiled-пути НЕ доказана
     // (committed/ready/state/tier/play/pause/seek у executor'а нет), поэтому
     // понижается ТОЛЬКО доказанно неиспользуемый результат — голый
