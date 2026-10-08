@@ -50,7 +50,7 @@ function releaseMetadata() {
     },
     files: [
       'dist',
-      'docs/api.md',
+      'docs/api.md', 'docs/adr/0003-color-interpolation-contract.md',
       'docs/architecture.md',
       'docs/behaviors.md',
       'docs/benchmark.md',
