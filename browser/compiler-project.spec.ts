@@ -39,11 +39,14 @@ test('промежуточные позиции списка и opacity совп
     const urls = ['/browser/.artifacts/compiler-project-runtime.js', '/browser/.artifacts/compiler-project-compiled.js'];
     const rows: Array<Array<{ width: number[]; opacity: number }>> = [];
     const original = window.requestAnimationFrame;
+    const frameCounts: number[] = [];
+    let requests = 0;
     let queue: FrameRequestCallback[] = [];
-    window.requestAnimationFrame = callback => { queue.push(callback); return queue.length; };
+    window.requestAnimationFrame = callback => { queue.push(callback); return ++requests; };
     const tick = (time: number) => { const jobs = queue; queue = []; for (const job of jobs) job(time); };
     try {
       for (const url of urls) {
+        const before = requests;
         const panels = Array.from({ length: 4 }, () => {
           const panel = document.createElement('div'); panel.style.cssText = 'width:240px;height:20px';
           document.body.append(panel); return panel;
@@ -67,17 +70,20 @@ test('промежуточные позиции списка и opacity совп
         rows.push(samples);
         for (let i = 0; queue.length > 0 && i < 10; i++) tick(3000 + i * 2000);
         if (queue.length) throw new Error('Runtime не освободил кадры после достижения цели');
+        frameCounts.push(requests - before);
         for (const effect of effects) effect.cancel();
         for (const element of elements) element.remove();
       }
     } finally { window.requestAnimationFrame = original; }
-    return rows;
+    return { rows, frameCounts };
   });
-  expect(result[0]).toHaveLength(6); expect(result[1]).toHaveLength(6);
-  expect(result[0]![2]!.width[0]).toBeGreaterThan(240);
-  expect(result[0]![2]!.width[0]).toBeLessThan(360);
+  expect(result.frameCounts[0]).toBeGreaterThan(0);
+  expect(result.frameCounts[1]).toBe(0);
+  expect(result.rows[0]).toHaveLength(6); expect(result.rows[1]).toHaveLength(6);
+  expect(result.rows[0]![2]!.width[0]).toBeGreaterThan(240);
+  expect(result.rows[0]![2]!.width[0]).toBeLessThan(360);
   for (let i = 0; i < 6; i++) {
-    for (let j = 0; j < 4; j++) expect(Math.abs(result[0]![i]!.width[j]! - result[1]![i]!.width[j]!)).toBeLessThanOrEqual(0.25);
-    expect(Math.abs(result[0]![i]!.opacity - result[1]![i]!.opacity)).toBeLessThanOrEqual(0.001);
+    for (let j = 0; j < 4; j++) expect(Math.abs(result.rows[0]![i]!.width[j]! - result.rows[1]![i]!.width[j]!)).toBeLessThanOrEqual(0.25);
+    expect(Math.abs(result.rows[0]![i]!.opacity - result.rows[1]![i]!.opacity)).toBeLessThanOrEqual(0.001);
   }
 });

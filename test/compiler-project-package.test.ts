@@ -10,7 +10,9 @@ it('документированный проект собирается и ти
   try {
     const result = await buildCompilerProject(resolve('.'), join(directory, 'out'), join(directory, 'project'));
     expect(result.outputs.compiled.modules).toEqual(['dist/compiler/runtime/index.js', 'dist/compiler/surface/index.js']);
-    expect(result.outputs.compiled.gzipBytes).toBeLessThan(result.outputs.runtime.gzipBytes / 5);
+    // Общий бюджет compiled-пути не зависит от будущего ускорения полного runtime.
+    expect(result.outputs.compiled.gzipBytes).toBeLessThanOrEqual(5000);
+    expect(result.outputs.compiled.gzipBytes).toBeLessThan(result.outputs.runtime.gzipBytes);
     const program = ts.createProgram([result.entry], { noEmit: true, strict: true, skipLibCheck: true,
       target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext,
       types: [], lib: ['lib.es2022.d.ts', 'lib.dom.d.ts'] });
