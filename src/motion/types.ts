@@ -47,6 +47,8 @@ export type SequenceOptions = Omit<MotionCommon, 'times' | 'stagger'>;
 
 /** Внутренний снимок: пользовательские getters больше не читаются исполнителем. */
 export interface Timing {
+  readonly _defaultMotion: boolean;
+  readonly _defaultEase: boolean;
   readonly spring: SpringParams | undefined;
   readonly duration: number | undefined;
   readonly ease: (progress: number) => number;

@@ -96,11 +96,11 @@ export function subpathMentionErrors(text, subpaths) {
 /** Каждый субпуть обязан разрешаться в исходник. */
 export function subpathSrcErrors(subpaths, root = ROOT) {
   const errs = [];
+  const packagePath = join(root, 'package.json');
+  const manifest = existsSync(packagePath) ? JSON.parse(readFileSync(packagePath, 'utf8')) : undefined;
   for (const s of subpaths) {
     const name = s === '.' ? 'index' : s.slice(2);
-    const packagePath = join(root, 'package.json');
-    const target = existsSync(packagePath)
-      ? JSON.parse(readFileSync(packagePath, 'utf8')).exports?.[s]?.import?.default : undefined;
+    const target = manifest?.exports?.[s]?.import?.default;
     const mapped = typeof target === 'string' ? /^\.\/dist\/(.+)\.js$/.exec(target) : null;
     const candidates = mapped ? [join(root, 'src', `${mapped[1]}.ts`)]
       : s === '.' ? [join(root, 'src', 'index.ts')]

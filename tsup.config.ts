@@ -64,7 +64,7 @@ async function makeSharedFrameBrowserNative(): Promise<void> {
 export function entriesFromPackageExports(): Record<string, string> {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
     exports?: Record<string, unknown>;
-    imports?: Record<string, { import?: string }>;
+    imports?: Record<string, unknown>;
   };
   const exportsMap = pkg.exports ?? {};
   if (Object.keys(exportsMap).length === 0) {
@@ -92,10 +92,11 @@ export function entriesFromPackageExports(): Record<string, string> {
   }
   // Частные точки нужны внутренним регрессионным потребителям; наружу они не экспортируются.
   for (const [key, target] of Object.entries(pkg.imports ?? {})) {
-    const match = /^\.\/dist\/(.+)\.js$/.exec(target.import ?? '');
+    const esm = typeof target === 'string' ? target : (target as { import?: unknown } | null)?.import;
+    const match = typeof esm === 'string' ? /^\.\/dist\/(.+)\.js$/.exec(esm) : null;
     if (!match) throw new Error(`build: imports['${key}'] требует dist-JS`);
     const name = match[1]!;
-    if (entries[name]) continue;
+    if (entries[name] !== undefined) continue;
     const source = `src/${name}.ts`;
     if (!existsSync(source)) throw new Error(`build: imports['${key}'] требует ${source}`);
     entries[name] = source;

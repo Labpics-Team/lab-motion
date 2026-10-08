@@ -1,5 +1,5 @@
 import { frame, type FrameLoop } from '../frame/index.js';
-import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, snapshot, type PropertyInput } from './model.js';
+import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, authoredTiming, snapshot, type PropertyInput } from './model.js';
 import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState, SequenceOptions, SequenceStep, Timing } from './types.js';
 
@@ -81,22 +81,23 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   return values;
 }
 
-interface Draft { readonly element: Element; readonly key: string; readonly program: Program; readonly reduced: boolean }
+interface Draft { readonly element: Element; readonly key: string; readonly _program: Program; readonly reduced: boolean }
 interface Track {
-  readonly program: Program;
-  readonly group: Surface;
+  readonly _program: Program;
+  readonly _group: Surface;
   readonly value: number[];
-  readonly velocity: number[];
+  readonly _velocity: number[];
   _owner: Run | undefined;
-  elapsed: number;
-  paused: boolean;
-  done: boolean;
+  _elapsed: number;
+  _paused: boolean;
+  _done: boolean;
 }
 
 class Run implements Playback {
   private _tracks = new Set<Track>();
   private _status: PlaybackState = 'running';
   private _natural = true;
+  private _notifications = 0;
   private _failure: { error: unknown } | undefined;
   private _resolve!: (value: MotionResult) => void;
   private _reject!: (error: unknown) => void;
@@ -106,127 +107,137 @@ class Run implements Playback {
     // Ошибка доступна через original promise; отсутствие await не оставляет unhandled rejection.
     void this.finished.catch(() => {});
   }
-  get state(): PlaybackState { return this._status; }
-  own(track: Track): void {
-    // Новый вызов получает управление, сохраняя уже исполняемую траекторию.
-    // Старый компонент не может остановить движение, принятое его преемником.
-    track._owner?.settle(track, false);
-    this._tracks.add(track); track._owner = this;
-  }
-  settle(track: Track, natural: boolean, failure?: { error: unknown }): void {
-    this._tracks.delete(track);
-    if (failure && !this._failure) {
-      this._failure = failure; this._status = 'failed';
-      for (const remaining of [...this._tracks]) {
-        try { remaining.group._control([remaining], 'stop', 0, this); }
-        catch { remaining.group._fail(failure.error); }
-      }
+  get state(): PlaybackState {
+    if (this._status === 'running') {
+      for (const track of this._tracks) if (!track._paused) return 'running';
+      if (this._tracks.size) return 'paused';
     }
-    this._natural &&= natural;
-    if (this._tracks.size === 0 && this._failure) { this._reject(this._failure.error); return; }
-    if (this._tracks.size === 0 && this._status !== 'failed') {
+    return this._status;
+  }
+  _hold(): void { this._notifications++; }
+  _release(): void { this._notifications--; this._complete(); }
+  _error(error: unknown): void {
+    if (this._failure) return;
+    this._failure = { error }; this._status = 'failed';
+    for (const track of [...this._tracks]) {
+      try { track._group._control([track], 'stop', 0, this); }
+      catch { track._group._fail(error); }
+    }
+    this._complete();
+  }
+  private _complete(): void {
+    if (this._tracks.size || this._notifications) return;
+    if (this._failure) this._reject(this._failure.error);
+    else {
       this._status = this._natural ? 'finished' : 'stopped';
       this._resolve(this._natural ? FINISHED : STOPPED);
     }
   }
-  empty(): void { if (this._tracks.size === 0 && this._status === 'running') { this._status = 'finished'; this._resolve(FINISHED); } }
+  _own(track: Track): void {
+    // Новый вызов получает управление, сохраняя уже исполняемую траекторию.
+    // Старый компонент не может остановить движение, принятое его преемником.
+    track._owner?._settle(track, false);
+    this._tracks.add(track); track._owner = this;
+  }
+  _settle(track: Track, natural: boolean, failure?: { error: unknown }): void {
+    this._tracks.delete(track);
+    this._natural &&= natural;
+    if (failure) this._error(failure.error);
+    this._complete();
+  }
+  _empty(): void { this._complete(); }
   private _apply(action: 'pause' | 'play' | 'seek' | 'stop' | 'finish', time = 0): void {
-    if (this._status === 'finished' || this._status === 'stopped' || this._status === 'failed') return;
+    if (this._status !== 'running') return;
     const groups = new Map<Surface, Track[]>();
     for (const track of this._tracks) {
-      const list = groups.get(track.group) ?? []; list.push(track); groups.set(track.group, list);
+      const list = groups.get(track._group) ?? []; list.push(track); groups.set(track._group, list);
     }
     const failures: unknown[] = [];
     for (const [group, selected] of groups) {
       try { group._control(selected, action, time, this); } catch (error) { failures.push(error); }
     }
     if (failures.length) throw failures.length === 1 ? failures[0] : new AggregateError(failures, 'Не удалось управлять движением');
-    if (this._status === 'running' || this._status === 'paused') {
-      if (action === 'pause') this._status = 'paused';
-      else if (action === 'play') this._status = 'running';
-    }
   }
   pause(): void { this._apply('pause'); }
   play(): void { this._apply('play'); }
   seek(milliseconds: number): void {
-    if (this._status === 'running' || this._status === 'paused') this._apply('seek', number(milliseconds, 'seek', 0));
+    if (this._status === 'running') this._apply('seek', number(milliseconds, 'seek', 0));
   }
   stop(): void { this._apply('stop'); }
   finish(): void { this._apply('finish'); }
 }
 
 class Surface {
-  readonly tracks: Map<string, Track> = new Map();
-  readonly rest: Map<string, Point> = new Map();
-  readonly transforms: Record<string, number>;
-  stamp: number;
-  busy = false;
+  readonly _tracks: Map<string, Track> = new Map();
+  readonly _rest: Map<string, Point> = new Map();
+  readonly _transforms: Record<string, number>;
+  _stamp: number;
+  _busy = false;
   private _native: Animation | undefined;
   private _nativeTime = 0;
   private _written: string | undefined;
   private _token: object | undefined;
-  constructor(readonly engine: Runtime, readonly element: Element, readonly key: string) {
-    const style = engine.host.styles(element);
-    this.transforms = key === 'transform' ? initialTransforms(style) : {};
-    this.stamp = number(engine.host.now(), 'clock');
+  constructor(readonly _engine: Runtime, readonly element: Element, readonly key: string) {
+    this._transforms = key === 'transform' ? initialTransforms(_engine._host.styles(element)) : {};
+    this._stamp = number(_engine._host.now(), 'clock');
   }
   _refresh(): void {
-    if (this.tracks.size || this._written === (this.element as HTMLElement).style.getPropertyValue(this.key)) return;
-    if (this.key === 'transform') Object.assign(this.transforms, initialTransforms(this.engine.host.styles(this.element)));
-    this.rest.clear();
+    if (this._tracks.size || this._written === (this.element as HTMLElement).style.getPropertyValue(this.key)) return;
+    if (this.key === 'transform') Object.assign(this._transforms, initialTransforms(this._engine._host.styles(this.element)));
+    this._rest.clear();
   }
-  _read(key: string): { point: Point; velocity: readonly number[] } {
-    const track = this.tracks.get(key);
-    if (track) return { point: { coordinates: [...track.value], unit: track.program.unit }, velocity: [...track.velocity] };
-    if (isTransform(key)) return { point: { coordinates: [this.transforms[key] ?? TRANSFORMS[key]!], unit: '' }, velocity: [0] };
-    const saved = this.rest.get(key);
-    if (saved) return { point: saved, velocity: saved.coordinates.map(() => 0) };
-    const text = this.engine.host.styles(this.element).getPropertyValue(key);
+  _read(key: string): { point: Point; _velocity: readonly number[] } {
+    const track = this._tracks.get(key);
+    if (track) return { point: { _coordinates: [...track.value], unit: track._program.unit }, _velocity: [...track._velocity] };
+    if (isTransform(key)) return { point: { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], unit: '' }, _velocity: [0] };
+    const saved = this._rest.get(key);
+    if (saved) return { point: saved, _velocity: saved._coordinates.map(() => 0) };
+    const text = this._engine._host.styles(this.element).getPropertyValue(key);
     const initial = point(key, key === 'opacity' ? text === '' ? 1 : number(Number(text), 'opacity') : text || 0);
-    return { point: initial, velocity: initial.coordinates.map(() => 0) };
+    return { point: initial, _velocity: initial._coordinates.map(() => 0) };
   }
   _sync(): void {
-    if (this.busy) throw new MotionError('Повторный вход в вычисление движения; easing должен быть чистым');
-    this.busy = true;
+    if (this._busy) throw new MotionError('Easing должен быть чистой функцией');
+    this._busy = true;
     try {
-      const now = number(this.engine.host.now(), 'clock');
-      let delta = Math.max(0, now - this.stamp);
+      const now = number(this._engine._host.now(), 'clock');
+      let delta = Math.max(0, now - this._stamp);
       if (this._native) {
         const local = this._native.currentTime;
         const current = typeof local === 'number' && Number.isFinite(local) ? local : this._nativeTime;
         delta = current - this._nativeTime; this._nativeTime = current;
       }
-      this.stamp = Math.max(this.stamp, now);
-      for (const track of this.tracks.values()) {
-        if (!track.paused) track.elapsed = Math.max(0, track.elapsed + delta);
-        sample(track.program, track.elapsed, track.value, track.velocity);
+      this._stamp = Math.max(this._stamp, now);
+      for (const track of this._tracks.values()) {
+        if (!track._paused) track._elapsed = Math.max(0, track._elapsed + delta);
+        sample(track._program, track._elapsed, track.value, track._velocity);
       }
-    } finally { this.busy = false; }
+    } finally { this._busy = false; }
   }
   private _text(at?: 'from' | 'to'): string {
     if (this.key === 'transform') {
-      const state = { ...this.transforms };
-      for (const [key, track] of this.tracks) {
-        const value = at ? track.program.segments[0]![at][0]! : track.value[0]!;
+      const state = { ...this._transforms };
+      for (const [key, track] of this._tracks) {
+        const value = at ? track._program._segments[0]![at][0]! : track.value[0]!;
         state[key] = value;
       }
       return !at && Object.keys(TRANSFORMS).every(key => state[key] === TRANSFORMS[key]) ? 'none' : transform(state);
     }
-    const track = this.tracks.values().next().value as Track | undefined;
+    const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {
-      const held = this.rest.get(this.key)!; return format(this.key, held.coordinates, held.unit);
+      const held = this._rest.get(this.key)!; return format(this.key, held._coordinates, held.unit);
     }
-    return format(track.program.key, at ? track.program.segments[0]![at] : track.value, track.program.unit);
+    return format(track._program.key, at ? track._program._segments[0]![at] : track.value, track._program.unit);
   }
   _render(): void {
-    if (this.busy) throw new MotionError('Повторная запись свойства');
-    this.busy = true;
+    if (this._busy) throw new MotionError('Повторная запись свойства');
+    this._busy = true;
     try {
       const text = this._text();
       (this.element as HTMLElement).style.setProperty(this.key, text);
       this._written = text;
     }
-    finally { this.busy = false; }
+    finally { this._busy = false; }
   }
   _detach(): void {
     const previous = this._native;
@@ -236,79 +247,79 @@ class Surface {
     }
   }
   _attach(track: Track): void {
-    const previous = this.tracks.get(track.program.key);
+    const previous = this._tracks.get(track._program.key);
     // Во время замены поверхность сохраняет владельца и регистрацию.
-    this.tracks.set(track.program.key, track);
+    this._tracks.set(track._program.key, track);
     if (previous) this._end(previous, false);
   }
   _end(track: Track, natural: boolean, failure?: { error: unknown }): void {
-    if (track.done) return;
-    track.done = true;
-    if (this.tracks.get(track.program.key) === track) this.tracks.delete(track.program.key);
-    this.rest.set(track.program.key, { coordinates: [...track.value], unit: track.program.unit });
-    if (isTransform(track.program.key)) this.transforms[track.program.key] = track.value[0]!;
-    if (this.tracks.size === 0) {
-      try { this.engine.idle(this); } catch (error) { failure ??= { error }; }
+    if (track._done) return;
+    track._done = true;
+    if (this._tracks.get(track._program.key) === track) this._tracks.delete(track._program.key);
+    this._rest.set(track._program.key, { _coordinates: [...track.value], unit: track._program.unit });
+    if (isTransform(track._program.key)) this._transforms[track._program.key] = track.value[0]!;
+    if (this._tracks.size === 0) {
+      try { this._engine._idle(this); } catch (error) { failure ??= { error }; }
     }
     const owner = track._owner; track._owner = undefined;
-    owner?.settle(track, natural, failure);
+    owner?._settle(track, natural, failure);
   }
   _fail(error: unknown): void {
     const native = this._native; this._native = undefined; this._token = undefined;
     try { native?.cancel(); } catch { /* исходное исключение сохраняется */ }
-    for (const track of [...this.tracks.values()]) this._end(track, false, { error });
-    this.engine.idle(this);
+    for (const track of [...this._tracks.values()]) this._end(track, false, { error });
+    this._engine._idle(this);
   }
   _reconcile(): void {
-    if (this.tracks.size === 0) { this.engine.idle(this); return; }
-    const active = [...this.tracks.values()];
-    if (active.every(track => track.paused)) { this.engine.idle(this); return; }
-    const first = active[0]!, seg = first.program.segments[0]!;
-    const nativeEase = first.program.nativeEase;
-    const canNative = (this.key === 'transform' || this.key === 'opacity') && nativeEase !== undefined && typeof this.element.animate === 'function' && this.engine.host.supports(nativeEase) &&
-      active.every(track => !track.paused && track.program.nativeEase === nativeEase && track.program.segments.length === 1 &&
-        track.program.duration === first.program.duration && track.program.segments[0]!.at === seg.at && track.elapsed === first.elapsed);
-    if (!canNative) { this.engine.wake(this); return; }
+    if (this._tracks.size === 0) { this._engine._idle(this); return; }
+    const active = [...this._tracks.values()];
+    if (active.every(track => track._paused)) { this._engine._idle(this); return; }
+    const first = active[0]!, seg = first._program._segments[0]!;
+    const _nativeEase = first._program._nativeEase;
+    const canNative = (this.key === 'transform' || this.key === 'opacity') && _nativeEase !== undefined && typeof this.element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
+      active.every(track => !track._paused && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
+        track._program.duration === first._program.duration && track._program._segments[0]!.at === seg.at && track._elapsed === first._elapsed);
+    if (!canNative) { this._engine._wake(this); return; }
     const token = {}; this._token = token;
     try {
-      this.busy = true;
+      this._busy = true;
       const effect = this.element.animate([{ [this.key]: this._text('from') }, { [this.key]: this._text('to') }], {
-        duration: seg.end - seg.at, delay: seg.at, easing: nativeEase, fill: 'both',
+        duration: seg.end - seg.at, delay: seg.at, easing: _nativeEase, fill: 'both',
       });
-      this._native = effect; this._nativeTime = first.elapsed;
-      if (first.elapsed !== 0) effect.currentTime = first.elapsed;
+      this._native = effect; this._nativeTime = first._elapsed;
+      if (first._elapsed !== 0) effect.currentTime = first._elapsed;
       const finished = effect.finished;
       if (!finished || typeof finished.then !== 'function') throw new MotionError('Native effect не предоставляет finished');
-      this.busy = false;
+      this._busy = false;
       void finished.then(() => {
         if (this._token !== token) return;
         try {
-          for (const track of this.tracks.values()) {
-            track.elapsed = track.program.duration; sample(track.program, track.elapsed, track.value, track.velocity);
+          for (const track of this._tracks.values()) {
+            track._elapsed = track._program.duration; sample(track._program, track._elapsed, track.value, track._velocity);
           }
           this._render(); this._detach();
-          for (const track of [...this.tracks.values()]) this._end(track, true);
-          this.engine.idle(this);
+          for (const track of [...this._tracks.values()]) this._end(track, true);
+          this._engine._idle(this);
         } catch (error) { this._fail(error); }
       }, error => {
         if (this._token !== token) return;
         if ((error as { name?: string })?.name === 'AbortError') {
           this._native = undefined; this._token = undefined;
-          for (const track of [...this.tracks.values()]) this._end(track, false);
-          this.engine.idle(this);
+          for (const track of [...this._tracks.values()]) this._end(track, false);
+          this._engine._idle(this);
         } else this._fail(error);
       });
-      this.engine.idle(this);
-    } catch (error) { this.busy = false; this._fail(error); throw error; }
+      this._engine._idle(this);
+    } catch (error) { this._busy = false; this._fail(error); throw error; }
   }
   _control(selected: readonly Track[], action: 'pause' | 'play' | 'seek' | 'stop' | 'finish', time: number, owner?: Run): void {
-    const owns = (track: Track): boolean => !track.done && this.tracks.get(track.program.key) === track &&
+    const owns = (track: Track): boolean => !track._done && this._tracks.get(track._program.key) === track &&
       (owner === undefined || track._owner === owner);
     // Пока команда ждала, траектория могла перейти к другому вызову.
     if (!selected.some(owns)) return;
-    if (this.busy) {
+    if (this._busy) {
       // Управление из пользовательского callback принимается после текущей операции.
-      this.engine.after(() => this._control(selected, action, time, owner));
+      this._engine._after(() => this._control(selected, action, time, owner));
       return;
     }
     try {
@@ -317,34 +328,34 @@ class Surface {
       this._detach();
       for (const track of selected) {
         if (!owns(track)) continue;
-        if (action === 'pause') track.paused = true;
-        else if (action === 'play') track.paused = false;
-        else if (action === 'seek') track.elapsed = time;
-        else if (action === 'finish') track.elapsed = track.program.duration;
-        sample(track.program, track.elapsed, track.value, track.velocity);
+        if (action === 'pause') track._paused = true;
+        else if (action === 'play') track._paused = false;
+        else if (action === 'seek') track._elapsed = time;
+        else if (action === 'finish') track._elapsed = track._program.duration;
+        sample(track._program, track._elapsed, track.value, track._velocity);
       }
       this._render();
       for (const track of selected) {
         if (!owns(track)) continue;
         if (action === 'stop') this._end(track, false);
-        else if (action === 'finish' || action === 'seek' && track.elapsed >= track.program.duration) this._end(track, true);
+        else if (action === 'finish' || action === 'seek' && track._elapsed >= track._program.duration) this._end(track, true);
       }
       this._reconcile();
-      this.engine.flush();
+      this._engine._flush();
     } catch (error) { this._fail(error); throw error; }
   }
   _tick(): void {
-    if (this._native || this.tracks.size === 0) return;
+    if (this._native || this._tracks.size === 0) return;
     try { this._sync(); } catch (error) { this._fail(error); }
   }
   _paint(): void {
-    if (this._native || this.tracks.size === 0) return;
+    if (this._native || this._tracks.size === 0) return;
     try {
       this._render();
-      for (const track of [...this.tracks.values()]) {
-        if (!track.paused && track.elapsed >= track.program.duration) this._end(track, true);
+      for (const track of [...this._tracks.values()]) {
+        if (!track._paused && track._elapsed >= track._program.duration) this._end(track, true);
       }
-      if (this.tracks.size === 0 || [...this.tracks.values()].every(t => t.paused)) this.engine.idle(this);
+      if (this._tracks.size === 0 || [...this._tracks.values()].every(t => t._paused)) this._engine._idle(this);
     } catch (error) { this._fail(error); }
   }
 }
@@ -358,12 +369,21 @@ export class Runtime {
   private _prepared: Surface[] = [];
   private _draining = false;
   private _subscribing = false;
-  constructor(readonly host: RuntimeHost = defaultHost) {}
-  after(action: () => void): void {
+  constructor(readonly _host: RuntimeHost = defaultHost) {}
+  _notify(element: Element, key: string, action: () => void): void {
+    const owner = this._surfaces.get(element)?.get(key)?._tracks.get(key)?._owner;
+    owner?._hold();
+    this._after(() => {
+      try { action(); }
+      catch (error) { owner?._error(error); throw error; }
+      finally { owner?._release(); }
+    });
+  }
+  _after(action: () => void): void {
     if (this._pending.length === 0) queueMicrotask(() => this._drain());
     this._pending.push(action);
   }
-  flush(): void { this._drain(); }
+  _flush(): void { this._drain(); }
   private _drain(): void {
     if (this._draining) return;
     this._draining = true;
@@ -376,21 +396,21 @@ export class Runtime {
     } finally { this._draining = false; }
     if (failures.length) throw failures.length === 1 ? failures[0] : new AggregateError(failures, 'Ошибка отложенного управления');
   }
-  wake(surface: Surface): void {
+  _wake(surface: Surface): void {
     this._active.add(surface);
     if (this._offUpdate || this._subscribing) return;
     this._subscribing = true;
     const teardown = (): void => {
       this._offUpdate = this._offRender = undefined;
-      for (const current of [...this._active]) current._control([...current.tracks.values()], 'stop', 0);
+      for (const current of [...this._active]) current._control([...current._tracks.values()], 'stop', 0);
     };
     try {
-      this._offUpdate = this.host.frame.update(() => {
+      this._offUpdate = this._host.frame.update(() => {
         this._prepared = [...this._active];
         for (const current of this._prepared) current._tick();
         this._drain();
       }, { onTeardown: teardown });
-      this._offRender = this.host.frame.render(() => {
+      this._offRender = this._host.frame.render(() => {
         const current = this._prepared; this._prepared = [];
         for (const surface of current) surface._paint();
         this._drain();
@@ -402,10 +422,10 @@ export class Runtime {
       throw error;
     } finally { this._subscribing = false; }
   }
-  idle(surface: Surface): void {
+  _idle(surface: Surface): void {
     this._active.delete(surface);
     const groups = this._surfaces.get(surface.element);
-    if (surface.tracks.size === 0 && surface.key !== 'transform' && groups?.get(surface.key) === surface)
+    if (surface._tracks.size === 0 && surface.key !== 'transform' && groups?.get(surface.key) === surface)
       groups.delete(surface.key);
     if (this._active.size !== 0) return;
     const update = this._offUpdate, render = this._offRender;
@@ -436,15 +456,17 @@ export class Runtime {
       const match = /^var\((--[\w-]+)(?:,\s*(.+))?\)$/.exec(text.trim());
       if (!match || seen.has(match[1]!)) throw new MotionError(`${key}: неразрешимая CSS-переменная`);
       seen.add(match[1]!);
-      text = this.host.styles(element).getPropertyValue(match[1]!).trim() || match[2] || '';
+      text = this._host.styles(element).getPropertyValue(match[1]!).trim() || match[2] || '';
       if (!text.startsWith('var(')) { if (!text) throw new MotionError(`${key}: пустая CSS-переменная`); return text; }
     }
     throw new MotionError(`${key}: слишком глубокая CSS-переменная`);
   }
-  private _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0): Draft[] {
+  private _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
+    origin?: (element: Element, key: string) => Point | undefined): Draft[] {
     const elements = targets(input);
     if (elements.length * props.reduce((sum, p) => sum + p.values.length, 0) > MAX_CHANNELS) throw new MotionError('Слишком много каналов движения');
-    const reduced = clock.reduced || this.host.reduced();
+    const reduced = clock.reduced || this._host.reduced();
+    const author = authoredTiming(clock);
     const result: Draft[] = [], synced = new Set<Surface>();
     try {
       for (let i = 0; i < elements.length; i++) {
@@ -453,46 +475,47 @@ export class Runtime {
           const group = this._surface(element, property.key);
           if (!synced.has(group)) { synced.add(group); group._sync(); }
           const values = property.values.map(v => this._resolveValue(element, property.key, v));
-          const explicit = property.authored ? point(property.key, values[0]!) : undefined;
-          const current = explicit ? { point: explicit, velocity: explicit.coordinates.map(() => 0) } : group._read(property.key);
-          const spec = program(property.key, current.point, values, property.authored, clock, current.velocity, offset + i * clock.stagger);
-          result.push({ element, key: property.key, program: spec, reduced });
+          const explicit = property.authored ? point(property.key, values[0]!) : origin?.(element, property.key);
+          const current = explicit ? { point: explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property.key);
+          const spec = program(property.key, current.point, values, property.authored, property.authored ? author : clock, current._velocity, offset + i * clock.stagger);
+          result.push({ element, key: property.key, _program: spec, reduced });
         }
       }
     } finally {
       // План хранит значения; пустая CSS-поверхность не нужна между стадиями.
-      for (const group of synced) if (group.tracks.size === 0) this.idle(group);
+      for (const group of synced) if (group._tracks.size === 0) this._idle(group);
     }
     return result;
   }
   private _execute(drafts: readonly Draft[], total?: number): Playback {
-    const run = new Run(total ?? drafts.reduce((max, d) => Math.max(max, d.reduced ? 0 : d.program.duration), 0));
+    const run = new Run(total ?? drafts.reduce((max, d) => Math.max(max, d.reduced ? 0 : d._program.duration), 0));
     const touched = new Set<Surface>();
     try {
       for (const draft of drafts) {
         const group = this._surface(draft.element, draft.key);
-        const existing = group.tracks.get(draft.key);
-        const equal = !draft.reduced && draft.program.identity && existing?.program.identity &&
-          draft.program.identity.every((v, i) => Object.is(v, existing.program.identity![i]));
-        if (equal) { run.own(existing!); continue; }
+        const existing = group._tracks.get(draft.key);
+        const equal = !draft.reduced && draft._program._identity && existing?._program._identity &&
+          draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
+        if (equal) { run._own(existing!); continue; }
         if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
-        const first = draft.program.segments[0]!.from;
-        const track: Track = { program: draft.program, group, value: [...first], velocity: first.map(() => 0),
-          _owner: undefined, elapsed: draft.reduced ? draft.program.duration : 0, paused: false, done: false };
-        sample(track.program, track.elapsed, track.value, track.velocity);
-        run.own(track); group._attach(track);
+        const first = draft._program._segments[0]!.from;
+        const track: Track = { _program: draft._program, _group: group, value: [...first], _velocity: first.map(() => 0),
+          _owner: undefined, _elapsed: draft.reduced ? draft._program.duration : 0, _paused: false, _done: false };
+        sample(track._program, track._elapsed, track.value, track._velocity);
+        run._own(track); group._attach(track);
       }
       for (const group of touched) {
         group._render();
-        for (const track of [...group.tracks.values()]) if (track.elapsed >= track.program.duration) group._end(track, true);
+        for (const track of [...group._tracks.values()]) if (track._elapsed >= track._program.duration) group._end(track, true);
         group._reconcile();
       }
-      run.empty(); this._drain(); return run;
+      run._empty();
     } catch (error) { for (const group of touched) group._fail(error); throw error; }
+    this._drain(); return run;
   }
   animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): Playback {
     const input = properties(props);
-    const clock = timing(options, input.some(p => p.authored));
+    const clock = timing(options);
     return this._execute(this._draft(target, input, clock));
   }
   sequence(steps: readonly SequenceStep[], options?: SequenceOptions): Playback {
@@ -505,29 +528,29 @@ export class Runtime {
       if (tuple.length > 3) throw new MotionError('Шаг последовательности: [target, properties, options]');
       const { at, ...rest } = option ?? {};
       const offset = at === '<' ? previousStart : at === undefined || at === '>' ? cursor : number(at, 'at', 0);
-      const input = properties(props), clock = timing(rest, input.some(p => p.authored));
-      const drafts = this._draft(target, input, clock, offset + sequenceClock.delay);
+      const input = properties(props), clock = timing(rest);
+      const drafts = this._draft(target, input, clock, offset + sequenceClock.delay, (element, key) => {
+        const prior = merged.get(element)?.get(key)?._program;
+        return prior && { _coordinates: prior.final, unit: prior.unit };
+      });
       for (const draft of drafts) {
-        count += draft.program.segments.length;
+        count += draft._program._segments.length;
         if (count > MAX_CHANNELS) throw new MotionError('Последовательность слишком велика');
         let channels = merged.get(draft.element);
         if (!channels) { channels = new Map(); merged.set(draft.element, channels); }
         const before = channels.get(draft.key);
         let next = draft;
         if (before) {
-          const at = draft.program.segments[0]!.at;
-          if (at < before.program.duration) throw new MotionError('Шаги одного свойства не должны пересекаться');
-          const property = input.find(p => p.key === draft.key)!;
-          const p = program(draft.key, { coordinates: before.program.final, unit: before.program.unit }, property.values, property.authored, clock,
-            before.program.final.map(() => 0), at - clock.delay);
-          next = { ...draft, program: { ...p, segments: [...before.program.segments, ...p.segments], nativeEase: undefined, identity: undefined } };
+          const at = draft._program._segments[0]!.at;
+          if (at < before._program.duration) throw new MotionError('Шаги одного свойства не должны пересекаться');
+          next = { ...draft, _program: { ...draft._program, _segments: [...before._program._segments, ...draft._program._segments], _nativeEase: undefined, _identity: undefined } };
         }
         channels.set(draft.key, next);
-        end = Math.max(end, next.program.duration);
+        end = Math.max(end, next._program.duration);
       }
-      previousStart = offset; cursor = end - sequenceClock.delay;
+      previousStart = offset; cursor = Math.max(0, end - sequenceClock.delay);
     }
-    const drafts = [...merged.values()].flatMap(map => [...map.values()]).map(d => ({ ...d, reduced: d.reduced || sequenceClock.reduced, program: { ...d.program, duration: end, nativeEase: undefined } }));
+    const drafts = [...merged.values()].flatMap(map => [...map.values()]).map(d => ({ ...d, reduced: d.reduced || sequenceClock.reduced, _program: { ...d._program, duration: end, _nativeEase: undefined, _identity: undefined } }));
     return this._execute(drafts, drafts.every(draft => draft.reduced) ? 0 : end);
   }
 }

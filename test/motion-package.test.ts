@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { expect, it } from 'vitest';
 import ts from 'typescript';
 import ts5 from 'typescript5';
+import { rootRecipe } from '../browser/fixtures/motion-root.mjs';
 
 it('установленный пакет предоставляет один root API, одинаковые ESM/CJS и точные типы', () => {
   const work = mkdtempSync(join(tmpdir(), 'lab-motion-api-'));
@@ -58,8 +59,8 @@ animate(element,{x:1},{ease:'infinite'});
 area.dispose();`;
     const file = join(work, 'consumer.ts'); writeFileSync(file, source);
     const guide = readFileSync(join(installed, 'docs/getting-started.md'), 'utf8');
-    const example = /<!-- motion-component-example -->\s*```typescript\n([^]*?)\n```/.exec(guide)?.[1];
-    expect(example).toBeTruthy();
+    const example = rootRecipe(guide);
+    expect(rootRecipe(guide.replaceAll('\n', '\r\n'))).toBe(example);
     const exampleFile = join(work, 'example.ts'); writeFileSync(exampleFile, example!);
     for (const compiler of [ts, ts5]) {
       const program = compiler.createProgram([file, exampleFile], { noEmit: true, strict: true, skipLibCheck: false, target: compiler.ScriptTarget.ES2022,

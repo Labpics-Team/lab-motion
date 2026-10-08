@@ -85,8 +85,8 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
   };
 
   const idle = (): void => {
-    reservation = null;
-    const cancel = cancelNative; cancelNative = null;
+    const cancel = cancelNative;
+    reservation = cancelNative = null;
     clearFallback();
     cancel?.();
   };
@@ -116,7 +116,6 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
 
   /** Один terminal снимает очередь, ссылки и teardown-владельцев. */
   const stopAll = (): void => {
-    idle();
     const teardown: Array<() => void> = [];
     const owned = phases;
     phases = [[], [], []];
@@ -128,8 +127,10 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
         }
       }
     }
-    for (const terminal of teardown) {
-      try { terminal(); } catch { /* teardown одного owner не блокирует остальных */ }
+    try { idle(); } finally {
+      for (const terminal of teardown) {
+        try { terminal(); } catch { /* teardown одного owner не блокирует остальных */ }
+      }
     }
   };
 

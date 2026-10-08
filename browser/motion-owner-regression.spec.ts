@@ -48,18 +48,32 @@ test('область снимает DOM-listener с однажды прочит�
 });
 
 
-test('пример подключения из документации запускается и освобождает компонент', async ({ page }) => {
-  const result = await page.evaluate(async () => {
+test('пример подключения из документации запускает повтор и освобождает компонент', async ({ page }) => {
+  await page.clock.install();
+  await page.clock.pauseAt(new Date());
+  const initial = await page.evaluate(async () => {
     const { mountMotion } = await import('/browser/.artifacts/motion-root.js');
-    const root = document.createElement('section');
+    const root = document.createElement('section') as HTMLElement & { dispose(): void };
+    root.id = 'motion-recipe';
     root.innerHTML = '<button data-replay>Повтор</button><div class="item"></div><div class="item"></div>';
-    document.body.append(root);
-    const dispose = mountMotion(root);
-    const initial = root.getAnimations({ subtree: true }).length;
-    const button = root.querySelector('button')!;
-    button.click(); dispose(); await Promise.resolve(); button.click();
-    const remaining = root.getAnimations({ subtree: true }).length;
-    root.remove(); return { initial, remaining };
+    document.body.append(root); root.dispose = mountMotion(root);
+    root.querySelector('button')!.click();
+    return root.getAnimations({ subtree: true }).length;
   });
-  expect(result.initial).toBeGreaterThan(0); expect(result.remaining).toBe(0);
+  await page.clock.runFor(80);
+  const moved = await page.evaluate(() => {
+    const root = document.getElementById('motion-recipe')! as HTMLElement & { dispose(): void };
+    const x = new DOMMatrixReadOnly(getComputedStyle(root.querySelector('.item')!).transform).m41;
+    root.dispose(); root.querySelector('button')!.click();
+    return x;
+  });
+  await page.clock.runFor(80);
+  const after = await page.evaluate(() => {
+    const root = document.getElementById('motion-recipe')!;
+    const state = { x: new DOMMatrixReadOnly(getComputedStyle(root.querySelector('.item')!).transform).m41,
+      remaining: root.getAnimations({ subtree: true }).length };
+    root.remove(); return state;
+  });
+  expect(initial).toBeGreaterThan(0); expect(Math.abs(moved)).toBeGreaterThan(.1);
+  expect(after.x).toBeCloseTo(moved, 5); expect(after.remaining).toBe(0);
 });

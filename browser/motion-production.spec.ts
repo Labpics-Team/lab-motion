@@ -148,3 +148,36 @@ test('layout: пауза до готовности сохраняет snapshot �
   }
   expect(result.after).toBe(0);
 });
+
+
+for (const delay of [0, 80]) test(`layout сохраняет native длительность и задержку ${delay} мс`, async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const result = await page.evaluate(async delay => {
+    const { layout } = await import('/browser/.artifacts/motion-root.js');
+    const root = document.createElement('section'); root.style.cssText = 'width:120px;height:30px;background:blue'; document.body.append(root);
+    const original = document.startViewTransition;
+    let transition: ViewTransition | undefined;
+    if (original) document.startViewTransition = (...args: Parameters<typeof original>) => transition = original.apply(document, args);
+    let run: ReturnType<typeof layout> | undefined;
+    try {
+      run = layout(root, () => { root.style.width = '240px'; }, { duration: 160, delay, ease: 'linear' });
+      if (transition) await transition.ready;
+      const name = root.style.viewTransitionName;
+      const effect = document.getAnimations().find(effect => (effect.effect as KeyframeEffect).pseudoElement === `::view-transition-group(${name})`);
+      const timing = effect?.effect!.getTiming();
+      const atReady = typeof effect?.currentTime === 'number' ? effect.currentTime : 0;
+      const began = performance.now();
+      const outcome = await run.finished;
+      return { supported: Boolean(transition), duration: run.duration, nativeDuration: timing?.duration, nativeDelay: timing?.delay,
+        elapsed: performance.now() - began, atReady, outcome, remaining: document.getAnimations().length,
+        name: root.style.viewTransitionName, width: getComputedStyle(root).width };
+    } finally { document.startViewTransition = original; run?.stop(); root.remove(); }
+  }, delay);
+  expect(result.duration).toBe(160 + delay);
+  if (result.supported) {
+    expect(result.nativeDuration).toBe(160); expect(result.nativeDelay).toBe(delay);
+    expect(result.elapsed + result.atReady).toBeGreaterThanOrEqual(160 + delay - 35);
+  }
+  expect(result.outcome).toEqual({ status: 'finished' }); expect(result.remaining).toBe(0);
+  expect(result.name).toBe(''); expect(result.width).toBe('240px');
+});

@@ -74,6 +74,9 @@ it('массив снимается по первоначальной длине
   expect(snapshot(source, 'values', 2)).toEqual([0, 1]); expect(reads).toBe(1);
   const hole = [0, , 1];
   expect(() => snapshot(hole, 'values')).toThrow('пропущено');
+  const prototype = Object.create(Array.prototype); prototype[1] = 2;
+  Object.setPrototypeOf(hole, prototype);
+  expect(() => snapshot(hole, 'values')).toThrow('пропущено');
 });
 
 it('поздние невалидные опции не прерывают активные соседние свойства', () => {
@@ -126,8 +129,8 @@ it('10 000 повторных целей держат один эффект и �
     previous.stop(); previous.finish();
   }
   expect(h.effects).toHaveLength(1); expect(h.effects[0]!.cancelled).toBe(false);
-  const registry = (h.runtime as unknown as { _surfaces: WeakMap<Element, Map<string, { tracks: Map<string, { _owner: unknown }> }>> })._surfaces;
-  expect(registry.get(h.element)!.get('transform')!.tracks.get('x')!._owner).toBe(current);
+  const registry = (h.runtime as unknown as { _surfaces: WeakMap<Element, Map<string, { _tracks: Map<string, { _owner: unknown }> }>> })._surfaces;
+  expect(registry.get(h.element)!.get('transform')!._tracks.get('x')!._owner).toBe(current);
   current.finish(); expect(await current.finished).toEqual({ status: 'finished' });
   expect(await first.finished).toEqual({ status: 'stopped' });
 });

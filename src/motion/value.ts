@@ -13,50 +13,45 @@ export interface MotionValue extends Disposable {
 
 export function value(initial: number = 0): MotionValue {
   let current = number(initial, 'value');
-  let listeners = new Map<(value: number) => void, object>();
+  const listeners = new Map<(value: number) => void, object>();
   let live = true;
+  let generation: object | undefined;
   let animation: Playback | undefined;
-  let notifying = false;
-  const pending: number[] = [];
-  function publish(next: number): void {
-    if (!live || Object.is(current, next)) return;
-    pending.push(next);
-    if (notifying) return;
-    notifying = true;
-    const errors: unknown[] = [];
-    try {
-      while (pending.length && live) {
-        current = pending.shift()!;
+  const target = { style: {
+    getPropertyValue() { return String(current); },
+    setProperty(_property: string, text: string) {
+      const next = number(Number(text), 'value');
+      if (!live || Object.is(current, next)) return;
+      current = next;
+      // Значение принято синхронно; уведомление принадлежит записавшему его прогону.
+      runtime._notify(target, '--lab-motion-value', () => {
+        const errors: unknown[] = [];
         for (const [listener, registration] of [...listeners]) {
           if (!live) break;
           if (listeners.get(listener) !== registration) continue;
-          try { listener(current); } catch (error) { errors.push(error); }
+          try { listener(next); } catch (error) { errors.push(error); }
         }
-      }
-    } finally { notifying = false; pending.length = 0; }
-    if (errors.length) throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'Ошибка подписки на движение');
-  }
-  const target = { style: {
-    getPropertyValue() { return String(current); },
-    setProperty(_property: string, next: string) {
-      const parsed = number(Number(next), 'value');
-      runtime.after(() => publish(parsed));
+        if (errors.length) throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'Ошибка подписки на движение');
+      });
     },
   } } as unknown as Element;
+  function start(next: number | readonly number[], options?: MotionOptions): Playback {
+    const token = {}; generation = token;
+    const started = runtime.animate(target, { '--lab-motion-value': next }, options);
+    if (!live || generation !== token) { started.stop(); return started; }
+    animation = started;
+    const release = (): void => { if (animation === started) animation = undefined; };
+    void started.finished.then(release, release);
+    return started;
+  }
   return {
     get: () => current,
     set(next): void {
-      if (!live) return;
-      next = number(next, 'value');
-      animation?.stop(); animation = undefined;
-      runtime.animate(target, { '--lab-motion-value': next }, { duration: 0 });
+      if (live) start(number(next, 'value'), { duration: 0 });
     },
     animate(next, options): Playback {
       if (!live) throw new MotionError('Значение уже освобождено');
-      const started = runtime.animate(target, { '--lab-motion-value': next }, options);
-      animation = started;
-      void started.finished.then(() => { if (animation === started) animation = undefined; }, () => { if (animation === started) animation = undefined; });
-      return started;
+      return start(next, options);
     },
     subscribe(listener): () => void {
       if (!live) return () => {};
@@ -72,8 +67,8 @@ export function value(initial: number = 0): MotionValue {
     },
     dispose(): void {
       if (!live) return;
-      live = false; listeners.clear(); listeners = new Map(); pending.length = 0;
-      try { animation?.stop(); } finally { animation = undefined; }
+      live = false; generation = undefined; listeners.clear();
+      const previous = animation; animation = undefined; previous?.stop();
     },
   };
 }

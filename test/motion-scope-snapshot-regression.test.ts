@@ -28,8 +28,12 @@ it('EventTarget получает тот же capture при добавлении
   const root = dom.window.document.querySelector('main')!, button = root.querySelector('button')!;
   const area = scope(root), listener = vi.fn(); let reads = 0;
   try {
+    const add = vi.spyOn(button, 'addEventListener'), remove = vi.spyOn(button, 'removeEventListener');
     const off = area.on(button, 'click', listener, { get capture() { return ++reads === 1; } });
+    const registered = add.mock.calls[0]!;
+    expect(registered[2]).toMatchObject({ capture: true });
     off(); button.dispatchEvent(new dom.window.Event('click'));
+    expect(remove).toHaveBeenCalledWith('click', registered[1], true);
     expect(reads).toBe(1); expect(listener).not.toHaveBeenCalled();
   } finally { area.dispose(); dom.window.close(); }
 });

@@ -610,28 +610,27 @@ export interface AnimateScope {
  */
 export function createAnimateScope(root: AnimateScopeRoot): AnimateScope {
   if (typeof root?.querySelectorAll !== 'function') {
-    throw new TypeError('scope root requires querySelectorAll()');
+    throw new TypeError('scope: querySelectorAll() required');
   }
   let liveRoot: AnimateScopeRoot | undefined = root;
   const runs = new Set<AnimateControls>();
   let idle: AnimateControls | undefined;
-  const inactive = (): AnimateControls => idle ??= animate([], {});
   const cancelRuns = (): void => {
     const errors: unknown[] = [];
     for (const controls of runs) {
       try { controls.cancel(); } catch (error) { errors.push(error); }
     }
-    if (errors.length) throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'scope cleanup failed');
+    if (errors.length) throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'scope cleanup');
   };
   return {
     animate(target, props, options): AnimateControls {
-      if (!liveRoot) return inactive();
+      if (!liveRoot) return idle ??= animate([], {});
       // Cast передаёт недоверенный query-выход существующей defensive границе
       // full animate. Здесь не копируются проверка элементов и bounded snapshot.
       const resolved = typeof target === 'string'
         ? liveRoot.querySelectorAll(target) as AnimateTarget
         : target;
-      if (!liveRoot) return inactive();
+      if (!liveRoot) return idle ??= animate([], {});
       const controls = animate(resolved, props, options);
       // Query, options и host setup могут синхронно уничтожить компонент ещё
       // до того, как обычный animate вернул доступный handle.

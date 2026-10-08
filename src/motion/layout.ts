@@ -53,7 +53,7 @@ class LayoutRun implements Playback {
   constructor(root: Element, mutate: () => void | Promise<void>, options?: LayoutOptions) {
     const config = timing(options as MotionOptions | undefined);
     if (typeof config.ease === 'function' && !config.cssEase) throw new MotionError('layout использует CSS easing');
-    const path = program('--lab-motion-progress', { coordinates: [0], unit: '' }, [1], false, config, [0]);
+    const path = program('--lab-motion-progress', { _coordinates: [0], unit: '' }, [1], false, config, [0]);
     const win = root.ownerDocument.defaultView;
     const reduced = config.reduced || win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
     this.duration = reduced ? 0 : path.duration;
@@ -61,7 +61,7 @@ class LayoutRun implements Playback {
     void this.finished.catch(() => {});
     this._session = { _root: root, _document: root.ownerDocument, _mutate: mutate, _effects: [], _name: `lab-motion-${++serial}`,
       _previousName: '', _previousPriority: '',
-      _delay: config.delay, _easing: path.nativeEase };
+      _delay: config.delay, _easing: path._nativeEase };
   }
   get state(): PlaybackState { return this._status; }
   private _inactive(): boolean { return this._settled || this._terminal !== undefined; }

@@ -850,7 +850,7 @@ async function runCli() {
 
   const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
   const entries = deriveEntriesFromExports(pkg);
-  if (pkg.imports?.['#kernel']) entries.push({ key: '#kernel', label: 'core (index)', importPath: 'dist/index.js', gate: CORE_GATE_BYTES });
+  if (pkg.imports?.['#kernel']) entries.push({ key: '#kernel', label: 'core (#kernel)', importPath: 'dist/index.js', gate: CORE_GATE_BYTES });
   const { rows, totalGzBytes, totalBrBytes, hasWarnings: measuredWarnings } = measureEntries(entries, ROOT);
   let hasWarnings = measuredWarnings;
 
@@ -903,7 +903,7 @@ async function runCli() {
   // ─── OPEN ITEMS ─────────────────────────────────────────────────────────
 
   if (hasWarnings) {
-    const core = rows.find(r => r.label === 'core (index)');
+    const core = rows.find(r => r.label === 'core (#kernel)') ?? rows.find(r => r.label === 'core (index)');
     if (core && !core.error && core.exceeded) {
       console.log(`
 РЕГРЕССИЯ РАЗМЕРА

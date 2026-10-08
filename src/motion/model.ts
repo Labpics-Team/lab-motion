@@ -1,3 +1,4 @@
+import { DEFAULT_DURATION_MS, DEFAULT_SPRING, STANDARD_EASING_COORDS } from '../internal/motion-defaults.js';
 import { cubicBezierUnchecked } from '../internal/cubic-bezier.js';
 import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
 import type { MotionOptions, MotionProperties, MotionScalar, MotionSpring, Timing, MotionResult } from './types.js';
@@ -10,10 +11,11 @@ export const FINISHED: MotionResult = Object.freeze({ status: 'finished' as cons
 export const STOPPED: MotionResult = Object.freeze({ status: 'stopped' as const });
 const linear = (t: number): number => t;
 const EASES: Readonly<Record<string, readonly [number, number, number, number]>> = {
-  standard: [.2, 0, 0, 1], ease: [.25, .1, .25, 1],
+  standard: STANDARD_EASING_COORDS, ease: [.25, .1, .25, 1],
   'ease-in': [.42, 0, 1, 1], 'ease-out': [0, 0, .58, 1], 'ease-in-out': [.42, 0, .58, 1],
 };
-const standard: (t: number) => number = cubicBezierUnchecked(.2, 0, 0, 1);
+const standard: (t: number) => number = cubicBezierUnchecked(...STANDARD_EASING_COORDS);
+const standardCss = `cubic-bezier(${STANDARD_EASING_COORDS.join(',')})`;
 
 export function number(value: unknown, name: string, minimum: number = -Infinity): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum)
@@ -38,7 +40,7 @@ export function snapshot<T>(input: readonly T[], name: string, minimum = 0): T[]
 }
 
 export function physics(input: MotionSpring | undefined): SpringParams {
-  if (input === undefined) return { mass: 1, stiffness: 170, damping: 26 };
+  if (input === undefined) return { ...DEFAULT_SPRING };
   const source = record(input, 'spring');
   const keys = Object.keys(source);
   if (keys.some(key => !['mass', 'stiffness', 'damping', 'response', 'bounce'].includes(key)))
@@ -71,7 +73,7 @@ export function timing(input: MotionOptions | undefined, authored = false): Timi
   if (reducedMotion !== undefined && reducedMotion !== 'user' && reducedMotion !== 'always')
     throw new MotionError('reducedMotion: user или always');
   let easeFunction: (p: number) => number = authored ? linear : standard;
-  let cssEase: string | undefined = authored ? 'linear' : 'cubic-bezier(0.2,0,0,1)';
+  let cssEase: string | undefined = authored ? 'linear' : standardCss;
   if (ease !== undefined) {
     if (typeof ease === 'function') { easeFunction = ease as (p: number) => number; cssEase = undefined; }
     else if (ease === 'linear') { easeFunction = linear; cssEase = 'linear'; }
@@ -92,10 +94,22 @@ export function timing(input: MotionOptions | undefined, authored = false): Timi
     if (stops[0] !== 0 || stops.at(-1) !== 1) throw new MotionError('times должны начинаться с 0 и заканчиваться 1');
   }
   return {
+    _defaultMotion: spring === undefined && duration === undefined && ease === undefined,
+    _defaultEase: ease === undefined,
     spring: duration !== undefined || ease !== undefined || authored && spring === undefined ? undefined : physics(spring as MotionSpring | undefined),
-    duration: duration === undefined ? authored || ease !== undefined ? 200 : undefined : number(duration, 'duration', 0),
+    duration: duration === undefined ? authored || ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
     ease: easeFunction, cssEase, delay: number(delay ?? 0, 'delay', 0), stagger: number(stagger ?? 0, 'stagger', 0),
     times: stops, reduced: reducedMotion === 'always',
+  };
+}
+
+/** Авторская траектория выбирает собственные defaults без повторного чтения опций. */
+export function authoredTiming(clock: Timing): Timing {
+  return { ...clock,
+    spring: clock._defaultMotion ? undefined : clock.spring,
+    duration: clock._defaultMotion ? DEFAULT_DURATION_MS : clock.duration,
+    ease: clock._defaultEase ? linear : clock.ease,
+    cssEase: clock._defaultEase ? 'linear' : clock.cssEase,
   };
 }
 

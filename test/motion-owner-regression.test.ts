@@ -45,7 +45,7 @@ describe('отложенная команда проверяет текущег�
     const write = h.element.style.setProperty.bind(h.element.style);
     h.element.style.setProperty = (name, text) => {
       write(name, text); if (!armed || name !== 'transform') return; armed = false;
-      h.runtime.after(() => { next = h.runtime.animate(h.element, { x: 100 }, linear); });
+      h.runtime._after(() => { next = h.runtime.animate(h.element, { x: 100 }, linear); });
       previous.stop();
     };
     try {
