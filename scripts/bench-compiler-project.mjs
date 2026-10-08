@@ -1,13 +1,14 @@
 /** Сравнивает доставляемую сборку и подготовку модулей на одинаковом проекте. */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { tmpdir, cpus } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { performance } from 'node:perf_hooks';
 import { build, parseAstAsync } from 'vite';
+import { readCompilerProjectRecipe } from './compiler-doc-recipe.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const [baselineArg, outputArg] = process.argv.slice(2);
@@ -16,22 +17,23 @@ assert.equal(typeof process.threadCpuUsage, 'function', 'Нужен Node с proc
 const baseline = resolve(baselineArg), output = resolve(outputArg);
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 function identity(path) {
-  const files = ['package.json', 'dist/compiler/vite/index.js', 'dist/animate/index.js',
-    'dist/nano/index.js', 'dist/compiler/runtime/index.js', 'dist/compiler/surface/index.js'];
+  const dist = join(path, 'dist');
+  const files = ['package.json', ...readdirSync(dist, { recursive: true, withFileTypes: true })
+    .filter(entry => entry.isFile()).map(entry => relative(path, join(entry.parentPath, entry.name)).replaceAll('\\', '/'))].sort();
   return Object.fromEntries(files.map(file => [file, digest(readFileSync(join(path, file)))]));
 }
 const identityBefore = { baseline: identity(baseline), candidate: identity(root) };
 const factories = await Promise.all([baseline, root].map(async directory =>
   (await import(pathToFileURL(join(directory, 'dist/compiler/vite/index.js')).href)).motionCompiler));
-const doc = readFileSync(join(root, 'docs/compiler.md'), 'utf8');
-const source = /<!-- compiler-project-recipe -->\s*```typescript\n([^]*?)\n```/.exec(doc)?.[1];
-assert.ok(source, 'Нет исполняемого примера проекта в документации');
+const source = readCompilerProjectRecipe(root);
 const profile = Object.freeze({ modules: 64, definitions: [4, 64], pairs: 24, warmupPairs: 4,
   metric: 'полный transform: parse + plan + артефакт + source map + buildEnd',
   includes: 'каждая обработка начинается с нового экземпляра плагина',
   size: 'сумма gzip всех достижимых JS/CSS/data chunks, maps исключены' });
 const work = mkdtempSync(join(tmpdir(), 'motion-project-'));
 const report = { profile, node: process.version, v8: process.versions.v8, cpu: cpus()[0]?.model,
+  vite: JSON.parse(readFileSync(join(root, 'node_modules/vite/package.json'), 'utf8')).version,
+  lockSha256: digest(readFileSync(join(root, 'pnpm-lock.yaml'))),
   identity: identityBefore, sourceSha256: digest(source), bundles: {}, transforms: [] };
 
 async function consumer(directory, factory) {

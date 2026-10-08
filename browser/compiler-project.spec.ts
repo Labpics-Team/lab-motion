@@ -38,30 +38,39 @@ test('промежуточные позиции списка и opacity совп
   const result = await page.evaluate(async () => {
     const urls = ['/browser/.artifacts/compiler-project-runtime.js', '/browser/.artifacts/compiler-project-compiled.js'];
     const rows: Array<Array<{ width: number[]; opacity: number }>> = [];
-    for (const url of urls) {
-      const panels = Array.from({ length: 4 }, () => {
-        const panel = document.createElement('div'); panel.style.cssText = 'width:240px;height:20px';
-        document.body.append(panel); return panel;
-      });
-      const label = document.createElement('span'); label.style.opacity = '0'; document.body.append(label);
-      const { reveal } = await import(url); reveal(panels, label);
-      const elements = [...panels, label];
-      const deadline = performance.now() + 5000;
-      while (!elements.every(element => element.getAnimations().length === 1)) {
-        if (performance.now() > deadline) throw new Error('Не появился обязательный путь анимации');
-        await new Promise(requestAnimationFrame);
+    const original = window.requestAnimationFrame;
+    let queue: FrameRequestCallback[] = [];
+    window.requestAnimationFrame = callback => { queue.push(callback); return queue.length; };
+    const tick = (time: number) => { const jobs = queue; queue = []; for (const job of jobs) job(time); };
+    try {
+      for (const url of urls) {
+        const panels = Array.from({ length: 4 }, () => {
+          const panel = document.createElement('div'); panel.style.cssText = 'width:240px;height:20px';
+          document.body.append(panel); return panel;
+        });
+        const label = document.createElement('span'); label.style.opacity = '0'; document.body.append(label);
+        const elements = [...panels, label];
+        const { reveal } = await import(url); reveal(panels, label);
+        const effects = elements.flatMap(element => element.getAnimations());
+        if (effects.length === 0) throw new Error('Прозрачность должна иметь native-исполнитель');
+        for (const effect of effects) { effect.pause(); effect.currentTime = 0; }
+        // Runtime width использует JS-кадры; compiled width — native currentTime.
+        // Оба получают одни и те же миллисекунды, независимо от способа исполнения.
+        tick(0);
+        const samples = [];
+        for (const time of [0, 50, 200, 500, 800, 1500]) {
+          tick(time);
+          for (const effect of effects) effect.currentTime = time;
+          samples.push({ width: panels.map(panel => Number.parseFloat(getComputedStyle(panel).width)),
+            opacity: Number(getComputedStyle(label).opacity) });
+        }
+        rows.push(samples);
+        for (let i = 0; queue.length > 0 && i < 10; i++) tick(3000 + i * 2000);
+        if (queue.length) throw new Error('Runtime не освободил кадры после достижения цели');
+        for (const effect of effects) effect.cancel();
+        for (const element of elements) element.remove();
       }
-      const effects = elements.map(element => element.getAnimations()[0]!);
-      for (const effect of effects) effect.pause();
-      const samples = [];
-      for (const t of [0, 0.05, 0.2, 0.5, 0.8, 1]) {
-        for (const effect of effects) effect.currentTime = Number(effect.effect!.getComputedTiming().duration) * t;
-        samples.push({ width: panels.map(panel => Number.parseFloat(getComputedStyle(panel).width)),
-          opacity: Number(getComputedStyle(label).opacity) });
-      }
-      rows.push(samples);
-      for (const effect of effects) effect.cancel(); for (const element of elements) element.remove();
-    }
+    } finally { window.requestAnimationFrame = original; }
     return rows;
   });
   expect(result[0]).toHaveLength(6); expect(result[1]).toHaveLength(6);

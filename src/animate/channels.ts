@@ -83,7 +83,7 @@ function requireFinite(v: unknown): number {
   return v;
 }
 
-function parseCssValue(v: unknown): ValueAST {
+function parseCssValue(v: unknown, property: string): ValueAST {
   if (typeof v === 'number' && !Number.isFinite(v)) {
     throw new MotionParamError('LM142');
   }
@@ -92,6 +92,9 @@ function parseCssValue(v: unknown): ValueAST {
   }
   const parsed = tryParseValue(v);
   if (parsed === undefined) throw new MotionParamError('LM144');
+  // Parser создаёт собственный unit-узел числа; свойство уточняет его размерность.
+  if (typeof v === 'number' && /^(width|height)$/.test(property))
+    (parsed as { unit: string }).unit = 'px';
   return parsed;
 }
 
@@ -137,12 +140,13 @@ export function parseProps(props: Record<string, unknown>): Map<GroupKey, Channe
         addSpec(groups, { _kind: 'num', _key: key, _group: group, _explicitFrom: explicitFrom, _to: to });
       }
     } else {
+      const group = camelToKebab(key);
       addSpec(groups, {
         _kind: 'css',
         _key: key,
-        _group: camelToKebab(key),
-        _explicitFrom: pair ? parseCssValue(pair[0]) : undefined,
-        _to: parseCssValue(pair ? pair[1] : raw),
+        _group: group,
+        _explicitFrom: pair ? parseCssValue(pair[0], group) : undefined,
+        _to: parseCssValue(pair ? pair[1] : raw, group),
       });
     }
   }
