@@ -79,3 +79,10 @@ it('10 000 жизненных циклов release удержанных controll
   expect(proof.nativeCreated).toBeGreaterThan(0); expect(proof.nativeCreated).toBe(proof.nativeRemoved);
   expect(proof.positiveControl).toBe(true);
 }, 100_000);
+
+
+it('отменённый layout освобождает root до завершения обновления приложения', () => {
+  const result = spawnSync(process.execPath, ['--expose-gc', 'test/fixtures/motion-layout-pending.mjs', resolve('dist/motion/index.js')],
+    { encoding: 'utf8', timeout: 15_000 });
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+}, 20_000);

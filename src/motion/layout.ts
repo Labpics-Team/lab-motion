@@ -16,7 +16,6 @@ interface Transition {
 interface Session {
   _root: Element;
   _document: Document;
-  _mutate: (() => void | Promise<void>) | undefined;
   _transition?: Transition;
   _style?: HTMLStyleElement;
   _effects: Animation[];
@@ -42,6 +41,7 @@ let serial = 0;
 
 class LayoutRun implements Playback {
   private _session: Session | undefined;
+  private _mutate: (() => void | Promise<void>) | undefined;
   private _status: PlaybackState = 'running';
   private _resolve!: (result: MotionResult) => void;
   private _reject!: (error: unknown) => void;
@@ -59,31 +59,31 @@ class LayoutRun implements Playback {
     this.duration = reduced ? 0 : path.duration;
     this.finished = new Promise((yes, no) => { this._resolve = yes; this._reject = no; });
     void this.finished.catch(() => {});
-    this._session = { _root: root, _document: root.ownerDocument, _mutate: mutate, _effects: [], _name: `lab-motion-${++serial}`,
+    this._mutate = mutate;
+    this._session = { _root: root, _document: root.ownerDocument, _effects: [], _name: `lab-motion-${++serial}`,
       _previousName: '', _previousPriority: '',
       _delay: config.delay, _easing: path._nativeEase };
   }
   get state(): PlaybackState { return this._status; }
   private _inactive(): boolean { return this._settled || this._terminal !== undefined; }
+  private _release(cancel: boolean): void {
+    const session = this._session; this._session = undefined;
+    if (!session) return;
+    if (owners.get(session._document) === this) owners.delete(session._document);
+    try { if (cancel) session._transition?.skipTransition(); }
+    finally { clearStyles(session); }
+  }
   private _complete(failure?: { error: unknown }): void {
     if (this._settled) return;
-    this._settled = true;
-    const session = this._session; this._session = undefined;
-    if (session) {
-      if (owners.get(session._document) === this) owners.delete(session._document);
-      if (failure) { try { session._transition?.skipTransition(); } catch { /* сохраняем исходную ошибку */ } }
-      try { clearStyles(session); } catch (error) { failure ??= { error }; }
-    }
+    this._settled = true; this._mutate = undefined;
+    try { this._release(Boolean(failure)); } catch (error) { failure ??= { error }; }
     if (failure) { this._status = 'failed'; this._reject(failure.error); }
     else { const result = this._terminal ?? FINISHED; this._status = result.status; this._resolve(result); }
   }
   private _stopWith(result: MotionResult): void {
     if (this._inactive()) return;
     this._terminal = result; this._status = result.status;
-    try {
-      this._session?._transition?.skipTransition();
-      if (this._session) clearStyles(this._session);
-    } catch (error) { this._complete({ error }); return; }
+    try { this._release(true); } catch (error) { this._complete({ error }); }
   }
   private _apply(): void {
     for (const effect of this._session?._effects ?? []) {
@@ -103,8 +103,7 @@ class LayoutRun implements Playback {
   stop(): void { this._stopWith(STOPPED); }
   finish(): void { this._stopWith(FINISHED); }
   private async _commit(): Promise<void> {
-    const action = this._session?._mutate;
-    if (this._session) this._session._mutate = undefined;
+    const action = this._mutate; this._mutate = undefined;
     await action?.();
   }
   private _ready(): void {

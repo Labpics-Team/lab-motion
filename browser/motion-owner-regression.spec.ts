@@ -64,8 +64,11 @@ test('пример подключения из документации запу
   const moved = await page.evaluate(() => {
     const root = document.getElementById('motion-recipe')! as HTMLElement & { dispose(): void };
     const x = new DOMMatrixReadOnly(getComputedStyle(root.querySelector('.item')!).transform).m41;
-    root.dispose(); root.querySelector('button')!.click();
-    return x;
+    root.dispose();
+    // Stop материализует положение на текущую миллисекунду между rAF-кадрами.
+    const stopped = new DOMMatrixReadOnly(getComputedStyle(root.querySelector('.item')!).transform).m41;
+    root.querySelector('button')!.click();
+    return { before: x, stopped };
   });
   await page.clock.runFor(80);
   const after = await page.evaluate(() => {
@@ -74,6 +77,6 @@ test('пример подключения из документации запу
       remaining: root.getAnimations({ subtree: true }).length };
     root.remove(); return state;
   });
-  expect(initial).toBeGreaterThan(0); expect(Math.abs(moved)).toBeGreaterThan(.1);
-  expect(after.x).toBeCloseTo(moved, 5); expect(after.remaining).toBe(0);
+  expect(initial).toBeGreaterThan(0); expect(Math.abs(moved.before)).toBeGreaterThan(.1);
+  expect(after.x).toBeCloseTo(moved.stopped, 5); expect(after.remaining).toBe(0);
 });
