@@ -5,13 +5,13 @@ import { setImmediate } from 'node:timers/promises';
 // Этот файл копируется в приложение, установившее полный tarball. Импорты
 // резолвятся только через его package.json, а не через исходный checkout.
 const require = createRequire(import.meta.url);
-const specifiers = ['@labpics/motion', '@labpics/motion/frame', '@labpics/motion/compositor',
+const specifiers = ['./node_modules/@labpics/motion/dist/index.js', '@labpics/motion/frame', '@labpics/motion/compositor',
   '@labpics/motion/bindings', '@labpics/motion/behaviors', '@labpics/motion/behaviors/reorder',
   '@labpics/motion/compositor/follow', '@labpics/motion/presence', '@labpics/motion/animate'];
 const modules = [];
 for (const format of ['esm', 'cjs']) {
   const loaded = [];
-  for (const name of specifiers) loaded.push(format === 'esm' ? await import(name) : require(name));
+  for (const name of specifiers) loaded.push(format === 'esm' ? await import(name) : require(name.startsWith('./') ? name.replace(/\.js$/, '.cjs') : name));
   const [root, frame, compositor, bindings, behaviors, reorder, follow, presence, animate] = loaded;
   modules.push({ format, root, frame, compositor, bindings, behaviors, reorder, follow, presence, animate });
 }

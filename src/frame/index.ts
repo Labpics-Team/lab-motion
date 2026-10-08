@@ -71,6 +71,7 @@ interface Entry {
 export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): FrameLoop {
   let phases: [Entry[], Entry[], Entry[]] = [[], [], []];
 
+  let cancelNative: (() => void) | null = null;
   let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
   /** Callback-владелец reserve; `schedule` — sentinel исполняемого тика. */
   let reservation: ((ts?: number) => void) | null = null;
@@ -85,7 +86,9 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
 
   const idle = (): void => {
     reservation = null;
+    const cancel = cancelNative; cancelNative = null;
     clearFallback();
+    cancel?.();
   };
 
   const fallback: RequestFrameFn = (cb) =>
@@ -143,6 +146,7 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
         }
         return;
       }
+      cancelNative = null;
       tick(fire, ts);
     };
     reservation = fire;
@@ -158,6 +162,11 @@ export function createFrameLoop(options?: { requestFrame?: RequestFrameFn }): Fr
         : native
           ? Reflect.apply(native, globalThis, [fire])
           : fallback(fire);
+      const cancel = !injected && native && globalThis.cancelAnimationFrame;
+      if (typeof cancel === 'function') {
+        const release = (): void => { Reflect.apply(cancel, globalThis, [handle]); };
+        if (reservation === fire) cancelNative = release; else release();
+      }
     } catch (error) {
       // Host-планировщик не должен навечно оставлять цикл не-idle:
       // следующая валидная подписка обязана снова запустить цикл.

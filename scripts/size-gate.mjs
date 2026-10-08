@@ -286,6 +286,9 @@ export const BESPOKE_SUBPATH_GATES = {
  * равен gate). `%DIST%` подставляется абсолютным путём dist/index.js.
  */
 export const IMPORT_COST_SCENARIOS = [
+  { name: 'root animate', gate: FULL_ANIMATE_GATE_BYTES, code: `import { animate } from '%DIST%/../motion/index.js'; export { animate };` },
+  { name: 'root component scope', gate: 15_700, code: `import { scope } from '%DIST%/../motion/index.js'; export { scope };` },
+
   {
     name: 'reorder-controlled',
     code: `import {createReorder} from '%DIST%/../behaviors/reorder/index.js'; console.log(createReorder({items:[],onReorder:console.log}));`,
@@ -700,14 +703,15 @@ export function deriveEntriesFromExports(pkg) {
     .map(([key, value]) => {
       const importPath = resolveImportString(value);
       if (!importPath) return null;
-      const label = key === '.' ? 'core (index)' : key.replace(/^\.\//, '');
+      const facade = key === '.' && importPath === './dist/motion/index.js';
+      const label = facade ? 'motion API' : key === '.' ? 'core (index)' : key.replace(/^\.\//, '');
       return {
         key,
         label,
         importPath: importPath.replace(/^\.\//, ''),
         gate:
           key === '.'
-            ? CORE_GATE_BYTES
+            ? facade ? FULL_ANIMATE_GATE_BYTES : CORE_GATE_BYTES
             : (BESPOKE_SUBPATH_GATES[key] ?? SUBPATH_GATE_BYTES),
       };
     })
@@ -846,6 +850,7 @@ async function runCli() {
 
   const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
   const entries = deriveEntriesFromExports(pkg);
+  if (pkg.imports?.['#kernel']) entries.push({ key: '#kernel', label: 'core (index)', importPath: 'dist/index.js', gate: CORE_GATE_BYTES });
   const { rows, totalGzBytes, totalBrBytes, hasWarnings: measuredWarnings } = measureEntries(entries, ROOT);
   let hasWarnings = measuredWarnings;
 

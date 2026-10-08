@@ -17,51 +17,49 @@ ESM, CommonJS и типы TypeScript включены. Для серверног
 Node.js 22 или новее; для браузерного runtime нужны ES2022 и `WeakRef`.
 Биндинги подключают фреймворк через optional peer dependency.
 
-## Первый переход
+## Первое движение
 
 ```typescript
-import { animate } from '@labpics/motion/animate';
+import { animate } from '@labpics/motion';
 
-const controls = animate('.card', { x: 160, opacity: 1 }, {
-  spring: { mass: 1, stiffness: 170, damping: 26 },
-});
-
-await controls.finished;
+const move = animate('.card', { x: 160, opacity: 1 });
+const result = await move.finished;
 ```
 
-`animate` принимает элемент или CSS-селектор. Возвращённые controls позволяют
-приостановить, продолжить или отменить переход. Для новой цели вызовите
-`animate` снова.
+Задайте цель. Библиотека выбирает подходящее исполнение и возвращает одинаковые
+контролы: `pause`, `play`, `seek`, `stop`, `finish`. Новая цель продолжает движение,
+а явный массив значений проигрывает авторскую траекторию.
 
-Подробнее: [начало работы](docs/getting-started.md), [API](docs/api.md), [рецепты](docs/recipes.md).
+## Компонент
 
-## Что импортировать
+```typescript
+import { scope } from '@labpics/motion';
 
-| Задача | Импорт |
-| --- | --- |
-| DOM-анимация с управлением | `@labpics/motion/animate` |
-| Минимальный нативный WAAPI-путь | `@labpics/motion/nano` |
-| Анимируемое числовое значение | `MotionValue` из `@labpics/motion` |
-| Жесты | `@labpics/motion/gestures` |
-| Появление и уход элементов | `@labpics/motion/presence` |
-| Изменение расположения | `@labpics/motion/projection`, `@labpics/motion/smart` |
-| Реакция на прокрутку и видимость | `@labpics/motion/scroll`, `@labpics/motion/in-view` |
+const ui = scope(document.querySelector('.panel')!);
+ui.animate('.item', { opacity: [0, 1], y: [8, 0] }, { duration: 180, stagger: 25 });
+ui.on('.replay', 'click', () => ui.animate('.item', { x: [0, -4, 4, 0] }));
 
-Биндинги доступны для React, Preact, Vue, Svelte, Solid, Angular, Qwik, Lit
-и Web Components. Сигнатуры и требования находятся в [справочнике](docs/api.md).
+// При удалении компонента:
+ui.dispose();
+```
 
-## Документация
+Область локализует селекторы и освобождает движения, обработчики, значения и
+дочерние области. Системное уменьшенное движение учитывается автоматически.
+Остановка старого controller не отменяет движение, которым уже владеет новый.
 
-[Руководства и справочник](docs/index.md) помогают выбрать API, настроить
-переходы и подключить движение к жизненному циклу компонента.
-[Миграция](docs/migration.md) описывает обновление версии и перенос с Motion и Anime.js.
+## Возможности
 
-Для `animate` предусмотрен JS-путь при недоступности подходящего нативного
-исполнения. У `nano` собственные требования к WAAPI;
-[проверьте их перед выбором](docs/api.md#контракт-nano).
+`animate` задаёт движение. `scope` связывает его с компонентом. `sequence`
+объединяет шаги одной временной шкалой. `layout` показывает переход между
+состояниями DOM. `value` предоставляет реактивное анимируемое число.
+Все эти функции доступны из `@labpics/motion`.
 
-Размер зависит от импортов. В исходном репозитории команда `pnpm size` измеряет
-отдельные входы. Методика описана в [руководстве по бенчмаркам](docs/benchmark.md).
+[Начало работы](docs/getting-started.md) · [API](docs/api.md) ·
+[Изменения версии](docs/migration.md) · [Устройство исполнения](docs/architecture.md).
+
+В репозитории `pnpm size` проверяет полный достижимый код потребительских сборок.
+Размер и производительность зависят от использованных возможностей; методика
+измерений описана в [руководстве по бенчмаркам](docs/benchmark.md).
 
 ## Разработка
 

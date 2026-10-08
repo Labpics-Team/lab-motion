@@ -13,7 +13,7 @@
 | --- | --- |
 | экспорт-субпутей package.json | 45 |
 | фреймворк-биндингов | 9 |
-| CSS-литералов `--lab-motion-*` в src | 0 |
+| CSS-литералов `--lab-motion-*` в src | 2 |
 | CSS-литералов вне `--lab-motion-*` в src | 0 |
 | файлов вне kebab-закона | 0 |
 
@@ -33,7 +33,7 @@
 ### Экспорт-субпути (публичный API)
 
 - Субпуть = домен, kebab-case: `./svg-morph`, `./a11y`.
-- Каждый субпуть разрешается в исходник: `.` → `src/index.ts`,
+- Каждый субпуть разрешается в исходник: `.` → `src/motion/index.ts`,
   `./<домен>` → `src/<домен>/index.ts` (или плоский `src/<домен>.ts`).
   Exports без кода запрещены.
 - Слоистые L1-модули могут жить плоско рядом с одноимённым доменом
@@ -49,8 +49,8 @@
 
 ### CSS
 
-- Движок не эмитит CSS-кастом-свойств: в строковых литералах src их 0 (факт
-  автоматической проверки). Контракт `--lab-motion-<категория>-<имя>` (категории `duration`,
+- Внутренние численные адаптеры используют `--lab-motion-value` и
+  `--lab-motion-progress`; эти ключи не создают публичных CSS-токенов. Контракт `--lab-motion-<категория>-<имя>` (категории `duration`,
   `easing`, `spring`) — SSOT в labui (docs/motion-tokens.md); `./tokens`
   зеркалирует его как typed JS-словарь, имена совпадают байт-в-байт.
 - Любая будущая эмиссия обязана начинаться с `--lab-motion-`; иное — только
@@ -66,12 +66,12 @@
 
 ## Карта субпутей
 
-Корневой субпуть `.` — headless-ядро и реэкспорты; DOM-фасады доступны через
-`./nano` и `./animate`. Домены:
+Корневой субпуть `.` предоставляет `animate`, `scope`, `sequence`, `layout`,
+`value` и `MotionError`. Низкоуровневые модули сохраняют собственные домены:
 
 | Группа | Субпути |
 | --- | --- |
-| Ядро анимации | `./nano` (platform-trusted WAAPI, ≤1 KB), `./animate` (основной продуктовый вход), `./frame`, `./driver`, `./compositor`, `./compositor/stagger`, `./compositor/follow`, `./waapi`, `./auto` |
+| Ядро анимации | `./nano` (platform-trusted WAAPI, ≤1 KB), `./animate` (низкоуровневый фасад), `./frame`, `./driver`, `./compositor`, `./compositor/stagger`, `./compositor/follow`, `./waapi`, `./auto` |
 | Значения и физика | `./value`, `./spring`, `./decay`, `./easing`, `./keyframes`, `./stagger`, `./timeline`, `./presets`, `./tokens`, `./utils` |
 | Доменные эффекты | `./bindings`, `./flip`, `./projection`, `./smart`, `./gestures`, `./behaviors`, `./behaviors/reorder`, `./scroll`, `./in-view`, `./presence`, `./svg`, `./svg-morph`, `./a11y`, `./compiler/surface` (приватный executor compiled-поверхности, ≤1 KB gz) |
 | Биндинги (9) | `./react`, `./svelte`, `./vue`, `./lit`, `./solid`, `./preact`, `./angular`, `./wc`, `./qwik` |

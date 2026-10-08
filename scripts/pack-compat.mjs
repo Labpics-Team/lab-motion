@@ -130,7 +130,7 @@ try {
         const m = await import(s);
         if (Object.keys(m).length === 0) throw new Error('пустой ESM-модуль: ' + s);
       }
-      const { spring } = await import('${pkg.name}');
+      const { spring } = await import('${pkg.name}/spring');
       if (!Number.isFinite(spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1).value))
         throw new Error('ESM spring не-конечен');
       console.log('esm ok: ' + specs.length);
@@ -148,7 +148,7 @@ try {
         const m = require(s);
         if (Object.keys(m).length === 0) throw new Error('пустой CJS-модуль: ' + s);
       }
-      const { spring } = require('${pkg.name}');
+      const { spring } = require('${pkg.name}/spring');
       if (!Number.isFinite(spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1).value))
         throw new Error('CJS spring не-конечен');
       console.log('cjs ok: ' + specs.length);
@@ -199,7 +199,7 @@ try {
     );
     writeFileSync(
       join(dir, 'consumer.ts'),
-      `import { spring, type SpringResult } from '${pkg.name}';\n` +
+      `import { spring, type SpringResult } from '${pkg.name}/spring';\n` +
         `import { readCompositorSpring } from '${pkg.name}/compositor';\n` +
         `import { createCompositorFollow, type CompositorFollow } from '${pkg.name}/compositor/follow';\n` +
         `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan, type CompositorStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
@@ -260,7 +260,7 @@ try {
     );
     writeFileSync(
       join(dir, 'consumer.ts'),
-      `import { drive, type DriveOptions } from '${pkg.name}';\n` +
+      `import { drive, type DriveOptions } from '${pkg.name}/driver';\n` +
         `import { createDriver, type DriverOptions } from '${pkg.name}/driver';\n` +
         `import { createDecay, type DecayOptions } from '${pkg.name}/decay';\n` +
         `import type { DragOptions } from '${pkg.name}/gestures';\n` +
@@ -307,7 +307,7 @@ try {
     );
     writeFileSync(
       join(dir, 'consumer.ts'),
-      `import { spring } from '${pkg.name}';\n` +
+      `import { spring } from '${pkg.name}/spring';\n` +
         `import { clamp } from '${pkg.name}/utils';\n` +
         `import { animate as nanoAnimate } from '${pkg.name}/nano';\n` +
         `import { CompositorSpring, compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
@@ -371,7 +371,7 @@ try {
     );
     writeFileSync(
       join(dir, 'consumer.cts'),
-      `import { spring, type SpringResult } from '${pkg.name}';\n` +
+      `import { spring, type SpringResult } from '${pkg.name}/spring';\n` +
         `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         `import { animate as nanoAnimate, type NanoControls } from '${pkg.name}/nano';\n` +
         compositorSubclassContract +
@@ -426,7 +426,7 @@ try {
     const dir = installFixture('vite', { name: 'vite-fx', private: true, type: 'module' }, tarball);
     writeFileSync(
       join(dir, 'entry.js'),
-      `import { spring } from '${pkg.name}';\n` +
+      `import { spring } from '${pkg.name}/spring';\n` +
         `import { animate } from '${pkg.name}/animate';\n` +
         `import { createDrag } from '${pkg.name}/gestures';\n` +
         `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +

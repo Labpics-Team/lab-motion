@@ -20,6 +20,7 @@
  */
 
 import { build } from 'vite';
+import { buildMotionRoot } from './motion-root.mjs';
 import { buildScopeRecipes } from './scope-recipes.mjs';
 import { buildPackagedCompositorFollowRecipes } from './compositor-follow-recipes.mjs';
 import { buildPresenceScopeResource } from './presence-scope-resource.mjs';
@@ -122,6 +123,8 @@ export default async function globalSetup() {
       throw new Error('compile-artifacts: return-форма ошибочно понижена — нарушена наблюдаемая эквивалентность');
     }
     const followReceipt = await buildPackagedCompositorFollowRecipes(ROOT, OUT, process.env.LAB_MOTION_TARBALL);
+    const rootReceipt = await buildMotionRoot(ROOT, OUT, resolve(TMP, 'root-consumer'), resolve(OUT, followReceipt.tarball.file));
+    if (rootReceipt.tarball.sha256 !== followReceipt.tarball.sha256) throw new Error('Root использует другой tarball');
     writeFileSync(resolve(OUT, 'compiled.js'), compiled);
     writeFileSync(resolve(OUT, 'uncompiled.js'), uncompiled);
     writeFileSync(resolve(OUT, 'surface-compiled.js'), surfaceCompiled);

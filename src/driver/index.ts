@@ -9,3 +9,6 @@
  */
 export { createDriver } from '../driver.js';
 export type { AnimationControls, DriverOptions } from '../driver.js';
+
+export { drive, type DriveOptions } from '../drive.js';
+export { MotionValue, type MotionValueOptions } from '../motion-value.js';

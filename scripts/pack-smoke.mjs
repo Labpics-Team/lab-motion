@@ -121,7 +121,7 @@ try {
       const module = await import(spec);
       if (Object.keys(module).length === 0) throw new Error('пустой ESM-модуль: ' + spec);
     }
-    const { spring } = await import('${pkg.name}');
+    const { spring } = await import('${pkg.name}/spring');
     const result = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);
     if (!Number.isFinite(result.value)) throw new Error('ESM spring вернул не-конечное');
     console.log('ESM OK: ' + names.length + ' entries');
@@ -138,7 +138,7 @@ try {
       const module = require(spec);
       if (Object.keys(module).length === 0) throw new Error('пустой CJS-модуль: ' + spec);
     }
-    const { spring } = require('${pkg.name}');
+    const { spring } = require('${pkg.name}/spring');
     const result = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);
     if (!Number.isFinite(result.value)) throw new Error('CJS spring вернул не-конечное');
     console.log('CJS OK: ' + names.length + ' entries');

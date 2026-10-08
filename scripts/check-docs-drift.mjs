@@ -98,10 +98,13 @@ export function subpathSrcErrors(subpaths, root = ROOT) {
   const errs = [];
   for (const s of subpaths) {
     const name = s === '.' ? 'index' : s.slice(2);
-    const candidates =
-      s === '.'
-        ? [join(root, 'src', 'index.ts')]
-        : [join(root, 'src', name, 'index.ts'), join(root, 'src', `${name}.ts`)];
+    const packagePath = join(root, 'package.json');
+    const target = existsSync(packagePath)
+      ? JSON.parse(readFileSync(packagePath, 'utf8')).exports?.[s]?.import?.default : undefined;
+    const mapped = typeof target === 'string' ? /^\.\/dist\/(.+)\.js$/.exec(target) : null;
+    const candidates = mapped ? [join(root, 'src', `${mapped[1]}.ts`)]
+      : s === '.' ? [join(root, 'src', 'index.ts')]
+      : [join(root, 'src', name, 'index.ts'), join(root, 'src', `${name}.ts`)];
     if (!candidates.some((c) => existsSync(c))) {
       errs.push(`субпуть ${s} не разрешается в src (нет src/${name}/index.ts | src/${name}.ts)`);
     }

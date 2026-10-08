@@ -27,14 +27,15 @@ const EXACT_FIELDS = Object.freeze({
   engines: { node: '>=22' },
   packageManager: 'pnpm@11.11.0',
   type: 'module',
-  main: './dist/index.cjs',
-  module: './dist/index.js',
-  types: './dist/index.d.ts',
+  main: './dist/motion/index.cjs',
+  module: './dist/motion/index.js',
+  types: './dist/motion/index.d.ts',
   imports: {
     '#frame': {
       import: './dist/frame/index.js',
       require: './dist/frame/index.cjs',
     },
+    '#kernel': { import: './dist/index.js', require: './dist/index.cjs' },
   },
   files: [
     'dist',
@@ -165,7 +166,7 @@ function assertExact(value, expected, label) {
 }
 
 function expectedExportTarget(subpath, kind, branch) {
-  const directory = subpath === '.' ? '' : `${subpath.slice(2)}/`;
+  const directory = subpath === '.' ? 'motion/' : `${subpath.slice(2)}/`;
   const extension = kind === 'types'
     ? branch === 'import' ? 'd.ts' : 'd.cts'
     : branch === 'import' ? 'js' : 'cjs';

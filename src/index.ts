@@ -1,16 +1,4 @@
-/**
- * @labpics/motion — dependency-free motion engine.
- *
- * Public API (invariant 6 — pinned by api-surface-pin.test.ts):
- *   spring         — L1 pure spring physics solver
- *   tween          — L1 pure linear interpolation
- *   drive          — L3 declarative animation driver (reduced-motion-aware)
- *   MotionValue    — L3 headless reactive value (spring + smooth pickup)
- *   MotionParamError — typed domain boundary error
- *
- * Zero runtime dependencies. CSS-safe (no NaN/Infinity emitted).
- * Deterministic. Reduced-motion honoured at every entry point.
- */
+/** Внутреннее численное ядро. Пользовательский root находится в motion/index.ts. */
 
 export { MotionParamError, type MotionParamErrorCode } from './errors.js';
 export {
