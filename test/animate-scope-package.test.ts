@@ -52,8 +52,8 @@ it('scope вырезается из обычного animate consumer; испо�
     return output.outputFiles[0]!.text;
   };
   const ordinary = await emit('animate'); const scoped = await emit('createAnimateScope');
-  expect(ordinary).not.toContain('root.querySelectorAll must be a function');
-  expect(ordinary).not.toContain('animate scope cleanup failed');
-  expect(scoped).toContain('root.querySelectorAll must be a function');
-  expect(scoped).toContain('animate scope cleanup failed');
+  expect(ordinary).not.toContain('scope root requires querySelectorAll()');
+  expect(ordinary).not.toContain('scope cleanup failed');
+  expect(scoped).toContain('scope root requires querySelectorAll()');
+  expect(scoped).toContain('scope cleanup failed');
 });

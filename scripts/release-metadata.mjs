@@ -40,6 +40,7 @@ const EXACT_FIELDS = Object.freeze({
   files: [
     'dist',
     'docs/api.md',
+    'docs/adr/0003-color-interpolation-contract.md',
     'docs/architecture.md',
     'docs/behaviors.md',
     'docs/benchmark.md',
