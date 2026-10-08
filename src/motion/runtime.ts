@@ -510,7 +510,7 @@ export class Runtime {
         group._reconcile();
       }
       run._empty();
-    } catch (error) { for (const group of touched) group._fail(error); throw error; }
+    } catch (error) { run._error(error); throw error; }
     this._drain(); return run;
   }
   animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): Playback {

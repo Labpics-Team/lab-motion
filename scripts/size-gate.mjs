@@ -693,6 +693,13 @@ function resolveImportString(value) {
  * функция — без чтения диска и без побочных эффектов, что делает её
  * напрямую юнит-тестируемой без сборки dist/.
  */
+export function deriveKernelEntry(pkg) {
+  if (!Object.hasOwn(pkg.imports ?? {}, '#kernel')) return undefined;
+  const target = resolveImportString(pkg.imports['#kernel']);
+  if (!target) throw new Error('package.json: imports["#kernel"] не содержит ESM-цель');
+  return { key: '#kernel', label: 'core (#kernel)', importPath: target.replace(/^\.\//, ''), gate: CORE_GATE_BYTES };
+}
+
 export function deriveEntriesFromExports(pkg) {
   const exportsField = pkg.exports;
   if (!exportsField || typeof exportsField !== 'object') {
@@ -850,7 +857,8 @@ async function runCli() {
 
   const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
   const entries = deriveEntriesFromExports(pkg);
-  if (pkg.imports?.['#kernel']) entries.push({ key: '#kernel', label: 'core (#kernel)', importPath: 'dist/index.js', gate: CORE_GATE_BYTES });
+  const kernel = deriveKernelEntry(pkg);
+  if (kernel) entries.push(kernel);
   const { rows, totalGzBytes, totalBrBytes, hasWarnings: measuredWarnings } = measureEntries(entries, ROOT);
   let hasWarnings = measuredWarnings;
 
@@ -908,7 +916,7 @@ async function runCli() {
       console.log(`
 РЕГРЕССИЯ РАЗМЕРА
 -----------------
-core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.gate / 1024).toFixed(2)} KB.
+${core.label} gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.gate / 1024).toFixed(2)} KB.
   Ядро выросло относительно зафиксированного после s09 веса (~2.04 KB gz).
   Найди раздувший коммит/правку и убери причину — порог не поднимать
   без явного решения Даниила (это и есть класс, который гейт ловит).
