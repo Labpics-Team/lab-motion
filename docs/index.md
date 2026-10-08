@@ -15,33 +15,16 @@ titleTemplate: false
 
 [Начать](getting-started.md) [Справочник API](api.md)
 
-## Первый переход
+## Один импорт
 
 ```typescript
-import { animate } from '@labpics/motion/animate';
+import { animate, scope, sequence, layout, value } from '@labpics/motion';
 
-animate('.card', { x: 160, opacity: 1 }, {
-  spring: { mass: 1, stiffness: 170, damping: 26 },
-});
+animate('.card', { x: 160, opacity: 1 });
 ```
 
-Задайте новое положение. Lab Motion рассчитает движение и вернёт управление
-для паузы, продолжения и отмены.
+Задайте движение и время его жизни. Исполнитель, продолжение при новой цели
+и освобождение ресурсов остаются внутри библиотеки.
 
-[Установка и первый пример →](getting-started.md)
-
-## Найдите нужный инструмент
-
-**Анимация и управление.** Начните с `animate` для DOM или `MotionValue`
-для числовых значений. [Выбрать API →](api.md)
-
-**Появление и изменение расположения.** Управляйте входом и выходом элементов,
-перестановкой и переходами между видами.
-[Presence](presence.md), [projection](projection.md), [shared elements](smart.md).
-
-**Интеграция.** Подключите движение к состоянию компонента и освободите ресурсы
-при его удалении. [Рецепты →](recipes.md)
-
-**Нативное исполнение.** Используйте браузерные анимации и оптимизацию
-статических вызовов во время сборки.
-[Compositor](compositor.md), [компилятор Vite](compiler.md).
+[Первый компонент](getting-started.md) · [Контролы и ошибки](api.md) ·
+[Примеры интеграции](recipes.md) · [Миграция](migration.md).

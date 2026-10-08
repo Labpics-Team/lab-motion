@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as motionModule from '../src/index.js';
 
 /**
- * Контрактный пин корневого runtime API.
+ * Контракт численного ядра, используемого внутренними потребителями.
  *
  * Точное множество защищает обе стороны semver-контракта: удаление ломает
  * потребителя, а случайный экспорт расширяет обещанную поверхность и способен
@@ -17,7 +17,7 @@ const EXPECTED_EXPORTS = new Set([
   'MotionValue',
 ]);
 
-describe('public API surface pin', () => {
+describe('numerical kernel surface pin', () => {
   it('exports exactly the contracted names — no more, no less', () => {
     const exported = new Set(Object.keys(motionModule));
 

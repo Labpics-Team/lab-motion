@@ -22,17 +22,18 @@ function metadata() {
     engines: { node: '>=22' },
     packageManager: 'pnpm@11.11.0',
     type: 'module',
-    main: './dist/index.cjs',
-    module: './dist/index.js',
-    types: './dist/index.d.ts',
+    main: './dist/motion/index.cjs',
+    module: './dist/motion/index.js',
+    types: './dist/motion/index.d.ts',
     imports: {
       '#frame': { import: './dist/frame/index.js', require: './dist/frame/index.cjs' },
+      '#kernel': { import: './dist/index.js', require: './dist/index.cjs' },
     },
     typesVersions: { '*': { '*': ['dist/*/index.d.ts'] } },
     exports: {
       '.': {
-        import: { types: './dist/index.d.ts', default: './dist/index.js' },
-        require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
+        import: { types: './dist/motion/index.d.ts', default: './dist/motion/index.js' },
+        require: { types: './dist/motion/index.d.cts', default: './dist/motion/index.cjs' },
       },
       './compositor/stagger': {
         import: {
@@ -47,7 +48,7 @@ function metadata() {
     },
     files: [
       'dist',
-      'docs/api.md',
+      'docs/api.md', 'docs/adr/0003-color-interpolation-contract.md',
       'docs/architecture.md',
       'docs/behaviors.md',
       'docs/benchmark.md',

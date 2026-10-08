@@ -1,6 +1,7 @@
 # Рецепты @labpics/motion
 
-> Роль: практика — исполняемые примеры интеграции с DOM и композиции субпутей.
+Для новых компонентов начните с [единого root API](getting-started.md).
+Здесь сохранены специализированные рецепты прямой композиции модулей.
 > Контракты — в [справочнике API](api.md) и тематических документах
 > ([compositor.md](compositor.md),
 > [projection.md](projection.md), [smart.md](smart.md),
@@ -14,7 +15,7 @@
 через `snapTo`, а завершение компонента снимает и значение, и обработчики.
 
 ```typescript
-import { MotionValue } from '@labpics/motion';
+import { MotionValue } from '@labpics/motion/driver';
 import { asRequestFrame } from '@labpics/motion/frame';
 
 const card = document.querySelector('.card') as HTMLElement;
@@ -267,7 +268,7 @@ export function bindAnimatedDialog(dialog: HTMLDialogElement) {
 ## Появление/уход (presence)
 
 ```typescript
-import { drive } from '@labpics/motion';
+import { drive } from '@labpics/motion/driver';
 import { createPresence } from '@labpics/motion/presence';
 
 const el = document.querySelector('.toast') as HTMLElement;
@@ -287,7 +288,7 @@ p.exit();
 exit продолжает движение из текущих (value, velocity), а не телепортом:
 
 ```typescript
-import { MotionValue } from '@labpics/motion';
+import { MotionValue } from '@labpics/motion/driver';
 
 const el = document.querySelector('.toast') as HTMLElement;
 const undoButton = document.querySelector('.undo') as HTMLElement;
@@ -919,7 +920,7 @@ React-пример допускает серверный рендеринг: э�
 При предпочтении уменьшенного движения цель применяется сразу.
 
 ```ts
-import { MotionValue } from '@labpics/motion';
+import { MotionValue } from '@labpics/motion/driver';
 import { createStateCascade } from '@labpics/motion/behaviors';
 
 export function bindInteractionScale(element: HTMLElement) {
