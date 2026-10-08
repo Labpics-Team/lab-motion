@@ -12,3 +12,7 @@ export type { AnimationControls, DriverOptions } from '../driver.js';
 
 export { drive, type DriveOptions } from '../drive.js';
 export { MotionValue, type MotionValueOptions } from '../motion-value.js';
+
+export { spring, validateSpringParams, type SpringParams, type SpringResult } from '../spring.js';
+export { tween } from '../tween.js';
+export { MotionParamError, type MotionParamErrorCode } from '../errors.js';
