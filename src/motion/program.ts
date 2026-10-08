@@ -100,7 +100,7 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   }
   const last = segments.at(-1)!;
   const first = segments[0]!;
-  const identity = authored ? undefined : [values[0], timing.spring?.mass, timing.spring?.stiffness, timing.spring?.damping,
+  const identity = authored ? undefined : [resolved[0]!.unit, ...last.to, timing.spring?.mass, timing.spring?.stiffness, timing.spring?.damping,
     timing.duration, timing.cssEase ?? timing.ease, timing.delay + offset];
   return { key, unit: resolved[0]!.unit, segments, duration: last.end, final: last.to,
     nativeEase: resolved[0]!.unit === 'color' || key === 'opacity' && resolved.some(p => p.coordinates[0]! < 0 || p.coordinates[0]! > 1) ? undefined : segments.length === 1 ? first.artifact?.[0] ?? (timing.spring ? undefined : timing.cssEase) : undefined,

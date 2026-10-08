@@ -459,10 +459,9 @@ export class Runtime {
           result.push({ element, key: property.key, program: spec, reduced });
         }
       }
-    } catch (error) {
-      // Отвергнутый ввод не оставляет записей на живом элементе.
+    } finally {
+      // План хранит значения; пустая CSS-поверхность не нужна между стадиями.
       for (const group of synced) if (group.tracks.size === 0) this.idle(group);
-      throw error;
     }
     return result;
   }
