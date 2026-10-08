@@ -32,4 +32,3 @@ export function harness(native = false) {
     y() { return Number(/translate\([^,]+,([^p]+)px/.exec(values.get('transform') ?? '')?.[1] ?? 0); },
   };
 }
-
