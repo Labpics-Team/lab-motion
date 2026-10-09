@@ -64,6 +64,7 @@ async function makeSharedFrameBrowserNative(): Promise<void> {
 export function entriesFromPackageExports(): Record<string, string> {
   const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
     exports?: Record<string, unknown>;
+    imports?: Record<string, unknown>;
   };
   const exportsMap = pkg.exports ?? {};
   if (Object.keys(exportsMap).length === 0) {
@@ -87,6 +88,17 @@ export function entriesFromPackageExports(): Record<string, string> {
     if (entries[name] !== undefined) {
       throw new Error(`build: exports дублируют dist-цель ${name} (субпуть '${subpath}')`);
     }
+    entries[name] = source;
+  }
+  // Частные точки нужны внутренним регрессионным потребителям; наружу они не экспортируются.
+  for (const [key, target] of Object.entries(pkg.imports ?? {})) {
+    const esm = typeof target === 'string' ? target : (target as { import?: unknown } | null)?.import;
+    const match = typeof esm === 'string' ? /^\.\/dist\/(.+)\.js$/.exec(esm) : null;
+    if (!match) throw new Error(`build: imports['${key}'] требует dist-JS`);
+    const name = match[1]!;
+    if (entries[name] !== undefined) continue;
+    const source = `src/${name}.ts`;
+    if (!existsSync(source)) throw new Error(`build: imports['${key}'] требует ${source}`);
     entries[name] = source;
   }
   return entries;

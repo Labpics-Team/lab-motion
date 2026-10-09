@@ -48,8 +48,9 @@ export class SurfaceBatch {
   }
 
   _add(unit: SurfaceUnit, paused: boolean): void {
-    // Persistent default-pool не должен расти от churn после peak live.
-    if (this._end < 0 && this._holes > 0) this._compact();
+    // Один проход обслуживает накопившиеся удаления. Порог в половину списка
+    // ограничивает пустые slots и сохраняет линейную цену массового retarget.
+    if (this._end < 0 && this._holes > 0 && this._holes * 2 >= this._units.length) this._compact();
     const slot = this._units.length;
     this._units.push(unit);
     unit._batchSlot = slot;
@@ -73,7 +74,6 @@ export class SurfaceBatch {
 
   _activate(unit: SurfaceUnit): void {
     if (unit._batchSlot < 0) return;
-    if (this._end < 0 && this._holes > 0) this._compact();
     this._active++;
     this._subscribe();
   }

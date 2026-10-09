@@ -1198,5 +1198,5 @@ export function assertFreezeMatrix(matrix, controlId) {
   }
 }
 
-// Exact pre-optimization module; aliases expose the reference API.
+// Исходная статистика; псевдонимы открывают её тестам.
 export { pairedClusterBootstrap as legacyBootstrap, exactBinomialOrderStatisticBounds as legacyBounds };

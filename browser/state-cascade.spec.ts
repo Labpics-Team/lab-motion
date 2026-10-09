@@ -92,7 +92,7 @@ test('документированный адаптер: real reduced-motion, pr
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const result = await page.evaluate(async (compiled) => {
     const module = compiled
-      .replace('"@labpics/motion"', JSON.stringify(`${location.origin}/dist/index.js`))
+      .replace('"@labpics/motion/driver"', JSON.stringify(`${location.origin}/dist/driver/index.js`))
       .replace('"@labpics/motion/behaviors"', JSON.stringify(`${location.origin}/dist/behaviors/index.js`));
     const url = URL.createObjectURL(new Blob([module], { type: 'text/javascript' }));
     const element = document.createElement('div');

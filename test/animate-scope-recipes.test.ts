@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
@@ -15,13 +15,17 @@ it('runnable DOM setup снимает listener при броске; React recipe
     const { packScopeRecipePackage, writeScopeRecipeSources } = await import(sourceUrl);
     const { packageRoot, receipt } = packScopeRecipePackage(root, dir);
     writeScopeRecipeSources(packageRoot, dir);
+    const cookbook = readFileSync(join(packageRoot, 'docs/recipes.md'), 'utf8');
+    const groupRecipe = cookbook.match(/```typescript\n([^`]*?export function mountGroupMotion[^]*?)\n```/)?.[1];
+    expect(groupRecipe).toBeTruthy();
+    writeFileSync(join(dir, 'group-motion.ts'), groupRecipe!);
     expect(receipt.tarball.sha256).toMatch(/^[a-f0-9]{64}$/);
     const config = join(dir, 'tsconfig.json');
     writeFileSync(config, JSON.stringify({ compilerOptions: {
       noEmit: true, strict: true, skipLibCheck: true, lib: ['es2022', 'dom'],
       module: 'nodenext', moduleResolution: 'nodenext', types: ['react'],
     }, files: ['card-motion.ts', 'react-card.ts', 'solid-card.ts', 'compositor-sheet.ts', 'compositor-pager.ts',
-      'presence-dialog.ts', 'reorder-component.ts'] }));
+      'presence-dialog.ts', 'reorder-component.ts', 'group-motion.ts'] }));
     for (const compiler of ['typescript5', 'typescript']) {
       try {
         execFileSync(process.execPath, [join(root, 'node_modules', compiler, 'bin', 'tsc'), '--project', config],

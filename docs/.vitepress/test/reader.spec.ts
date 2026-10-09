@@ -25,12 +25,12 @@ test('start, read and navigate without runtime failures', async ({ page, baseURL
   await expect(page.getByRole('heading', { level: 1 })).toContainText('Анимация для интерфейсов.');
   await page.screenshot({ path: info.outputPath('home.png'), fullPage: true });
   await page.getByRole('link', { name: 'Начать', exact: true }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Первый переход');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/^Начало работы[\s\u200b]*$/);
   await expect(page.locator('main')).toContainText('pnpm add @labpics/motion');
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: info.outputPath('guide.png'), fullPage: true });
-  await page.locator('main').getByRole('link', { name: 'справочнике API' }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Справочник API');
+  await page.locator('main').getByRole('link', { name: 'Полный API' }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/^API[\s\u200b]*$/);
   expect(failures).toEqual([]);
 });
 
@@ -58,10 +58,10 @@ test('content remains available with JavaScript disabled', async ({ browser, bas
   try {
     const page = await context.newPage();
     await page.goto(new URL('getting-started.html', baseURL).href);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Первый переход');
-    await expect(page.locator('main')).toContainText('createAnimateScope');
-    await page.locator('main').getByRole('link', { name: 'справочнике API' }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Справочник API');
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/^Начало работы[\s\u200b]*$/);
+    await expect(page.locator('main')).toContainText('motion.dispose()');
+    await page.locator('main').getByRole('link', { name: 'Полный API' }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(/^API[\s\u200b]*$/);
   } finally {
     await context.close();
   }
@@ -71,7 +71,7 @@ test('dark and reduced-motion preferences keep the page usable', async ({ page }
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await page.goto('getting-started.html');
   await expect(page.locator('html')).toHaveClass(/dark/);
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Первый переход');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(/^Начало работы[\s\u200b]*$/);
   expect(await page.evaluate(() => document.getAnimations().filter((animation) => animation.playState === 'running').length)).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({ path: info.outputPath('guide-dark.png'), fullPage: true });
@@ -85,7 +85,7 @@ for (const [opening, dismissal] of [
     const button = page.getByRole('button', { name: 'Поиск по документации', exact: true });
     const origin = opening === 'button'
       ? button
-      : page.locator('main').getByRole('link', { name: 'справочнике API', exact: true });
+      : page.locator('main').getByRole('link', { name: 'Полный API', exact: true });
     await origin.focus();
     await page.keyboard.press(opening === 'button' ? 'Enter' : 'Control+k');
     const search = page.locator('.VPLocalSearchBox');

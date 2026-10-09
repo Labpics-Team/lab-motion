@@ -286,6 +286,9 @@ export const BESPOKE_SUBPATH_GATES = {
  * равен gate). `%DIST%` подставляется абсолютным путём dist/index.js.
  */
 export const IMPORT_COST_SCENARIOS = [
+  { name: 'root animate', gate: FULL_ANIMATE_GATE_BYTES, code: `import { animate } from '%DIST%/../motion/index.js'; export { animate };` },
+  { name: 'root component scope', gate: 15_700, code: `import { scope } from '%DIST%/../motion/index.js'; export { scope };` },
+
   {
     name: 'reorder-controlled',
     code: `import {createReorder} from '%DIST%/../behaviors/reorder/index.js'; console.log(createReorder({items:[],onReorder:console.log}));`,
@@ -690,6 +693,13 @@ function resolveImportString(value) {
  * функция — без чтения диска и без побочных эффектов, что делает её
  * напрямую юнит-тестируемой без сборки dist/.
  */
+export function deriveKernelEntry(pkg) {
+  if (!Object.hasOwn(pkg.imports ?? {}, '#kernel')) return undefined;
+  const target = resolveImportString(pkg.imports['#kernel']);
+  if (!target) throw new Error('package.json: imports["#kernel"] не содержит ESM-цель');
+  return { key: '#kernel', label: 'core (#kernel)', importPath: target.replace(/^\.\//, ''), gate: CORE_GATE_BYTES };
+}
+
 export function deriveEntriesFromExports(pkg) {
   const exportsField = pkg.exports;
   if (!exportsField || typeof exportsField !== 'object') {
@@ -700,14 +710,15 @@ export function deriveEntriesFromExports(pkg) {
     .map(([key, value]) => {
       const importPath = resolveImportString(value);
       if (!importPath) return null;
-      const label = key === '.' ? 'core (index)' : key.replace(/^\.\//, '');
+      const facade = key === '.' && importPath === './dist/motion/index.js';
+      const label = facade ? 'motion API' : key === '.' ? 'core (index)' : key.replace(/^\.\//, '');
       return {
         key,
         label,
         importPath: importPath.replace(/^\.\//, ''),
         gate:
           key === '.'
-            ? CORE_GATE_BYTES
+            ? facade ? FULL_ANIMATE_GATE_BYTES : CORE_GATE_BYTES
             : (BESPOKE_SUBPATH_GATES[key] ?? SUBPATH_GATE_BYTES),
       };
     })
@@ -846,6 +857,8 @@ async function runCli() {
 
   const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
   const entries = deriveEntriesFromExports(pkg);
+  const kernel = deriveKernelEntry(pkg);
+  if (kernel) entries.push(kernel);
   const { rows, totalGzBytes, totalBrBytes, hasWarnings: measuredWarnings } = measureEntries(entries, ROOT);
   let hasWarnings = measuredWarnings;
 
@@ -898,12 +911,12 @@ async function runCli() {
   // ─── OPEN ITEMS ─────────────────────────────────────────────────────────
 
   if (hasWarnings) {
-    const core = rows.find(r => r.label === 'core (index)');
+    const core = rows.find(r => r.label === 'core (#kernel)') ?? rows.find(r => r.label === 'core (index)');
     if (core && !core.error && core.exceeded) {
       console.log(`
 РЕГРЕССИЯ РАЗМЕРА
 -----------------
-core (index) gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.gate / 1024).toFixed(2)} KB.
+${core.label} gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.gate / 1024).toFixed(2)} KB.
   Ядро выросло относительно зафиксированного после s09 веса (~2.04 KB gz).
   Найди раздувший коммит/правку и убери причину — порог не поднимать
   без явного решения Даниила (это и есть класс, который гейт ловит).

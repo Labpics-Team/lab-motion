@@ -1,218 +1,186 @@
-# Справочник API @labpics/motion
+# API
 
-Карта публичных точек входа и их контрактов. Для первого подключения начните с
-[руководства по установке](getting-started.md) и [рецептов](recipes.md).
-
-Импорт: `@labpics/motion` для ядра или `@labpics/motion/<субпуть>` для
-отдельной возможности. Неиспользуемые входы вырезаются tree-shaking; side
-effects ограничены авто-регистрацией Lit и Web Components.
-
-## Требования и артефакт
-
-Node ≥ 22. Пакет поставляет ESM, CJS и пофайловые декларации типов без runtime-
-зависимостей. Фреймворки подключаются как optional peers.
-
-При разработке из исходников используйте тарбол: `pnpm build && pnpm pack`,
-затем установите его в consumer-проект. Release-проверки устанавливают этот же
-архив в чистые ESM/CJS, TypeScript, Vite и SSR fixtures.
-
-
-## Область анимаций компонента
-
-`createAnimateScope(root): AnimateScope` — дополнительный экспорт `./animate`.
-`root` реализует `AnimateScopeRoot.querySelectorAll(selector): ArrayLike<unknown>`:
-подходят Element, Document и ShadowRoot. Неверный query-host даёт `TypeError`.
-Factory ничего не анимирует и не читает глобальный document.
-
-- `scope.animate(target, props, options?)` возвращает обычный `AnimateControls`.
-  Строка сначала разрешается относительно root, затем результат проходит защитную
-  границу полного animate. Selector errors остаются host errors; явные targets
-  проходят без query и не ограничиваются потомками root.
-- `scope.destroy()` отказывает новым запускам, отменяет учтённые handles и снимает
-  root. Вызовы после destroy возвращают завершённый no-op, не читая входы.
-  Повторный destroy бездействует. Незавершённый reentrant setup отменяется после
-  возврата controls; host reservation дренируется одной микрозадачей, без rAF.
-- `finished`, natural/onComplete, reduced motion и ownership сохраняют контракт
-  animate. Завершённые handles удаляются из учёта. Нет автоматического revert
-  стилей, удаления listeners или отмены чужого successor.
-- Синхронные cleanup errors: одна пробрасывается буквально, несколько дают
-  `AggregateError`; остаточные ошибки финального прохода передаются `reportError`
-  среды, если он доступен. Неисправный host не получает обещания полного rollback.
-
-Сценарии DOM, React и Solid с одним cleanup приведены в
-[рецептах компонентной области](recipes.md#анимации-принадлежащие-компоненту).
-
-## Ядро и управление
-
-| Импорт | Что даёт |
-|---|---|
-| `@labpics/motion` | `spring` (аналитический closed-form солвер), `tween`, `drive` (декларативный запуск), `MotionValue` (реактивное значение со smooth-pickup), `MotionParamError` |
-| `…/driver` | Scrubbable-контроллер: `play/pause/reverse/seek/timeScale/progress` + thenable |
-| `…/frame` | Единый frame-шедулер: `createFrameLoop` / синглтон `frame` — один rAF на кадр, фазы read→update→render против layout-thrash, SSR-safe; `asRequestFrame(loop)` сажает `MotionValue`/`drive` на общий кадр. **Фреймворк-биндинги используют его по умолчанию** (как shared-ticker у Framer Motion/GSAP); инжекция своего `requestFrame` переопределяет |
-| `…/nano` | **Platform-trusted WAAPI to-only ≤ 1 КБ gzip**: spring/tween, `delay`/`stagger`, reduced-motion, сами `Animation` как контролы; полный контракт и границы — ниже |
-| `…/animate` | Фасад-one-liner: `animate(target, props, options)` и `createAnimateScope(root)` — цели по каналам (`x`/`y`/`scale`/`rotate`, `opacity`, CSS-свойства), режим `{ spring }` или `{ duration, ease }`, `delay`/`stagger`, контролы `{ finished, play, pause, seek, cancel, stop }`. Это базовый single-transition DX-срез; ядро от него не растёт |
-| `…/bindings` | [Семантическая привязка](bindings.md): `createMotionBinding(project, targets)` связывает модель компонента с визуальными ролями; обновляет только изменившиеся цели, без второго store или кадрового цикла |
-
-### Пример: scrub-контроллер
+Обычная работа использует один импорт:
 
 ```typescript
-import { createDriver } from '@labpics/motion/driver';
-
-const anim = createDriver({ from: 0, to: 1, spring: { mass: 1, stiffness: 200, damping: 24 },
-  onStep: (v) => { el.style.opacity = String(v); } });
-anim.pause();
-anim.seek(0.5);
-await anim; // thenable
+import { animate, scope, sequence, layout, value } from '@labpics/motion';
 ```
 
-### Контракт `./nano`
+## `animate(target, properties, options?)`
 
-`./nano` — platform-trusted to-only WAAPI-вход с ограничением размера до 1 КБ gzip;
-контролы — сами `Animation`. Числа — миллисекунды; `translate/scale/rotate` —
-целые нативные CSS longhand-каналы, цвета/фильтры/единицы интерполирует
-браузер. CSS `x/y` не трактуются как оси `translate` (nano не читает layout,
-чтобы угадывать вторую ось) — transform-шортхенды `x/y` принадлежат полному
-`./animate`. Нужны нативные `Element.animate`, `Animation.commitStyles` и CSS
-`linear()`; скрытого rAF-fallback, C1-подхвата и защиты от
-hostile/polyfill-host здесь нет. Физические параметры должны задавать конечную
-затухающую пружину: длительность и плотность `linear()` выводятся из её
-полюсов и допуска реконструкции, без wall-clock cap; кривая выше общего
-compiler-ceiling отклоняется до синхронной материализации. Defensive-граница,
-C1-подхват, fallback и живой solver для сверхдлинных кривых — контракт полного
-`./animate`.
+`target` — DOM-элемент, CSS-селектор, iterable или ArrayLike элементов. Повторный
+элемент в списке обрабатывается один раз. Селекторы вне области ищутся в `document`;
+селектор в окружении без DOM выбрасывает `MotionError`.
+
+Значение свойства задаёт цель, массив из двух или более значений — явную
+траекторию. Новая цель подхватывает положение; пружина сохраняет также скорость,
+а временная кривая задаёт её через `duration/ease`. Явный первый
+кадр задаёт новое начало с нулевой скоростью. Равная цель с равными параметрами
+продолжает прежнюю траекторию и передаёт управление новому вызову.
+
+Поддерживаются:
+
+| Значения | Форма |
+| --- | --- |
+| Перемещение и масштаб | `x`, `y` в px; `scale`, `scaleX`, `scaleY` — числа |
+| Поворот и наклон | `rotate`, `skewX`, `skewY` в градусах |
+| Прозрачность | `opacity` от 0 до 1; выход за CSS-диапазон ограничивается при записи |
+| CSS-размеры | Конечные числа в px либо строки с одинаковыми единицами |
+| Цвета | Поддерживаемые `hex`, `rgb/rgba`, `hsl/hsla` значения |
+| Пользовательские CSS-свойства | Числовые или совместимые строковые значения |
+
+`scale` задаёт обе оси. Одновременно указывать `scale` и `scaleX/scaleY` нельзя.
+Полная строка `transform` не принимается: используйте независимые числовые оси.
+Исходный transform должен быть двумерным и разложимым. Цвета всех входных форм
+переводятся в RGB: каналы движутся в пространстве квадратов значений и при записи
+преобразуются через квадратный корень, alpha интерполируется отдельно. Например,
+середина красного и синего имеет каналы `(255/√2, 0, 255/√2)`. Контраст и читаемость
+промежуточных цветов остаются [за приложением и его цветовой системой](adr/0003-color-interpolation-contract.md).
+
+`var(--name)` разрешается из computed styles при вызове для CSS-свойств.
+`opacity` и числовые transform-оси принимают только конечные числа, без `var()`. Относительные CSS-цели
+`+=N` и `-=N` требуют совместимой исходной единицы. Динамическое изменение
+CSS-переменной само по себе не переназначает цель. Равенство целей проверяется
+после разрешения CSS-переменных и относительных значений.
+
+### Параметры
+
+Все времена указаны в миллисекундах.
+
+| Параметр | Значение |
+| --- | --- |
+| `spring` | `{ response, bounce }` либо `{ mass, stiffness, damping }` |
+| `duration` | Длительность временной кривой, конечное число ≥ 0 |
+| `ease` | `linear`, `standard`, `ease`, `ease-in`, `ease-out`, `ease-in-out`, cubic-bezier tuple или чистая функция |
+| `delay` | Общая задержка, ≥ 0 |
+| `stagger` | Интервал между целями списка, ≥ 0 |
+| `times` | Строго возрастающие доли: начало `0`, конец `1`; длина совпадает с каждой авторской траекторией |
+| `reducedMotion` | `user` по умолчанию, `always` для немедленного финала |
+
+`spring` исключает `duration/ease` и поддерживает одиночную цель или пару значений.
+Траектории из трёх и более значений используют временную интерполяцию; явный
+`spring` для них отклоняется до запуска. `response` задаёт характерную длительность
+колебания, а не жёсткий срок завершения. `bounce` находится в `[0, 1)`.
+Ненулевая скорость после прерывания может увеличить время успокоения.
+При отсутствии настроек обычная цель использует пружину `{ mass: 1, stiffness: 170, damping: 26 }`.
+Авторская траектория без опций использует 200 мс и линейную интерполяцию.
+
+Пользовательский easing должен быть чистой функцией. Библиотека может вызвать
+его для вычисления положения и производной; не создавайте внутри него новое
+движение того же свойства. Нечисловой результат и исключение завершают затронутый
+прогон ошибкой без записи `NaN` или `Infinity`.
+
+### Контролы и завершение
+
+Каждый вызов возвращает `Playback`:
+
+| Поле или метод | Поведение |
+| --- | --- |
+| `state` | `running`, `paused`, `finished`, `stopped` или `failed` |
+| `duration` | Полная шкала прогона с задержками |
+| `pause()` | Сохранить текущую позицию без изменения исходной кривой |
+| `play()` | Продолжить после паузы |
+| `seek(ms)` | Переместиться на исходной шкале; пауза сохраняется |
+| `stop()` | Оставить текущую позу и завершить как `stopped` |
+| `finish()` | Применить конечные значения и завершить как `finished` |
+| `finished` | Promise результата `{ status: 'finished' \| 'stopped' }`; ошибка отклоняет promise |
+
+Обычное прерывание не является исключением. Если хотя бы одно свойство прогона
+передано другому вызову, исходный прогон завершается как `stopped` после окончания
+оставшихся принадлежащих ему свойств. Его контролы не управляют преемником.
+Завершённые контролы не создают новые эффекты и не читают поздние аргументы.
+
+Цели и параметры снимаются до создания эффектов. Ошибка подготовки сохраняет
+прежние анимации. Ошибка host-записи или создания эффекта во время принятия
+завершает затронутые движения; уже выполненные внешние изменения DOM не откатываются.
+
+## `scope(root, defaults?)`
+
+Область принимает `Element`, `Document` или `ShadowRoot` и возвращает:
 
 ```typescript
-import { animate } from '@labpics/motion/nano';
-
-const moves = animate('.card', { translate: '240px', rotate: 8, opacity: 1 }, {
-  spring: { mass: 1, stiffness: 170, damping: 26 },
-  stagger: 40,
-});
-moves[0]?.pause(); // каждый элемент — нативный Animation
-await moves.finished;
+const ui = scope(root);
+ui.animate('.item', { opacity: 1 });
+ui.sequence([['.item', { x: [0, 16, 0] }, { duration: 200 }]]);
+ui.on('.action', 'click', () => ui.animate('.item', { scale: 1.05 }));
+const progress = ui.value(0);
+const child = ui.scope(root.querySelector('.nested')!);
+ui.dispose();
 ```
 
-## Математика значений
+Корневая `layout(root, mutate, options?)` принимает `root: Element` явно.
+`ui.layout(mutate, options?)` использует Element из `scope(root)`. Значения по умолчанию
+принадлежат области, а не всему приложению. Локальный `duration/ease` заменяет
+унаследованную пружину, локальный `spring` заменяет унаследованную временную кривую.
 
-| Импорт | Что даёт |
-|---|---|
-| `…/easing` | Каталог кривых: named-кривые, `cubicBezier`, `steps`, кастомные функции |
-| `…/value` | CSS-значения: парсинг/интерполяция единиц (px/%/deg/rem/vh), цветов (hex/rgb/hsl), transform-компонент, `var()`, относительных значений |
-| `…/utils` | Value-mapping примитивы (headless-ядро Framer Motion / GSAP): `mapRange`, `interpolate` (N-стоповый маппер: клампинг, per-segment easing, кастомный `mixer`), `clamp`, `wrap`, `snap`, `mix`, `pipe`. Каррируемые config-first, финитность гарантирована |
-| `…/spring` | Эргономика пружин: `fromBounce` (duration+bounce ∈ [−1,1], канон SwiftUI ⊇ Motion [0,1]), `fromVisualDuration`, `springPresets` (канон react-spring), `springAsEasing` |
+`dispose()` освобождает активные анимации, значения, дочерние области и
+обработчики. Ручная очистка дочернего ресурса сразу убирает его из учёта родителя.
+Последующие `animate`, `sequence` и `layout` возвращают завершённый `stopped`.
+Область не удаляет DOM и не возвращает CSS к состоянию до монтирования.
 
-## Композиция движения
+## `sequence(steps, options?)`
 
-| Импорт | Что даёт |
-|---|---|
-| `…/keyframes` | Ключевые кадры: массивы, offsets, per-keyframe easing, repeat/reverse/yoyo |
-| `…/timeline` | Оркестрация: `createTimeline` — сегменты, `seek/progress/totalDuration`, thenable |
-| `…/stagger` | Каскадные задержки: списки и 2D-сетки, from/направления/easing |
-| `…/decay` | Инерция: аналитическое затухание (drag-momentum, инерционный скролл) |
-| `…/presets` | Словарь generic-движений «от смысла» (иконки): 10 фабрик (`pulse`, `blink`, `wiggle`, `spin`, `breathe`, `pop`, `bounceY`, `drift`, `fadeSlide`, `drawOn`), мультитрековые кейфреймы, `runPreset` с виртуальным временем, `presetToWaapi`; текстовые/числовые сахара — `splitText`/`typewriterAt`/`scrambleAt`, `formatNumber` (Intl) + `tickerCells`, раннеры `runTypewriter`/`runScramble`/`runNumber` |
-| `…/svg` | SVG: `parsePath`/`pathLength`, draw-математика штриха (`drawPath`), движение вдоль пути (`createMotionPath`) |
-| `…/svg-morph` | Морфинг путей: `interpolatePath(dFrom, dTo)` — точный режим при совпадающей структуре, ресэмплинг с выравниванием при разной |
+Шаг имеет форму `[target, properties, options?]`. Дополнительный `at` задаёт
+абсолютную миллисекунду, `'<'` — начало предыдущего шага, `'>'` или отсутствие
+`at` — конец предыдущих шагов. Общие options: `delay` и `reducedMotion`.
+Все шаги проверяются до начала записи. Пересечение одного свойства недопустимо.
 
-## Взаимодействие и layout
+Общий controller управляет всей шкалой. Раннее свойство сохраняется для обратной
+перемотки, пока последовательность не завершена. После `finish` или естественного
+конца новый запуск создаётся отдельным вызовом `sequence`.
 
-| Импорт | Что даёт |
-|---|---|
-| `…/gestures` | `createPress` (tap + клавиатурный путь Enter/Space), `createHover`, `createPan`, `createDrag` (границы + rubber-band + инерция + reduced-motion) |
-| `…/behaviors` | `createStateCascade`: приоритетные слои целевых значений без DOM, часов и физики. [Контракт](behaviors.md) |
-| `…/behaviors/reorder` | `createReorder`: предложения перестановки по ключам и геометрии; порядок подтверждает приложение |
-| `…/scroll` | Headless-прогресс страницы/target-с-офсетами (семантика Motion), чистая in-view машина, скорость, scrub-клей к timeline |
-| `…/in-view` | Нативный `IntersectionObserver`-адаптер: selector/Element/список, custom root/margin/amount, one-shot либо парный enter/leave cleanup; возвращает idempotent `stop` |
-| `…/presence` | [Управляемый вход/выход](presence.md): `createPresenceTransition`, группа исполнителей и одна цель видимости; ручной `createPresence`, `swapPresence` (wait/sync) |
-| `…/flip` | Layout-анимация FLIP: инверсия first→last, пружинный «доезд», коррекция scale-искажений (`correctRadius`, `counterScale`) |
-| `…/projection` | Вложенный FLIP-движок (жанр Framer projection): transform родителя не искажает детей и border-radius; `projectAt` (чистая математика), `createProjection` (headless-драйвер), `createDomProjection` (DOM-адаптер). Подробно — [projection.md](projection.md) |
-| `…/smart` | Smart-animate поверх `./projection` (жанр Figma smart-animate / shared-element): диф двух снимков дерева по `data-motion-key`. Подробно — [smart.md](smart.md) |
-| `…/auto` | Zero-config FLIP: `autoAnimate(parent)` — add/remove/move детей анимируются сами; reduced-motion меняет характер (move→снап), не выключает |
-| `…/a11y` | `createMotionConfig` — политика reduced-motion (`system`/`always`/`never`), меняет характер анимации, не выключает |
+## `layout(root, mutate, options?)`
 
-## Compositor-путь и токены
+`mutate` выполняется ровно один раз и может возвращать `Promise<void>`. Библиотека
+использует View Transitions для снимков состояния. При недоступности этой
+возможности или системном уменьшении движения применяется конечное состояние.
+Управление снимками не отменяет изменений данных и DOM из `mutate`.
 
-| Импорт | Что даёт |
-|---|---|
-| `…/waapi` | Низкоуровневый native-мост: `compileWaapi`/`animateWaapi`; `animateScrollWaapi`/`animateViewWaapi` отдают scroll/view-progress → property нативным progress timelines без собственного покадрового JS и без скрытого fallback; capability probes явные |
-| `…/compositor` | Базовый compositor-компилятор: `compileSpringLinear`, `compileSpringPlan`, `CompositorSpring`, ретаргет, хендофф и fallback-матрица. Подробно — [compositor.md](compositor.md) |
-| `…/compositor/stagger` | Самодостаточный групповой compositor-фасад: `compileStaggerPlan`, `CompositorStaggerGroup` и связанные `compileSpringPlan`/`CompositorSpring` из одного entry |
-| `…/compositor/follow` | Прямое следование за вводом, нативная доводка и повторный перехват: `createCompositorFollow`; `compileSpringPlan` для того же графа зависимостей потребителя |
-| `…/tokens` | Motion-токены: `duration`, `easing`, `spring`, `staggerGap`, `distanceScale`. Подробно — [tokens.md](tokens.md) |
+Параметры: `spring` либо `duration/ease`, `delay`, `reducedMotion`. Easing задаётся
+CSS-именем или cubic-bezier tuple. Нативный переход принадлежит документу:
+следующий вызов заменяет предыдущий переход этого документа.
 
-## Build-tool
+`finished` ждёт завершения изменения приложения и удаления временных эффектов.
+Ошибка `mutate` отклоняет promise. `stop` убирает переход, сохраняя принятую
+раскладку; он не отменяет уже начатую асинхронную работу приложения.
 
-| Импорт | Что даёт |
-|---|---|
-| `…/compiler/vite` | `motionCompiler()` — Vite/Rollup-плагин build-time lowering статических вызовов `./nano` и `animate(..., { layout: 'project' })` (сертификация артефакта на сборке). Подробно — [compiler.md](compiler.md), [future-layout.md](future-layout.md) |
-| `…/compiler/runtime` | Исполнитель compiled-вызовов nano; импорт вставляет плагин, вручную не используется |
-| `…/surface` | Приватный executor compiled-поверхностей (≤1 KB gz); импорт вставляет плагин, вручную не используется |
+## `value(initial?)`
 
-## Непрерывное слежение MotionValue
-
-`setTarget(target)` не создаёт новый объект анимации. В активном движении он
-перенаправляет существующее значение из последней опубликованной пары
-`value`/`velocity`, сохраняя временную координату этого снимка. Следующий кадр
-учитывает уже прошедший интервал; поток новых целей перед каждым кадром не
-останавливает движение. При таком перенаправлении на самой границе `setTarget`
-значение и скорость не меняются. Исключение — возврат к уже достигнутому значению
-при `|velocity| < 1e-10`: он завершает движение и обнуляет остаточную скорость
-без дополнительного `onChange`.
-
-Повтор активной цели — no-op. Несколько разных целей между кадрами не эмитят
-промежуточные значения и не планируют дополнительные callbacks: действует последняя.
-Это не история pointer-сэмплов для оценки скорости жеста — её ведёт `./gestures`.
-
-До первого callback с timestamp начало времени неизвестно и определяется этим
-callback. После `stop()`/`snapTo()` следующий запуск получает новую epoch. Без
-timestamp каждый callback продвигает фиксированный шаг 1/60 секунды. Смешивание
-произвольных временных координат не заменяет согласованный клок приложения.
-Для нескольких значений используйте `asRequestFrame` из `./frame`; биндинги уже
-подключают его по умолчанию. Рецепт — [слежение за указателем](recipes.md#слежение-за-указателем).
-
-## Биндинги
-
-Peer-фреймворк ставит потребитель; все биндинги по умолчанию едут на общем
-кадре `./frame`.
-
-| Импорт | Что даёт |
-|---|---|
-| `…/react` | `useSpring`, `useMotionValue`, `useMotionStyle` (effect-binding: пишет в `style` через ref без render на кадр — аналог `vMotion`), `useReducedMotion` (реактивное системное `prefers-reduced-motion`, hydration-safe) |
-| `…/preact` | `useSpring`, `useMotionValue` (зеркало react-биндинга поверх `preact/hooks`) |
-| `…/solid` | `createSpring`, `createMotionValue` (сигналы, авто-уборка через `onCleanup`) |
-| `…/vue` | `useSpring`, `useMotionValue`, директива `vMotion` |
-| `…/svelte` | `springStore` |
-| `…/angular` | Angular (v16+): `injectSpring`, `injectMotionValue` (Signals + DestroyRef) |
-| `…/qwik` | `useSpring` — управление сигналом `target` (резюм-safe), MotionValue = noSerialize, пересоздаётся на клиенте |
-| `…/lit` | `MotionController` (ReactiveController), `LabMotionSpringElement` |
-| `…/wc` | Vanilla web-component `<lab-spring>` без зависимостей — путь для Astro/Stencil/HTML-first стеков |
-
-В Vue 3.2+ `useSpring` и `useMotionValue` освобождают движение при остановке
-текущего `effectScope`, включая scope компонента. В Vue 3.0/3.1 уборка происходит
-при unmount. Для `useMotionValue` вне scope нужно явно вызвать `destroy()`;
-`useSpring` вызывается внутри scope или `setup()` компонента.
-
-## Ошибки
+Реактивное число использует тот же runtime:
 
 ```typescript
-import { MotionParamError, spring } from '@labpics/motion';
-
-try {
-  spring({ mass: -1, stiffness: 100, damping: 10 }, 0);
-} catch (error) {
-  if (error instanceof MotionParamError) {
-    if (error.code === 'LM088') console.error('Масса должна быть больше нуля');
-    else console.error(`Ошибка движения: ${error.code}`);
-  }
-}
+const progress = value(0);
+const off = progress.subscribe(current => console.log(current));
+progress.animate(1, { duration: 300 });
+progress.set(0.5);
+off();
+progress.dispose();
 ```
 
-Сообщения движка содержат только стабильный код `LMddd` (входные значения не
-отражаются): ветвитесь по `error.code`, причина и исправление — в
-[каталоге кодов](errors.md). Тип `MotionParamErrorCode` экспортируется из
-корня; совместимый `new MotionParamError('текст')` сохраняет текст и получает
-код `LM000`. Для `instanceof` импортируйте constructor из того же физического
-entry, что и проверяемую функцию: корневой entry намеренно не связывает
-независимые bundle-графы.
+`get()` возвращает принятое значение. `set()` устанавливает его сразу и
+останавливает прежнее движение. `subscribe()` сообщает изменения, не вызывая
+слушателя при подписке. Вложенные изменения доставляются по порядку.
+После `dispose()` подписки удалены, `set` инертен, новое `animate` отвергается.
+
+## Низкоуровневые модули
+
+Специализированные модули и прежние framework-binding API сохраняют собственные
+контракты. Они предназначены для прямой композиции, а обычный интерфейс приложения
+использует root API выше. Не назначайте независимым движкам или внешнему CSS
+одновременное владение одним свойством.
+
+### Область анимаций компонента
+
+Для нового кода используйте `scope(root)` и `dispose()`. В низкоуровневом
+`@labpics/motion/animate` прежняя область называется `createAnimateScope` и
+освобождается через `destroy`. Её контролы принадлежат этому низкоуровневому API.
+
+### Контракт Nano
+
+Низкоуровневый `@labpics/motion/nano` требует WAAPI и имеет отдельные нативные
+контролы. Выбирать его для обычного root-вызова не требуется: root `animate`
+сам выбирает поддерживаемое исполнение и сохраняет единый lifecycle.
+
 
 ## Управляемая перестановка `./behaviors/reorder`
 

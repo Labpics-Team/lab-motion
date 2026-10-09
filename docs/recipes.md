@@ -1,6 +1,7 @@
 # Рецепты @labpics/motion
 
-> Роль: практика — исполняемые примеры интеграции с DOM и композиции субпутей.
+Для новых компонентов начните с [единого root API](getting-started.md).
+Здесь сохранены специализированные рецепты прямой композиции модулей.
 > Контракты — в [справочнике API](api.md) и тематических документах
 > ([compositor.md](compositor.md),
 > [projection.md](projection.md), [smart.md](smart.md),
@@ -14,7 +15,7 @@
 через `snapTo`, а завершение компонента снимает и значение, и обработчики.
 
 ```typescript
-import { MotionValue } from '@labpics/motion';
+import { MotionValue } from '@labpics/motion/driver';
 import { asRequestFrame } from '@labpics/motion/frame';
 
 const card = document.querySelector('.card') as HTMLElement;
@@ -267,7 +268,7 @@ export function bindAnimatedDialog(dialog: HTMLDialogElement) {
 ## Появление/уход (presence)
 
 ```typescript
-import { drive } from '@labpics/motion';
+import { drive } from '@labpics/motion/driver';
 import { createPresence } from '@labpics/motion/presence';
 
 const el = document.querySelector('.toast') as HTMLElement;
@@ -287,7 +288,7 @@ p.exit();
 exit продолжает движение из текущих (value, velocity), а не телепортом:
 
 ```typescript
-import { MotionValue } from '@labpics/motion';
+import { MotionValue } from '@labpics/motion/driver';
 
 const el = document.querySelector('.toast') as HTMLElement;
 const undoButton = document.querySelector('.undo') as HTMLElement;
@@ -919,7 +920,7 @@ React-пример допускает серверный рендеринг: э�
 При предпочтении уменьшенного движения цель применяется сразу.
 
 ```ts
-import { MotionValue } from '@labpics/motion';
+import { MotionValue } from '@labpics/motion/driver';
 import { createStateCascade } from '@labpics/motion/behaviors';
 
 export function bindInteractionScale(element: HTMLElement) {
@@ -1161,3 +1162,33 @@ pnpm build && node scripts/compiler-acceptance.mjs --trace
 версия схемы и правило fail-closed определены в [контракте компилятора](compiler.md#контракт-диагностической-трассировки).
 Если acceptance падает, trace не считается доказательством и не должен разбираться
 как частичный успешный результат.
+
+## Независимые цели для группы элементов
+
+Одинаковую цель можно передать всему списку одним вызовом `animate`. Для разных
+координат используйте обычный цикл внутри одной области компонента:
+
+```typescript
+import { createAnimateScope } from '@labpics/motion/animate';
+
+export function mountGroupMotion(root: HTMLElement) {
+  const motion = createAnimateScope(root);
+  return {
+    move(items: readonly { element: HTMLElement; x: number; y: number }[]) {
+      for (const { element, x, y } of items) {
+        motion.animate(element, { x, y }, { duration: 240, ease: t => t });
+      }
+    },
+    destroy: () => motion.destroy(),
+  };
+}
+```
+
+Передавайте готовые координаты в `move`. Следующий вызов переназначает цели,
+сохраняя текущее положение. При удалении компонента вызовите `destroy`.
+Позиции и их расчёт остаются у приложения; `x` и `y` задают смещение в пикселях.
+
+Обычные вызовы `animate` разделяют общий цикл: сначала вычисляются значения всех
+активных поверхностей, затем записываются стили. Дополнительный `requestAnimationFrame`
+вокруг цикла не нужен. Если координаты зависят от размеров DOM, сначала выполните
+все измерения, затем передайте готовый список.

@@ -189,6 +189,9 @@ if (!navigationRecipe) throw new Error('Отсутствует исполняе�
 const navigationCode = transformSync(navigationRecipe, { loader: 'ts', format: 'esm', target: 'es2022' }).code;
 
 for (const direction of ['ltr', 'rtl']) test(`навигация: фокус не перезапускает выбор, геометрия обновляется (${direction})`, async ({ page }) => {
+  // Native-позу задаёт currentTime; wall clock не завершает переход между действиями теста.
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'));
   await page.evaluate(async ({ source, direction }) => {
     document.body.innerHTML = `<nav style="position:relative;display:flex;gap:8px;width:360px;direction:${direction}">
       <button data-key="a" style="width:100px">Обзор</button>
@@ -265,4 +268,50 @@ for (const direction of ['ltr', 'rtl']) test(`навигация: фокус н�
   expect(result.actual).toEqual([result.expected, result.expected]);
   expect(result.focused).toBe(true);
   expect(result.remaining).toEqual([0, 0]);
+});
+
+
+const bindingDocs = readFileSync(new URL('../docs/bindings.md', import.meta.url), 'utf8');
+const startRecipe = bindingDocs.match(/```typescript\n([^`]*?export function bindProgressMotion[^]*?)\n```/)?.[1];
+if (!startRecipe) throw new Error('Отсутствует пример bindProgressMotion');
+const startCode = transformSync(startRecipe, { loader: 'ts', format: 'esm', target: 'es2022' }).code;
+
+for (const reduced of [false, true]) test(`первое подключение: повтор, новая цель и очистка (reduce=${reduced})`, async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: reduced ? 'reduce' : 'no-preference' });
+  const result = await page.evaluate(async ({ source, reduced }) => {
+    document.body.innerHTML = '<div id="fill" style="transform:scaleX(0);transform-origin:left center"></div><span id="label" style="opacity:0">Загрузка</span>';
+    const fill = document.getElementById('fill')!, label = document.getElementById('label')!;
+    const text = source.replaceAll('@labpics/motion/animate', location.origin + '/dist/animate/index.js')
+      .replaceAll('@labpics/motion/bindings', location.origin + '/dist/bindings/index.js');
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    const { bindProgressMotion } = await import(url); URL.revokeObjectURL(url);
+    const view = bindProgressMotion(fill, label);
+    const model = { progress: 0.25, active: true };
+    let copies = 0;
+    const freeze = Object.freeze;
+    try {
+      view.update(model);
+      const initial = [fill, label].map(el => el.getAnimations());
+      for (const effects of initial) for (const effect of effects) { effect.pause(); effect.currentTime = 40; }
+      Object.freeze = ((value: unknown) => { copies++; return freeze(value); }) as typeof Object.freeze;
+      try { view.update(model); } finally { Object.freeze = freeze; }
+      const unchanged = [fill, label].every((el, i) => {
+        const current = el.getAnimations();
+        return current.length === initial[i]!.length && current.every((effect, j) => effect === initial[i]![j]);
+      });
+      model.progress = 0.75;
+      view.update(model);
+      const labelKept = label.getAnimations().every((effect, i) => effect === initial[1]![i]);
+      const fillChanged = fill.getAnimations()[0] !== initial[0]![0];
+      const values = reduced ? { progress: new DOMMatrix(getComputedStyle(fill).transform).m11,
+        label: Number(getComputedStyle(label).opacity) } : undefined;
+      view.destroy();
+      view.update({ progress: 1, active: false });
+      return { copies, unchanged, labelKept, fillChanged, values,
+        initial: initial.map(effects => effects.length), remaining: document.getAnimations().length, state: view.state };
+    } finally { Object.freeze = freeze; view.destroy(); }
+  }, { source: startCode, reduced });
+  expect(result).toEqual({ copies: 0, unchanged: true, labelKept: true,
+    fillChanged: !reduced, values: reduced ? { progress: 0.75, label: 1 } : undefined,
+    initial: reduced ? [0, 0] : [1, 1], remaining: 0, state: 'destroyed' });
 });

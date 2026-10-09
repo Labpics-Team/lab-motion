@@ -610,40 +610,38 @@ export interface AnimateScope {
  */
 export function createAnimateScope(root: AnimateScopeRoot): AnimateScope {
   if (typeof root?.querySelectorAll !== 'function') {
-    throw new TypeError('createAnimateScope: root.querySelectorAll must be a function');
+    throw new TypeError('scope: querySelectorAll() required');
   }
   let liveRoot: AnimateScopeRoot | undefined = root;
   const runs = new Set<AnimateControls>();
   let idle: AnimateControls | undefined;
-  const inactive = (): AnimateControls => idle ??= animate([], {});
   const cancelRuns = (): void => {
     const errors: unknown[] = [];
     for (const controls of runs) {
       try { controls.cancel(); } catch (error) { errors.push(error); }
     }
-    if (errors.length === 1) throw errors[0];
-    if (errors.length > 1) throw new AggregateError(errors, 'animate scope cleanup failed');
+    if (errors.length) throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'scope cleanup');
   };
   return {
     animate(target, props, options): AnimateControls {
-      if (liveRoot === undefined) return inactive();
+      if (!liveRoot) return idle ??= animate([], {});
       // Cast передаёт недоверенный query-выход существующей defensive границе
       // full animate. Здесь не копируются проверка элементов и bounded snapshot.
       const resolved = typeof target === 'string'
         ? liveRoot.querySelectorAll(target) as AnimateTarget
         : target;
-      if (liveRoot === undefined) return inactive();
+      if (!liveRoot) return idle ??= animate([], {});
       const controls = animate(resolved, props, options);
       // Query, options и host setup могут синхронно уничтожить компонент ещё
       // до того, как обычный animate вернул доступный handle.
       runs.add(controls);
       const release = (): void => { runs.delete(controls); };
       void controls.finished.then(release, release);
-      if (liveRoot === undefined) controls.cancel();
+      if (!liveRoot) controls.cancel();
       return controls;
     },
     destroy(): void {
-      if (liveRoot === undefined) return;
+      if (!liveRoot) return;
       // Отзыв предшествует user/host cleanup: reentry не публикует новый run.
       liveRoot = undefined;
       // Вложенный cancel внутри host-транзакции может законно не сработать
