@@ -1,7 +1,8 @@
+import assert, { AssertionError } from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { exactBinomialOrderStatisticBounds, pairedClusterBootstrap } from '../bench/compare/methodology.mjs';
+import { createRankCache, RANK_CACHE_LIMIT, exactBinomialOrderStatisticBounds, pairedClusterBootstrap } from '../bench/compare/methodology.mjs';
 
 import { legacyBootstrap, legacyBounds } from './fixtures/legacy-statistics.mjs';
 
@@ -95,31 +96,92 @@ describe('границы оптимизированной статистики',
     expect(outcome(() => pairedClusterBootstrap(left, right, { seed: 23, iterations: 257 }))).toEqual(expected);
   });
 
-  it('удерживает восемь пар рангов и пересчитывает вытесненный ключ', async () => {
-    const source = readFileSync(new URL('../bench/compare/methodology.mjs', import.meta.url), 'utf8');
-    // Временный модуль открывает состояние тесту, сохраняя исходные вычисления и публичный API.
-    const address = 'data:text/javascript;base64,' + Buffer.from(source + '\nexport { binomialRanks };\n').toString('base64');
-    const { exactBinomialOrderStatisticBounds: bounds, binomialRanks: cache } = await import(/* @vite-ignore */ address);
-    const values = Array.from({ length: 48 }, (_, index) => index + 0.5);
-    const keys: string[] = [];
-    let firstRanks: unknown;
-    for (let policy = 1; policy <= 12; policy++) {
-      const probability = [BigInt(policy), 20n], alpha = [1n, 1000n];
-      expect(bounds(values, probability, alpha)).toEqual(legacyBounds(values, probability, alpha));
-      keys.push([...cache.keys()].at(-1));
-      expect(cache.size).toBe(Math.min(policy, 8));
-      expect([...cache.keys()]).toEqual(keys.slice(-8));
-      if (policy === 1) {
-        firstRanks = cache.get(keys[0]);
-        bounds(values.map(value => value + 10), probability, alpha);
-        expect(cache.get(keys[0])).toBe(firstRanks);
-      }
+});
+
+type RankParameters = [number, bigint, bigint, bigint, bigint];
+type RankPair = { lowRank: number; highRank: number | null };
+type RankCache = { readonly size: number; get(...parameters: RankParameters): RankPair };
+type RankCacheFactory = (calculate: (...parameters: RankParameters) => RankPair) => RankCache;
+
+const rankParameters: RankParameters[] = [
+  [48, 3n, 20n, 1n, 1000n],
+  [49, 3n, 20n, 1n, 1000n],
+  [48, 4n, 20n, 1n, 1000n],
+  [48, 3n, 21n, 1n, 1000n],
+  [48, 3n, 20n, 2n, 1000n],
+  [48, 3n, 20n, 1n, 1001n],
+  ...Array.from({ length: RANK_CACHE_LIMIT }, (_, index): RankParameters => [64 + index, 3n, 20n, 1n, 1000n]),
+];
+
+function assertRankCache(factory: RankCacheFactory): void {
+  const calls: RankParameters[] = [];
+  const cache = factory((...parameters) => {
+    calls.push(parameters);
+    return { lowRank: calls.length, highRank: null };
+  });
+  let first: RankPair | undefined;
+  assert.equal(cache.size, 0);
+  for (const [index, parameters] of rankParameters.entries()) {
+    const before = calls.length;
+    const result = cache.get(...parameters);
+    assert.equal(calls.length, before + 1);
+    assert.deepEqual(calls.at(-1), parameters);
+    assert.equal(cache.size, Math.min(index + 1, RANK_CACHE_LIMIT));
+    assert.equal(cache.get(...parameters), result);
+    assert.equal(calls.length, before + 1);
+    assert.ok(Object.isFrozen(result));
+    if (index === 0) first = result;
+    if (index === RANK_CACHE_LIMIT - 1) {
+      assert.equal(cache.get(...rankParameters[0]), first);
+      assert.equal(calls.length, before + 1);
     }
-    expect(cache.has(keys[0])).toBe(false);
-    expect(bounds(values, [1n, 20n], [1n, 1000n])).toEqual(legacyBounds(values, [1n, 20n], [1n, 1000n]));
-    expect(cache.size).toBe(8);
-    expect(cache.has(keys[0])).toBe(true);
-    expect(cache.get(keys[0])).not.toBe(firstRanks);
-    expect([...cache.keys()]).toEqual([...keys.slice(-7), keys[0]]);
+  }
+  const before = calls.length;
+  const restored = cache.get(...rankParameters[0]);
+  assert.equal(calls.length, before + 1);
+  assert.notEqual(restored, first);
+  assert.equal(cache.size, RANK_CACHE_LIMIT);
+}
+
+describe('ограниченная память биномиальных рангов', () => {
+  it('различает все параметры, повторно использует пару и вытесняет старейшую', () => {
+    assertRankCache(createRankCache);
+  });
+
+  it('сохраняет результаты публичной статистики при изменении каждого параметра ключа', () => {
+    for (const [n, numerator, denominator, alphaNumerator, alphaDenominator] of [...rankParameters, ...rankParameters].reverse()) {
+      const values = Array.from({ length: n }, (_, index) => index + 0.5);
+      const probability = [numerator, denominator], alpha = [alphaNumerator, alphaDenominator];
+      expect(exactBinomialOrderStatisticBounds(values, probability, alpha)).toEqual(legacyBounds(values, probability, alpha));
+    }
+  });
+
+  it('сохраняет уже рассчитанное после отказа новой вычисляемой пары', () => {
+    const calculate = vi.fn(() => ({ lowRank: 1, highRank: null }));
+    const cache = createRankCache(calculate);
+    const first = cache.get(...rankParameters[0]);
+    calculate.mockImplementationOnce(() => { throw new Error('Расчёт недоступен'); });
+    expect(() => cache.get(...rankParameters[1])).toThrow('Расчёт недоступен');
+    expect(cache.size).toBe(1);
+    expect(cache.get(...rankParameters[0])).toBe(first);
+  });
+
+  const key = 'const key = [n, numerator, denominator, alphaNumerator, alphaDenominator].join';
+  const mutants = [
+    ['размер выборки', key, 'const key = [numerator, denominator, alphaNumerator, alphaDenominator].join'],
+    ['числитель вероятности', key, 'const key = [n, denominator, alphaNumerator, alphaDenominator].join'],
+    ['знаменатель вероятности', key, 'const key = [n, numerator, alphaNumerator, alphaDenominator].join'],
+    ['числитель хвоста', key, 'const key = [n, numerator, denominator, alphaDenominator].join'],
+    ['знаменатель хвоста', key, 'const key = [n, numerator, denominator, alphaNumerator].join'],
+    ['отключённое вытеснение', 'if (entries.size === RANK_CACHE_LIMIT)', 'if (false)'],
+    ['отключённый повтор', 'if (known) return known;', 'if (false) return known;'],
+  ];
+  it.each(mutants)('обнаруживает намеренное повреждение: %s', async (_name, before, after) => {
+    const source = readFileSync(new URL('../bench/compare/methodology.mjs', import.meta.url), 'utf8');
+    expect(source.split(before)).toHaveLength(2);
+    // Каждый мутант меняет один оператор настоящего модуля; контракт проверяется тем же oracle.
+    const address = 'data:text/javascript;base64,' + Buffer.from(source.replace(before, after)).toString('base64');
+    const altered = await import(/* @vite-ignore */ address);
+    expect(() => assertRankCache(altered.createRankCache)).toThrow(AssertionError);
   });
 });

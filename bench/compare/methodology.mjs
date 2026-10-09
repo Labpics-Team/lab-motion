@@ -333,16 +333,7 @@ export function exactBinomialOrderStatisticBounds(values, probabilityFraction, a
     throw new Error('exact order statistics: невалидные rational probabilities');
   }
   const sorted = [...values].sort((a, b) => a - b), n = sorted.length;
-  // Ранги зависят только от размера выборки и рациональной политики.
-  // Наблюдения и их значения остаются у вызова; удерживается не более восьми пар рангов.
-  const key = [n, numerator, denominator, alphaNumerator, alphaDenominator].join('/');
-  let ranks = binomialRanks.get(key);
-  if (!ranks) {
-    ranks = exactBinomialRanks(n, numerator, denominator, alphaNumerator, alphaDenominator);
-    if (binomialRanks.size === 8) binomialRanks.delete(binomialRanks.keys().next().value);
-    binomialRanks.set(key, ranks);
-  }
-  const { lowRank, highRank } = ranks;
+  const { lowRank, highRank } = binomialRanks.get(n, numerator, denominator, alphaNumerator, alphaDenominator);
   const probability = Number(numerator) / Number(denominator), alphaPerTail = Number(alphaNumerator) / Number(alphaDenominator);
   const estimateRank = Number((BigInt(n) * numerator + denominator - 1n) / denominator);
   return { estimate: sorted[Math.min(n - 1, estimateRank - 1)],
@@ -351,7 +342,27 @@ export function exactBinomialOrderStatisticBounds(values, probabilityFraction, a
     minimumFiniteUpperBlocks: Math.ceil(Math.log(alphaPerTail) / Math.log(probability)), noTailObservationProbability: probability ** n };
 }
 
-const binomialRanks = new Map();
+export const RANK_CACHE_LIMIT = 8;
+
+/** Ранги разделены по размеру выборки и обеим рациональным вероятностям. */
+export function createRankCache(calculate) {
+  if (typeof calculate !== 'function') throw new TypeError('Для кэша рангов нужен расчёт');
+  const entries = new Map();
+  return {
+    get size() { return entries.size; },
+    get(n, numerator, denominator, alphaNumerator, alphaDenominator) {
+      const key = [n, numerator, denominator, alphaNumerator, alphaDenominator].join('/');
+      const known = entries.get(key);
+      if (known) return known;
+      const ranks = Object.freeze(calculate(n, numerator, denominator, alphaNumerator, alphaDenominator));
+      if (entries.size === RANK_CACHE_LIMIT) entries.delete(entries.keys().next().value);
+      entries.set(key, ranks);
+      return ranks;
+    },
+  };
+}
+
+const binomialRanks = createRankCache(exactBinomialRanks);
 function exactBinomialRanks(n, numerator, denominator, alphaNumerator, alphaDenominator) {
   const populationDenominator = denominator ** BigInt(n), pmf = [];
   let mass = (denominator - numerator) ** BigInt(n);
