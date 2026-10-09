@@ -354,7 +354,8 @@ export function createRankCache(calculate) {
       const key = [n, numerator, denominator, alphaNumerator, alphaDenominator].join('/');
       const known = entries.get(key);
       if (known) return known;
-      const ranks = Object.freeze(calculate(n, numerator, denominator, alphaNumerator, alphaDenominator));
+      const { lowRank, highRank } = calculate(n, numerator, denominator, alphaNumerator, alphaDenominator);
+      const ranks = Object.freeze({ lowRank, highRank });
       if (entries.size === RANK_CACHE_LIMIT) entries.delete(entries.keys().next().value);
       entries.set(key, ranks);
       return ranks;

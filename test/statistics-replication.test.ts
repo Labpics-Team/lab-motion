@@ -50,15 +50,52 @@ describe('точная статистика после устранения по
 describe('границы оптимизированной статистики', () => {
   const population = (rows: number[][]) => rows.map((samples, run) => ({ run, semantic: true, samples }));
 
-  it.each([0, 23, 4294967295])('сохраняет непропорциональные пары и ненулевую нулевую гипотезу, seed=%s', seed => {
-    const lab = population([[1, 2], [80, 120], [6, 9]]);
-    const competitor = population([[70, 80], [1, 3], [7, 10]]);
+  it.each([0, 23, 4294967295].flatMap(seed => [1, 2].map(observations => ({ seed, observations }))))('сохраняет непропорциональные пары, seed=$seed, observations=$observations', ({ seed, observations }) => {
+    const lab = population([[1, 2], [80, 120], [6, 9]].map(row => row.slice(0, observations)));
+    const competitor = population([[70, 80], [1, 3], [7, 10]].map(row => row.slice(0, observations)));
     const options = { seed, iterations: 257 };
     const expected = legacyBootstrap(lab, competitor, options);
     const actual = pairedClusterBootstrap(lab, competitor, options);
     expect(actual).toEqual(expected);
     expect(actual.pValue).toBeGreaterThan(1 / (options.iterations + 1));
     expect(actual.pValue).toBeLessThan(1);
+  });
+
+  it('сохраняет полную вероятность для одинаковых выборок', () => {
+    const values = population([[1], [2]]);
+    const options = { seed: 0, iterations: 100 };
+    const result = pairedClusterBootstrap(values, values, options);
+    expect(result).toEqual(legacyBootstrap(values, values, options));
+    expect(result.pValue).toBe(1);
+  });
+
+  it('сохраняет число сортировок при росте числа реплик и замечает возврат старого пути', async () => {
+    const lab = population([[1, 2], [80, 120], [6, 9]]);
+    const competitor = population([[70, 80], [1, 3], [7, 10]]);
+    const count = (bootstrap: typeof pairedClusterBootstrap, iterations: number) => {
+      const sorts = vi.spyOn(Array.prototype, 'sort');
+      try {
+        [2, 1].sort();
+        assert.equal(sorts.mock.calls.length, 1);
+        sorts.mockClear();
+        bootstrap(lab, competitor, { seed: 77, iterations });
+        return sorts.mock.calls.length;
+      } finally {
+        sorts.mockRestore();
+      }
+    };
+    const check = (bootstrap: typeof pairedClusterBootstrap) => {
+      const before = count(bootstrap, 137);
+      assert.ok(before > 0);
+      assert.equal(count(bootstrap, 257), before);
+    };
+    check(pairedClusterBootstrap);
+    const source = readFileSync(new URL('../bench/compare/methodology.mjs', import.meta.url), 'utf8');
+    const branch = 'if (weighted) {';
+    expect(source.split(branch)).toHaveLength(2);
+    const address = 'data:text/javascript;base64,' + Buffer.from(source.replace(branch, 'if (false) {')).toString('base64');
+    const altered = await import(/* @vite-ignore */ address);
+    expect(() => check(altered.pairedClusterBootstrap)).toThrow(AssertionError);
   });
 
   it('выполняет все парные выборки полного стандартного bootstrap', () => {
@@ -117,7 +154,7 @@ function assertRankCache(factory: RankCacheFactory): void {
   const calls: RankParameters[] = [];
   const cache = factory((...parameters) => {
     calls.push(parameters);
-    return { lowRank: calls.length, highRank: null };
+    return { lowRank: calls.length, highRank: null, observations: [1, 2, 3] };
   });
   let first: RankPair | undefined;
   assert.equal(cache.size, 0);
@@ -130,6 +167,9 @@ function assertRankCache(factory: RankCacheFactory): void {
     assert.equal(cache.get(...parameters), result);
     assert.equal(calls.length, before + 1);
     assert.ok(Object.isFrozen(result));
+    assert.deepEqual(Reflect.ownKeys(result), ['lowRank', 'highRank']);
+    assert.equal(typeof result.lowRank, 'number');
+    assert.equal(result.highRank, null);
     if (index === 0) first = result;
     if (index === RANK_CACHE_LIMIT - 1) {
       assert.equal(cache.get(...rankParameters[0]), first);
@@ -175,6 +215,7 @@ describe('ограниченная память биномиальных ран�
     ['знаменатель хвоста', key, 'const key = [n, numerator, denominator, alphaNumerator].join'],
     ['отключённое вытеснение', 'if (entries.size === RANK_CACHE_LIMIT)', 'if (false)'],
     ['отключённый повтор', 'if (known) return known;', 'if (false) return known;'],
+    ['сохранение наблюдений', 'Object.freeze({ lowRank, highRank })', 'Object.freeze({ lowRank, highRank, observations: [] })'],
   ];
   it.each(mutants)('обнаруживает намеренное повреждение: %s', async (_name, before, after) => {
     const source = readFileSync(new URL('../bench/compare/methodology.mjs', import.meta.url), 'utf8');
