@@ -77,10 +77,10 @@ describe('границы оптимизированной статистики',
   });
 
   it.each([
-    { name: 'нулевое отношение', lab: [[Number.MIN_VALUE], [Number.MIN_VALUE]], competitor: [[Number.MAX_VALUE], [Number.MAX_VALUE]] },
-    { name: 'бесконечное отношение', lab: [[Number.MAX_VALUE], [Number.MAX_VALUE]], competitor: [[Number.MIN_VALUE], [Number.MIN_VALUE]] },
-    { name: 'переполнение отдельного наблюдения', lab: [[1e-100, 1e-100], [1e-100, Number.MAX_VALUE]], competitor: [[1e200, 1e200], [1e200, 1e200]] },
-  ])('сохраняет исходный отказ при fallback: $name', ({ lab, competitor }) => {
+    { name: 'нулевое отношение', result: 'error', lab: [[Number.MIN_VALUE], [Number.MIN_VALUE]], competitor: [[Number.MAX_VALUE], [Number.MAX_VALUE]] },
+    { name: 'бесконечное отношение', result: 'value', lab: [[Number.MAX_VALUE], [Number.MAX_VALUE]], competitor: [[Number.MIN_VALUE], [Number.MIN_VALUE]] },
+    { name: 'переполнение отдельного наблюдения', result: 'error', lab: [[1e-100, 1e-100], [1e-100, Number.MAX_VALUE]], competitor: [[1e200, 1e200], [1e200, 1e200]] },
+  ])('сохраняет исходное поведение fallback: $name', ({ lab, competitor, result }) => {
     const left = population(lab), right = population(competitor);
     const outcome = (operation: () => unknown) => {
       try { return { value: operation() }; }
@@ -90,7 +90,8 @@ describe('границы оптимизированной статистики',
       }
     };
     const expected = outcome(() => legacyBootstrap(left, right, { seed: 23, iterations: 257 }));
-    expect(expected).toHaveProperty('error');
+    expect(expected).toHaveProperty(result);
+    if (result === 'value') expect(expected).toHaveProperty('value.p50.ratio', Number.POSITIVE_INFINITY);
     expect(outcome(() => pairedClusterBootstrap(left, right, { seed: 23, iterations: 257 }))).toEqual(expected);
   });
 
