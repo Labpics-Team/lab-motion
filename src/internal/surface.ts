@@ -175,28 +175,21 @@ export interface SurfaceRecord {
   order?: TransformOrder;
   transform?: string;
 }
-const registry = new WeakMap<object, Map<string, SurfaceRecord>>();
+const registry = new WeakMap<object, Record<string, SurfaceRecord>>();
 
 export function surfaceRecord(element: object, key: string): SurfaceRecord {
   let groups = registry.get(element);
-  if (!groups) { groups = new Map(); registry.set(element, groups); }
-  let record = groups.get(key);
-  if (!record) {
-    record = { numbers: new Map() };
-    groups.set(key, record);
-  }
-  return record;
+  if (!groups) { groups = Object.create(null) as Record<string, SurfaceRecord>; registry.set(element, groups); }
+  return groups[key] ??= { numbers: new Map() };
 }
 
 export function releaseSurfaceRecord(element: object, key: string, record: SurfaceRecord): void {
   if (!record.owner && !record.locked && !record.numbers.size && record.css === undefined) {
     const groups = registry.get(element);
-    if (groups?.get(key) === record) groups.delete(key);
-    if (!groups?.size) registry.delete(element);
+    if (groups?.[key] === record) delete groups[key];
   }
 }
 
 export function findSurfaceRecord(element: object, key: string): SurfaceRecord | undefined {
-  return registry.get(element)?.get(key);
+  return registry.get(element)?.[key];
 }
-
