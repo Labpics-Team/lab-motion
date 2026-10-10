@@ -16,8 +16,8 @@ describe('preset ownership', () => {
       for (const key of ['mass', 'stiffness', 'damping'] as const) {
         Reflect.set(preset, key, saved[key] * 2);
         expect(physics(undefined)).toEqual(defaults);
-        expect(DEFAULT_SPRING).toEqual(runtime.normal);
-        expect(SNAPPY_SPRING).toEqual(runtime.snappy);
+        expect({ ...DEFAULT_SPRING }).toEqual(runtime.normal);
+        expect({ ...SNAPPY_SPRING }).toEqual(runtime.snappy);
       }
     } finally {
       for (const key of ['mass', 'stiffness', 'damping'] as const) Reflect.set(preset, key, saved[key]);
