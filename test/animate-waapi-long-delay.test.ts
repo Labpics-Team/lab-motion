@@ -333,7 +333,7 @@ describe('animate WAAPI: точный long-delay timer', () => {
       });
       await controls.finished;
 
-      expect(record._owner).toBeUndefined();
+      expect(record.owner).toBeUndefined();
       expect(cancel).toHaveBeenCalledTimes(1);
       expect(onComplete).toHaveBeenCalledTimes(mode === 'resolve-then-reject' ? 1 : 0);
     },

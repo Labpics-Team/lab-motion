@@ -56,7 +56,7 @@ import {
 import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import type { StaggerOptions } from '../stagger/index.js';
 import { scheduleStagger } from '../stagger/scheduler.js';
-import { buildTransform } from '../value/transform.js';
+import { formatTransform as buildTransform } from '../value/transform.js';
 import {
   bindGroup,
   cssAt,
@@ -74,7 +74,7 @@ import {
   type MotionMode,
   type RequestFrameFn,
 } from './main-unit.js';
-import { surfaceBatchFor, type SurfaceBatch } from '../internal/surface-batch.js';
+import { surfaceBatchFor, type SurfaceBatch } from '../internal/surface.js';
 import {
   collectBoundedArrayLike,
   requireAnimateOptions,
@@ -182,9 +182,9 @@ const ASYNC_FINISH = {
 } as unknown as PromiseLike<void>;
 
 function releaseTransition(rec: GroupRecord, owner: GroupOwner | undefined): void {
-  rec._transition = false;
+  rec.locked = false;
   // User onComplete при release не должен скрыть исходный host-сбой successor.
-  try { owner?._release?.(); } catch { /* owner уже терминализирован */ }
+  try { owner?.release?.(); } catch { /* owner уже терминализирован */ }
 }
 
 // ─── Дефолтные швы (читаются в вызове — SSR-safe) ────────────────────────────
@@ -280,7 +280,7 @@ function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup): v
   if (group === 'transform') {
     const state = bound._transform!;
     for (const ch of bound._numeric) state[ch._key] = ch._to;
-    el.style.setProperty('transform', buildTransform(state));
+    el.style.setProperty('transform', buildTransform(state, bound._order));
   } else if (bound._css !== undefined) {
     bound._css._css = cssAt(bound._css, 1);
     el.style.setProperty(group, String(bound._css._css));
@@ -295,9 +295,9 @@ function commitSnap(
   bound: BoundGroup,
 ): void {
   if (bound._css !== undefined) {
-    rec._cssValue = bound._css._css;
+    rec.css = bound._css._css;
   }
-  for (const ch of bound._numeric) rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
+  for (const ch of bound._numeric) rec.numbers.set(ch._key, { value: ch._to, velocity: 0 });
 }
 
 /**
@@ -478,12 +478,12 @@ export function animate(
   //    прервать юнит, созданный предыдущей записью того же commit.
   try {
     for (const [el, group, rec, bound, delayMs, execution] of plan) {
-      const previous = rec._owner;
-      if (rec._transition) throw new MotionParamError('LM157');
-      rec._transition = true;
+      const previous = rec.owner;
+      if (rec.locked) throw new MotionParamError('LM157');
+      rec.locked = true;
       if (execution === 3) {
         try {
-          if (previous) previous._supersede(() => writeSnap(el, group, bound));
+          if (previous) previous.replace(() => writeSnap(el, group, bound));
           else writeSnap(el, group, bound);
         } catch (error) {
           protectedOwner = previous;
@@ -491,7 +491,7 @@ export function animate(
           throw error;
         }
         commitSnap(rec, bound);
-        rec._transition = false;
+        rec.locked = false;
         report(true);
         continue;
       }
@@ -507,6 +507,7 @@ export function animate(
             _numeric: bound._numeric,
             _residuals: bound._residuals,
             _transform: bound._transform,
+            _order: bound._order,
             _spring: (mode as Extract<MotionMode, { _type: 'spring' }>)._spring,
             _delayMs: delayMs,
             _now: now,
@@ -533,15 +534,15 @@ export function animate(
         throw error;
       }
       try {
-        previous?._supersede();
+        previous?.replace();
       } catch (error) {
         unit._rollback();
         protectedOwner = previous;
         releaseTransition(rec, previous);
         throw error;
       }
-      rec._owner = unit;
-      rec._transition = false;
+      rec.owner = unit;
+      rec.locked = false;
       units.push(unit);
       // Sync timer остаётся pending, пока не опубликованы все
       // owners: иначе duplicate target успевает записать target,

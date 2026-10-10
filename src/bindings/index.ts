@@ -8,10 +8,11 @@ export type MotionBindingGoals = Readonly<Record<string, MotionBindingGoal>>;
 
 /** Ресурс остаётся безопасно отменяемым и после естественного завершения. */
 export interface MotionBindingHandle { cancel(): void }
+type BindingResource = MotionBindingHandle | { stop(): void };
 
 /** Порты связывают рецепт с существующим animate, MotionValue или renderer. */
 export type MotionBindingTargets<G extends MotionBindingGoals> = {
-  readonly [K in keyof G]: (goal: Readonly<G[K]>) => MotionBindingHandle | void;
+  readonly [K in keyof G]: (goal: Readonly<G[K]>) => BindingResource | void;
 };
 
 export interface MotionBindingControls<Model> {
@@ -152,12 +153,14 @@ export function createMotionBinding<Model, Goals extends MotionBindingGoals>(
     return goals ?? previousGoals;
   }
 
-  function capture(value: MotionBindingHandle | void): Effect | undefined {
+  function capture(value: BindingResource | void): Effect | undefined {
     if (value === undefined) return;
     if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
       throw new MotionParamError('LM179');
     }
-    const stop = value.cancel;
+    const resource = value as { cancel?: unknown; stop?: unknown };
+    const cancel = resource.cancel;
+    const stop = cancel === undefined ? resource.stop : cancel;
     if (typeof stop !== 'function') throw new MotionParamError('LM179');
     return { identity: value, cancel: () => stop.call(value) };
   }

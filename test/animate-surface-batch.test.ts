@@ -15,7 +15,7 @@ import {
   surfaceBatchFor,
   SurfaceBatch,
   type SurfaceUnit,
-} from '../src/internal/surface-batch.js';
+} from '../src/internal/surface.js';
 import { WaapiUnit, type WaapiTarget } from '../src/animate/waapi-unit.js';
 import {
   compileSpringExecutionArtifactTupleUnchecked,
@@ -78,10 +78,10 @@ function slot(id: string, events: string[] = []): {
   readonly record: GroupRecord;
 } {
   const record: GroupRecord = {
-    _owner: undefined,
-    _transition: false,
-    _numeric: new Map(),
-    _cssValue: undefined,
+    owner: undefined,
+    locked: false,
+    numbers: new Map(),
+    css: undefined,
   };
   const channel: NumericChannel = {
     _key: 'opacity',
@@ -128,7 +128,7 @@ function batchWithUnits(
       _batch: batch,
       _onDone: onDone,
     });
-    item.record._owner = unit;
+    item.record.owner = unit;
     return unit;
   });
   return { batch, units };
@@ -148,7 +148,7 @@ function mainUnit(
     _onDone: onDone,
     _startPaused: startPaused,
   });
-  item.record._owner = unit;
+  item.record.owner = unit;
   return unit;
 }
 
@@ -207,11 +207,11 @@ function fakeSurface(
   fail: () => void = () => {},
 ): SurfaceUnit {
   return {
-    _batchSlot: -1,
-    _updateStep: update,
-    _renderStep: render,
-    _batchAbort: fail,
-    _batchRollback() {},
+    slot: -1,
+    update: update,
+    render: render,
+    abort: fail,
+    rollback() {},
   };
 }
 
@@ -238,10 +238,10 @@ function targetCrossingMs(): number {
 
 function waapiUnit(getBatch: () => SurfaceBatch): WaapiUnit {
   const record: GroupRecord = {
-    _owner: undefined,
-    _transition: false,
-    _numeric: new Map(),
-    _cssValue: undefined,
+    owner: undefined,
+    locked: false,
+    numbers: new Map(),
+    css: undefined,
   };
   const numeric: NumericChannel[] = [{
     _key: 'x', _from: 0, _to: 100, _solverTo: 100,
@@ -266,7 +266,7 @@ function waapiUnit(getBatch: () => SurfaceBatch): WaapiUnit {
     _onDone() {},
     _artifact: HANDOFF_ARTIFACT,
   });
-  record._owner = unit;
+  record.owner = unit;
   unit._commit();
   return unit;
 }
@@ -353,12 +353,12 @@ describe('SurfaceBatch: потолок подписок', () => {
     const completions: boolean[] = [];
     const b = mainUnit(batch, 'b', true, (natural) => completions.push(natural));
     reenter = () => {
-      expect(b._batchSlot).toBe(2);
+      expect(b.slot).toBe(2);
       a.cancel();
       removed.cancel();
       // Добавление пересекает порог и меняет адрес ещё создаваемого failed-c.
       const temporary = mainUnit(batch, 'temporary', true);
-      expect(b._batchSlot).toBe(0);
+      expect(b.slot).toBe(0);
       temporary.cancel();
       b.play();
     };
@@ -378,7 +378,7 @@ describe('SurfaceBatch: потолок подписок', () => {
     };
     expect(thrown).toBe(hostError);
     expect(state._units).toEqual([b]);
-    expect(b._batchSlot).toBe(0);
+    expect(b.slot).toBe(0);
     expect((b as unknown as { _paused: boolean })._paused).toBe(true);
     expect(state._active).toBe(0);
     expect(state._offUpdate).toBeUndefined();
@@ -407,8 +407,8 @@ describe('SurfaceBatch: потолок подписок', () => {
     expect(host.subscriptions).toEqual({ update: 1, render: 1 });
     expect((batch as unknown as { _active: number })._active).toBe(2);
     expect((b as unknown as { _paused: boolean })._paused).toBe(false);
-    expect(b._batchSlot).toBe(0);
-    expect(c._batchSlot).toBe(1);
+    expect(b.slot).toBe(0);
+    expect(c.slot).toBe(1);
 
     host.tick(0);
     host.tick(1001);
@@ -485,7 +485,7 @@ describe('SurfaceBatch: потолок подписок', () => {
       expect(host.subscriptions).toEqual({ update: 1, render: 0 });
       expect(state._units).toEqual(retained ? [nested] : []);
       for (let index = 0; index < state._units.length; index++) {
-        expect(state._units[index]!._batchSlot).toBe(index);
+        expect(state._units[index]!.slot).toBe(index);
       }
 
       if (retained) {
@@ -512,13 +512,13 @@ describe('SurfaceBatch: потолок подписок', () => {
 
     let thrown: unknown;
     try {
-      batch._add(unit, false);
+      batch.add(unit, false);
     } catch (error) {
       thrown = error;
     }
 
     expect(thrown).toBe(hostError);
-    expect(unit._batchSlot).toBe(-1);
+    expect(unit.slot).toBe(-1);
     expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
     expect((batch as unknown as { _active: number })._active).toBe(0);
   });
@@ -538,13 +538,13 @@ describe('SurfaceBatch: граница кадра и lifecycle', () => {
       () => events.push('u2'),
       () => events.push('r2'),
     );
-    batch._add(first, false);
-    batch._add(second, false);
+    batch.add(first, false);
+    batch.add(second, false);
 
     expect(() => host.tick(16)).not.toThrow();
     expect(events).toEqual(['u1', 'f1', 'u2', 'r1', 'r2']);
-    batch._remove(first, false);
-    batch._remove(second, false);
+    batch.remove(first, false);
+    batch.remove(second, false);
   });
 
   it('бросок cleanup в render не лишает кадра поздние slots', () => {
@@ -560,13 +560,13 @@ describe('SurfaceBatch: граница кадра и lifecycle', () => {
       () => events.push('u2'),
       () => events.push('r2'),
     );
-    batch._add(first, false);
-    batch._add(second, false);
+    batch.add(first, false);
+    batch.add(second, false);
 
     expect(() => host.tick(16)).not.toThrow();
     expect(events).toEqual(['u1', 'u2', 'r1', 'f1', 'r2']);
-    batch._remove(first, false);
-    batch._remove(second, false);
+    batch.remove(first, false);
+    batch.remove(second, false);
   });
 
   it('бросок teardown одного slot не удерживает остальные и scheduler', () => {
@@ -583,8 +583,8 @@ describe('SurfaceBatch: граница кадра и lifecycle', () => {
       () => {},
       () => events.push('t2'),
     );
-    batch._add(first, false);
-    batch._add(second, false);
+    batch.add(first, false);
+    batch.add(second, false);
 
     const teardown = (batch as unknown as { _frameTeardown(): void })._frameTeardown;
     expect(() => teardown()).not.toThrow();
@@ -603,18 +603,18 @@ describe('SurfaceBatch: граница кадра и lifecycle', () => {
     const first = fakeSurface(
       () => {
         events.push('u1');
-        if (second._batchSlot < 0) batch._add(second, false);
+        if (second.slot < 0) batch.add(second, false);
       },
       () => events.push('r1'),
     );
-    batch._add(first, false);
+    batch.add(first, false);
 
     host.tick(16);
     expect(events).toEqual(['u1', 'r1']);
     host.tick(32);
     expect(events).toEqual(['u1', 'r1', 'u1', 'u2', 'r1', 'r2']);
-    batch._remove(first, false);
-    batch._remove(second, false);
+    batch.remove(first, false);
+    batch.remove(second, false);
   });
 
   it('удаление unit внутри update не пропускает sibling', () => {
@@ -625,7 +625,7 @@ describe('SurfaceBatch: граница кадра и lifecycle', () => {
     first = fakeSurface(
       () => {
         events.push('u1');
-        batch._remove(first, false);
+        batch.remove(first, false);
       },
       () => events.push('r1'),
     );
@@ -633,12 +633,12 @@ describe('SurfaceBatch: граница кадра и lifecycle', () => {
       () => events.push('u2'),
       () => events.push('r2'),
     );
-    batch._add(first, false);
-    batch._add(second, false);
+    batch.add(first, false);
+    batch.add(second, false);
 
     host.tick(16);
     expect(events).toEqual(['u1', 'u2', 'r2']);
-    batch._remove(second, false);
+    batch.remove(second, false);
     expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
     expect(host.removals).toEqual({ update: 1, render: 1 });
   });
@@ -687,10 +687,10 @@ describe('SurfaceBatch: физический ключ spring-basis', () => {
   it('не решает повторно равные m/k/c и t из разных animate-вызовов', () => {
     const batch = new SurfaceBatch(frameHarness().frame);
     const spring = { mass: 1, stiffness: 170, damping: 26 };
-    batch._springBasis(spring, 0.1);
+    batch.basis(spring, 0.1);
     const exp = vi.spyOn(Math, 'exp');
     try {
-      batch._springBasis({ ...spring }, 0.1);
+      batch.basis({ ...spring }, 0.1);
       expect(exp).not.toHaveBeenCalled();
     } finally {
       exp.mockRestore();
@@ -736,7 +736,7 @@ describe('SurfaceBatch: retention общего default-pool', () => {
 
 describe('SurfaceBatch: структура горячих методов', () => {
   it('update/render не создают per-frame arrays или closures', () => {
-    const path = 'src/internal/surface-batch.ts';
+    const path = 'src/internal/surface.ts';
     const file = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true);
     const nodes: ts.Node[] = [];
     const visit = (node: ts.Node): void => {

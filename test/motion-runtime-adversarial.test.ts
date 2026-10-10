@@ -1,3 +1,4 @@
+import { findSurfaceRecord } from '../src/internal/surface.js';
 import { expect, it } from 'vitest';
 import { harness } from './fixtures/motion-runtime.js';
 import { snapshot } from '../src/motion/model.js';
@@ -129,8 +130,8 @@ it('10 000 повторных целей держат один эффект и �
     previous.stop(); previous.finish();
   }
   expect(h.effects).toHaveLength(1); expect(h.effects[0]!.cancelled).toBe(false);
-  const registry = (h.runtime as unknown as { _surfaces: WeakMap<Element, Map<string, { _tracks: Map<string, { _owner: unknown }> }>> })._surfaces;
-  expect(registry.get(h.element)!.get('transform')!._tracks.get('x')!._owner).toBe(current);
+  const owner = findSurfaceRecord(h.element, 'transform')!.owner as unknown as { _tracks: Map<string, { _owner: unknown }> };
+  expect(owner._tracks.get('x')!._owner).toBe(current);
   current.finish(); expect(await current.finished).toEqual({ status: 'finished' });
   expect(await first.finished).toEqual({ status: 'stopped' });
 });
@@ -138,8 +139,7 @@ it('10 000 повторных целей держат один эффект и �
 it('постоянный элемент не накапливает завершённые custom properties в реестре', () => {
   const h = harness();
   for (let i = 0; i < 10_000; i++) h.runtime.animate(h.element, { ['--test' + i]: [0, 1] }, { duration: 0 });
-  const registry = (h.runtime as unknown as { _surfaces: WeakMap<Element, Map<string, unknown>> })._surfaces;
-  expect(registry.get(h.element)?.size ?? 0).toBe(0);
+  for (let i = 0; i < 10_000; i++) expect(findSurfaceRecord(h.element, '--test' + i)).toBeUndefined();
   expect(h.updates.size + h.renders.size).toBe(0);
 });
 

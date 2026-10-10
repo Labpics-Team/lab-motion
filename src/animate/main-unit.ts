@@ -1,3 +1,5 @@
+import type { CssSnapshot   SurfaceBatch, type SurfaceUnit,
+} from '../internal/surface.js';
 /** Main-thread executor одной CSS-поверхности внутри общего SurfaceBatch. */
 
 import { scaleSerializedVelocity } from '../compositor/sample.js';
@@ -6,10 +8,10 @@ import { finiteOrZero } from '../internal/finite.js';
 import {
   readSpringFromBasisUnchecked,
   sampleSpringFromBasisUnchecked,
-} from '../internal/read-spring.js';
+} from '../internal/surface.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import type { SpringParams } from '../spring.js';
-import { buildTransform } from '../value/transform.js';
+import { formatTransform as buildTransform } from '../value/transform.js';
 import {
   RANGE_EPSILON,
   channelAt,
@@ -22,7 +24,6 @@ import {
   type GroupOwner,
   type GroupRecord,
 } from './channels.js';
-import { SurfaceBatch, type SurfaceUnit } from '../internal/surface-batch.js';
 
 export type MotionMode =
   | { readonly _type: 'spring'; readonly _spring: SpringParams }
@@ -48,7 +49,7 @@ const EASE_DERIV_H = 1e-3;
 
 /** Unit хранит семантику группы; scheduler и spring-basis принадлежат aggregate. */
 export class MainUnit implements GroupOwner, SurfaceUnit {
-  _batchSlot = -1;
+  slot = -1;
   private _o: MainUnitOptions | undefined;
   private _done = false;
   private _paused: boolean;
@@ -73,7 +74,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     this._paused = options._startPaused === true;
     this._phaseMs = -options._delayMs;
     try {
-      options._batch._add(this, this._paused);
+      options._batch.add(this, this._paused);
     } catch (error) {
       this._done = true;
       this._o = undefined;
@@ -81,7 +82,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     }
   }
 
-  _captureNum(key: string): ChannelSnapshot | undefined {
+  readNumber(key: string): ChannelSnapshot | undefined {
     if (this._done) return undefined;
     const o = this._o!;
     const channel = o._bound._numeric.find((item) => item._key === key);
@@ -95,13 +96,13 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
           this._tweenDerivative(this._liveTweenK());
         velocity = finiteOrZero(sampled);
       }
-      return { _value: writing ? channel._value : channel._renderedValue, _velocity: velocity };
+      return { value: writing ? channel._value : channel._renderedValue, velocity };
     }
     const frozen = o._bound._residuals.get(key);
-    return frozen === undefined ? undefined : { _value: frozen, _velocity: 0 };
+    return frozen === undefined ? undefined : { value: frozen, velocity: 0 };
   }
 
-  _captureCss(key: string): CssChannel | undefined {
+  readCss(key: string): CssSnapshot | undefined {
     if (this._done) return undefined;
     const channel = this._o!._bound._css;
     if (channel === undefined || channel._key !== key) return undefined;
@@ -111,7 +112,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       : this._o!._mode._type === 'tween'
         ? this._tweenDerivative(this._liveTweenK())
         : writing ? channel._dpdt : channel._renderedDpdt;
-    return { ...channel, _dpdt: dpdt, _css: writing ? channel._css : channel._renderedCss };
+    return { key: channel._key, from: channel._fromAst, to: channel._toAst, rate: dpdt, value: writing ? channel._css : channel._renderedCss };
   }
 
   /** k текущего поколения: во время host-write — применяемый, иначе rendered. */
@@ -119,13 +120,13 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     return this._writing ? this._tweenK : this._renderedTweenK;
   }
 
-  _numericKeys(): readonly string[] {
+  keys(): readonly string[] {
     if (this._done) return [];
     const bound = this._o!._bound;
     return [...bound._numeric.map((channel) => channel._key), ...bound._residuals.keys()];
   }
 
-  _supersede(replacement?: () => void): void {
+  replace(replacement?: () => void): void {
     if (this._done) return;
     replacement?.();
     this._writeBack();
@@ -137,11 +138,11 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   }
 
   play(): void {
-    if (this._done || !this._paused || this._o!._record._transition) return;
+    if (this._done || !this._paused || this._o!._record.locked) return;
     this._lastTs = undefined;
     this._paused = false;
     try {
-      this._o!._batch._activate(this);
+      this._o!._batch.activate(this);
     } catch (error) {
       this._paused = true;
       throw error;
@@ -149,13 +150,13 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   }
 
   pause(): void {
-    if (this._done || this._paused || this._o!._record._transition) return;
+    if (this._done || this._paused || this._o!._record.locked) return;
     this._paused = true;
-    this._o!._batch._deactivate(this);
+    this._o!._batch.deactivate(this);
   }
 
   seek(tMs: number): void {
-    if (this._done || this._o!._record._transition || !Number.isFinite(tMs)) return;
+    if (this._done || this._o!._record.locked || !Number.isFinite(tMs)) return;
     const localMs = Math.max(0, tMs);
     this._active = true;
     // Seek задаёт локальную фазу без восстановления абсолютного timestamp.
@@ -166,12 +167,12 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   }
 
   cancel(): void {
-    if (this._done || this._o!._record._transition) return;
-    this._batchAbort();
+    if (this._done || this._o!._record.locked) return;
+    this.abort();
   }
 
-  _updateStep(ts: number | undefined): void {
-    if (this._done || this._paused || this._o!._record._transition) return;
+  update(ts: number | undefined): void {
+    if (this._done || this._paused || this._o!._record.locked) return;
     let dt: number;
     if (ts === undefined || !Number.isFinite(ts)) {
       dt = FIXED_DT_MS;
@@ -198,19 +199,19 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     }
   }
 
-  _renderStep(): void {
-    if (this._done || this._paused || this._o!._record._transition) return;
+  render(): void {
+    if (this._done || this._paused || this._o!._record.locked) return;
     if (this._converged) this._settle();
     else if (this._active) this._write();
   }
 
-  _batchAbort(): void {
+  abort(): void {
     if (this._done) return;
     this._writeBack();
     this._finish(false);
   }
 
-  _batchRollback(): void {
+  rollback(): void {
     if (this._done) return;
     this._paused = true;
     this._o!._onRollback?.();
@@ -233,7 +234,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       return false;
     }
 
-    const basis = o._batch._springBasis(o._mode._spring, this._phaseMs / 1000);
+    const basis = o._batch.basis(o._mode._spring, this._phaseMs / 1000);
     let converged = true;
     for (const channel of bound._numeric) {
       const range = channel._solverTo - channel._from;
@@ -302,7 +303,9 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       if (o._group === 'transform') {
         const state = bound._transform!;
         for (const channel of bound._numeric) state[channel._key] = channel._value;
-        o._el.style.setProperty('transform', buildTransform(state));
+        const text = buildTransform(state, o._bound._order);
+        o._el.style.setProperty('transform', text);
+        if (o._record.owner === this) o._record.transform = text;
       } else if (bound._css !== undefined) {
         o._el.style.setProperty(o._group, String(bound._css._css));
       } else o._el.style.setProperty(o._group, String(bound._numeric[0]!._value));
@@ -354,24 +357,24 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     // а не rendered-снапшот прошлого кадра.
     const writing = this._writing;
     for (const channel of bound._numeric) {
-      record._numeric.set(channel._key, {
-        _value: writing ? channel._value : channel._renderedValue,
-        _velocity: 0,
+      record.numbers.set(channel._key, {
+        value: writing ? channel._value : channel._renderedValue,
+        velocity: 0,
       });
     }
     // css без writing-ветки: у css-группы один канал, поэтому successor
     // (live-capture либо его собственный writeBack) всегда перекрывает эту
-    // запись до любого чтения rec._cssValue — ветка была бы ненаблюдаемой
+    // запись до любого чтения rec.css — ветка была бы ненаблюдаемой
     // (эквивалентный мутант) и не оправдывает байтов под size-гейтом.
-    if (bound._css !== undefined) record._cssValue = bound._css._renderedCss;
+    if (bound._css !== undefined) record.css = bound._css._renderedCss;
   }
 
   private _finish(natural: boolean): void {
     if (this._done) return;
     this._done = true;
     const o = this._o!;
-    o._batch._remove(this, this._paused);
-    if (o._record._owner === this) o._record._owner = undefined;
+    o._batch.remove(this, this._paused);
+    if (o._record.owner === this) o._record.owner = undefined;
     const done = o._onDone;
     this._o = undefined;
     done(natural);

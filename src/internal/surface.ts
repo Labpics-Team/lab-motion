@@ -1,3 +1,5 @@
+import type { TransformOrder } from './transform.js';
+import type { ValueAST } from '../value/parse.js';
 /** Один aggregate scheduler: все compute, затем все DOM-write. */
 
 import { createFrameLoop, frame as defaultFrame, type FrameLoop } from '../frame/index.js';
@@ -8,11 +10,11 @@ import type { SpringParams } from '../spring.js';
 
 /** Узкий контракт не создаёт обратную runtime-зависимость на MainUnit. */
 export interface SurfaceUnit {
-  _batchSlot: number;
-  _updateStep(ts: number | undefined): void;
-  _renderStep(): void;
-  _batchAbort(): void;
-  _batchRollback(error?: unknown): void;
+  slot: number;
+  update(ts: number | undefined): void;
+  render(): void;
+  abort(): void;
+  rollback(error?: unknown): void;
 }
 
 /** Две FrameLoop-подписки независимо от числа поверхностей aggregate. */
@@ -39,7 +41,7 @@ export class SurfaceBatch {
   private readonly _frameTeardown = (): void => {
     const end = this._units.length;
     for (let i = 0; i < end; i++) {
-      try { this._units[i]?._batchAbort(); } catch { /* teardown siblings обязаны освободиться */ }
+      try { this._units[i]?.abort(); } catch { /* teardown siblings обязаны освободиться */ }
     }
     this._teardown();
     if (this._units.length === this._holes) this._resetStorage();
@@ -49,12 +51,12 @@ export class SurfaceBatch {
     this._frame = frame;
   }
 
-  _after(action: () => void): void {
-    if (this._pending.length === 0) queueMicrotask(() => this._flush());
+  defer(action: () => void): void {
+    if (this._pending.length === 0) queueMicrotask(() => this.flush());
     this._pending.push(action);
   }
 
-  _flush(): void {
+  flush(): void {
     if (this._draining) return;
     this._draining = true;
     const failures: unknown[] = [];
@@ -70,24 +72,24 @@ export class SurfaceBatch {
       : new AggregateError(failures, 'Ошибка отложенного управления');
   }
 
-  _add(unit: SurfaceUnit, paused: boolean): void {
+  add(unit: SurfaceUnit, paused: boolean): void {
     // Один проход обслуживает накопившиеся удаления. Порог в половину списка
     // ограничивает пустые slots и сохраняет линейную цену массового retarget.
     if (this._end < 0 && this._holes > 0 && this._holes * 2 >= this._units.length) this._compact();
     const slot = this._units.length;
     this._units.push(unit);
-    unit._batchSlot = slot;
+    unit.slot = slot;
     if (paused) return;
     this._active++;
     try {
       this._subscribe();
     } catch (error) {
       // Host reentry мог сдвинуть unit compaction-ом: identity живёт в slot unit.
-      const current = unit._batchSlot;
+      const current = unit.slot;
       if (current >= 0 && this._units[current] === unit) {
         this._units[current] = undefined;
         this._holes++;
-        unit._batchSlot = -1;
+        unit.slot = -1;
       }
       if (this._units.length === this._holes) this._resetStorage();
       else if (this._end < 0) this._compact();
@@ -95,28 +97,28 @@ export class SurfaceBatch {
     }
   }
 
-  _activate(unit: SurfaceUnit): void {
-    if (unit._batchSlot < 0) return;
+  activate(unit: SurfaceUnit): void {
+    if (unit.slot < 0) return;
     this._active++;
     this._subscribe();
   }
 
-  _deactivate(unit: SurfaceUnit): void {
-    if (unit._batchSlot < 0) return;
+  deactivate(unit: SurfaceUnit): void {
+    if (unit.slot < 0) return;
     if (--this._active === 0) this._teardown();
   }
 
-  _remove(unit: SurfaceUnit, paused: boolean): void {
-    const slot = unit._batchSlot;
+  remove(unit: SurfaceUnit, paused: boolean): void {
+    const slot = unit.slot;
     if (slot < 0 || this._units[slot] !== unit) return;
     this._units[slot] = undefined;
     this._holes++;
-    unit._batchSlot = -1;
+    unit.slot = -1;
     if (!paused && --this._active === 0) this._teardown();
     if (this._units.length === this._holes) this._resetStorage();
   }
 
-  _springBasis(spring: SpringParams, t: number): Readonly<MutableSpringBasis> {
+  basis(spring: SpringParams, t: number): Readonly<MutableSpringBasis> {
     const cached = this._basisSpring;
     if (
       t !== this._basisTime ||
@@ -141,11 +143,11 @@ export class SurfaceBatch {
     for (let i = 0; i < this._end; i++) {
       const unit = this._units[i];
       if (!unit) continue;
-      try { unit._updateStep(ts); } catch {
-        try { unit._batchAbort(); } catch { /* cleanup одного slot не прерывает кадр */ }
+      try { unit.update(ts); } catch {
+        try { unit.abort(); } catch { /* cleanup одного slot не прерывает кадр */ }
       }
     }
-    this._flush();
+    this.flush();
     // Pause/cancel-all в update снимает render-подписку: второй
     // фазы не будет, значит stable compaction уже безопасна.
     if (this._active === 0) {
@@ -158,11 +160,11 @@ export class SurfaceBatch {
     for (let i = 0; i < this._end; i++) {
       const unit = this._units[i];
       if (!unit) continue;
-      try { unit._renderStep(); } catch {
-        try { unit._batchAbort(); } catch { /* cleanup одного slot не прерывает кадр */ }
+      try { unit.render(); } catch {
+        try { unit.abort(); } catch { /* cleanup одного slot не прерывает кадр */ }
       }
     }
-    this._flush();
+    this.flush();
     this._end = -1;
     this._compact();
   }
@@ -174,7 +176,7 @@ export class SurfaceBatch {
       const unit = this._units[read];
       if (!unit) continue;
       this._units[write] = unit;
-      unit._batchSlot = write++;
+      unit.slot = write++;
     }
     this._units.length = write;
     this._holes = 0;
@@ -212,7 +214,7 @@ export class SurfaceBatch {
         try { offUpdate?.(); } catch { /* исходная host-ошибка приоритетна */ }
         this._active = 0;
         for (let i = 0; i < this._units.length; i++) {
-          try { this._units[i]?._batchRollback(error); } catch { /* sibling rollback продолжается */ }
+          try { this._units[i]?.rollback(error); } catch { /* sibling rollback продолжается */ }
         }
         this._active = 0;
         this._subscribing = false;
@@ -248,3 +250,58 @@ export function surfaceBatchFor(requestFrame: RequestFrameFn | undefined): Surfa
     ? surfaceBatchForFrame(defaultFrame)
     : new SurfaceBatch(createFrameLoop({ requestFrame }));
 }
+
+
+export interface ChannelSnapshot { readonly value: number; readonly velocity: number }
+export interface CssSnapshot {
+  readonly key: string;
+  readonly from: ValueAST;
+  readonly to: ValueAST;
+  readonly rate: number;
+  readonly value: string | number;
+  readonly velocity?: readonly number[];
+}
+
+/** Владелец CSS-декларации передаёт состояние до замены эффекта. */
+export interface SurfaceOwner {
+  release?(): void;
+  capture?(): void;
+  readNumber(key: string): ChannelSnapshot | undefined;
+  readCss(key: string): CssSnapshot | undefined;
+  keys(): readonly string[];
+  replace(replacement?: () => void): void;
+}
+export interface SurfaceRecord {
+  owner: SurfaceOwner | undefined;
+  locked: boolean;
+  readonly numbers: Map<string, ChannelSnapshot>;
+  css: string | number | undefined;
+  order?: TransformOrder;
+  transform?: string;
+}
+const registry = new WeakMap<object, Map<string, SurfaceRecord>>();
+
+export function surfaceRecord(element: object, key: string): SurfaceRecord {
+  let groups = registry.get(element);
+  if (!groups) { groups = new Map(); registry.set(element, groups); }
+  let record = groups.get(key);
+  if (!record) {
+    record = { owner: undefined, locked: false, numbers: new Map(), css: undefined };
+    groups.set(key, record);
+  }
+  return record;
+}
+
+export function releaseSurfaceRecord(element: object, key: string, record: SurfaceRecord): void {
+  if (!record.owner && !record.locked && !record.numbers.size && record.css === undefined) {
+    const groups = registry.get(element);
+    if (groups?.get(key) === record) groups.delete(key);
+    if (!groups?.size) registry.delete(element);
+  }
+}
+
+export function findSurfaceRecord(element: object, key: string): SurfaceRecord | undefined {
+  return registry.get(element)?.get(key);
+}
+
+export { readSpringFromBasisUnchecked, sampleSpringFromBasisUnchecked } from './read-spring.js';

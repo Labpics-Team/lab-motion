@@ -4,15 +4,15 @@ import { animate } from '../../src/animate/index.js';
 import { WaapiUnit } from '../../src/animate/waapi-unit.js';
 import { clearSpringExecutionArtifactCacheUnchecked,
   compileSpringExecutionArtifactTupleUnchecked, DEFAULT_TOLERANCE } from '../../src/compositor/curve.js';
-import { SurfaceBatch } from '../../src/internal/surface-batch.js';
+import { SurfaceBatch } from '../../src/internal/surface.js';
 
 // Наблюдатель не меняет исполнение: вызывает исходный метод с тем же this,
 // не держит units/buffers сильными ссылками и не зависит от приватных имён.
 const observed: Array<{ unit: WeakRef<object>; buffers: WeakRef<object>[] }> = [];
 const seen = new WeakSet<object>();
 const mainUnits: WeakRef<object>[] = [];
-const originalAdd = SurfaceBatch.prototype._add;
-SurfaceBatch.prototype._add = function (unit, paused): void {
+const originalAdd = SurfaceBatch.prototype.add;
+SurfaceBatch.prototype.add = function (unit, paused): void {
   mainUnits.push(new WeakRef(unit));
   originalAdd.call(this, unit, paused);
 };
@@ -151,6 +151,6 @@ for (const record of records) {
 // Все controls по-прежнему удерживаются вызывающей стороной, а не выброшены тестом.
 assert.equal(holds.length, 11);
 assert.equal(alive(mainUnits), 0, 'terminal controls retain main delegates');
-SurfaceBatch.prototype._add = originalAdd;
+SurfaceBatch.prototype.add = originalAdd;
 WaapiUnit.prototype._commit = originalCommit;
 console.log('animate-terminal-retention: PASS');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SurfaceBatch, type SurfaceUnit } from '../src/internal/surface-batch.js';
+import { SurfaceBatch, type SurfaceUnit } from '../src/internal/surface.js';
 import type { FrameLoop } from '../src/frame/index.js';
 
 function harness() {
@@ -17,14 +17,14 @@ function harness() {
   function unit(id: number, paused = false) {
     let slot = -1;
     const entry: SurfaceUnit = {
-      get _batchSlot() { return slot; },
-      set _batchSlot(value) { writes++; slot = value; },
-      _updateStep() { events.push(`u${id}`); },
-      _renderStep() { events.push(`r${id}`); },
-      _batchAbort() { batch._remove(entry, paused); },
-      _batchRollback() { batch._remove(entry, paused); },
+      get slot() { return slot; },
+      set slot(value) { writes++; slot = value; },
+      update() { events.push(`u${id}`); },
+      render() { events.push(`r${id}`); },
+      abort() { batch.remove(entry, paused); },
+      rollback() { batch.remove(entry, paused); },
     };
-    batch._add(entry, paused);
+    batch.add(entry, paused);
     return entry;
   }
   return { batch, unit, events,
@@ -46,15 +46,15 @@ describe('массовая смена владельцев поверхност�
         const previous = live[index]!;
         // animate сначала устанавливает преемника, затем отзывает прежнего владельца.
         live[index] = host.unit(count + step, paused);
-        host.batch._remove(previous, paused);
-        expect(previous._batchSlot).toBe(-1);
+        host.batch.remove(previous, paused);
+        expect(previous.slot).toBe(-1);
         expect(host.storage.length).toBeLessThanOrEqual(2 * (count + 1));
       }
       // Учтены назначения при add/remove и все перенумерации выживших slots.
       expect(host.writes - start).toBeLessThanOrEqual(4 * replacements + count);
       expect(host.storage.filter(Boolean)).toEqual(live);
-      for (const entry of live) expect(host.storage[entry._batchSlot]).toBe(entry);
-      for (const entry of live) host.batch._remove(entry, paused);
+      for (const entry of live) expect(host.storage[entry.slot]).toBe(entry);
+      for (const entry of live) host.batch.remove(entry, paused);
       expect(host.storage).toHaveLength(0);
     });
   }
@@ -63,12 +63,12 @@ describe('массовая смена владельцев поверхност�
     const host = harness();
     const live = Array.from({ length: 12 }, (_, id) => host.unit(id));
     let inserted = false;
-    const update = live[0]!._updateStep;
-    live[0]!._updateStep = () => {
+    const update = live[0]!.update;
+    live[0]!.update = () => {
       update();
       if (inserted) return;
       inserted = true;
-      for (let id = 1; id < 9; id++) host.batch._remove(live[id]!, false);
+      for (let id = 1; id < 9; id++) host.batch.remove(live[id]!, false);
       for (let id = 12; id < 24; id++) live.push(host.unit(id));
     };
     host.tick();
@@ -78,27 +78,27 @@ describe('массовая смена владельцев поверхност�
     const ids = [0, 9, 10, 11, ...Array.from({ length: 12 }, (_, i) => i + 12)];
     expect(host.events).toEqual([...ids.map(id => `u${id}`), ...ids.map(id => `r${id}`)]);
     expect(host.storage).toHaveLength(ids.length);
-    for (const entry of live) host.batch._remove(entry, false);
+    for (const entry of live) host.batch.remove(entry, false);
     expect(host.storage).toHaveLength(0);
   });
 
   it('пауза и возобновление сохраняют адреса, а удалённые entries не оживают', () => {
     const host = harness();
     const live = Array.from({ length: 128 }, (_, id) => host.unit(id, true));
-    for (let id = 0; id < 100; id++) host.batch._remove(live[id]!, true);
+    for (let id = 0; id < 100; id++) host.batch.remove(live[id]!, true);
     const tail = live.slice(100);
-    const addresses = tail.map(entry => entry._batchSlot);
+    const addresses = tail.map(entry => entry.slot);
     const writes = host.writes;
-    for (const entry of tail) host.batch._activate(entry);
-    expect(tail.map(entry => entry._batchSlot)).toEqual(addresses);
+    for (const entry of tail) host.batch.activate(entry);
+    expect(tail.map(entry => entry.slot)).toEqual(addresses);
     expect(host.writes).toBe(writes);
     host.tick();
     const ids = Array.from({ length: 28 }, (_, id) => 100 + id);
     expect(host.events).toEqual([...ids.map(id => `u${id}`), ...ids.map(id => `r${id}`)]);
     expect(host.storage).toEqual(tail);
     for (const entry of tail) {
-      host.batch._deactivate(entry);
-      host.batch._remove(entry, true);
+      host.batch.deactivate(entry);
+      host.batch.remove(entry, true);
     }
     expect(host.storage).toHaveLength(0);
   });

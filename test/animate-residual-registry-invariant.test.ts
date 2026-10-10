@@ -27,8 +27,8 @@ describe('animate: инвариант остаточного transform', () => {
     clock.step(1_000);
 
     const record = groupRecord(f.el, 'transform');
-    expect(record._numeric.get('rotate')?._value).toBe(90);
-    expect(record._numeric.get('x')?._value).toBe(50);
+    expect(record.numbers.get('rotate')?.value).toBe(90);
+    expect(record.numbers.get('x')?.value).toBe(50);
   });
 
   it('живой owner фиксирует residual до публикации main-successor', () => {
@@ -43,7 +43,7 @@ describe('animate: инвариант остаточного transform', () => {
     clock.step(100);
 
     const record = groupRecord(f.el, 'transform');
-    expect(record._numeric.has('rotate')).toBe(false);
+    expect(record.numbers.has('rotate')).toBe(false);
 
     const successor = animate(f.el, { x: [0, 50] }, {
       duration: 1_000,
@@ -51,7 +51,7 @@ describe('animate: инвариант остаточного transform', () => {
       requestFrame: clock.requestFrame,
     });
 
-    expect(record._numeric.get('rotate')?._value).toBeCloseTo(9, 12);
+    expect(record.numbers.get('rotate')?.value).toBeCloseTo(9, 12);
     successor.cancel();
   });
 
@@ -73,8 +73,8 @@ describe('animate: инвариант остаточного transform', () => {
     });
 
     const record = groupRecord(f.el, 'transform');
-    expect(record._numeric.get('rotate')?._value).toBeCloseTo(9, 12);
-    expect(record._numeric.get('x')?._value).toBe(50);
+    expect(record.numbers.get('rotate')?.value).toBeCloseTo(9, 12);
+    expect(record.numbers.get('x')?.value).toBe(50);
     expect(f.writes.at(-1)?.value).toContain('rotate(9deg)');
   });
 
@@ -91,7 +91,7 @@ describe('animate: инвариант остаточного transform', () => {
       });
 
       const record = groupRecord(f.el, 'transform');
-      expect(record._numeric.has('rotate')).toBe(false);
+      expect(record.numbers.has('rotate')).toBe(false);
       now = 100;
 
       const successor = animate(f.el, { x: [0, 50] }, {
@@ -100,7 +100,7 @@ describe('animate: инвариант остаточного transform', () => {
         setTimer: () => () => {},
       });
 
-      expect(record._numeric.get('rotate')?._value).toBeGreaterThan(0);
+      expect(record.numbers.get('rotate')?.value).toBeGreaterThan(0);
       successor.cancel();
     } finally {
       vi.unstubAllGlobals();

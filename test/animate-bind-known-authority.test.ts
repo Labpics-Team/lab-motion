@@ -8,7 +8,7 @@ import {
   type GroupRecord,
 } from '../src/animate/channels.js';
 import { MainUnit } from '../src/animate/main-unit.js';
-import { SurfaceBatch } from '../src/internal/surface-batch.js';
+import { SurfaceBatch } from '../src/internal/surface.js';
 import type { FrameLoop } from '../src/frame/index.js';
 
 function countSetAllocations<T>(run: () => T): { readonly result: T; readonly allocations: number } {
@@ -37,13 +37,13 @@ const element: AnimatableElement = {
 
 function record(owner?: GroupOwner): GroupRecord {
   const numeric = new Map<string, ChannelSnapshot>();
-  numeric.set('rotate', { _value: 30, _velocity: 0 });
-  numeric.set('skewX', { _value: 5, _velocity: 0 });
+  numeric.set('rotate', { value: 30, velocity: 0 });
+  numeric.set('skewX', { value: 5, velocity: 0 });
   return {
-    _owner: owner,
-    _transition: false,
-    _numeric: numeric,
-    _cssValue: undefined,
+    owner: owner,
+    locked: false,
+    numbers: numeric,
+    css: undefined,
   };
 }
 
@@ -75,18 +75,18 @@ describe('bindGroup transform key authority', () => {
 
   it('uses the live owner as complete key authority without a union Set', () => {
     const owner: GroupOwner = {
-      _captureNum(key) {
-        if (key === 'rotate') return { _value: 42, _velocity: 7 };
-        if (key === 'skewX') return { _value: 9, _velocity: 3 };
+      readNumber(key) {
+        if (key === 'rotate') return { value: 42, velocity: 7 };
+        if (key === 'skewX') return { value: 9, velocity: 3 };
         return undefined;
       },
-      _captureCss() {
+      readCss() {
         return undefined;
       },
-      _numericKeys() {
+      keys() {
         return ['x', 'rotate', 'skewX'];
       },
-      _supersede() {},
+      replace() {},
     };
 
     const { result: bound, allocations } = countSetAllocations(() =>
@@ -118,7 +118,7 @@ describe('bindGroup transform key authority', () => {
       _onDone() {},
       _startPaused: true,
     });
-    rec._owner = owner;
+    rec.owner = owner;
 
     try {
       const { result: bound, allocations } = countSetAllocations(() =>

@@ -1,3 +1,4 @@
+import type { TransformOrder } from '../internal/transform.js';
 /**
  * animate/channels.ts — доменная модель каналов фасада ./animate.
  *
@@ -315,95 +316,22 @@ function spanVec(from: ValueAST, to: ValueAST): number[] | undefined {
  * fromAst нового спана bindGroup реконструирует из live.css (оба цветовые либо
  * оба юнитные — иначе undefined выше); −0 схлопывает normalizeV0.
  */
-function projectCssV0(live: CssChannel, fromAst: ValueAST, toAst: ValueAST): number {
-  const a = spanVec(live._fromAst, live._toAst);
+function projectCssV0(live: CssSnapshot, fromAst: ValueAST, toAst: ValueAST): number {
+  const a = live.velocity ?? spanVec(live.from, live.to);
   const b = spanVec(fromAst, toAst);
   if (!a || !b) return 0; // undefined-гейт: определённый спан — непустой массив (truthy)
   let i = 0;
   for (let k = 1; k < b.length; k++) {
     if (Math.abs(b[k]!) > Math.abs(b[i]!)) i = k;
   }
-  return normalizeV0(live._dpdt * a[i]!, b[i]!);
+  return normalizeV0((live.velocity ? 1 : live.rate) * a[i]!, b[i]!);
 }
 
 // ─── Реестр состояния по элементам ───────────────────────────────────────────
 
-/** Снимок числового канала (значение + скорость units/s). */
-export interface ChannelSnapshot {
-  readonly _value: number;
-  readonly _velocity: number;
-}
-
-/**
- * Живой владелец группы — юнит, чей прогон можно прервать с подхватом
- * (capture → supersede). Оба движка (rAF и WAAPI) реализуют этот контракт.
- *
- * Контракт поколения (#196): если реализация сама пишет в host (style/effect),
- * то ВО ВРЕМЯ такой записи _captureNum/_captureCss обязаны отдавать
- * ПРИМЕНЯЕМОЕ поколение поверхности (значение И скорость), а не rendered-
- * снапшот прошлого кадра: hostile host может реентрантно запустить successor
- * прямо из setter-а, когда значение уже видимо. Осевшее (settle) поколение
- * несёт скорость покоя. Реализация обязана либо гарантировать это (MainUnit:
- * транзакция _writing), либо исключить реентри на записи (WaapiUnit:
- * _transaction/_locked + commit-reservation LM157). До переноса инварианта в
- * generation/lease на GroupRecord (§10.1 roadmap #106) новая реализация без
- * одного из двух механизмов воспроизведёт класс #196.
- */
-export interface GroupOwner {
-  /** Снимает резерв при rollback до supersede. */
-  _release?(): void;
-  /** Фиксирует общий снимок до поканального чтения stateful host-часов. */
-  _capture?(): void;
-  /** Аналитический снимок числового канала в момент прерывания. */
-  _captureNum(key: string): ChannelSnapshot | undefined;
-  /** Живой CSS-канал в момент прерывания (значение + ṗ для C¹-проекции). */
-  _captureCss(key: string): CssChannel | undefined;
-  /** Ключи числовых каналов прогона (для остаточного transform-состояния). */
-  _numericKeys(): readonly string[];
-  /**
-   * Прервать прогон. Опциональный replacement пишется до destructive cleanup:
-   * его отказ оставляет старого владельца живым и повторяемым.
-   */
-  _supersede(replacement?: () => void): void;
-}
-
-/** Запись группы: живой владелец + последнее известное состояние каналов. */
-export interface GroupRecord {
-  _owner: GroupOwner | undefined;
-  /** Commit-reservation закрывает reentry даже до публикации первого owner. */
-  _transition: boolean;
-  /** Последние известные числовые значения по субканалам (после settle/cancel). */
-  readonly _numeric: Map<string, ChannelSnapshot>;
-  /** Последнее известное значение CSS-канала. */
-  _cssValue: string | number | undefined;
-}
-
-/**
- * Реестр фасада: элемент → группа → запись. WeakMap — уход элемента из DOM
- * не удерживает состояние (нет утечки). Модульный синглтон: повторный
- * animate из любого места видит один и тот же прогон.
- */
-const registry = new WeakMap<object, Map<GroupKey, GroupRecord>>();
-
-/** Запись группы элемента (создаётся лениво). */
-export function groupRecord(el: object, group: GroupKey): GroupRecord {
-  let groups = registry.get(el);
-  if (!groups) {
-    groups = new Map();
-    registry.set(el, groups);
-  }
-  let rec = groups.get(group);
-  if (!rec) {
-    rec = {
-      _owner: undefined,
-      _transition: false,
-      _numeric: new Map(),
-      _cssValue: undefined,
-    };
-    groups.set(group, rec);
-  }
-  return rec;
-}
+export { surfaceRecord as groupRecord } from '../internal/surface.js';
+export type { ChannelSnapshot, SurfaceRecord as GroupRecord, SurfaceOwner as GroupOwner } from '../internal/surface.js';
+import type { SurfaceRecord as GroupRecord, CssSnapshot } from '../internal/surface.js';
 
 // ─── Чтение текущего состояния из стиля (в момент вызова, SSR-safe) ──────────
 
@@ -486,6 +414,7 @@ export function cssAt(ch: CssChannel, p: number): string | number {
 
 /** Каналы группы, привязанные к элементу, + остаточное transform-состояние. */
 export interface BoundGroup {
+  readonly _order?: TransformOrder;
   readonly _numeric: NumericChannel[];
   readonly _css: CssChannel | undefined;
   readonly _residuals: Map<string, number>;
@@ -506,8 +435,9 @@ export function bindGroup(
   specs: readonly ChannelSpec[],
   rec: GroupRecord,
 ): BoundGroup {
-  const owner = rec._owner;
-  owner?._capture?.();
+  const owner = rec.owner;
+  if (group === 'transform') rec.order ??= 0;
+  owner?.capture?.();
   const numeric: NumericChannel[] = [];
   let css: CssChannel | undefined;
 
@@ -518,13 +448,13 @@ export function bindGroup(
       if (spec._explicitFrom !== undefined) {
         from = spec._explicitFrom;
       } else {
-        const live = owner?._captureNum(spec._key);
-        const stored = rec._numeric.get(spec._key);
+        const live = owner?.readNumber(spec._key);
+        const stored = rec.numbers.get(spec._key);
         if (live) {
-          from = live._value;
-          velocity = live._velocity;
+          from = live.value;
+          velocity = live.velocity;
         } else if (stored) {
-          from = stored._value;
+          from = stored.value;
         } else if (group === 'transform') {
           from = TRANSFORM_IDENTITY[spec._key]!;
         } else {
@@ -539,9 +469,9 @@ export function bindGroup(
       if (spec._explicitFrom !== undefined) {
         fromAst = spec._explicitFrom;
       } else {
-        const live = owner?._captureCss(spec._key);
+        const live = owner?.readCss(spec._key);
         // live.css не бывает nullish (string | number) — ?? безопасно каскадит.
-        const source = live?._css ?? rec._cssValue ?? readStyleValue(el, group);
+        const source = live?.value ?? rec.css ?? readStyleValue(el, group);
         fromAst = tryParse(source) ?? spec._to; // нечитаемо → дискретный старт с цели
         // Живой прогон отдаёт ṗ̂ — проекция в новое прогресс-пространство (C¹);
         // live — объект канала (truthy) либо undefined.
@@ -570,18 +500,18 @@ export function bindGroup(
     // authority — settled registry. Второй Set не материализуем только затем,
     // чтобы один раз пройти его в этом же bind.
     const animated = new Set(specs.map((s) => s._key));
-    const known = owner?._numericKeys() ?? rec._numeric.keys();
+    const known = owner?.keys() ?? rec.numbers.keys();
     for (const key of known) {
       if (animated.has(key)) continue;
-      const snap = owner?._captureNum(key) ?? rec._numeric.get(key);
-      if (snap) residuals.set(key, snap._value);
+      const snap = owner?.readNumber(key) ?? rec.numbers.get(key);
+      if (snap) residuals.set(key, snap.value);
     }
   }
 
   const transform = group === 'transform'
     ? createTransformState(residuals, numeric)
     : undefined;
-  return { _numeric: numeric, _css: css, _residuals: residuals, _transform: transform };
+  return { _numeric: numeric, _css: css, _residuals: residuals, _transform: transform, _order: rec.order ?? 0 };
 }
 
 /** parse() без броска: нераспознанное значение → undefined. */

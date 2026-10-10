@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { animate, type AnimatableElement } from '../src/animate/index.js';
 import type { BoundGroup, GroupRecord } from '../src/animate/channels.js';
 import { MainUnit } from '../src/animate/main-unit.js';
-import { SurfaceBatch } from '../src/internal/surface-batch.js';
+import { SurfaceBatch } from '../src/internal/surface.js';
 import type { FrameLoop } from '../src/frame/index.js';
 import { makeClock, readTranslateX, translateXSeries } from './animate-facade-helpers.js';
 
@@ -51,7 +51,7 @@ describe('animate MainUnit: compact executor', () => {
   });
 
   it('N=2 equal-delay x исполняет два unit в общем scheduler', () => {
-    const units = vi.spyOn(MainUnit.prototype, '_updateStep');
+    const units = vi.spyOn(MainUnit.prototype, 'update');
     const clock = makeClock();
     const controls = animate(
       [target('a', []), target('b', [])],
@@ -65,7 +65,7 @@ describe('animate MainUnit: compact executor', () => {
   });
 
   it('N=1 сохраняет тот же executor contract', () => {
-    const units = vi.spyOn(MainUnit.prototype, '_updateStep');
+    const units = vi.spyOn(MainUnit.prototype, 'update');
     const clock = makeClock();
     const controls = animate(
       target('a', []),
@@ -79,7 +79,7 @@ describe('animate MainUnit: compact executor', () => {
   });
 
   it('stagger остаётся per-unit delay одного scheduler', () => {
-    const units = vi.spyOn(MainUnit.prototype, '_updateStep');
+    const units = vi.spyOn(MainUnit.prototype, 'update');
     const clock = makeClock();
     const controls = animate(
       [target('a', []), target('b', [])],
@@ -93,7 +93,7 @@ describe('animate MainUnit: compact executor', () => {
   });
 
   it('generic CSS использует тот же широкий executor', () => {
-    const units = vi.spyOn(MainUnit.prototype, '_updateStep');
+    const units = vi.spyOn(MainUnit.prototype, 'update');
     const clock = makeClock();
     const controls = animate(
       [target('a', []), target('b', [])],
@@ -142,10 +142,10 @@ describe('animate MainUnit: plan-order и изоляция', () => {
       cancelAll() {},
     };
     const record: GroupRecord = {
-      _owner: undefined,
-      _transition: false,
-      _numeric: new Map(),
-      _cssValue: undefined,
+      owner: undefined,
+      locked: false,
+      numbers: new Map(),
+      css: undefined,
     };
     let natural: boolean | undefined;
     const writes: number[] = [];
@@ -183,7 +183,7 @@ describe('animate MainUnit: plan-order и изоляция', () => {
       _batch: new SurfaceBatch(frame),
       _onDone(value) { natural = value; },
     });
-    record._owner = unit;
+    record.owner = unit;
 
     callbacks[0]?.(16);
     callbacks[1]?.(16);
@@ -192,17 +192,17 @@ describe('animate MainUnit: plan-order и изоляция', () => {
     callbacks[0]?.(516);
     callbacks[1]?.(516);
 
-    const pickup = unit._captureNum('x');
-    expect(Number.isFinite(pickup?._velocity)).toBe(true);
-    expect(pickup?._velocity).not.toBe(0);
+    const pickup = unit.readNumber('x');
+    expect(Number.isFinite(pickup?.velocity)).toBe(true);
+    expect(pickup?.velocity).not.toBe(0);
 
-    for (let frameIndex = 2; frameIndex < 1000 && record._owner === unit; frameIndex++) {
+    for (let frameIndex = 2; frameIndex < 1000 && record.owner === unit; frameIndex++) {
       const ts = 516 + frameIndex * 16;
       callbacks[0]?.(ts);
       callbacks[1]?.(ts);
     }
 
-    expect(record._owner).toBeUndefined();
+    expect(record.owner).toBeUndefined();
     expect(natural).toBe(true);
     expect(writes.every(Number.isFinite)).toBe(true);
     expect(writes.some((value) => value !== Number.MAX_VALUE && value !== -Number.MAX_VALUE))
@@ -347,10 +347,10 @@ describe('animate MainUnit: plan-order и изоляция', () => {
     const records: GroupRecord[] = [];
     const make = (i: number) => {
       const record: GroupRecord = {
-        _owner: undefined,
-        _transition: false,
-        _numeric: new Map(),
-        _cssValue: undefined,
+        owner: undefined,
+        locked: false,
+        numbers: new Map(),
+        css: undefined,
       };
       records.push(record);
       const bound: BoundGroup = {
@@ -382,21 +382,21 @@ describe('animate MainUnit: plan-order и изоляция', () => {
           if (reports === 2) throw new Error('report failed');
         },
       });
-      input._record._owner = owner;
+      input._record.owner = owner;
       return owner;
     });
 
     const cancel = (): void => { owners.forEach((owner) => owner.cancel()); };
     expect(cancel).toThrow('report failed');
-    expect(records[0]!._owner).toBeUndefined();
-    expect(records[1]!._owner).toBeUndefined();
-    expect(records[2]!._owner).toBe(owners[2]);
+    expect(records[0]!.owner).toBeUndefined();
+    expect(records[1]!.owner).toBeUndefined();
+    expect(records[2]!.owner).toBe(owners[2]);
   });
 
   it('superseded slot очищает сильные DOM/record/owner ссылки', () => {
     let firstOwner: MainUnit | undefined;
-    const originalSupersede = MainUnit.prototype._supersede;
-    const supersede = vi.spyOn(MainUnit.prototype, '_supersede').mockImplementation(function (
+    const originalSupersede = MainUnit.prototype.replace;
+    const supersede = vi.spyOn(MainUnit.prototype, 'replace').mockImplementation(function (
       this: MainUnit,
       replacement,
     ) {

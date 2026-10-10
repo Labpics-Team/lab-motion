@@ -1,3 +1,4 @@
+import { composeTransform, TRANSFORM_AXES, type TransformOrder } from '../internal/transform.js';
 /**
  * transform.ts — Независимые CSS-трансформы и их интерполяция.
  *
@@ -44,12 +45,7 @@ export interface TransformState {
 
 // ── Дефолты ───────────────────────────────────────────────────────────────────
 
-const DEFAULTS: Required<TransformState> = {
-  x: 0, y: 0,
-  scale: 1, scaleX: 1, scaleY: 1,
-  rotate: 0,
-  skewX: 0, skewY: 0,
-};
+const DEFAULTS = { ...TRANSFORM_AXES, scale: 1 } as Required<TransformState>;
 
 // ── buildTransform ────────────────────────────────────────────────────────────
 
@@ -69,55 +65,12 @@ const DEFAULTS: Required<TransformState> = {
  *   // → "translateX(10px) rotate(45deg)"
  */
 export function buildTransform(state: TransformState): string {
-  let result = '';
+  return formatTransform(state);
+}
 
-  const x = fin(state.x ?? DEFAULTS.x);
-  const y = fin(state.y ?? DEFAULTS.y);
-
-  // translate (объединяем в translate3d для GPU-слой, или раздельно)
-  if (x !== 0 || y !== 0) {
-    if (x !== 0 && y === 0) {
-      result += ` translateX(${x}px)`;
-    } else if (x === 0 && y !== 0) {
-      result += ` translateY(${y}px)`;
-    } else {
-      result += ` translate(${x}px, ${y}px)`;
-    }
-  }
-
-  // scale: если задан scale — перекрывает scaleX/scaleY
-  if (state.scale !== undefined) {
-    const sv = fin(state.scale);
-    if (sv !== 1) result += ` scale(${sv})`;
-  } else {
-    const sx = fin(state.scaleX ?? DEFAULTS.scaleX);
-    const sy = fin(state.scaleY ?? DEFAULTS.scaleY);
-    if (sx !== 1 || sy !== 1) {
-      if (sx === sy) {
-        result += ` scale(${sx})`;
-      } else {
-        result += ` scaleX(${sx})`;
-        if (sy !== 1) result += ` scaleY(${sy})`;
-      }
-    }
-  }
-
-  // rotate
-  const rot = fin(state.rotate ?? DEFAULTS.rotate);
-  if (rot !== 0) result += ` rotate(${rot}deg)`;
-
-  // skew
-  const skewX = fin(state.skewX ?? DEFAULTS.skewX);
-  const skewY = fin(state.skewY ?? DEFAULTS.skewY);
-  if (skewX !== 0 && skewY !== 0) {
-    result += ` skew(${skewX}deg, ${skewY}deg)`;
-  } else if (skewX !== 0) {
-    result += ` skewX(${skewX}deg)`;
-  } else if (skewY !== 0) {
-    result += ` skewY(${skewY}deg)`;
-  }
-
-  return result === '' ? 'none' : result.slice(1);
+/** Проверенный форматтер используется всеми исполнителями CSS-поверхности. */
+export function formatTransform(state: TransformState, order: TransformOrder = 0): string {
+  return composeTransform(state, order, 0, true);
 }
 
 // ── interpolateTransform ──────────────────────────────────────────────────────
