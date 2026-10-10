@@ -81,7 +81,7 @@ describe('один владелец CSS-декларации', () => {
     after.seek(0);
     expect(h.element.style.getPropertyValue('width')).toBe('25px');
     const snapshot = surfaceRecord(h.element, 'width').owner!.readCss('width')!;
-    expect(snapshot.rate * (200 - 25)).toBeCloseTo(100);
+    expect(snapshot.velocity[0]).toBeCloseTo(100);
     after.cancel();
   });
 });

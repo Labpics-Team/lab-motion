@@ -1,19 +1,21 @@
+import { SurfaceBatch, type SurfaceUnit, type CssSnapshot } from '../internal/surface.js';
 /** Main-thread executor одной CSS-поверхности внутри общего SurfaceBatch. */
 
 import { scaleSerializedVelocity } from '../compositor/sample.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import { finiteOrZero } from '../internal/finite.js';
 import {
-  SurfaceBatch, type SurfaceUnit, type CssSnapshot,
+  springBasis,
   readSpringFromBasisUnchecked,
   sampleSpringFromBasisUnchecked,
-} from '../internal/surface.js';
+} from '../internal/read-spring.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import type { SpringParams } from '../spring.js';
 import { formatTransform as buildTransform } from '../value/transform.js';
 import {
   RANGE_EPSILON,
   channelAt,
+  spanVec,
   cssAt,
   type AnimatableElement,
   type BoundGroup,
@@ -111,7 +113,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       : this._o!._mode._type === 'tween'
         ? this._tweenDerivative(this._liveTweenK())
         : writing ? channel._dpdt : channel._renderedDpdt;
-    return { key: channel._key, from: channel._fromAst, to: channel._toAst, rate: dpdt, value: writing ? channel._css : channel._renderedCss };
+    return { value: writing ? channel._css : channel._renderedCss, velocity: (spanVec(channel._fromAst, channel._toAst) ?? []).map(value => value * dpdt) };
   }
 
   /** k текущего поколения: во время host-write — применяемый, иначе rendered. */
@@ -233,7 +235,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       return false;
     }
 
-    const basis = o._batch.basis(o._mode._spring, this._phaseMs / 1000);
+    const basis = springBasis(o._batch, o._mode._spring, this._phaseMs / 1000);
     let converged = true;
     for (const channel of bound._numeric) {
       const range = channel._solverTo - channel._from;

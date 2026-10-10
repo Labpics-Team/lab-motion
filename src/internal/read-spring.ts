@@ -7,7 +7,7 @@
  * сбой скорости → покой, переполнение денормализации → цель/покой.
  */
 
-import { solveSpring, type MutableSpringBasis } from './solver.js';
+import { solveSpring, sampleSpringBasisUnchecked, type MutableSpringBasis } from './solver.js';
 import { finiteOr } from './finite.js';
 import type { SpringParams } from './types.js';
 
@@ -88,4 +88,26 @@ export function readSpringUnchecked(
   state.value = value;
   state.velocity = velocity;
   return state;
+}
+
+interface SpringProjection {
+  spring: SpringParams | undefined;
+  time: number;
+  readonly basis: MutableSpringBasis;
+}
+const projections = new WeakMap<object, SpringProjection>();
+
+/** Жизненный цикл численного кэша совпадает с владельцем кадровой группы. */
+export function springBasis(owner: object, spring: SpringParams, time: number): Readonly<MutableSpringBasis> {
+  let state = projections.get(owner);
+  if (!state) {
+    state = { spring: undefined, time: NaN, basis: { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 } };
+    projections.set(owner, state);
+  }
+  const cached = state.spring;
+  if (time !== state.time || !cached || spring !== cached &&
+    (spring.mass !== cached.mass || spring.stiffness !== cached.stiffness || spring.damping !== cached.damping))
+    sampleSpringBasisUnchecked(spring, time, state.basis);
+  state.spring = spring; state.time = time;
+  return state.basis;
 }

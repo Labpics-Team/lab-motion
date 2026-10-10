@@ -1,3 +1,4 @@
+import { springBasis } from '../src/internal/read-spring.js';
 /** SurfaceBatch: две phase-подписки и стабильная граница кадра. */
 
 import { readFileSync } from 'node:fs';
@@ -687,10 +688,10 @@ describe('SurfaceBatch: физический ключ spring-basis', () => {
   it('не решает повторно равные m/k/c и t из разных animate-вызовов', () => {
     const batch = new SurfaceBatch(frameHarness().frame);
     const spring = { mass: 1, stiffness: 170, damping: 26 };
-    batch.basis(spring, 0.1);
+    springBasis(batch, spring, 0.1);
     const exp = vi.spyOn(Math, 'exp');
     try {
-      batch.basis({ ...spring }, 0.1);
+      springBasis(batch, { ...spring }, 0.1);
       expect(exp).not.toHaveBeenCalled();
     } finally {
       exp.mockRestore();

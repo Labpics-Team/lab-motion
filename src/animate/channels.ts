@@ -296,7 +296,7 @@ export function sharedV0(channels: readonly NumericChannel[]): number | undefine
  * интерполяция). Цвет — r/g/b; альфа не участвует в выборе доминанты (её спан
  * ≤ 1 против 255 — недоминантна), её подхват C⁰.
  */
-function spanVec(from: ValueAST, to: ValueAST): number[] | undefined {
+export function spanVec(from: ValueAST, to: ValueAST): number[] | undefined {
   if (from.kind === 'color' && to.kind === 'color') {
     return [to.r - from.r, to.g - from.g, to.b - from.b];
   }
@@ -317,14 +317,14 @@ function spanVec(from: ValueAST, to: ValueAST): number[] | undefined {
  * оба юнитные — иначе undefined выше); −0 схлопывает normalizeV0.
  */
 function projectCssV0(live: CssSnapshot, fromAst: ValueAST, toAst: ValueAST): number {
-  const a = live.velocity ?? spanVec(live.from, live.to);
+  const a = live.velocity;
   const b = spanVec(fromAst, toAst);
-  if (!a || !b) return 0; // undefined-гейт: определённый спан — непустой массив (truthy)
+  if (!b || a.length !== b.length) return 0; // undefined-гейт: определённый спан — непустой массив (truthy)
   let i = 0;
   for (let k = 1; k < b.length; k++) {
     if (Math.abs(b[k]!) > Math.abs(b[i]!)) i = k;
   }
-  return normalizeV0((live.velocity ? 1 : live.rate) * a[i]!, b[i]!);
+  return normalizeV0(a[i]!, b[i]!);
 }
 
 // ─── Реестр состояния по элементам ───────────────────────────────────────────

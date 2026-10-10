@@ -1,12 +1,8 @@
 import type { TransformOrder } from './transform.js';
-import type { ValueAST } from '../value/parse.js';
 /** Один aggregate scheduler: все compute, затем все DOM-write. */
 
 import { createFrameLoop, frame as defaultFrame, type FrameLoop } from '../frame/index.js';
-import type { MutableSpringBasis } from './solver.js';
-import { sampleSpringBasisUnchecked } from './solver.js';
 import type { RequestFrameFn } from '../motion-value.js';
-import type { SpringParams } from '../spring.js';
 
 /** Узкий контракт не создаёт обратную runtime-зависимость на MainUnit. */
 export interface SurfaceUnit {
@@ -21,14 +17,6 @@ export interface SurfaceUnit {
 export class SurfaceBatch {
   private readonly _frame: FrameLoop;
   private readonly _units: Array<SurfaceUnit | undefined> = [];
-  private readonly _basis: MutableSpringBasis = {
-    _value: 0,
-    _valueV0: 0,
-    _velocity: 0,
-    _velocityV0: 0,
-  };
-  private _basisSpring: SpringParams | undefined;
-  private _basisTime = NaN;
   private _active = 0;
   private _pending: Array<() => void> = [];
   private _draining = false;
@@ -116,26 +104,6 @@ export class SurfaceBatch {
     unit.slot = -1;
     if (!paused && --this._active === 0) this._teardown();
     if (this._units.length === this._holes) this._resetStorage();
-  }
-
-  basis(spring: SpringParams, t: number): Readonly<MutableSpringBasis> {
-    const cached = this._basisSpring;
-    if (
-      t !== this._basisTime ||
-      cached === undefined ||
-      (spring !== cached && (
-        spring.mass !== cached.mass ||
-        spring.stiffness !== cached.stiffness ||
-        spring.damping !== cached.damping
-      ))
-    ) {
-      sampleSpringBasisUnchecked(spring, t, this._basis);
-    }
-    // Следующая группа того же animate попадает в identity-fast-path,
-    // а равные snapshot-объекты разных вызовов — в физический ключ.
-    this._basisSpring = spring;
-    this._basisTime = t;
-    return this._basis;
   }
 
   private _runUpdate(ts: number | undefined): void {
@@ -254,12 +222,8 @@ export function surfaceBatchFor(requestFrame: RequestFrameFn | undefined): Surfa
 
 export interface ChannelSnapshot { readonly value: number; readonly velocity: number }
 export interface CssSnapshot {
-  readonly key: string;
-  readonly from: ValueAST;
-  readonly to: ValueAST;
-  readonly rate: number;
   readonly value: string | number;
-  readonly velocity?: readonly number[];
+  readonly velocity: readonly number[];
 }
 
 /** Владелец CSS-декларации передаёт состояние до замены эффекта. */
@@ -304,4 +268,3 @@ export function findSurfaceRecord(element: object, key: string): SurfaceRecord |
   return registry.get(element)?.get(key);
 }
 
-export { readSpringFromBasisUnchecked, sampleSpringFromBasisUnchecked } from './read-spring.js';

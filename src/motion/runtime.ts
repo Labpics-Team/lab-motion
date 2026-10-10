@@ -1,6 +1,5 @@
 import { composeTransform, type TransformOrder } from '../internal/transform.js';
 import { surfaceRecord, findSurfaceRecord, releaseSurfaceRecord, type SurfaceRecord, type SurfaceOwner, type ChannelSnapshot, type CssSnapshot } from '../internal/surface.js';
-import { tryParseValue } from '../value/parse.js';
 import { surfaceBatchForFrame, type SurfaceBatch, type SurfaceUnit } from '../internal/surface.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, authoredTiming, snapshot, type PropertyInput } from './model.js';
@@ -207,12 +206,10 @@ class Surface implements SurfaceUnit, SurfaceOwner {
     const track = this._tracks.get(key);
     if (!track) return undefined;
     const text = format(key, track.value, track._program.unit);
-    const value = tryParseValue(text), target = tryParseValue(format(key, track._program.final, track._program.unit));
-    if (!value || !target) return undefined;
     const velocity = track._program.unit === 'color'
       ? track._velocity.slice(0, 3).map((v, i) => track.value[i]! > 0 ? v / (2 * Math.sqrt(track.value[i]!)) : 0)
       : [...track._velocity];
-    return { key, from: value, to: target, value: text, rate: 0, velocity };
+    return { value: text, velocity };
   }
   keys(): readonly string[] { return this.key === 'transform' ? Object.keys(TRANSFORMS) : [...this._tracks.keys()]; }
   replace(replacement?: () => void): void {
@@ -264,10 +261,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
     const css = source?.readCss(key);
     if (css) {
       const current = point(key, css.value);
-      const a = css.from, b = css.to;
-      const velocity = css.velocity ? [...css.velocity]
-        : a.kind === 'unit' && b.kind === 'unit' ? [(b.value - a.value) * css.rate]
-        : a.kind === 'color' && b.kind === 'color' ? [(b.r - a.r) * css.rate, (b.g - a.g) * css.rate, (b.b - a.b) * css.rate, 0] : current._coordinates.map(() => 0);
+      const velocity = css.velocity.length ? [...css.velocity] : current._coordinates.map(() => 0);
       if (current.unit === 'color') {
         for (let i = 0; i < 3; i++) velocity[i] = (velocity[i] ?? 0) * 2 * Math.sqrt(current._coordinates[i]!);
         velocity[3] ??= 0;
