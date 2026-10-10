@@ -1,11 +1,10 @@
-import type { CssSnapshot   SurfaceBatch, type SurfaceUnit,
-} from '../internal/surface.js';
 /** Main-thread executor одной CSS-поверхности внутри общего SurfaceBatch. */
 
 import { scaleSerializedVelocity } from '../compositor/sample.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import { finiteOrZero } from '../internal/finite.js';
 import {
+  SurfaceBatch, type SurfaceUnit, type CssSnapshot,
   readSpringFromBasisUnchecked,
   sampleSpringFromBasisUnchecked,
 } from '../internal/surface.js';

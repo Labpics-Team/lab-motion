@@ -174,6 +174,7 @@ class Run implements Playback {
 class Surface implements SurfaceUnit, SurfaceOwner {
   slot = -1;
   readonly _tracks: Map<string, Track> = new Map();
+  private _rest: Point | undefined;
   readonly _transforms: Record<string, number>;
   _stamp: number;
   _busy = false;
@@ -252,6 +253,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
       this._order = 1;
     }
     this._written = inline;
+    this._rest = undefined;
   }
   _read(key: string): { point: Point; _velocity: readonly number[] } {
     const track = this._tracks.get(key);
@@ -273,6 +275,8 @@ class Surface implements SurfaceUnit, SurfaceOwner {
       return { point: current, _velocity: velocity };
     }
     if (isTransform(key)) return { point: { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], unit: '' }, _velocity: [0] };
+    const saved = this._rest;
+    if (saved) return { point: saved, _velocity: saved._coordinates.map(() => 0) };
     const text = this._engine._host.styles(this.element).getPropertyValue(key);
     const initial = point(key, key === 'opacity' ? text === '' ? 1 : number(Number(text), 'opacity') : text || 0);
     return { point: initial, _velocity: initial._coordinates.map(() => 0) };
@@ -311,7 +315,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {
-      const held = this._rest.get(this.key)!; return format(this.key, held._coordinates, held.unit);
+      const held = this._rest!; return format(this.key, held._coordinates, held.unit);
     }
     return format(track._program.key, at ? track._program._segments[0]![at] : track.value, track._program.unit);
   }
@@ -322,6 +326,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
       const text = this._text();
       (this.element as HTMLElement).style.setProperty(this.key, text);
       this._written = text;
+      if (this.key === 'transform' && this._record.owner === this) { this._record.transform = text; this._record.order = this._order; }
     }
     finally { this._busy = false; }
   }
@@ -342,7 +347,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
     if (track._done) return;
     track._done = true;
     if (this._tracks.get(track._program.key) === track) this._tracks.delete(track._program.key);
-    this._rest.set(track._program.key, { _coordinates: [...track.value], unit: track._program.unit });
+    if (this.key !== 'transform') this._rest = { _coordinates: [...track.value], unit: track._program.unit };
     if (isTransform(track._program.key)) {
       this._transforms[track._program.key] = track.value[0]!;
       if (this._record.owner === this) this._record.numbers.set(track._program.key, { value: track.value[0]!, velocity: 0 });
