@@ -3,10 +3,12 @@ import { animate } from 'motion/mini';
 
 export const name = 'motion/mini transform';
 
-export function start(els, px, durMs) {
+export function start(els, px, durMs, from = 0) {
+  const target = 'translateX(' + px + 'px)';
+  const transform = from === null ? target : ['translateX(' + from + 'px)', target];
   const controls = animate(
     els,
-    { transform: ['translateX(0px)', `translateX(${px}px)`] },
+    { transform },
     { duration: durMs / 1000, ease: 'linear' },
   );
   return {

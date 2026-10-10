@@ -73,8 +73,13 @@ pnpm size
 ```bash
 cd bench/compare
 xvfb-run -a node transition-profile.mjs ../.. results/transition-run
-xvfb-run -a node transition-profile.mjs ../.. results/native-run native
+xvfb-run -a node transition-profile.mjs ../.. results/native-implicit native-implicit
+xvfb-run -a node transition-profile.mjs ../.. results/native-explicit native-explicit
 ```
+
+В нативных группах все участники получают одинаковый вход: только конечную
+цель (`native-implicit`) или обе точки (`native-explicit`). Сравнивать эти
+группы между собой как одинаковую работу нельзя.
 
 Каталог результата должен отсутствовать. В нём сохраняются версии, отпечатки
 адаптеров, порядок запусков, исходные счётчики каждого наблюдения и сводка.

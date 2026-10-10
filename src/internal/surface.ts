@@ -15,35 +15,22 @@ export interface SurfaceUnit {
 
 /** Две FrameLoop-подписки независимо от числа поверхностей aggregate. */
 export class SurfaceBatch {
-  private readonly _frame: FrameLoop;
-  private readonly _units: Array<SurfaceUnit | undefined> = [];
+  private readonly _units = new Set<SurfaceUnit>();
+  private _serial = 0;
+  private _end = -1;
   private _active = 0;
   private _pending: Array<() => void> = [];
   private _draining = false;
-  private _holes = 0;
-  /** -1 вне кадра; иначе зафиксированная граница update→render. */
-  private _end = -1;
   private _offUpdate: (() => void) | undefined;
   private _offRender: (() => void) | undefined;
   private _subscribing = false;
-  private readonly _frameTeardown = (): void => {
-    const end = this._units.length;
-    for (let i = 0; i < end; i++) {
-      try { this._units[i]?.abort(); } catch { /* teardown siblings обязаны освободиться */ }
-    }
-    this._teardown();
-    if (this._units.length === this._holes) this._resetStorage();
-  };
 
-  constructor(frame: FrameLoop) {
-    this._frame = frame;
-  }
+  constructor(private readonly _frame: FrameLoop) {}
 
   defer(action: () => void): void {
     if (this._pending.length === 0) queueMicrotask(() => this.flush());
     this._pending.push(action);
   }
-
   flush(): void {
     if (this._draining) return;
     this._draining = true;
@@ -59,143 +46,90 @@ export class SurfaceBatch {
     if (failures.length) throw failures.length === 1 ? failures[0]
       : new AggregateError(failures, 'Ошибка отложенного управления');
   }
-
   add(unit: SurfaceUnit, paused: boolean): void {
-    // Один проход обслуживает накопившиеся удаления. Порог в половину списка
-    // ограничивает пустые slots и сохраняет линейную цену массового retarget.
-    if (this._end < 0 && this._holes > 0 && this._holes * 2 >= this._units.length) this._compact();
-    const slot = this._units.length;
-    this._units.push(unit);
-    unit.slot = slot;
+    unit.slot = this._serial++;
+    this._units.add(unit);
     if (paused) return;
     this._active++;
-    try {
-      this._subscribe();
-    } catch (error) {
-      // Host reentry мог сдвинуть unit compaction-ом: identity живёт в slot unit.
-      const current = unit.slot;
-      if (current >= 0 && this._units[current] === unit) {
-        this._units[current] = undefined;
-        this._holes++;
-        unit.slot = -1;
-      }
-      if (this._units.length === this._holes) this._resetStorage();
-      else if (this._end < 0) this._compact();
-      throw error;
-    }
+    try { this._subscribe(); }
+    catch (error) { this.remove(unit, true); throw error; }
   }
-
   activate(unit: SurfaceUnit): void {
     if (unit.slot < 0) return;
     this._active++;
     this._subscribe();
   }
-
   deactivate(unit: SurfaceUnit): void {
-    if (unit.slot < 0) return;
-    if (--this._active === 0) this._teardown();
+    if (unit.slot >= 0 && --this._active === 0) this._teardown();
   }
-
   remove(unit: SurfaceUnit, paused: boolean): void {
-    const slot = unit.slot;
-    if (slot < 0 || this._units[slot] !== unit) return;
-    this._units[slot] = undefined;
-    this._holes++;
+    if (!this._units.delete(unit)) return;
     unit.slot = -1;
     if (!paused && --this._active === 0) this._teardown();
-    if (this._units.length === this._holes) this._resetStorage();
+    if (!this._units.size && this._end < 0) this._serial = 0;
   }
-
   private _runUpdate(ts: number | undefined): void {
-    this._end = this._units.length;
-    for (let i = 0; i < this._end; i++) {
-      const unit = this._units[i];
-      if (!unit) continue;
+    this._end = this._serial;
+    for (const unit of this._units) {
+      if (unit.slot >= this._end) break;
       try { unit.update(ts); } catch {
-        try { unit.abort(); } catch { /* cleanup одного slot не прерывает кадр */ }
+        try { unit.abort(); } catch { /* остальные владельцы завершают кадр */ }
       }
     }
     this.flush();
-    // Pause/cancel-all в update снимает render-подписку: второй
-    // фазы не будет, значит stable compaction уже безопасна.
-    if (this._active === 0) {
-      this._end = -1;
-      this._compact();
-    }
+    if (this._active === 0) this._endFrame();
   }
-
   private _runRender(): void {
-    for (let i = 0; i < this._end; i++) {
-      const unit = this._units[i];
-      if (!unit) continue;
+    for (const unit of this._units) {
+      if (unit.slot >= this._end) break;
       try { unit.render(); } catch {
-        try { unit.abort(); } catch { /* cleanup одного slot не прерывает кадр */ }
+        try { unit.abort(); } catch { /* остальные владельцы завершают кадр */ }
       }
     }
     this.flush();
-    this._end = -1;
-    this._compact();
+    this._endFrame();
   }
-
-  private _compact(): void {
-    if (this._holes === 0) return;
-    let write = 0;
-    for (let read = 0; read < this._units.length; read++) {
-      const unit = this._units[read];
-      if (!unit) continue;
-      this._units[write] = unit;
-      unit.slot = write++;
+  private _endFrame(): void {
+    this._end = -1;
+    if (!this._units.size) this._serial = 0;
+  }
+  private readonly _frameTeardown = (): void => {
+    const previous = this._end;
+    this._end = this._serial;
+    for (const unit of this._units) {
+      if (unit.slot >= this._end) break;
+      try { unit.abort(); } catch { /* ошибка одного владельца не удерживает соседей */ }
     }
-    this._units.length = write;
-    this._holes = 0;
-  }
-
-  private _resetStorage(): void {
-    this._units.length = 0;
-    this._holes = 0;
-    this._end = -1;
-  }
-
+    this._end = previous;
+    this._teardown();
+    if (!this._units.size && this._end < 0) this._serial = 0;
+  };
   private _subscribe(): void {
     if (this._offUpdate !== undefined || this._active === 0 || this._subscribing) return;
     this._subscribing = true;
     let offUpdate: (() => void) | undefined;
     try {
-      offUpdate = this._frame.update(
-        (ts) => this._runUpdate(ts),
-        { onTeardown: this._frameTeardown },
-      );
-      if (this._active === 0) {
-        this._subscribing = false;
-        offUpdate();
-        return;
-      }
+      offUpdate = this._frame.update(ts => this._runUpdate(ts), { onTeardown: this._frameTeardown });
+      if (this._active === 0) { this._subscribing = false; offUpdate(); return; }
       const offRender = this._frame.render(() => this._runRender());
-      this._offUpdate = offUpdate;
-      this._offRender = offRender;
+      this._offUpdate = offUpdate; this._offRender = offRender;
       this._subscribing = false;
       if (this._active === 0) this._teardown();
     } catch (error) {
       if (this._subscribing) {
-        // Всё, что reentrant host присоединил до commit общей пары, принадлежит
-        // той же попытке. Cleanup остаётся внутри неё и не подменяет host-error.
-        try { offUpdate?.(); } catch { /* исходная host-ошибка приоритетна */ }
+        try { offUpdate?.(); } catch { /* исходная ошибка остаётся причиной */ }
         this._active = 0;
-        for (let i = 0; i < this._units.length; i++) {
-          try { this._units[i]?.rollback(error); } catch { /* sibling rollback продолжается */ }
+        for (const unit of this._units) {
+          try { unit.rollback(error); } catch { /* откат остальных владельцев обязателен */ }
         }
-        this._active = 0;
-        this._subscribing = false;
+        this._active = 0; this._subscribing = false;
       }
       throw error;
     }
   }
-
   private _teardown(): void {
-    const update = this._offUpdate;
-    const render = this._offRender;
-    this._offUpdate = undefined;
-    this._offRender = undefined;
+    const update = this._offUpdate, render = this._offRender;
+    this._offUpdate = this._offRender = undefined;
     const errors: unknown[] = [];
     try { update?.(); } catch (error) { errors.push(error); }
     try { render?.(); } catch (error) { errors.push(error); }

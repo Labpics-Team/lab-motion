@@ -22,9 +22,10 @@ mkdirSync(path.join(output, 'adapters'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const optionalFile = file => { try { return readFileSync(file, 'utf8').trim(); } catch { return null; } };
 const group = process.argv[4] ?? 'full';
-if (!['full', 'native'].includes(group)) throw new Error('Expected full or native capability group');
-const ids = group === 'native'
-  ? ['lab', 'lab-nano', 'motion-mini', 'waapi-ctl']
+if (!['full', 'native-implicit', 'native-explicit'].includes(group)) throw new Error('Expected full, native-implicit or native-explicit');
+const fromPx = group === 'native-explicit' ? 0 : null;
+const ids = group.startsWith('native-')
+  ? ['lab-nano', 'motion-mini', 'waapi-ctl']
   : ['lab', 'motion', 'gsap', 'anime', 'waapi-ctl'];
 const counts = [1, 100, 1000];
 const rounds = 20, durationMs = 400, watchdogMs = 10_000;
@@ -50,7 +51,7 @@ const metadata = {
   profileSha256: hash(readFileSync(new URL(import.meta.url))),
   versions: { lab: root.version, ...installed, chromium: browser.version(), node: process.version },
   environment: { cpu: os.cpus()[0].model, cpuMax: optionalFile('/sys/fs/cgroup/cpu.max'), memoryMax: optionalFile('/sys/fs/cgroup/memory.max') },
-  scenario: { group, counts, rounds, durationMs, watchdogMs, targetPx: 300, easing: 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
+  scenario: { group, fromPx, counts, rounds, durationMs, watchdogMs, targetPx: 300, easing: 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
   adapters, orders,
 };
 writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
@@ -94,11 +95,11 @@ try {
         await settle(page);
         await cdp.send('Performance.enable', { timeDomain: 'threadTicks' });
         const before = await metrics(cdp);
-        const started = await page.evaluate(duration => {
+        const started = await page.evaluate(({ duration, from }) => {
           const start = performance.now();
-          window.__control = window.__adapterModule.start(window.__targets, 300, duration);
+          window.__control = window.__adapterModule.start(window.__targets, 300, duration, from);
           return { apiMs: performance.now() - start, start };
-        }, durationMs);
+        }, { duration: durationMs, from: fromPx });
         const completionMs = await page.evaluate(async ({ start, watchdogMs }) => {
           let watchdog;
           try {
