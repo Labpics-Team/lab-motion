@@ -899,7 +899,7 @@ async function main() {
     root: ROOT,
     benchDirectory: __dirname,
     requiredDist: [
-      'dist/animate/index.js',
+      'dist/motion/index.js',
     ],
     requiredPackages: BENCH_PACKAGES,
     requiredRootPackages: [CANONICAL_GZIP_PACKAGE],
