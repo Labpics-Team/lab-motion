@@ -276,7 +276,7 @@ function resolveTargets(target: unknown): AnimatableElement[] {
 
 // ─── Снап (единая reduced-политика пакета: мгновенный финал, без кадров) ─────
 
-function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup): void {
+function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup, rec: ReturnType<typeof groupRecord>): void {
   if (group === 'transform') {
     const state = bound._transform!;
     for (const ch of bound._numeric) state[ch._key] = ch._to;
@@ -483,8 +483,8 @@ export function animate(
       rec.locked = true;
       if (execution === 3) {
         try {
-          if (previous) previous.replace(() => writeSnap(el, group, bound));
-          else writeSnap(el, group, bound);
+          if (previous) previous.replace(() => writeSnap(el, group, bound, rec));
+          else writeSnap(el, group, bound, rec);
         } catch (error) {
           protectedOwner = previous;
           releaseTransition(rec, previous);
