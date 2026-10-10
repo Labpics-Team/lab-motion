@@ -52,7 +52,7 @@ class LayoutRun implements Playback {
   readonly finished: Promise<MotionResult>;
   constructor(root: Element, mutate: () => void | Promise<void>, options?: LayoutOptions) {
     const config = timing(options as MotionOptions | undefined);
-    if (typeof config.ease === 'function' && !config.cssEase) throw new MotionError('layout использует CSS easing');
+    if (typeof config.ease === 'function' && !config.cssEase) throw new MotionError('LM213');
     const path = program('--lab-motion-progress', { _coordinates: [0], unit: '' }, [1], false, config, [0]);
     const win = root.ownerDocument.defaultView;
     const reduced = config.reduced || win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
@@ -147,7 +147,7 @@ class LayoutRun implements Playback {
 /** Обновляет приложение один раз; временные снимки принадлежат браузеру. */
 export function layout(root: Element, mutate: () => void | Promise<void>, options?: LayoutOptions): Playback {
   if (!root?.ownerDocument || typeof root.getBoundingClientRect !== 'function' || !(root as HTMLElement).style)
-    throw new MotionError('layout ожидает DOM-элемент');
-  if (typeof mutate !== 'function') throw new MotionError('layout ожидает функцию изменения DOM');
+    throw new MotionError('LM206');
+  if (typeof mutate !== 'function') throw new MotionError('LM214');
   const run = new LayoutRun(root, mutate, options); run.start(); return run;
 }

@@ -8,6 +8,7 @@ import { dirname, extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
+const CONSTRUCTORS = new Set(['MotionParamError', 'MotionError']);
 const CODE_RE = /^LM\d{3}$/;
 const TABLE_ROW_RE = /^\|\s*`?(LM\d{3})`?\s*\|/;
 
@@ -144,7 +145,7 @@ function constructorExportOrigins(sources) {
     const dependencies = [];
     reexports.set(file, dependencies);
     for (const statement of sourceFile.statements) {
-      if (ts.isClassDeclaration(statement) && statement.name?.text === 'MotionParamError' &&
+      if (ts.isClassDeclaration(statement) && CONSTRUCTORS.has(statement.name?.text) &&
         statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) {
         constructorModules.add(file);
       }
@@ -152,7 +153,7 @@ function constructorExportOrigins(sources) {
       const exported = statement.exportClause;
       if (exported !== undefined && ts.isNamedExports(exported)) {
         if (exported.elements.some(element => !element.isTypeOnly &&
-          (element.propertyName ?? element.name).text === 'MotionParamError')) {
+          CONSTRUCTORS.has((element.propertyName ?? element.name).text))) {
           constructorModules.add(file);
         }
       } else if (statement.moduleSpecifier !== undefined && ts.isStringLiteral(statement.moduleSpecifier)) {
@@ -176,7 +177,7 @@ function constructorExportOrigins(sources) {
 }
 
 function constructorBindings(sourceFile, exportsConstructor) {
-  const bindings = new Set(['MotionParamError']);
+  const bindings = new Set(CONSTRUCTORS);
   const namespaces = new Set();
   const escapes = [];
   for (const statement of sourceFile.statements) {
@@ -191,10 +192,10 @@ function constructorBindings(sourceFile, exportsConstructor) {
         continue;
       }
       for (const element of imports.elements) {
-        if ((element.propertyName ?? element.name).text !== 'MotionParamError') continue;
+        if (!CONSTRUCTORS.has((element.propertyName ?? element.name).text)) continue;
         if (element.isTypeOnly) continue;
         bindings.add(element.name.text);
-        if (element.name.text !== 'MotionParamError') escapes.push(element.name);
+        if (element.name.text !== (element.propertyName ?? element.name).text) escapes.push(element.name);
       }
       continue;
     }
@@ -212,7 +213,7 @@ function constructorBindings(sourceFile, exportsConstructor) {
       for (const element of exported.elements) {
         if (element.isTypeOnly) continue;
         const original = (element.propertyName ?? element.name).text;
-        if (original === 'MotionParamError' && element.name.text !== 'MotionParamError') {
+        if (CONSTRUCTORS.has(original) && element.name.text !== (element.propertyName ?? element.name).text) {
           escapes.push(element.name);
         }
       }
@@ -278,12 +279,12 @@ function isInstanceofRhs(node) {
 }
 
 function isConstructorProperty(node) {
-  if (ts.isPropertyAccessExpression(node)) return node.name.text === 'MotionParamError';
+  if (ts.isPropertyAccessExpression(node)) return CONSTRUCTORS.has(node.name.text);
   if (!ts.isElementAccessExpression(node)) return false;
   const argument = node.argumentExpression;
   return argument !== undefined &&
     (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument)) &&
-    argument.text === 'MotionParamError';
+    CONSTRUCTORS.has(argument.text);
 }
 
 function isDynamicErrorsImport(node, file, exportsConstructor) {
@@ -351,7 +352,7 @@ function inspectMotionParamErrorSource(source, file = 'source.ts', exportsConstr
     if (
       ts.isNewExpression(node) &&
       ts.isIdentifier(node.expression) &&
-      node.expression.text === 'MotionParamError'
+      CONSTRUCTORS.has(node.expression.text)
     ) {
       recordCall(node, node.arguments ?? []);
       for (const argument of node.arguments ?? []) visit(argument);
@@ -367,7 +368,7 @@ function inspectMotionParamErrorSource(source, file = 'source.ts', exportsConstr
       // Именованный член эквивалентен named import. Вынос всего namespace
       // (включая export) и computed-доступ могут скрыть конструктор ошибки.
       const namedMember = ts.isPropertyAccessExpression(node.parent) &&
-        node.parent.expression === node && node.parent.name.text !== 'MotionParamError';
+        node.parent.expression === node && !CONSTRUCTORS.has(node.parent.name.text);
       if (!namedMember && !ts.isNamespaceImport(node.parent) && !isTypeReference(node)) escape(node);
       return;
     }

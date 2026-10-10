@@ -24,27 +24,27 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
   const selected = typeof input === 'string'
     ? (root ?? (typeof document === 'undefined' ? undefined : document))?.querySelectorAll(input)
     : input;
-  if (selected === undefined) throw new MotionError('Селектор требует DOM-контейнер');
+  if (selected === undefined) throw new MotionError('LM206');
   let result: Element[];
   if (selected && typeof selected === 'object' && 'style' in selected) result = [selected as Element];
   else {
-    if (!selected || typeof selected !== 'object') throw new MotionError('Ожидается элемент или список элементов');
+    if (!selected || typeof selected !== 'object') throw new MotionError('LM206');
     if (Symbol.iterator in selected) {
       result = [];
       for (const item of selected as Iterable<Element>) {
-        if (result.length === MAX_CHANNELS) throw new MotionError('Слишком много элементов');
+        if (result.length === MAX_CHANNELS) throw new MotionError('LM197');
         result.push(item);
       }
     } else {
       const list = selected as ArrayLike<Element>, length = list.length;
-      if (!Number.isSafeInteger(length) || length < 0 || length > MAX_CHANNELS) throw new MotionError('Недопустимый список элементов');
+      if (!Number.isSafeInteger(length) || length < 0 || length > MAX_CHANNELS) throw new MotionError('LM206');
       result = Array.from({ length }, (_, i) => list[i]!);
     }
   }
   for (const element of result) {
     const style = (element as HTMLElement)?.style;
     if (!style || typeof style.getPropertyValue !== 'function' || typeof style.setProperty !== 'function')
-      throw new MotionError('Цель должна предоставлять CSS style');
+      throw new MotionError('LM206');
   }
   return [...new Set(result)];
 }
@@ -54,10 +54,10 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   if (!text || text === 'none') return values;
   if (typeof DOMMatrixReadOnly !== 'undefined') {
     const matrix = new DOMMatrixReadOnly(text);
-    if (!matrix.is2D) throw new MotionError('Независимые x/y требуют двумерного transform');
+    if (!matrix.is2D) throw new MotionError('LM207');
     const { a, b, c, d, e, f } = matrix;
     const sx = Math.hypot(a, b), determinant = a * d - b * c;
-    if (sx > 0 && determinant === 0 && (c !== 0 || d !== 0)) throw new MotionError('Вырожденный transform нужно задать явно');
+    if (sx > 0 && determinant === 0 && (c !== 0 || d !== 0)) throw new MotionError('LM207');
     values.x = e; values.y = f;
     values.scaleX = sx;
     values.scaleY = sx ? determinant / sx : Math.hypot(c, d);
@@ -70,7 +70,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   const re = /(translate|translateX|translateY|rotate|skew|skewX|skewY|scale|scaleX|scaleY)\(([^)]+)\)/g;
   for (const match of text.matchAll(re)) {
     const args = match[2]!.split(/[,\s]+/).filter(Boolean).map(Number.parseFloat);
-    if (args.some(n => !Number.isFinite(n))) throw new MotionError('Нечисловой transform');
+    if (args.some(n => !Number.isFinite(n))) throw new MotionError('LM207');
     const name = match[1]!, a = args[0]!;
     if (name === 'translate') { values.x = a; values.y = args[1] ?? 0; }
     else if (name === 'translateX') values.x = a;
@@ -80,7 +80,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
     else values[name] = a;
     rest = rest.replace(match[0], '');
   }
-  if (rest.trim()) throw new MotionError('Transform не поддерживается этим style-host');
+  if (rest.trim()) throw new MotionError('LM207');
   return values;
 }
 
@@ -213,7 +213,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
   }
   keys(): readonly string[] { return this.key === 'transform' ? Object.keys(TRANSFORMS) : [...this._tracks.keys()]; }
   replace(replacement?: () => void): void {
-    if (this._busy) throw new MotionError('Повторная запись свойства');
+    if (this._busy) throw new MotionError('LM208');
     if (this._tracks.size) { this._sync(); this._render(); }
     replacement?.();
     const effect = this._native; this._native = undefined; this._token = undefined;
@@ -225,7 +225,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
   _publish(): void {
     const record = this._record;
     if (record.owner === this) { this._render(); return; }
-    if (record.locked || record.owner !== this._previous) throw new MotionError('Владелец свойства изменился во время подготовки');
+    if (record.locked || record.owner !== this._previous) throw new MotionError('LM208');
     const previous = record.owner;
     record.locked = true;
     record.owner = this;
@@ -276,7 +276,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
     return { point: initial, _velocity: initial._coordinates.map(() => 0) };
   }
   _sync(): void {
-    if (this._busy) throw new MotionError('Easing должен быть чистой функцией');
+    if (this._busy) throw new MotionError('LM205');
     this._busy = true;
     try {
       const now = number(this._engine._host.now(), 'clock');
@@ -314,7 +314,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
     return format(track._program.key, at ? track._program._segments[0]![at] : track.value, track._program.unit);
   }
   _render(): void {
-    if (this._busy) throw new MotionError('Повторная запись свойства');
+    if (this._busy) throw new MotionError('LM208');
     this._busy = true;
     try {
       const text = this._text();
@@ -377,7 +377,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
       this._native = effect; this._nativeTime = first._elapsed;
       if (first._elapsed !== 0) effect.currentTime = first._elapsed;
       const finished = effect.finished;
-      if (!finished || typeof finished.then !== 'function') throw new MotionError('Native effect не предоставляет finished');
+      if (!finished || typeof finished.then !== 'function') throw new MotionError('LM209');
       this._busy = false;
       void finished.then(() => {
         if (this._token !== token) return;
@@ -486,7 +486,7 @@ export class Runtime {
   private _surface(element: Element, key: string, prepared: Map<SurfaceRecord, Surface>): Surface {
     const name = isTransform(key) ? 'transform' : key;
     const record = surfaceRecord(element, name);
-    if (record.locked) throw new MotionError('Свойство занято сменой владельца');
+    if (record.locked) throw new MotionError('LM208');
     let group = prepared.get(record);
     if (group) return group;
     const owner = record.owner;
@@ -496,7 +496,7 @@ export class Runtime {
         group = new Surface(this, element, name, record);
         const current = record.owner;
         if (current instanceof Surface && current._engine === this) group = current;
-        else if (current !== owner) throw new MotionError('Владелец свойства изменился во время чтения');
+        else if (current !== owner) throw new MotionError('LM208');
       } catch (error) { releaseSurfaceRecord(element, name, record); throw error; }
     }
     prepared.set(record, group);
@@ -508,17 +508,17 @@ export class Runtime {
     const seen = new Set<string>();
     for (let i = 0; i < 16; i++) {
       const match = /^var\((--[\w-]+)(?:,\s*(.+))?\)$/.exec(text.trim());
-      if (!match || seen.has(match[1]!)) throw new MotionError(`${key}: неразрешимая CSS-переменная`);
+      if (!match || seen.has(match[1]!)) throw new MotionError('LM202');
       seen.add(match[1]!);
       text = this._host.styles(element).getPropertyValue(match[1]!).trim() || match[2] || '';
-      if (!text.startsWith('var(')) { if (!text) throw new MotionError(`${key}: пустая CSS-переменная`); return text; }
+      if (!text.startsWith('var(')) { if (!text) throw new MotionError('LM202'); return text; }
     }
-    throw new MotionError(`${key}: слишком глубокая CSS-переменная`);
+    throw new MotionError('LM202');
   }
   private _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
     origin?: (element: Element, key: string) => Point | undefined, prepared = new Map<SurfaceRecord, Surface>()): Draft[] {
     const elements = targets(input);
-    if (elements.length * props.reduce((sum, p) => sum + p.values.length, 0) > MAX_CHANNELS) throw new MotionError('Слишком много каналов движения');
+    if (elements.length * props.reduce((sum, p) => sum + p.values.length, 0) > MAX_CHANNELS) throw new MotionError('LM197');
     const reduced = clock.reduced || this._host.reduced();
     const author = authoredTiming(clock);
     const result: Draft[] = [], synced = new Set<Surface>();
@@ -591,7 +591,7 @@ export class Runtime {
     try {
     for (const tuple of list) {
       const [target, props, option] = snapshot(tuple, 'sequence step', 2) as unknown as SequenceStep;
-      if (tuple.length > 3) throw new MotionError('Шаг последовательности: [target, properties, options]');
+      if (tuple.length > 3) throw new MotionError('LM210');
       const { at, ...rest } = option ?? {};
       const offset = at === '<' ? previousStart : at === undefined || at === '>' ? cursor : number(at, 'at', 0);
       const input = properties(props), clock = timing(rest);
@@ -601,14 +601,14 @@ export class Runtime {
       }, prepared);
       for (const draft of drafts) {
         count += draft._program._segments.length;
-        if (count > MAX_CHANNELS) throw new MotionError('Последовательность слишком велика');
+        if (count > MAX_CHANNELS) throw new MotionError('LM197');
         let channels = merged.get(draft.element);
         if (!channels) { channels = new Map(); merged.set(draft.element, channels); }
         const before = channels.get(draft.key);
         let next = draft;
         if (before) {
           const at = draft._program._segments[0]!.at;
-          if (at < before._program.duration) throw new MotionError('Шаги одного свойства не должны пересекаться');
+          if (at < before._program.duration) throw new MotionError('LM211');
           next = { ...draft, _program: { ...draft._program, _segments: [...before._program._segments, ...draft._program._segments], _nativeEase: undefined, _identity: undefined } };
         }
         channels.set(draft.key, next);

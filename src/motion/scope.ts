@@ -49,7 +49,7 @@ function own<T extends Disposable>(resources: Set<Disposable>, resource: T): T {
 }
 
 export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
-  if (!root || typeof root.querySelectorAll !== 'function') throw new MotionError('scope ожидает Element, Document или ShadowRoot');
+  if (!root || typeof root.querySelectorAll !== 'function') throw new MotionError('LM206');
   let owner: ParentNode | undefined = root;
   let settings: MotionOptions = snapshotOptions(defaults);
   const playbacks = new Set<Playback>(), resources = new Set<Disposable>();
@@ -91,16 +91,16 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
     layout(mutate, options): Playback {
       if (!owner) return stopped;
       const root = owner as Element;
-      if (typeof root.getBoundingClientRect !== 'function') throw new MotionError('layout требует Element-контейнер');
+      if (typeof root.getBoundingClientRect !== 'function') throw new MotionError('LM206');
       const { times: _times, stagger: _stagger, ...defaults } = settings;
       return adopt(layout(root, mutate, mergeOptions(defaults as MotionOptions, options) as LayoutOptions));
     },
     value(initial): MotionValue {
-      if (!owner) throw new MotionError('Область уже освобождена');
+      if (!owner) throw new MotionError('LM212');
       return own(resources, value(initial));
     },
     scope(root, defaults): MotionScope {
-      if (!owner) throw new MotionError('Область уже освобождена');
+      if (!owner) throw new MotionError('LM212');
       return own(resources, scope(root, mergeOptions(settings, defaults)));
     },
     on(target, event, listener, options): () => void {

@@ -74,10 +74,10 @@ it('массив снимается по первоначальной длине
   Object.defineProperty(source, 0, { get() { source.push(7); reads++; return 0; } });
   expect(snapshot(source, 'values', 2)).toEqual([0, 1]); expect(reads).toBe(1);
   const hole = [0, , 1];
-  expect(() => snapshot(hole, 'values')).toThrow('пропущено');
+  expect(() => snapshot(hole, 'values')).toThrow('LM189');
   const prototype = Object.create(Array.prototype); prototype[1] = 2;
   Object.setPrototypeOf(hole, prototype);
-  expect(() => snapshot(hole, 'values')).toThrow('пропущено');
+  expect(() => snapshot(hole, 'values')).toThrow('LM189');
 });
 
 it('поздние невалидные опции не прерывают активные соседние свойства', () => {

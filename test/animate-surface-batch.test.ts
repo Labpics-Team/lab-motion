@@ -706,7 +706,7 @@ describe('SurfaceBatch: retention общего default-pool', () => {
       );
       const batch = surfaceBatchFor(undefined);
       const storage = (): Array<MainUnit | undefined> =>
-        (batch as unknown as { _units: Set<MainUnit> })._units;
+        [...(batch as unknown as { _units: Set<MainUnit> })._units];
       const retained = storage().filter((unit): unit is MainUnit => unit !== undefined);
       const peakLive = retained.length;
 

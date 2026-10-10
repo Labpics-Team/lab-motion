@@ -14,7 +14,7 @@ export type MotionParamErrorCode = `LM${Digit}${Digit}${Digit}`;
 const MOTION_PARAM_ERROR_CODE = /^LM\d{3}$/;
 
 /** Последний непрерывный код каталога; contract-тест сверяет его с docs/errors.md. */
-export const LAST_MOTION_PARAM_ERROR_CODE: MotionParamErrorCode = 'LM184';
+export const LAST_MOTION_PARAM_ERROR_CODE: MotionParamErrorCode = 'LM214';
 
 /** Thrown when caller-supplied physics parameters are invalid (invariant 2). */
 export class MotionParamError extends Error {
@@ -27,9 +27,12 @@ export class MotionParamError extends Error {
    */
   constructor(messageOrCode: string) {
     super(messageOrCode);
-    this.code = messageOrCode <= LAST_MOTION_PARAM_ERROR_CODE &&
-      MOTION_PARAM_ERROR_CODE.test(messageOrCode)
-      ? messageOrCode as MotionParamErrorCode
-      : 'LM000';
+    this.code = /* @__INLINE__ */ errorCode(messageOrCode);
   }
+}
+
+/** Классы публичных API используют общий словарь машинных причин. */
+export function errorCode(value: string): MotionParamErrorCode {
+  return value <= LAST_MOTION_PARAM_ERROR_CODE && MOTION_PARAM_ERROR_CODE.test(value)
+    ? value as MotionParamErrorCode : 'LM000';
 }
