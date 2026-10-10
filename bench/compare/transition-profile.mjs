@@ -16,6 +16,7 @@ const { canonicalGzip, observationalBrotli } = await load('scripts/compression-o
 const require = createRequire(path.join(benchPath, 'package.json'));
 const { chromium } = require('playwright');
 const esbuild = require('esbuild');
+mkdirSync(path.dirname(output), { recursive: true });
 mkdirSync(output);
 mkdirSync(path.join(output, 'adapters'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -125,6 +126,11 @@ try {
         sample.valid = endpoint.count === count && endpoint.finite && endpoint.maxError <= 0.05 && effects === 0 && ['apiMs', 'completionMs', 'taskCpuMs', 'threadCpuMs', 'scriptCpuMs', 'styleCpuMs', 'layoutCpuMs'].every(k => Number.isFinite(sample[k]) && sample[k] >= 0);
         samples.push(sample); appendFileSync(path.join(output, 'samples.jsonl'), JSON.stringify(sample) + '\n');
         if (!sample.valid) throw new Error(`Invalid sample ${round}/${count}/${id}: ${JSON.stringify({ endpoint, effects })}`);
+      } catch (error) {
+        appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify({
+          round, count, id, error: String(error?.stack ?? error),
+        }) + '\n');
+        throw error;
       } finally { await context.close(); }
     }
     console.log(`ROUND ${round + 1}/${rounds}`);
