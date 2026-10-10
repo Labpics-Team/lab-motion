@@ -1,18 +1,4 @@
-/**
- * test/tokens.test.ts — motion-токены: пины значений/имён + контракты SSOT.
- * Классы: contract (api-surface + пины значений — токен есть КОНТРАКТ, тихий
- * сдвиг значения ломает потребителя; пересечение имён с ДС-схемой labui обязано
- * совпадать байт-в-байт), А (известные числа distanceScale, формулы канонической
- * пары), В (финитность-фазз, монотонность), Д (mutation-хуки в клэмпе/полосе).
- *
- * ── RED PROOF ──
- * - Сдвинуть duration.base 200→190 → пин RED.
- * - Сменить easing.standard css/координаты → пин RED.
- * - Разъехаться с формулой SSOT в springFromDurationBounce → «формулы» RED.
- * - Сломать клэмп distanceScale (убрать t>1 ветку) → «клэмп к max» RED.
- * - Сделать пружину-пресет неоседающей → «пресеты валидны» RED.
- * - Добавить/убрать экспорт → api-surface RED.
- */
+/** Публичные значения, численные свойства и валидация необязательных пресетов. */
 
 import { describe, expect, it } from 'vitest';
 import * as tokens from '../src/tokens/index.js';
@@ -44,9 +30,9 @@ describe('tokens: api-surface-pin', () => {
   });
 });
 
-// ─── Длительности: пины значений и имён (SSOT labui) ─────────────────────────
+// ─── Длительности: пины значений и имён (контракт пакета) ─────────────────────────
 
-describe('tokens: duration — пины значений/имён (= SSOT labui)', () => {
+describe('tokens: duration — пины значений/имён (контракт пакета)', () => {
   it('точные значения шкалы (мс): спайн 100/200/300/500', () => {
     expect(duration).toEqual({
       instant: 0,
@@ -63,10 +49,10 @@ describe('tokens: duration — пины значений/имён (= SSOT labui)
   });
 });
 
-// ─── Изинги: имена, css-строки, эндпоинты fn (SSOT labui / M3 official) ──────
+// ─── Изинги: имена, css-строки, эндпоинты fn (контракт пакета) ──────
 
 describe('tokens: easing — пины координат/имён + fn-эндпоинты', () => {
-  it('точные css cubic-bezier() строки (= SSOT labui, официальные кривые M3)', () => {
+  it('точные css cubic-bezier() строки (контракт пакета)', () => {
     expect(easing.standard.css).toBe('cubic-bezier(0.2, 0, 0, 1)');
     expect(easing.decelerate.css).toBe('cubic-bezier(0, 0, 0, 1)');
     expect(easing.accelerate.css).toBe('cubic-bezier(0.3, 0, 1, 1)');
@@ -121,10 +107,10 @@ describe('tokens: easing — пины координат/имён + fn-эндп�
   });
 });
 
-// ─── Каноническая пара (duration, bounce): формулы SSOT + валидация ──────────
+// ─── Каноническая пара (duration, bounce): формулы осциллятора + валидация ──────────
 
-describe('tokens: springFromDurationBounce — формулы SSOT и грани', () => {
-  it('вывод физической тройки — в точности формулы ДС-схемы labui', () => {
+describe('tokens: springFromDurationBounce — формулы осциллятора и грани', () => {
+  it('вывод физической тройки — в точности формулы затухающего осциллятора', () => {
     // ζ = 1 − bounce; m = 1; ω₀ = 2π/duration; k = ω₀²·m; c = 2·ζ·ω₀·m
     for (const [durationS, bounce] of [
       [0.35, 0],
@@ -180,7 +166,7 @@ describe('tokens: spring — пресеты валидны и запинены',
     expect(spring.bounce).toEqual({ mass: 1, stiffness: 180, damping: 12 });
   });
 
-  it('ДС-пресеты smooth/expressive = каноническая пара SSOT (не дублируют значения)', () => {
+  it('smooth/expressive вычисляются из duration и bounce', () => {
     expect(spring.smooth).toEqual(springFromDurationBounce(0.35, 0));
     expect(spring.expressive).toEqual(springFromDurationBounce(0.5, 0.3));
   });

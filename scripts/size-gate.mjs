@@ -200,7 +200,7 @@ export const BESPOKE_SUBPATH_GATES = {
   // контроллер. Порог равен прежнему полному compositor-контракту, не новому факту.
   './compositor/stagger': 6450,
   './compositor/follow': COMPOSITOR_FOLLOW_GATE_BYTES,
-  // ./tokens — motion-токены (SSOT labui): duration/easing/spring/staggerGap +
+  // ./tokens — необязательные пресеты движения: duration/easing/spring/staggerGap +
   // distanceScale + springFromDurationBounce (каноническая пара ДС (duration,bounce)
   // → SpringParams; тянет validateSpringParams ядра, чтобы выход ГАРАНТИРОВАННО
   // оседал). Изинг `standard` специализирован под дефолтную кривую; ещё три
