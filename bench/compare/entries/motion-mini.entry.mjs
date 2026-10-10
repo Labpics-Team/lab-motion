@@ -10,6 +10,7 @@ export function start(els, px, durMs) {
     { duration: durMs / 1000, ease: 'linear' },
   );
   return {
+    finished() { return controls.finished; },
     cancel() {
       try { controls.cancel ? controls.cancel() : controls.stop(); } catch { /* noop */ }
     },

@@ -20,10 +20,14 @@ mkdirSync(output);
 mkdirSync(path.join(output, 'adapters'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const optionalFile = file => { try { return readFileSync(file, 'utf8').trim(); } catch { return null; } };
-const ids = ['lab', 'motion', 'gsap', 'anime', 'waapi-ctl'];
+const group = process.argv[4] ?? 'full';
+if (!['full', 'native'].includes(group)) throw new Error('Expected full or native capability group');
+const ids = group === 'native'
+  ? ['lab', 'lab-nano', 'motion-mini', 'waapi-ctl']
+  : ['lab', 'motion', 'gsap', 'anime', 'waapi-ctl'];
 const counts = [1, 100, 1000];
 const rounds = 20, durationMs = 400, watchdogMs = 10_000;
-const entries = { lab: 'lab', motion: 'motion', gsap: 'gsap', anime: 'anime', 'waapi-ctl': 'waapi-control', 'motion-mini': 'motion-mini', 'anime-waapi': 'anime-waapi' };
+const entries = { 'lab-nano': 'lab-nano', lab: 'lab', motion: 'motion', gsap: 'gsap', anime: 'anime', 'waapi-ctl': 'waapi-control', 'motion-mini': 'motion-mini', 'anime-waapi': 'anime-waapi' };
 const adapters = Object.fromEntries(Object.entries(entries).map(([id, entry]) => {
   const outputPath = path.join(output, 'adapters', `${id}.js`);
   esbuild.buildSync({ ...PRODUCTION_ADAPTER_PROFILE, entryPoints: [path.join(benchPath, 'entries', `${entry}.entry.mjs`)], format: 'iife', globalName: '__adapterModule', outfile: outputPath });
@@ -32,15 +36,20 @@ const adapters = Object.fromEntries(Object.entries(entries).map(([id, entry]) =>
 }));
 const root = JSON.parse(readFileSync(path.join(rootPath, 'package.json')));
 const manifest = JSON.parse(readFileSync(path.join(benchPath, 'package.json')));
+const installed = Object.fromEntries(Object.entries(manifest.devDependencies).map(([name, expected]) => {
+  const actual = JSON.parse(readFileSync(path.join(benchPath, 'node_modules', name, 'package.json'))).version;
+  if (actual !== expected) throw new Error('Installed package differs from manifest: ' + name);
+  return [name, actual];
+}));
 const orders = makeRoundRobinOrders(ids, rounds, 0x5A71);
 const origin = await startBenchmarkOrigin();
 const browser = await chromium.launch({ headless: false, args: ['--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'] });
 const metadata = {
   schema: 1, generatedAt: new Date().toISOString(), revision: execFileSync('git', ['-C', rootPath, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
   profileSha256: hash(readFileSync(new URL(import.meta.url))),
-  versions: { lab: root.version, ...manifest.devDependencies, chromium: browser.version(), node: process.version },
+  versions: { lab: root.version, ...installed, chromium: browser.version(), node: process.version },
   environment: { cpu: os.cpus()[0].model, cpuMax: optionalFile('/sys/fs/cgroup/cpu.max'), memoryMax: optionalFile('/sys/fs/cgroup/memory.max') },
-  scenario: { counts, rounds, durationMs, watchdogMs, targetPx: 300, easing: 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
+  scenario: { group, counts, rounds, durationMs, watchdogMs, targetPx: 300, easing: 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
   adapters, orders,
 };
 writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
@@ -59,6 +68,10 @@ try {
   for (const id of ids) {
     const { context, page } = await pageFor(id);
     try {
+      if (!await page.evaluate(() => typeof window.__adapterModule.startStagger === 'function')) {
+        writeFileSync(path.join(output, id + '-original-semantic.json'), JSON.stringify({ status: 'not-applicable', reason: 'adapter-has-no-stagger' }));
+        continue;
+      }
       const evidence = await runSemanticStartCheck(page, START_SCENARIO_MANIFEST.s2, 5);
       writeFileSync(path.join(output, `${id}-original-semantic.json`), JSON.stringify(evidence));
       console.log(`ORIGINAL_ORACLE ${id} ${evidence.valid}`);

@@ -73,6 +73,7 @@ pnpm size
 ```bash
 cd bench/compare
 xvfb-run -a node transition-profile.mjs ../.. results/transition-run
+xvfb-run -a node transition-profile.mjs ../.. results/native-run native
 ```
 
 Каталог результата должен отсутствовать. В нём сохраняются версии, отпечатки
