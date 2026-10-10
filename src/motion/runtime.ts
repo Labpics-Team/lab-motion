@@ -178,12 +178,16 @@ class Surface {
   private _written: string | undefined;
   private _token: object | undefined;
   constructor(readonly _engine: Runtime, readonly element: Element, readonly key: string) {
+    this._written = (element as HTMLElement).style.getPropertyValue(key);
     this._transforms = key === 'transform' ? initialTransforms(_engine._host.styles(element)) : {};
     this._stamp = number(_engine._host.now(), 'clock');
   }
   _refresh(): void {
-    if (this._tracks.size || this._written === (this.element as HTMLElement).style.getPropertyValue(this.key)) return;
+    if (this._tracks.size) return;
+    const inline = (this.element as HTMLElement).style.getPropertyValue(this.key);
+    if (this._written === inline) return;
     if (this.key === 'transform') Object.assign(this._transforms, initialTransforms(this._engine._host.styles(this.element)));
+    this._written = inline;
     this._rest.clear();
   }
   _read(key: string): { point: Point; _velocity: readonly number[] } {
@@ -297,7 +301,7 @@ class Surface {
           for (const track of this._tracks.values()) {
             track._elapsed = track._program.duration; sample(track._program, track._elapsed, track.value, track._velocity);
           }
-          this._render(); this._detach();
+          this._detach();
           for (const track of [...this._tracks.values()]) this._end(track, true);
           this._engine._idle(this);
         } catch (error) { this._fail(error); }
@@ -444,8 +448,7 @@ export class Runtime {
       const candidate = new Surface(this, element, name);
       // Чтение host-стиля может синхронно принять другой прогон.
       group = groups.get(name) ?? candidate; groups.set(name, group);
-    }
-    group._refresh();
+    } else group._refresh();
     return group;
   }
   private _resolveValue(element: Element, key: string, value: MotionScalar): MotionScalar {
@@ -507,8 +510,9 @@ export class Runtime {
       for (const group of touched) {
         group._render();
         for (const track of [...group._tracks.values()]) if (track._elapsed >= track._program.duration) group._end(track, true);
-        group._reconcile();
       }
+      // Начальные CSS-записи закончены до создания браузерных эффектов.
+      for (const group of touched) group._reconcile();
       run._empty();
     } catch (error) { run._error(error); throw error; }
     this._drain(); return run;

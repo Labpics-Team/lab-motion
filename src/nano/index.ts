@@ -77,15 +77,19 @@ export function animate(
     });
     return animation;
   }) as NanoControls;
-  animations.finished = Promise.all(animations.map((animation) => new Promise<Animation>((resolve, reject) => {
-    animation.finished.catch(reject);
-    animation.addEventListener('finish', () => {
-      try {
-        animation.commitStyles();
-        animation.cancel();
-      } catch { /* fill сохраняет финал на платформе без commitStyles */ }
-      resolve(animation);
-    });
-  })));
+  animations.finished = Promise.all(animations.map((animation) => {
+    // Promise завершается до следующего style update; listener обслуживает replay.
+    const commit = (): Animation => {
+      if (animation.playState === 'finished') {
+        try {
+          animation.commitStyles();
+          animation.cancel();
+        } catch { /* fill сохраняет финал на платформе без commitStyles */ }
+      }
+      return animation;
+    };
+    animation.addEventListener('finish', commit);
+    return animation.finished.then(commit);
+  }));
   return animations;
 }
