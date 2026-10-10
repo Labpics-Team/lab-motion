@@ -280,7 +280,7 @@ function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup): v
   if (group === 'transform') {
     const state = bound._transform!;
     for (const ch of bound._numeric) state[ch._key] = ch._to;
-    el.style.setProperty('transform', buildTransform(state, bound._order));
+    el.style.setProperty('transform', buildTransform(state, rec.order));
   } else if (bound._css !== undefined) {
     bound._css._css = cssAt(bound._css, 1);
     el.style.setProperty(group, String(bound._css._css));
@@ -401,7 +401,7 @@ export function animate(
           mode._type === 'spring' &&
           (group === 'transform' || group === 'opacity') &&
           v0 !== undefined
-            ? tryCompileSpringExecutionArtifactTupleUnchecked(
+            ? /* @__INLINE__ */ tryCompileSpringExecutionArtifactTupleUnchecked(
                 mode._spring,
                 v0,
                 DEFAULT_TOLERANCE,
@@ -507,7 +507,6 @@ export function animate(
             _numeric: bound._numeric,
             _residuals: bound._residuals,
             _transform: bound._transform,
-            _order: bound._order,
             _spring: (mode as Extract<MotionMode, { _type: 'spring' }>)._spring,
             _delayMs: delayMs,
             _now: now,

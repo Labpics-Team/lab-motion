@@ -1,4 +1,3 @@
-import type { TransformOrder } from '../internal/transform.js';
 /**
  * animate/waapi-unit.ts — compositor-движок одной группы каналов ./animate.
  *
@@ -85,7 +84,6 @@ export interface WaapiTarget extends AnimatableElement {
 }
 
 export interface WaapiUnitOptions {
-  readonly _order?: TransformOrder;
   readonly _el: WaapiTarget;
   readonly _group: GroupKey; // 'transform' | 'opacity'
   readonly _record: GroupRecord;
@@ -363,7 +361,7 @@ export class WaapiUnit implements GroupOwner {
     if (o._group === 'transform') {
       const state = o._transform!;
       for (const ch of o._numeric) state[ch._key] = channelAt(ch, p);
-      return buildTransform(state, this._o!._order);
+      return buildTransform(state, this._o!._record.order);
     }
     return channelAt(o._numeric[0]!, p);
   }
@@ -415,7 +413,7 @@ export class WaapiUnit implements GroupOwner {
     const rebased = rebaseNumericChannels(o._numeric);
     const v0 = sharedV0(rebased);
     if (v0 === undefined) return undefined;
-    const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
+    const artifact = /* @__INLINE__ */ tryCompileSpringExecutionArtifactTupleUnchecked(
       o._spring,
       v0,
       DEFAULT_TOLERANCE,
@@ -458,7 +456,7 @@ export class WaapiUnit implements GroupOwner {
             _numeric: o._numeric,
             _css: undefined,
             _residuals: o._residuals,
-            _transform: o._transform, _order: o._order,
+            _transform: o._transform,
           },
           _mode: { _type: 'spring', _spring: o._spring },
           _delayMs: 0,
@@ -485,7 +483,7 @@ export class WaapiUnit implements GroupOwner {
     if (o._group === 'transform') {
       const state = o._transform!;
       for (const ch of o._numeric) state[ch._key] = ch._value;
-      const text = buildTransform(state, this._o!._order);
+      const text = buildTransform(state, this._o!._record.order);
       o._el.style.setProperty('transform', text);
       if (o._record.owner === this) o._record.transform = text;
     } else {

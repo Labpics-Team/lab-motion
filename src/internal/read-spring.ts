@@ -91,9 +91,9 @@ export function readSpringUnchecked(
 }
 
 interface SpringProjection {
-  spring: SpringParams | undefined;
-  time: number;
-  readonly basis: MutableSpringBasis;
+  _spring: SpringParams | undefined;
+  _time: number;
+  readonly _basis: MutableSpringBasis;
 }
 const projections = new WeakMap<object, SpringProjection>();
 
@@ -101,13 +101,13 @@ const projections = new WeakMap<object, SpringProjection>();
 export function springBasis(owner: object, spring: SpringParams, time: number): Readonly<MutableSpringBasis> {
   let state = projections.get(owner);
   if (!state) {
-    state = { spring: undefined, time: NaN, basis: { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 } };
+    state = { _spring: undefined, _time: NaN, _basis: { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 } };
     projections.set(owner, state);
   }
-  const cached = state.spring;
-  if (time !== state.time || !cached || spring !== cached &&
+  const cached = state._spring;
+  if (time !== state._time || !cached || spring !== cached &&
     (spring.mass !== cached.mass || spring.stiffness !== cached.stiffness || spring.damping !== cached.damping))
-    sampleSpringBasisUnchecked(spring, time, state.basis);
-  state.spring = spring; state.time = time;
-  return state.basis;
+    sampleSpringBasisUnchecked(spring, time, state._basis);
+  state._spring = spring; state._time = time;
+  return state._basis;
 }

@@ -178,10 +178,10 @@ export interface SurfaceOwner {
   replace(replacement?: () => void): void;
 }
 export interface SurfaceRecord {
-  owner: SurfaceOwner | undefined;
-  locked: boolean;
+  owner?: SurfaceOwner;
+  locked?: boolean;
   readonly numbers: Map<string, ChannelSnapshot>;
-  css: string | number | undefined;
+  css?: string | number;
   order?: TransformOrder;
   transform?: string;
 }
@@ -192,7 +192,7 @@ export function surfaceRecord(element: object, key: string): SurfaceRecord {
   if (!groups) { groups = new Map(); registry.set(element, groups); }
   let record = groups.get(key);
   if (!record) {
-    record = { owner: undefined, locked: false, numbers: new Map(), css: undefined };
+    record = { numbers: new Map() };
     groups.set(key, record);
   }
   return record;

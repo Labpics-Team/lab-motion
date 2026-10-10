@@ -1,4 +1,3 @@
-import type { TransformOrder } from '../internal/transform.js';
 /**
  * animate/channels.ts — доменная модель каналов фасада ./animate.
  *
@@ -414,7 +413,6 @@ export function cssAt(ch: CssChannel, p: number): string | number {
 
 /** Каналы группы, привязанные к элементу, + остаточное transform-состояние. */
 export interface BoundGroup {
-  readonly _order?: TransformOrder;
   readonly _numeric: NumericChannel[];
   readonly _css: CssChannel | undefined;
   readonly _residuals: Map<string, number>;
@@ -511,7 +509,7 @@ export function bindGroup(
   const transform = group === 'transform'
     ? createTransformState(residuals, numeric)
     : undefined;
-  return { _numeric: numeric, _css: css, _residuals: residuals, _transform: transform, _order: rec.order ?? 0 };
+  return { _numeric: numeric, _css: css, _residuals: residuals, _transform: transform };
 }
 
 /** parse() без броска: нераспознанное значение → undefined. */

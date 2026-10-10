@@ -304,7 +304,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       if (o._group === 'transform') {
         const state = bound._transform!;
         for (const channel of bound._numeric) state[channel._key] = channel._value;
-        const text = buildTransform(state, o._bound._order);
+        const text = buildTransform(state, o._record.order);
         o._el.style.setProperty('transform', text);
         if (o._record.owner === this) o._record.transform = text;
       } else if (bound._css !== undefined) {
