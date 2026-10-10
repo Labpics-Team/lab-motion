@@ -11,7 +11,7 @@ import {
 } from '../internal/read-spring.js';
 import type { RequestFrameFn } from '../motion-value.js';
 import type { SpringParams } from '../spring.js';
-import { formatTransform as buildTransform } from '../value/transform.js';
+import { composeTransform as buildTransform } from '../internal/transform.js';
 import {
   RANGE_EPSILON,
   channelAt,

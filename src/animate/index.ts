@@ -56,7 +56,7 @@ import {
 import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import type { StaggerOptions } from '../stagger/index.js';
 import { scheduleStagger } from '../stagger/scheduler.js';
-import { formatTransform as buildTransform } from '../value/transform.js';
+import { composeTransform as buildTransform } from '../internal/transform.js';
 import {
   bindGroup,
   cssAt,
@@ -401,7 +401,7 @@ export function animate(
           mode._type === 'spring' &&
           (group === 'transform' || group === 'opacity') &&
           v0 !== undefined
-            ? /* @__INLINE__ */ tryCompileSpringExecutionArtifactTupleUnchecked(
+            ? tryCompileSpringExecutionArtifactTupleUnchecked(
                 mode._spring,
                 v0,
                 DEFAULT_TOLERANCE,

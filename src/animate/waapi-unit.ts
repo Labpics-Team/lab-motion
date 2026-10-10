@@ -39,7 +39,7 @@ import {
   scaleSerializedVelocity,
 } from '../compositor/sample.js';
 import type { SpringParams } from '../spring.js';
-import { formatTransform as buildTransform } from '../value/transform.js';
+import { composeTransform as buildTransform } from '../internal/transform.js';
 import {
   channelAt,
   rebaseNumericChannels,
@@ -413,7 +413,7 @@ export class WaapiUnit implements GroupOwner {
     const rebased = rebaseNumericChannels(o._numeric);
     const v0 = sharedV0(rebased);
     if (v0 === undefined) return undefined;
-    const artifact = /* @__INLINE__ */ tryCompileSpringExecutionArtifactTupleUnchecked(
+    const artifact = tryCompileSpringExecutionArtifactTupleUnchecked(
       o._spring,
       v0,
       DEFAULT_TOLERANCE,
