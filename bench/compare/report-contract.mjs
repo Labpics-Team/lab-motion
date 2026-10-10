@@ -81,7 +81,7 @@ const CLAIM_METRICS = Object.freeze([
 /** Нормальное движение обязательно у всех; блокировку — у заявленных native-путей. */
 export const S5_MOTION_REQUIREMENTS = Object.freeze({
   baseline: FREEZE_IDS,
-  blocked: Object.freeze(['waapi-ctl', 'lab-spring', 'motion-mini', 'anime-waapi']),
+  blocked: Object.freeze(['lab', 'waapi-ctl', 'lab-spring', 'motion-mini', 'anime-waapi']),
 });
 
 function aggregateConformance(verdicts) {

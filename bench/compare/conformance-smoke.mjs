@@ -135,7 +135,7 @@ async function main() {
       repeats: 1,
     }));
     for (const scenario of [
-      { label: 'lab-js', participant: 'lab', adapter: 'lab', expected: { baseline: 'pass', blocked: 'fail' } },
+      { label: 'lab-root-native', participant: 'lab', adapter: 'lab', expected: { baseline: 'pass', blocked: 'pass' } },
       { label: 'native-control', participant: 'waapi-ctl', adapter: 'waapi-ctl', expected: { baseline: 'pass', blocked: 'pass' } },
       { label: 'lab-spring', participant: 'lab-spring', adapter: 'lab-spring', expected: { baseline: 'pass', blocked: 'pass' } },
       { label: 'injected-native-freeze', participant: 'waapi-ctl', adapter: 'injected-native-freeze', expected: { baseline: 'fail' } },
