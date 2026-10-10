@@ -70,7 +70,7 @@ export function buildTransform(state: TransformState): string {
 
 /** Проверенный форматтер используется всеми исполнителями CSS-поверхности. */
 export function formatTransform(state: TransformState, order: TransformOrder = 0): string {
-  return composeTransform(state, order, 0, true);
+  return /* @__INLINE__ */ composeTransform(state, order, 0, true);
 }
 
 // ── interpolateTransform ──────────────────────────────────────────────────────

@@ -305,7 +305,7 @@ class Surface implements SurfaceUnit, SurfaceOwner {
       if (this._tracks.has('scaleX') || this._tracks.has('scaleY')) axes |= 2;
       if (this._tracks.has('rotate')) axes |= 4;
       if (this._tracks.has('skewX') || this._tracks.has('skewY')) axes |= 8;
-      return composeTransform(state, this._order, axes);
+      return /* @__INLINE__ */ composeTransform(state, this._order, axes);
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {

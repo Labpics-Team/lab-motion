@@ -1,13 +1,10 @@
-import { errorCode, type MotionParamErrorCode } from '../errors.js';
+import { MotionError } from '../errors.js';
+export { MotionError } from '../errors.js';
 import { DEFAULT_DURATION_MS, DEFAULT_SPRING, STANDARD_EASING_COORDS } from '../internal/motion-defaults.js';
 import { cubicBezierUnchecked } from '../internal/cubic-bezier.js';
 import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
 import type { MotionOptions, MotionProperties, MotionScalar, MotionSpring, Timing, MotionResult } from './types.js';
 
-export class MotionError extends Error {
-  readonly code: MotionParamErrorCode;
-  constructor(message: string) { super(message); this.name = 'MotionError'; this.code = errorCode(message); }
-}
 export const MAX_CHANNELS = 100_000;
 export const FINISHED: MotionResult = Object.freeze({ status: 'finished' as const });
 export const STOPPED: MotionResult = Object.freeze({ status: 'stopped' as const });

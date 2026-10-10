@@ -1,10 +1,4 @@
-/**
- * errors.ts — typed domain boundary for motion engine errors.
- *
- * L1 Domain / cross-cutting. No DOM, no window, no clock.
- * Only MotionParamError is public; it is the sole error type
- * callers should catch to distinguish invalid inputs from bugs.
- */
+/** Общий конструктор ошибок и машинные причины всех уровней API. */
 
 type Digit = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9';
 
@@ -18,7 +12,7 @@ export const LAST_MOTION_PARAM_ERROR_CODE: MotionParamErrorCode = 'LM214';
 
 /** Thrown when caller-supplied physics parameters are invalid (invariant 2). */
 export class MotionParamError extends Error {
-  override readonly name = 'MotionParamError';
+  override readonly name: string = 'MotionParamError';
   declare readonly code: MotionParamErrorCode;
 
   /**
@@ -27,12 +21,12 @@ export class MotionParamError extends Error {
    */
   constructor(messageOrCode: string) {
     super(messageOrCode);
-    this.code = errorCode(messageOrCode);
+    this.code = messageOrCode <= LAST_MOTION_PARAM_ERROR_CODE && MOTION_PARAM_ERROR_CODE.test(messageOrCode)
+      ? messageOrCode as MotionParamErrorCode : 'LM000';
   }
 }
 
-/** Классы публичных API используют общий словарь машинных причин. */
-export function errorCode(value: string): MotionParamErrorCode {
-  if (value <= LAST_MOTION_PARAM_ERROR_CODE && MOTION_PARAM_ERROR_CODE.test(value)) return value as MotionParamErrorCode;
-  return 'LM000';
+/** Совместимое имя ошибки высокоуровневого API; классификация принадлежит базе. */
+export class MotionError extends MotionParamError {
+  override readonly name = 'MotionError';
 }

@@ -372,6 +372,13 @@ function inspectMotionParamErrorSource(source, file = 'source.ts', exportsConstr
       if (!namedMember && !ts.isNamespaceImport(node.parent) && !isTypeReference(node)) escape(node);
       return;
     }
+    // Именованный совместимый подкласс остаётся внутри владельца конструктора.
+    if (ts.isIdentifier(node) && node.text === 'MotionParamError' && isClassExtendsReference(node) &&
+      /(?:^|\/)src\/errors\.ts$/.test(sourceFile.fileName.replaceAll('\\', '/'))) {
+      let declaration = node.parent;
+      while (declaration && !ts.isClassDeclaration(declaration)) declaration = declaration.parent;
+      if (declaration?.name?.text === 'MotionError') return;
+    }
     if (ts.isIdentifier(node) && constructorScope.bindings.has(node.text)) {
       const classDeclaration = ts.isClassDeclaration(node.parent) && node.parent.name === node
         ? node.parent

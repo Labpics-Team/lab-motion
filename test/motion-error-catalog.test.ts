@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { MotionError, physics, snapshot, timing } from '../src/motion/model.js';
-import { MotionParamError, errorCode } from '../src/errors.js';
+import { MotionParamError } from '../src/errors.js';
 import { validateErrorCatalog } from '../scripts/check-error-catalog.mjs';
 
 it('публичные классы сохраняют имена и используют общий идентификатор причины', () => {
@@ -13,7 +13,8 @@ it('публичные классы сохраняют имена и испол�
     expect(external.message).toBe('Ошибка приложения');
     expect(external.code).toBe('LM000');
   }
-  expect(errorCode('LM999')).toBe('LM000');
+  expect(new MotionError('LM999').code).toBe('LM000');
+  expect(new MotionError('LM191')).toBeInstanceOf(MotionParamError);
 });
 
 it('невалидные состояния различаются стабильной причиной', () => {
