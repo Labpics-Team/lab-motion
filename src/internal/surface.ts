@@ -49,26 +49,16 @@ export class SurfaceBatch {
     if (!paused && --this._active === 0) this._teardown();
     if (!this._units.size && this._end < 0) this._serial = 0;
   }
-  private _runUpdate(ts: number | undefined): void {
-    this._end = this._serial;
+  private _run(phase: 'update' | 'render', ts?: number): void {
+    if (phase === 'update') this._end = this._serial;
     for (const unit of this._units) {
       if (unit.slot >= this._end) break;
-      try { unit.update(ts); } catch {
-        try { unit.abort(); } catch { /* остальные владельцы завершают кадр */ }
+      try { unit[phase](ts); } catch {
+        try { unit.abort(); } catch { /* ошибка владельца не удерживает соседей */ }
       }
     }
     this.flush?.();
-    if (this._active === 0) this._endFrame();
-  }
-  private _runRender(): void {
-    for (const unit of this._units) {
-      if (unit.slot >= this._end) break;
-      try { unit.render(); } catch {
-        try { unit.abort(); } catch { /* остальные владельцы завершают кадр */ }
-      }
-    }
-    this.flush?.();
-    this._endFrame();
+    if (phase === 'render' || this._active === 0) this._endFrame();
   }
   private _endFrame(): void {
     this._end = -1;
@@ -90,9 +80,9 @@ export class SurfaceBatch {
     this._subscribing = true;
     let offUpdate: (() => void) | undefined;
     try {
-      offUpdate = this._frame.update(ts => this._runUpdate(ts), { onTeardown: this._frameTeardown });
+      offUpdate = this._frame.update(ts => this._run('update', ts), { onTeardown: this._frameTeardown });
       if (this._active === 0) { this._subscribing = false; offUpdate(); return; }
-      const offRender = this._frame.render(() => this._runRender());
+      const offRender = this._frame.render(() => this._run('render'));
       this._offUpdate = offUpdate; this._offRender = offRender;
       this._subscribing = false;
       if (this._active === 0) this._teardown();

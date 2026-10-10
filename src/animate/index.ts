@@ -648,7 +648,7 @@ export function createAnimateScope(root: AnimateScopeRoot): AnimateScope {
       // из-за reservation юнита. Один финальный drain после текущего стека
       // снимает такую анимацию, включая handle, ещё не возвращённый setup-ом.
       // Это одна job на destroy, не второй кадровый цикл или retry-loop.
-      void new INTRINSIC_PROMISE<void>((resolve) => resolve()).then(() => {
+      queueMicrotask(() => {
         try { cancelRuns(); } catch (error) {
           try {
             (globalThis as { reportError?: (reason: unknown) => void }).reportError?.(error);

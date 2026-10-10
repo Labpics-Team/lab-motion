@@ -90,24 +90,25 @@ export function readSpringUnchecked(
   return state;
 }
 
-interface SpringProjection {
-  _spring: SpringParams | undefined;
-  _time: number;
-  readonly _basis: MutableSpringBasis;
+interface SpringProjection extends MutableSpringBasis {
+  _mass?: number;
+  _stiffness?: number;
+  _damping?: number;
+  _time?: number;
 }
 const projections = new WeakMap<object, SpringProjection>();
 
-/** Жизненный цикл численного кэша совпадает с владельцем кадровой группы. */
+/** Кэш принадлежит кадровой группе; ключ снимает числа, не хранит чужие параметры. */
 export function springBasis(owner: object, spring: SpringParams, time: number): Readonly<MutableSpringBasis> {
   let state = projections.get(owner);
   if (!state) {
-    state = { _spring: undefined, _time: NaN, _basis: { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 } };
+    state = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
     projections.set(owner, state);
   }
-  const cached = state._spring;
-  if (time !== state._time || !cached || spring !== cached &&
-    (spring.mass !== cached.mass || spring.stiffness !== cached.stiffness || spring.damping !== cached.damping))
-    sampleSpringBasisUnchecked(spring, time, state._basis);
-  state._spring = spring; state._time = time;
-  return state._basis;
+  const { mass, stiffness, damping } = spring;
+  if (time !== state._time || mass !== state._mass || stiffness !== state._stiffness || damping !== state._damping) {
+    sampleSpringBasisUnchecked(spring, time, state);
+    state._mass = mass; state._stiffness = stiffness; state._damping = damping; state._time = time;
+  }
+  return state;
 }
