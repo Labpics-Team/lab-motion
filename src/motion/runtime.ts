@@ -1,3 +1,4 @@
+import { surfaceBatchForFrame, type SurfaceBatch, type SurfaceUnit } from '../internal/surface-batch.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, authoredTiming, snapshot, type PropertyInput } from './model.js';
 import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
@@ -167,7 +168,8 @@ class Run implements Playback {
   finish(): void { this._apply('finish'); }
 }
 
-class Surface {
+class Surface implements SurfaceUnit {
+  _batchSlot = -1;
   readonly _tracks: Map<string, Track> = new Map();
   readonly _rest: Map<string, Point> = new Map();
   readonly _transforms: Record<string, number>;
@@ -348,6 +350,13 @@ class Surface {
       this._engine._flush();
     } catch (error) { this._fail(error); throw error; }
   }
+  _updateStep(): void { this._tick(); }
+  _renderStep(): void { this._paint(); }
+  _batchAbort(): void { this._control([...this._tracks.values()], 'stop', 0); }
+  _batchRollback(error?: unknown): void {
+    this._engine._batch._remove(this, true);
+    this._fail(error);
+  }
   _tick(): void {
     if (this._native || this._tracks.size === 0) return;
     try { this._sync(); } catch (error) { this._fail(error); }
@@ -366,14 +375,10 @@ class Surface {
 
 export class Runtime {
   private readonly _surfaces = new WeakMap<Element, Map<string, Surface>>();
-  private readonly _active = new Set<Surface>();
-  private _offUpdate: (() => void) | undefined;
-  private _offRender: (() => void) | undefined;
-  private _pending: Array<() => void> = [];
-  private _prepared: Surface[] = [];
-  private _draining = false;
-  private _subscribing = false;
-  constructor(readonly _host: RuntimeHost = defaultHost) {}
+  readonly _batch: SurfaceBatch;
+  constructor(readonly _host: RuntimeHost = defaultHost) {
+    this._batch = surfaceBatchForFrame(_host.frame);
+  }
   _notify(element: Element, key: string, action: () => void): void {
     const owner = this._surfaces.get(element)?.get(key)?._tracks.get(key)?._owner;
     owner?._hold();
@@ -383,61 +388,16 @@ export class Runtime {
       finally { owner?._release(); }
     });
   }
-  _after(action: () => void): void {
-    if (this._pending.length === 0) queueMicrotask(() => this._drain());
-    this._pending.push(action);
-  }
-  _flush(): void { this._drain(); }
-  private _drain(): void {
-    if (this._draining) return;
-    this._draining = true;
-    const failures: unknown[] = [];
-    try {
-      while (this._pending.length) {
-        const actions = this._pending; this._pending = [];
-        for (const action of actions) { try { action(); } catch (error) { failures.push(error); } }
-      }
-    } finally { this._draining = false; }
-    if (failures.length) throw failures.length === 1 ? failures[0] : new AggregateError(failures, 'Ошибка отложенного управления');
-  }
+  _after(action: () => void): void { this._batch._after(action); }
+  _flush(): void { this._batch._flush(); }
   _wake(surface: Surface): void {
-    this._active.add(surface);
-    if (this._offUpdate || this._subscribing) return;
-    this._subscribing = true;
-    const teardown = (): void => {
-      this._offUpdate = this._offRender = undefined;
-      for (const current of [...this._active]) current._control([...current._tracks.values()], 'stop', 0);
-    };
-    try {
-      this._offUpdate = this._host.frame.update(() => {
-        this._prepared = [...this._active];
-        for (const current of this._prepared) current._tick();
-        this._drain();
-      }, { onTeardown: teardown });
-      this._offRender = this._host.frame.render(() => {
-        const current = this._prepared; this._prepared = [];
-        for (const surface of current) surface._paint();
-        this._drain();
-      }, { onTeardown: teardown });
-      if (this._active.size === 0) { this._offUpdate(); this._offRender(); this._offUpdate = this._offRender = undefined; }
-    } catch (error) {
-      this._offUpdate?.(); this._offRender?.(); this._offUpdate = this._offRender = undefined;
-      for (const current of [...this._active]) current._fail(error);
-      throw error;
-    } finally { this._subscribing = false; }
+    if (surface._batchSlot < 0) this._batch._add(surface, false);
   }
   _idle(surface: Surface): void {
-    this._active.delete(surface);
+    this._batch._remove(surface, false);
     const groups = this._surfaces.get(surface.element);
     if (surface._tracks.size === 0 && surface.key !== 'transform' && groups?.get(surface.key) === surface)
       groups.delete(surface.key);
-    if (this._active.size !== 0) return;
-    const update = this._offUpdate, render = this._offRender;
-    this._offUpdate = this._offRender = undefined; this._prepared = [];
-    const errors: unknown[] = [];
-    try { update?.(); } catch (error) { errors.push(error); }
-    try { render?.(); } catch (error) { errors.push(error); }
-    if (errors.length) throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'Frame cleanup failed');
   }
   private _surface(element: Element, key: string): Surface {
     let groups = this._surfaces.get(element);
@@ -471,6 +431,8 @@ export class Runtime {
     const reduced = clock.reduced || this._host.reduced();
     const author = authoredTiming(clock);
     const result: Draft[] = [], synced = new Set<Surface>();
+    const compiled = new Map<PropertyInput, { from: Point; velocity: readonly number[]; values: readonly MotionScalar[]; offset: number; plan: Program }>();
+    const equal = (a: readonly unknown[], b: readonly unknown[]): boolean => a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
     try {
       for (let i = 0; i < elements.length; i++) {
         const element = elements[i]!;
@@ -480,7 +442,12 @@ export class Runtime {
           const values = property.values.map(v => this._resolveValue(element, property.key, v));
           const explicit = property.authored ? point(property.key, values[0]!) : origin?.(element, property.key);
           const current = explicit ? { point: explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property.key);
-          const spec = program(property.key, current.point, values, property.authored, property.authored ? author : clock, current._velocity, offset + i * clock.stagger);
+          const at = offset + i * clock.stagger, previous = compiled.get(property);
+          // Неизменяемый план разделяется только при совпадении всех входов.
+          const spec = previous && previous.offset === at && previous.from.unit === current.point.unit &&
+            equal(previous.from._coordinates, current.point._coordinates) && equal(previous.velocity, current._velocity) && equal(previous.values, values)
+            ? previous.plan : program(property.key, current.point, values, property.authored, property.authored ? author : clock, current._velocity, at);
+          compiled.set(property, { from: current.point, velocity: current._velocity, values, offset: at, plan: spec });
           result.push({ element, key: property.key, _program: spec, reduced });
         }
       }
@@ -515,7 +482,7 @@ export class Runtime {
       for (const group of touched) group._reconcile();
       run._empty();
     } catch (error) { run._error(error); throw error; }
-    this._drain(); return run;
+    this._flush(); return run;
   }
   animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): Playback {
     const input = properties(props);

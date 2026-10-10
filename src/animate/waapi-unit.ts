@@ -53,7 +53,7 @@ import {
   type NumericChannel,
 } from './channels.js';
 import { MainUnit } from './main-unit.js';
-import { SurfaceBatch } from './surface-batch.js';
+import { SurfaceBatch } from '../internal/surface-batch.js';
 
 // Sampler синхронен и чист: единый scratch безопасен между unit и не создаёт
 // объект на каждый compositor-run.

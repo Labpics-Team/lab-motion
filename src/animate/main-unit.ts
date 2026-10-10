@@ -22,7 +22,7 @@ import {
   type GroupOwner,
   type GroupRecord,
 } from './channels.js';
-import { SurfaceBatch, type SurfaceUnit } from './surface-batch.js';
+import { SurfaceBatch, type SurfaceUnit } from '../internal/surface-batch.js';
 
 export type MotionMode =
   | { readonly _type: 'spring'; readonly _spring: SpringParams }

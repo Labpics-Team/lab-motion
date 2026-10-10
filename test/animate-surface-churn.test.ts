@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SurfaceBatch, type SurfaceUnit } from '../src/animate/surface-batch.js';
+import { SurfaceBatch, type SurfaceUnit } from '../src/internal/surface-batch.js';
 import type { FrameLoop } from '../src/frame/index.js';
 
 function harness() {

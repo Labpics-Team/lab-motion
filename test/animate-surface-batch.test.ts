@@ -15,7 +15,7 @@ import {
   surfaceBatchFor,
   SurfaceBatch,
   type SurfaceUnit,
-} from '../src/animate/surface-batch.js';
+} from '../src/internal/surface-batch.js';
 import { WaapiUnit, type WaapiTarget } from '../src/animate/waapi-unit.js';
 import {
   compileSpringExecutionArtifactTupleUnchecked,
@@ -736,7 +736,7 @@ describe('SurfaceBatch: retention общего default-pool', () => {
 
 describe('SurfaceBatch: структура горячих методов', () => {
   it('update/render не создают per-frame arrays или closures', () => {
-    const path = 'src/animate/surface-batch.ts';
+    const path = 'src/internal/surface-batch.ts';
     const file = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true);
     const nodes: ts.Node[] = [];
     const visit = (node: ts.Node): void => {

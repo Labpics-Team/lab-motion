@@ -1,7 +1,7 @@
 /** Численный модуль владеет scratch; batch выдаёт только readonly-базис. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { animate } from '../src/animate/index.js';
-import { SurfaceBatch, type SurfaceUnit } from '../src/animate/surface-batch.js';
+import { SurfaceBatch, type SurfaceUnit } from '../src/internal/surface-batch.js';
 import * as readers from '../src/internal/read-spring.js';
 import * as channels from '../src/animate/channels.js';
 import { sampleSpringBasisUnchecked } from '../src/internal/solver.js';

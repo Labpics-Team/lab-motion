@@ -74,7 +74,7 @@ import {
   type MotionMode,
   type RequestFrameFn,
 } from './main-unit.js';
-import { surfaceBatchFor, type SurfaceBatch } from './surface-batch.js';
+import { surfaceBatchFor, type SurfaceBatch } from '../internal/surface-batch.js';
 import {
   collectBoundedArrayLike,
   requireAnimateOptions,

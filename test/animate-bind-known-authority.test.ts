@@ -8,7 +8,7 @@ import {
   type GroupRecord,
 } from '../src/animate/channels.js';
 import { MainUnit } from '../src/animate/main-unit.js';
-import { SurfaceBatch } from '../src/animate/surface-batch.js';
+import { SurfaceBatch } from '../src/internal/surface-batch.js';
 import type { FrameLoop } from '../src/frame/index.js';
 
 function countSetAllocations<T>(run: () => T): { readonly result: T; readonly allocations: number } {

@@ -4,7 +4,7 @@ import { animate } from '../../src/animate/index.js';
 import { WaapiUnit } from '../../src/animate/waapi-unit.js';
 import { clearSpringExecutionArtifactCacheUnchecked,
   compileSpringExecutionArtifactTupleUnchecked, DEFAULT_TOLERANCE } from '../../src/compositor/curve.js';
-import { SurfaceBatch } from '../../src/animate/surface-batch.js';
+import { SurfaceBatch } from '../../src/internal/surface-batch.js';
 
 // Наблюдатель не меняет исполнение: вызывает исходный метод с тем же this,
 // не держит units/buffers сильными ссылками и не зависит от приватных имён.

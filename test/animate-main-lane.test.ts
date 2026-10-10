@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { animate, type AnimatableElement } from '../src/animate/index.js';
 import type { BoundGroup, GroupRecord } from '../src/animate/channels.js';
 import { MainUnit } from '../src/animate/main-unit.js';
-import { SurfaceBatch } from '../src/animate/surface-batch.js';
+import { SurfaceBatch } from '../src/internal/surface-batch.js';
 import type { FrameLoop } from '../src/frame/index.js';
 import { makeClock, readTranslateX, translateXSeries } from './animate-facade-helpers.js';
 

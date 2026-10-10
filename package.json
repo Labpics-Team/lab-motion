@@ -34,6 +34,10 @@
     "#kernel": {
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "#surface-batch": {
+      "import": "./dist/internal/surface-batch.js",
+      "require": "./dist/internal/surface-batch.cjs"
     }
   },
   "main": "./dist/motion/index.cjs",
