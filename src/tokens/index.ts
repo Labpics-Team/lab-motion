@@ -1,36 +1,7 @@
 /**
- * tokens/index.ts — motion-токены: типобезопасный фундамент движения (subpath ./tokens).
- *
- * Subpath export: import { duration, easing, spring } from '@labpics/motion/tokens'
- *
- * ЗАЧЕМ (граница ответственности): это ФУНДАМЕНТ — примитивы длительностей,
- * изингов, пружин, дистанс-скейла и stagger-шага + их ИМЕНОВАНИЕ, готовое к
- * оркестрации сверху (роль → токен) слоем дизайн-системы (labui). Здесь НЕТ
- * семантики ролей («кнопка-ховер», «модал-вход») — только словарь примитивов.
- * Оркестрация (какой токен на какую роль) живёт у потребителя, НЕ тут.
- *
- * ВКУС (не кричащие дефолты): калибровано В ДУХЕ Apple (spring-first, спокойно),
- * Fluent 2 (сдержанная шкала) и Material 3 (изинг-семейства standard/decelerate/
- * accelerate/emphasized). Дефолты — критично-задемпфированные пружины и мягкие
- * изинги: НИКАКОГО bounce-цирка по умолчанию. Overshoot живёт ровно в двух
- * OPT-IN токенах: изинг `emphasized` и пружины `expressive`/`bounce`.
- *
- * SSOT (шов с дизайн-системой): физический словарь — длительности, изинги и
- * ДС-пружины smooth/expressive — ЗЕРКАЛИРУЕТ схему motion-токенов labui
- * (labui/docs/motion-tokens.md, CSS-контракт `--lab-motion-*`). При пересечении
- * имён значения обязаны совпадать байт-в-байт; эталон при расхождении — labui.
- * Движковые экстры (пресеты default/gentle/snappy/bounce, staggerGap,
- * distanceScale) — честное надмножество: таких имён в ДС-схеме нет.
- * Значения запинены тестами (пины значений/имён) как контракт.
- *
- * Инварианты (наследуют ядро):
- *   1. Субпуть-изоляция: не импортируешь ./tokens — платишь ноль (ядро не растёт,
- *      проверено размерным гейтом full-core). `standard` использует специальную
- *      функцию, остальные именованные кривые — общий решатель cubic-bezier.
- *   2. Zero-DOM / SSR-safe — только данные и чистые функции.
- *   3. Детерминизм — distanceScale чист; одинаковый вход → бит-идентичный выход.
- *   4. Финитность — distanceScale клэмпит враждебный вход (NaN/∞ → границы band).
- *   5. Типобезопасность — `as const` + выведенные union-типы имён токенов.
+ * Необязательные пресеты движения. Значения принадлежат этому пакету;
+ * семантические роли и настройки дизайн-системы задаёт потребитель.
+ * Ядро принимает физические параметры и не импортирует этот словарь.
  */
 
 import { MotionParamError } from '../errors.js';
@@ -46,11 +17,7 @@ import { validateSpringPhysics, type SpringParams } from '../spring.js';
 
 // ─── Длительности (мс) ───────────────────────────────────────────────────────
 //
-// Спокойная 5-ступенчатая шкала = SSOT labui (`--lab-motion-duration-*`),
-// заземлённая на сходящихся индустриальных сетках: спайн 100/200/300/500 — там,
-// где M3 (short2/short4/medium2/long2), Fluent 2 (durationFaster/durationNormal)
-// и Carbon совпадают. Не кричащая: без суб-100мс «дёрганья» и без
-// «кино»-затягиваний. instant=0 — нулевой якорь и цель reduced-motion.
+// Длительности в миллисекундах. Числовые значения сохраняются между patch-релизами.
 
 /** Именованная шкала длительностей движения (мс). Tree-shakeable чистые данные. */
 export interface DurationTokens {
@@ -97,16 +64,7 @@ function bezierToken(x1: number, y1: number, x2: number, y2: number): EasingToke
   return { fn: cubicBezierUnchecked(x1, y1, x2, y2), css: `cubic-bezier(${x1}, ${y1}, ${x2}, ${y2})` };
 }
 
-/**
- * Семантические изинг-токены = SSOT labui (`--lab-motion-easing-*`), заземлены
- * на официальных кривых Material 3. Три сдержанных дефолта БЕЗ overshoot +
- * ЕДИНСТВЕННАЯ кривая с overshoot (`emphasized`, y1=1.21 — зарезервирована ДС
- * под роль emphasis). Координаты запинены тестами.
- *   standard   — универсальный, оба конца сглажены (M3 easing-standard).
- *   decelerate — «вход»: быстрый старт, мягкая посадка (M3 standard-decelerate).
- *   accelerate — «выход»: мягкий старт, быстрый уход (M3 standard-accelerate).
- *   emphasized — единственный сдержанный overshoot (M3 Expressive web-fallback).
- */
+/** Именованные кривые. Функция и CSS-строка используют одни координаты. */
 // `standard` разделяет ссылочную идентичность с дефолтом фасада и не проходит
 // через общую фабрику; остальные три кривые остаются на едином решателе
 // cubic-bezier. Поэтому граница размера — весь субпуть ./tokens, а не сумма полей.
@@ -139,17 +97,8 @@ export type EasingTokenName = keyof typeof easing;
 
 // ─── Каноническая пара (duration, bounce) → SpringParams ─────────────────────
 //
-// Человеко-понятная параметризация пружины (модель SwiftUI Spring(duration:bounce:)
-// / Motion.dev; каноническая модель ДС-схемы labui): единственное представление,
-// одновременно читаемое дизайнером и детерминированно конвертируемое на любую
-// платформу. Вывод физической тройки — В ТОЧНОСТИ формулы SSOT
-// (labui packages/tokens/src/motion/spring.ts), расходиться им нельзя:
-//
-//   dampingRatio ζ = 1 − bounce
-//   mass m         = 1
-//   ω₀             = 2π / durationS
-//   stiffness k    = ω₀²·m
-//   damping c      = 2·ζ·√(k·m) = 2·ζ·ω₀·m
+// durationS задаёт период: ω₀ = 2π / durationS; bounce задаёт ζ = 1 − bounce.
+// При mass = 1: stiffness = ω₀², damping = 2ζω₀.
 
 /**
  * Конвертирует каноническую пару восприятия в физпараметры движка.
@@ -162,8 +111,8 @@ export type EasingTokenName = keyof typeof easing;
  * бюджет кадра проверяет исполнитель на своей границе — очень медленная
  * пружина легальна как токен, но может быть отвергнута кадровым исполнителем.
  *
- * @example springFromDurationBounce(0.35, 0)   // ДС smooth (effects)
- * @example springFromDurationBounce(0.5, 0.3)  // ДС expressive (spatial)
+ * @example springFromDurationBounce(0.35, 0)   // критическое демпфирование
+ * @example springFromDurationBounce(0.5, 0.3)  // затухающая пружина с overshoot
  * @throws MotionParamError при неконечных/внедиапазонных входах.
  */
 export function springFromDurationBounce(durationS: number, bounce: number): SpringParams {
@@ -180,7 +129,7 @@ export function springFromDurationBounce(durationS: number, bounce: number): Spr
     stiffness: omega0 * omega0,
     damping: 2 * dampingRatio * omega0,
   };
-  // Физическая валидация (#218): конструктор токена — чистая биекция, бюджет
+  // Физическая валидация (#218): конструктор токена проверяет физические параметры, бюджет
   // кадра проверяет исполнитель на своей границе (validateSpringForFrameLoop).
   validateSpringPhysics(params);
   return params;
@@ -188,15 +137,8 @@ export function springFromDurationBounce(durationS: number, bounce: number): Spr
 
 // ─── Пружины (SpringParams-пресеты для compositor/live-путей) ─────────────────
 //
-// Два семейства в одном словаре:
-//   ДС SSOT (labui `--lab-motion-spring-*`): smooth (effects: opacity/цвет,
-//     ζ=1, без overshoot) и expressive (spatial: единственный сдержанный
-//     overshoot ~4.6%, под роль emphasis) — выведены из канонической пары
-//     ЧЕРЕЗ springFromDurationBounce, значения не дублируются.
-//   Движковые экстры: default/gentle/snappy — критично-/над-задемпфированные,
-//     bounce — заметно underdamped, OPT-IN. В ДС-схеме их нет.
-// Все проходят валидатор ядра (settle гарантирован), запинены тестом. Питают
-// compileSpringPlan / CompositorSpring / compileStaggerPlan.
+// Пресеты передаются исполнителю обычными физическими параметрами.
+// Их публичные объекты не разделяют изменяемое состояние с defaults ядра.
 
 /** Именованные пружинные пресеты (физпараметры для ./compositor и ./value). */
 export interface SpringTokens {
@@ -208,16 +150,16 @@ export interface SpringTokens {
   readonly snappy: { readonly mass: 1; readonly stiffness: 260; readonly damping: 28 };
   /** OPT-IN пружинистость (underdamped, эмитит overshoot). НЕ дефолт. */
   readonly bounce: { readonly mass: 1; readonly stiffness: 180; readonly damping: 12 };
-  /** ДС SSOT effects: opacity/цвет, прерываемая, без overshoot (0.35s, bounce 0). */
+  /** Без overshoot: durationS = 0.35, bounce = 0. */
   readonly smooth: SpringParams;
-  /** ДС SSOT spatial: единственный сдержанный overshoot ~4.6% (0.5s, bounce 0.3). */
+  /** Сдержанный overshoot: durationS = 0.5, bounce = 0.3. */
   readonly expressive: SpringParams;
 }
 
 export const spring: SpringTokens = {
-  default: DEFAULT_SPRING,
+  default: { ...DEFAULT_SPRING },
   gentle: { mass: 1, stiffness: 120, damping: 30 },
-  snappy: SNAPPY_SPRING,
+  snappy: { ...SNAPPY_SPRING },
   bounce: { mass: 1, stiffness: 180, damping: 12 },
   // PURE-аннотации: вызовы с константами не бросают (запинено тестом), поэтому
   // честно помечены чистыми — иначе tsup-бандлы соседних субпутей (presets,

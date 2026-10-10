@@ -4,7 +4,7 @@ import { animate, stagger } from 'motion';
 export const name = 'motion';
 
 function norm(c) {
-  return { cancel() { try { c.cancel ? c.cancel() : c.stop(); } catch { /* noop */ } } };
+  return { finished() { return c.finished; }, cancel() { try { c.cancel ? c.cancel() : c.stop(); } catch { /* noop */ } } };
 }
 
 export function start(els, px, durMs) {

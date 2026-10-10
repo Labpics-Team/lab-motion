@@ -535,16 +535,16 @@ describe('schema 10 motion conformance admission', () => {
     expect(report.payload.companion.markdownSha256).toBe(sha256Text(report.markdown));
   });
 
-  it('фиксирует scoped требования: baseline для всех и blocked для четырёх native-путей', () => {
+  it('фиксирует scoped требования: baseline для всех и blocked для заявленных native-путей', () => {
     expect(S5_MOTION_REQUIREMENTS).toEqual({
-      baseline: FREEZE, blocked: ['waapi-ctl', 'lab-spring', 'motion-mini', 'anime-waapi'],
+      baseline: FREEZE, blocked: ['lab', 'waapi-ctl', 'lab-spring', 'motion-mini', 'anime-waapi'],
     });
     expect(Object.isFrozen(S5_MOTION_REQUIREMENTS)).toBe(true);
     expect(Object.isFrozen(S5_MOTION_REQUIREMENTS.baseline)).toBe(true);
     expect(Object.isFrozen(S5_MOTION_REQUIREMENTS.blocked)).toBe(true);
   });
 
-  it('сохраняет наблюдаемое JS-зависание как валидную диагностику, отклоняя blocked quality claim', () => {
+  it('сохраняет зависание root как диагностику и запрещает публикацию', () => {
     const report = motionFixture();
     const run = report.payload.results.lab.raw.freeze[0];
     run.evidence.blocked = linearMotionPoints().map((point) => point.t >= 0.3 && point.t <= 1.2
@@ -560,7 +560,7 @@ describe('schema 10 motion conformance admission', () => {
     })).toThrow(/motion conformance: lab\.blocked = fail/);
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).not.toThrow();
+    })).toThrow(/motion conformance: lab\.blocked = fail/);
   });
 
   it('отклоняет одинаковое неверное движение baseline и blocked при score 100 и valid=true', () => {

@@ -71,7 +71,13 @@ test('actual tarball: React SSR → hydration сохраняет DOM, StrictMode
     const host = document.querySelector<HTMLElement>('#hydration')!; host.innerHTML = html;
     const w = window as any; w.serverNode = host.firstElementChild; w.starts = 0;
     const original = Element.prototype.animate;
-    Element.prototype.animate = function (...args) { w.starts++; return original.apply(this, args); };
+    // Проверка cleanup наблюдает активные эффекты независимо от времени опроса.
+    Element.prototype.animate = function (...args) {
+      w.starts++;
+      const animation = original.apply(this, args);
+      animation.pause();
+      return animation;
+    };
     w.hydrated = recipes.mountReact(host, true);
   }, { url: recipeUrl, html });
   await expect.poll(() => page.locator('#hydration .motion-target').evaluate(el => el.getAnimations().length)).toBe(2);
@@ -81,9 +87,8 @@ test('actual tarball: React SSR → hydration сохраняет DOM, StrictMode
     const button = document.querySelector<HTMLButtonElement>('#hydration button')!;
     const same = document.querySelector('#hydration')!.firstElementChild === w.serverNode;
     const outside = document.querySelector('#outside')!.getAnimations().length;
-    const starts = w.starts;
     w.hydrated.destroy(); button.click();
-    return { same, outside, starts, effects: target.getAnimations().length };
+    return { same, outside, starts: w.starts, effects: target.getAnimations().length };
   });
   expect(result).toEqual({ same: true, outside: 0, starts: 4, effects: 0 });
   expect(errors).toEqual([]);

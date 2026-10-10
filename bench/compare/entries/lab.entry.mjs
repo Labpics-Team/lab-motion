@@ -1,18 +1,17 @@
-// Адаптер @labpics/motion — реальный фасад ./animate из собранного dist.
-// Тот же модуль, что получает потребитель через exports["./animate"].
-import { animate } from '../../../dist/animate/index.js';
+// Публичный root API из сборки проверяемого пакета.
+import { animate } from '../../../dist/motion/index.js';
 
 export const name = '@labpics/motion';
 
 function norm(c) {
-  return { cancel() { try { c.cancel(); } catch { /* уже завершена */ } } };
+  return { finished() { return c.finished; }, cancel() { try { c.stop(); } catch { /* уже завершена */ } } };
 }
 
 /** Линейный tween x→px за durMs — общий знаменатель всех четырёх библиотек. */
 export function start(els, px, durMs) {
-  return norm(animate(els, { x: px }, { duration: durMs, ease: (t) => t }));
+  return norm(animate(els, { x: px }, { duration: durMs, ease: 'linear' }));
 }
 
 export function startStagger(els, px, durMs, gapMs) {
-  return norm(animate(els, { x: px }, { duration: durMs, ease: (t) => t, stagger: gapMs }));
+  return norm(animate(els, { x: px }, { duration: durMs, ease: 'linear', stagger: gapMs }));
 }

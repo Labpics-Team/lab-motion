@@ -1,9 +1,6 @@
-// Адаптер @labpics/motion в SPRING-режиме — компоситорный путь фасада
-// (WaapiUnit: spring + transform/opacity + tier 'compositor', см. src/animate/index.ts).
-// Это НЕ участник tween-матрицы: пружина несравнима с линейным tween напрямую,
-// ряд существует ради S5 — проверки продуктового клейма «compositor переживает
-// фриз main-thread». Ключевая метрика — «кадров в окне фриза».
-import { animate } from '../../../dist/animate/index.js';
+// Root API: пружина с той же физикой, что независимый контракт S5.
+// Пружинный ряд проверяется отдельно от линейных переходов.
+import { animate } from '../../../dist/motion/index.js';
 
 export const name = '@labpics/motion (spring→WAAPI)';
 
@@ -13,7 +10,7 @@ export const name = '@labpics/motion (spring→WAAPI)';
 const SPRING = { stiffness: 40, damping: 8, mass: 1 };
 
 function norm(c) {
-  return { cancel() { try { c.cancel(); } catch { /* уже завершена */ } } };
+  return { finished() { return c.finished; }, cancel() { try { c.stop(); } catch { /* уже завершена */ } } };
 }
 
 /** durMs игнорируется намеренно: spring и duration взаимоисключающие в фасаде. */

@@ -4,7 +4,7 @@ import { animate, stagger } from 'animejs';
 export const name = 'anime.js';
 
 function norm(a) {
-  return { cancel() { try { a.cancel(); } catch { /* noop */ } } };
+  return { finished() { return a.then(() => {}); }, cancel() { try { a.cancel(); } catch { /* noop */ } } };
 }
 
 export function start(els, px, durMs) {

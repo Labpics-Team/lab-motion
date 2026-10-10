@@ -6,6 +6,7 @@ export const name = 'WAAPI (платформа, контроль)';
 
 function norm(anims) {
   return {
+    finished() { return Promise.all(anims.map(animation => animation.finished)); },
     cancel() {
       for (const a of anims) {
         try { a.cancel(); } catch { /* уже отменена */ }
