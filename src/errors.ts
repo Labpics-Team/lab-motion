@@ -27,12 +27,12 @@ export class MotionParamError extends Error {
    */
   constructor(messageOrCode: string) {
     super(messageOrCode);
-    this.code = /* @__INLINE__ */ errorCode(messageOrCode);
+    this.code = errorCode(messageOrCode);
   }
 }
 
 /** Классы публичных API используют общий словарь машинных причин. */
 export function errorCode(value: string): MotionParamErrorCode {
-  return value <= LAST_MOTION_PARAM_ERROR_CODE && MOTION_PARAM_ERROR_CODE.test(value)
-    ? value as MotionParamErrorCode : 'LM000';
+  if (value <= LAST_MOTION_PARAM_ERROR_CODE && MOTION_PARAM_ERROR_CODE.test(value)) return value as MotionParamErrorCode;
+  return 'LM000';
 }

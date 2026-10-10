@@ -19,33 +19,14 @@ export class SurfaceBatch {
   private _serial = 0;
   private _end = -1;
   private _active = 0;
-  private _pending: Array<() => void> = [];
-  private _draining = false;
+  declare defer?: (action: () => void) => void;
+  declare flush?: () => void;
   private _offUpdate: (() => void) | undefined;
   private _offRender: (() => void) | undefined;
   private _subscribing = false;
 
   constructor(private readonly _frame: FrameLoop) {}
 
-  defer(action: () => void): void {
-    if (this._pending.length === 0) queueMicrotask(() => this.flush());
-    this._pending.push(action);
-  }
-  flush(): void {
-    if (this._draining) return;
-    this._draining = true;
-    const failures: unknown[] = [];
-    try {
-      while (this._pending.length) {
-        const actions = this._pending; this._pending = [];
-        for (const action of actions) {
-          try { action(); } catch (error) { failures.push(error); }
-        }
-      }
-    } finally { this._draining = false; }
-    if (failures.length) throw failures.length === 1 ? failures[0]
-      : new AggregateError(failures, 'Ошибка отложенного управления');
-  }
   add(unit: SurfaceUnit, paused: boolean): void {
     unit.slot = this._serial++;
     this._units.add(unit);
@@ -76,7 +57,7 @@ export class SurfaceBatch {
         try { unit.abort(); } catch { /* остальные владельцы завершают кадр */ }
       }
     }
-    this.flush();
+    this.flush?.();
     if (this._active === 0) this._endFrame();
   }
   private _runRender(): void {
@@ -86,7 +67,7 @@ export class SurfaceBatch {
         try { unit.abort(); } catch { /* остальные владельцы завершают кадр */ }
       }
     }
-    this.flush();
+    this.flush?.();
     this._endFrame();
   }
   private _endFrame(): void {
@@ -136,6 +117,33 @@ export class SurfaceBatch {
     if (errors.length) throw errors.length === 1 ? errors[0]
       : new AggregateError(errors, 'Frame cleanup failed');
   }
+}
+
+/** Очередь существует только у кадровой группы, получившей вложенную команду. */
+export function deferSurface(batch: SurfaceBatch, action: () => void): void {
+  if (!batch.defer) {
+    let pending: Array<() => void> = [], draining = false;
+    batch.flush = (): void => {
+      if (draining) return;
+      draining = true;
+      const failures: unknown[] = [];
+      try {
+        while (pending.length) {
+          const actions = pending; pending = [];
+          for (const action of actions) {
+            try { action(); } catch (error) { failures.push(error); }
+          }
+        }
+      } finally { draining = false; }
+      if (failures.length) throw failures.length === 1 ? failures[0]
+        : new AggregateError(failures, 'Ошибка управления');
+    };
+    batch.defer = (action: () => void): void => {
+      if (pending.length === 0) queueMicrotask(() => batch.flush?.());
+      pending.push(action);
+    };
+  }
+  batch.defer(action);
 }
 
 // Владелец цикла определяет batch независимо от публичной точки входа.

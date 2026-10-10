@@ -1,6 +1,6 @@
 import { composeTransform, type TransformOrder } from '../internal/transform.js';
 import { surfaceRecord, findSurfaceRecord, releaseSurfaceRecord, type SurfaceRecord, type SurfaceOwner, type ChannelSnapshot, type CssSnapshot } from '../internal/surface.js';
-import { surfaceBatchForFrame, type SurfaceBatch, type SurfaceUnit } from '../internal/surface.js';
+import { deferSurface, surfaceBatchForFrame, type SurfaceBatch, type SurfaceUnit } from '../internal/surface.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, authoredTiming, snapshot, type PropertyInput } from './model.js';
 import { TRANSFORMS, isTransform, format, point, program, sample, type Point, type Program, type Segment } from './program.js';
@@ -470,8 +470,8 @@ export class Runtime {
       finally { owner?._release(); }
     });
   }
-  _after(action: () => void): void { this._batch.defer(action); }
-  _flush(): void { this._batch.flush(); }
+  _after(action: () => void): void { deferSurface(this._batch, action); }
+  _flush(): void { this._batch.flush?.(); }
   _wake(surface: Surface): void {
     if (surface.slot < 0) this._batch.add(surface, false);
   }
