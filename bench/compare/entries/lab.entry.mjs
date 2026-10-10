@@ -4,7 +4,7 @@ import { animate } from '../../../dist/motion/index.js';
 export const name = '@labpics/motion';
 
 function norm(c) {
-  return { cancel() { try { c.stop(); } catch { /* уже завершена */ } } };
+  return { finished() { return c.finished; }, cancel() { try { c.stop(); } catch { /* уже завершена */ } } };
 }
 
 /** Линейный tween x→px за durMs — общий знаменатель всех четырёх библиотек. */

@@ -10,7 +10,7 @@ export const name = '@labpics/motion (spring→WAAPI)';
 const SPRING = { stiffness: 40, damping: 8, mass: 1 };
 
 function norm(c) {
-  return { cancel() { try { c.stop(); } catch { /* уже завершена */ } } };
+  return { finished() { return c.finished; }, cancel() { try { c.stop(); } catch { /* уже завершена */ } } };
 }
 
 /** durMs игнорируется намеренно: spring и duration взаимоисключающие в фасаде. */

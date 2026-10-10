@@ -4,7 +4,7 @@ import { gsap } from 'gsap';
 export const name = 'gsap';
 
 function norm(t) {
-  return { cancel() { try { t.kill(); } catch { /* noop */ } } };
+  return { finished() { return t.then(() => {}); }, cancel() { try { t.kill(); } catch { /* noop */ } } };
 }
 
 export function start(els, px, durMs) {
