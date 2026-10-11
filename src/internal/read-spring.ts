@@ -7,7 +7,7 @@
  * сбой скорости → покой, переполнение денормализации → цель/покой.
  */
 
-import { solveSpring, type MutableSpringBasis } from './solver.js';
+import { solveSpring, sampleSpringBasisUnchecked, type MutableSpringBasis } from './solver.js';
 import { finiteOr } from './finite.js';
 import type { SpringParams } from './types.js';
 
@@ -87,5 +87,28 @@ export function readSpringUnchecked(
   const state = out;
   state.value = value;
   state.velocity = velocity;
+  return state;
+}
+
+interface Projection extends MutableSpringBasis {
+  _mass?: number;
+  _stiffness?: number;
+  _damping?: number;
+  _time?: number;
+}
+const projections = new WeakMap<object, Projection>();
+
+/** Ключ снимает физические параметры; вызывающий не может изменить кэш задним числом. */
+export function springBasis(owner: object, spring: SpringParams, time: number): Readonly<MutableSpringBasis> {
+  let state = projections.get(owner);
+  if (!state) {
+    state = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
+    projections.set(owner, state);
+  }
+  const { mass, stiffness, damping } = spring;
+  if (time !== state._time || mass !== state._mass || stiffness !== state._stiffness || damping !== state._damping) {
+    sampleSpringBasisUnchecked(spring, time, state);
+    state._mass = mass; state._stiffness = stiffness; state._damping = damping; state._time = time;
+  }
   return state;
 }

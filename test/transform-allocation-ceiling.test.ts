@@ -14,7 +14,7 @@ import {
   type GroupRecord,
 } from '../src/animate/channels.js';
 import { MainUnit } from '../src/animate/main-unit.js';
-import { SurfaceBatch } from '../src/animate/surface-batch.js';
+import { SurfaceBatch } from '../src/internal/surface-batch.js';
 import { WaapiUnit, type WaapiTarget } from '../src/animate/waapi-unit.js';
 import { __resetDetectionCache } from '../src/compositor/detect.js';
 import type { FrameLoop } from '../src/frame/index.js';

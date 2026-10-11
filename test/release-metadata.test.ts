@@ -28,6 +28,7 @@ function metadata() {
     imports: {
       '#frame': { import: './dist/frame/index.js', require: './dist/frame/index.cjs' },
       '#kernel': { import: './dist/index.js', require: './dist/index.cjs' },
+    '#surface-batch': { import: './dist/internal/surface-batch.js', require: './dist/internal/surface-batch.cjs' },
     },
     typesVersions: { '*': { '*': ['dist/*/index.d.ts'] } },
     exports: {

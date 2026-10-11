@@ -1,7 +1,7 @@
 /** Численный модуль владеет scratch; batch выдаёт только readonly-базис. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { animate } from '../src/animate/index.js';
-import { SurfaceBatch, type SurfaceUnit } from '../src/animate/surface-batch.js';
+import { SurfaceBatch, type SurfaceUnit } from '../src/internal/surface-batch.js';
 import * as readers from '../src/internal/read-spring.js';
 import * as channels from '../src/animate/channels.js';
 import { sampleSpringBasisUnchecked } from '../src/internal/solver.js';
@@ -18,8 +18,8 @@ afterEach(() => vi.restoreAllMocks());
 describe('animate: borrowed numeric projection', () => {
   it('сохраняет бюджет прямых object-ссылок живых и завершённых MainUnit', () => {
     const units: SurfaceUnit[] = [];
-    const add = SurfaceBatch.prototype._add;
-    vi.spyOn(SurfaceBatch.prototype, '_add').mockImplementation(function (unit, paused) {
+    const add = SurfaceBatch.prototype.add;
+    vi.spyOn(SurfaceBatch.prototype, 'add').mockImplementation(function (unit, paused) {
       units.push(unit);
       return add.call(this, unit, paused);
     });

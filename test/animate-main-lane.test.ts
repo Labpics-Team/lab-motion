@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { animate, type AnimatableElement } from '../src/animate/index.js';
 import type { BoundGroup, GroupRecord } from '../src/animate/channels.js';
 import { MainUnit } from '../src/animate/main-unit.js';
-import { SurfaceBatch } from '../src/animate/surface-batch.js';
+import { SurfaceBatch } from '../src/internal/surface-batch.js';
 import type { FrameLoop } from '../src/frame/index.js';
 import { makeClock, readTranslateX, translateXSeries } from './animate-facade-helpers.js';
 
@@ -51,7 +51,7 @@ describe('animate MainUnit: compact executor', () => {
   });
 
   it('N=2 equal-delay x исполняет два unit в общем scheduler', () => {
-    const units = vi.spyOn(MainUnit.prototype, '_updateStep');
+    const units = vi.spyOn(MainUnit.prototype, 'update');
     const clock = makeClock();
     const controls = animate(
       [target('a', []), target('b', [])],
@@ -65,7 +65,7 @@ describe('animate MainUnit: compact executor', () => {
   });
 
   it('N=1 сохраняет тот же executor contract', () => {
-    const units = vi.spyOn(MainUnit.prototype, '_updateStep');
+    const units = vi.spyOn(MainUnit.prototype, 'update');
     const clock = makeClock();
     const controls = animate(
       target('a', []),
@@ -79,7 +79,7 @@ describe('animate MainUnit: compact executor', () => {
   });
 
   it('stagger остаётся per-unit delay одного scheduler', () => {
-    const units = vi.spyOn(MainUnit.prototype, '_updateStep');
+    const units = vi.spyOn(MainUnit.prototype, 'update');
     const clock = makeClock();
     const controls = animate(
       [target('a', []), target('b', [])],
@@ -93,7 +93,7 @@ describe('animate MainUnit: compact executor', () => {
   });
 
   it('generic CSS использует тот же широкий executor', () => {
-    const units = vi.spyOn(MainUnit.prototype, '_updateStep');
+    const units = vi.spyOn(MainUnit.prototype, 'update');
     const clock = makeClock();
     const controls = animate(
       [target('a', []), target('b', [])],
