@@ -107,7 +107,6 @@ function slot(id: string, events: string[] = []): {
       _bound: {
         _numeric: [channel],
         _css: undefined,
-        _residuals: new Map(),
         _transform: undefined,
       },
       _delayMs: 0,
@@ -257,7 +256,6 @@ function waapiUnit(getBatch: () => SurfaceBatch): WaapiUnit {
     _group: 'transform',
     _record: record,
     _numeric: numeric,
-    _residuals: new Map(),
     _transform: { x: 0 },
     _spring: HANDOFF_SPRING,
     _delayMs: 0,

@@ -68,8 +68,8 @@ describe('bindGroup transform key authority', () => {
     );
 
     expect(allocations).toBe(1);
-    expect(bound._residuals.get('rotate')).toBe(30);
-    expect(bound._residuals.get('skewX')).toBe(5);
+    expect(bound._transform!.rotate).toBe(30);
+    expect(bound._transform!.skewX).toBe(5);
     expect(bound._transform).toMatchObject({ x: 0, rotate: 30, skewX: 5 });
   });
 
@@ -94,8 +94,8 @@ describe('bindGroup transform key authority', () => {
     );
 
     expect(allocations).toBe(1);
-    expect(bound._residuals.get('rotate')).toBe(42);
-    expect(bound._residuals.get('skewX')).toBe(9);
+    expect(bound._transform!.rotate).toBe(42);
+    expect(bound._transform!.skewX).toBe(9);
     expect(bound._transform).toMatchObject({ x: 0, rotate: 42, skewX: 9 });
   });
 
@@ -126,9 +126,9 @@ describe('bindGroup transform key authority', () => {
       );
 
       expect(allocations).toBe(1);
-      expect(bound._residuals.get('x')).toBe(0);
-      expect(bound._residuals.get('rotate')).toBe(30);
-      expect(bound._residuals.get('skewX')).toBe(5);
+      expect(bound._transform!.x).toBe(0);
+      expect(bound._transform!.rotate).toBe(30);
+      expect(bound._transform!.skewX).toBe(5);
       expect(bound._transform).toMatchObject({ y: 0, x: 0, rotate: 30, skewX: 5 });
     } finally {
       owner.cancel();

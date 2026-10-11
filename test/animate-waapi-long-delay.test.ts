@@ -605,7 +605,6 @@ describe('animate WAAPI: точный long-delay timer', () => {
       _group: 'opacity',
       _record: record,
       _numeric: bound._numeric,
-      _residuals: bound._residuals,
       _transform: bound._transform,
       _spring: SPRING,
       _delayMs: Number.MAX_VALUE,

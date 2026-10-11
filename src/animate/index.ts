@@ -505,7 +505,6 @@ export function animate(
             _group: group,
             _record: rec,
             _numeric: bound._numeric,
-            _residuals: bound._residuals,
             _transform: bound._transform,
             _spring: (mode as Extract<MotionMode, { _type: 'spring' }>)._spring,
             _delayMs: delayMs,

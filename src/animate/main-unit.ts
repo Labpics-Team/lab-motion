@@ -99,7 +99,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       }
       return { value: writing ? channel._value : channel._renderedValue, velocity };
     }
-    const frozen = o._bound._residuals.get(key);
+    const frozen = o._bound._transform?.[key];
     return frozen === undefined ? undefined : { value: frozen, velocity: 0 };
   }
 
@@ -124,7 +124,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   keys(): readonly string[] {
     if (this._done) return [];
     const bound = this._o!._bound;
-    return [...bound._numeric.map((channel) => channel._key), ...bound._residuals.keys()];
+    return bound._transform ? Object.keys(bound._transform) : bound._numeric.map(channel => channel._key);
   }
 
   replace(replacement?: () => void): void {

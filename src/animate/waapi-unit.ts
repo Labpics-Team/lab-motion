@@ -88,7 +88,6 @@ export interface WaapiUnitOptions {
   readonly _group: GroupKey; // 'transform' | 'opacity'
   readonly _record: GroupRecord;
   readonly _numeric: NumericChannel[];
-  readonly _residuals: Map<string, number>;
   readonly _transform: Record<string, number> | undefined;
   readonly _spring: SpringParams;
   readonly _delayMs: number;
@@ -156,7 +155,7 @@ export class WaapiUnit implements GroupOwner {
     if (ch) {
       return { value: ch._value, velocity: ch._velocity };
     }
-    const frozen = this._o!._residuals.get(key);
+    const frozen = this._o!._transform?.[key];
     return frozen === undefined ? undefined : { value: frozen, velocity: 0 };
   }
 
@@ -167,7 +166,7 @@ export class WaapiUnit implements GroupOwner {
   keys(): readonly string[] {
     if (this._done) return [];
     if (this._delegate) return this._delegate.keys();
-    return [...this._o!._numeric.map((c) => c._key), ...this._o!._residuals.keys()];
+    return this._o!._transform ? Object.keys(this._o!._transform) : this._o!._numeric.map(c => c._key);
   }
 
   replace(replacement?: () => void): void {
@@ -455,7 +454,6 @@ export class WaapiUnit implements GroupOwner {
           _bound: {
             _numeric: o._numeric,
             _css: undefined,
-            _residuals: o._residuals,
             _transform: o._transform,
           },
           _mode: { _type: 'spring', _spring: o._spring },

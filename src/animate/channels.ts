@@ -1,3 +1,4 @@
+import { TRANSFORM_AXES } from '../internal/transform.js';
 /**
  * animate/channels.ts — доменная модель каналов фасада ./animate.
  *
@@ -26,16 +27,7 @@ import {
 
 // ─── Ключи transform-шортхендов (словарь = TransformState ядра ./value) ──────
 
-const TRANSFORM_IDENTITY: Readonly<Record<string, number>> = {
-  x: 0,
-  y: 0,
-  scale: 1,
-  scaleX: 1,
-  scaleY: 1,
-  rotate: 0,
-  skewX: 0,
-  skewY: 0,
-};
+const TRANSFORM_IDENTITY: Readonly<Record<string, number>> = TRANSFORM_AXES;
 
 /**
  * Является ли ключ props transform-шортхендом. Проверка `typeof ...==='number'`
@@ -43,7 +35,7 @@ const TRANSFORM_IDENTITY: Readonly<Record<string, number>> = {
  * функции/объект, не число — иначе классифицировались бы как transform-канал.
  */
 function isTransformKey(key: string): boolean {
-  return typeof TRANSFORM_IDENTITY[key] === 'number';
+  return key === 'scale' || Object.hasOwn(TRANSFORM_IDENTITY, key);
 }
 
 // ─── Спецификации каналов (до привязки к элементу) ───────────────────────────
@@ -364,21 +356,6 @@ function readStyleValue(el: AnimatableElement, cssName: string): string {
 
 // ─── Форматирование записи ───────────────────────────────────────────────────
 
-/** Один mutable state на lifecycle группы заменяет Map+object на каждом кадре. */
-function createTransformState(
-  residuals: ReadonlyMap<string, number>,
-  channels: readonly NumericChannel[],
-): Record<string, number> {
-  const state: Record<string, number> = {};
-  residuals.forEach((v, k) => {
-    state[k] = v;
-  });
-  for (const channel of channels) {
-    state[channel._key] = channel._value;
-  }
-  return state;
-}
-
 /** Интерполяция AST, уже прошедшего parse-границу фасада. */
 function interpolateParsed(from: ValueAST, to: ValueAST, p: number): string | number {
   if (from.kind === 'color' && to.kind === 'color') {
@@ -415,7 +392,6 @@ export function cssAt(ch: CssChannel, p: number): string | number {
 export interface BoundGroup {
   readonly _numeric: NumericChannel[];
   readonly _css: CssChannel | undefined;
-  readonly _residuals: Map<string, number>;
   /** Единственный transform-state группы; undefined для остальных поверхностей. */
   readonly _transform: Record<string, number> | undefined;
 }
@@ -489,27 +465,19 @@ export function bindGroup(
     }
   }
 
-  // Остаточное transform-состояние: известные каналы вне нового прогона
-  // замораживаются на текущем значении — transform-строка остаётся полной
-  // проекцией состояния (новый прогон x не сбрасывает прежний rotate).
-  const residuals = new Map<string, number>();
+  // Один снимок хранит как активные, так и оставшиеся неподвижными оси.
+  let transform: Record<string, number> | undefined;
   if (group === 'transform') {
-    // Живой owner уже содержит полный transform-ключевой срез; без owner
-    // authority — settled registry. Второй Set не материализуем только затем,
-    // чтобы один раз пройти его в этом же bind.
-    const animated = new Set(specs.map((s) => s._key));
+    transform = {};
     const known = owner?.keys() ?? rec.numbers.keys();
     for (const key of known) {
-      if (animated.has(key)) continue;
+      if (numeric.some(channel => channel._key === key)) continue;
       const snap = owner?.readNumber(key) ?? rec.numbers.get(key);
-      if (snap) residuals.set(key, snap.value);
+      if (snap) transform[key] = snap.value;
     }
+    for (const channel of numeric) transform[channel._key] = channel._value;
   }
-
-  const transform = group === 'transform'
-    ? createTransformState(residuals, numeric)
-    : undefined;
-  return { _numeric: numeric, _css: css, _residuals: residuals, _transform: transform };
+  return { _numeric: numeric, _css: css, _transform: transform };
 }
 
 /** parse() без броска: нераспознанное значение → undefined. */

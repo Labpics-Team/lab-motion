@@ -392,7 +392,6 @@ describe.each([1, 1000])('transform Map/state evidence: N=$samples', (samples) =
           _group: 'transform',
           _record: record,
           _numeric: bound._numeric,
-          _residuals: bound._residuals,
           _transform: tracked.state,
           _spring: { mass: 1, stiffness: 100, damping: 10 },
           _delayMs: 0,

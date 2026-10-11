@@ -175,7 +175,6 @@ describe('animate MainUnit: plan-order и изоляция', () => {
           _velocity: 0,
         }],
         _css: undefined,
-        _residuals: new Map(),
         _transform: { x: Number.MAX_VALUE },
       },
       _mode: { _type: 'spring', _spring: { mass: 1, stiffness: 170, damping: 26 } },
@@ -359,7 +358,6 @@ describe('animate MainUnit: plan-order и изоляция', () => {
           _v0: 0, _value: 0, _velocity: 0,
         }],
         _css: undefined,
-        _residuals: new Map(),
         _transform: { x: 0 },
       };
       return {

@@ -225,3 +225,14 @@ describe('animate: borrowed numeric projection', () => {
     expect(outputs.size).toBe(1);
   });
 });
+
+it('изменение того же объекта параметров обновляет численный базис', () => {
+  const owner = {}, spring = { mass: 1, stiffness: 100, damping: 20 };
+  const first = { ...readers.springBasis(owner, spring, 0.1) };
+  spring.damping = 40;
+  const current = readers.springBasis(owner, spring, 0.1);
+  const expected = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
+  sampleSpringBasisUnchecked(spring, 0.1, expected);
+  for (const key of Object.keys(expected) as (keyof typeof expected)[]) expect(current[key]).toBe(expected[key]);
+  expect(current._value).not.toBe(first._value);
+});
