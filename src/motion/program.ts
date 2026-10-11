@@ -34,9 +34,9 @@ export function format(key: string, value: readonly number[], unit: string): str
   return `${n === 0 ? 0 : n}${unit}`;
 }
 export function transform(values: Readonly<Record<string, number>>): string {
-  // Одинаковая топология сохраняет независимые оси и авторские полные обороты.
-  return `translate(${values.x ?? 0}px,${values.y ?? 0}px) rotate(${values.rotate ?? 0}deg) skew(${values.skewX ?? 0}deg,${values.skewY ?? 0}deg) scale(${values.scaleX ?? 1},${values.scaleY ?? 1})`;
+  return /* @__INLINE__ */ composeTransform(values, 1, 15);
 }
+
 
 export interface Segment {
   readonly at: number;

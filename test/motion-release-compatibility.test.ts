@@ -66,8 +66,9 @@ function observe(Engine: typeof Runtime, seed: number) {
 it('сохраняет опубликованные импорты и поведение прерываемых переходов', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'motion-release-contract-'));
   try {
-    const archive = execFileSync('git', ['archive', RELEASE, 'src']);
-    execFileSync('tar', ['-xf', '-', '-C', directory], { input: archive });
+    const archive = join(directory, 'baseline.tar');
+    execFileSync('git', ['archive', '--output', archive, RELEASE, 'src']);
+    execFileSync('tar', ['-xf', archive, '-C', directory]);
     const module = join(directory, 'baseline.mjs');
     await build({ entryPoints: [join(directory, 'src/motion/runtime.ts')], outfile: module,
       bundle: true, platform: 'node', format: 'esm', target: 'es2022' });

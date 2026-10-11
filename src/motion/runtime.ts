@@ -471,8 +471,6 @@ export class Runtime {
     const reduced = clock.reduced || this._host.reduced();
     const author = authoredTiming(clock);
     const result: Draft[] = [], synced = new Set<Surface>();
-    const compiled = new Map<PropertyInput, Program>();
-    const equal = (a: readonly unknown[], b: readonly unknown[]): boolean => a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
     try {
       for (let i = 0; i < elements.length; i++) {
         const element = elements[i]!;
@@ -482,14 +480,8 @@ export class Runtime {
           const values = property.values.map(v => this._resolveValue(element, property.key, v));
           const explicit = property.authored ? point(property.key, values[0]!) : origin?.(element, property.key);
           const current = explicit ? { point: explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property.key);
-          const previous = clock.stagger ? undefined : compiled.get(property);
-          const first = previous?._segments[0];
-          const reusable = previous && first && previous.unit === current.point.unit &&
-            equal(first.from, current.point._coordinates) && equal(first.velocity, current._velocity) &&
-            values.every((value, index) => Object.is(value, property.values[index]));
-          const spec = reusable ? previous : program(property.key, current.point, values, property.authored,
+          const spec = program(property.key, current.point, values, property.authored,
             property.authored ? author : clock, current._velocity, offset + i * clock.stagger);
-          if (!reusable) compiled.set(property, spec);
           result.push({ element, key: property.key, _program: spec, reduced });
         }
       }
