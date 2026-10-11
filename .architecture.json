@@ -22,7 +22,7 @@
     {
       "id": "site",
       "prefixes": [
-        "site"
+        "docs/.vitepress"
       ]
     },
     {
@@ -36,6 +36,12 @@
         "vitest.config.ts",
         "vitest.stryker.config.ts",
         "vitest.stryker.driver.config.ts"
+      ]
+    },
+    {
+      "id": "examples",
+      "prefixes": [
+        "examples"
       ]
     }
   ],
