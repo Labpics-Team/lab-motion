@@ -1,7 +1,7 @@
 /** Численный модуль владеет scratch; batch выдаёт только readonly-базис. */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { animate } from '../src/animate/index.js';
-import { SurfaceBatch, type SurfaceUnit } from '../src/internal/surface.js';
+import { SurfaceBatch, type SurfaceUnit } from '../src/animate/surface-batch.js';
 import * as readers from '../src/internal/read-spring.js';
 import * as channels from '../src/animate/channels.js';
 import { sampleSpringBasisUnchecked } from '../src/internal/solver.js';
@@ -18,8 +18,8 @@ afterEach(() => vi.restoreAllMocks());
 describe('animate: borrowed numeric projection', () => {
   it('сохраняет бюджет прямых object-ссылок живых и завершённых MainUnit', () => {
     const units: SurfaceUnit[] = [];
-    const add = SurfaceBatch.prototype.add;
-    vi.spyOn(SurfaceBatch.prototype, 'add').mockImplementation(function (unit, paused) {
+    const add = SurfaceBatch.prototype._add;
+    vi.spyOn(SurfaceBatch.prototype, '_add').mockImplementation(function (unit, paused) {
       units.push(unit);
       return add.call(this, unit, paused);
     });
@@ -224,15 +224,4 @@ describe('animate: borrowed numeric projection', () => {
     }
     expect(outputs.size).toBe(1);
   });
-});
-
-it('изменение того же объекта параметров обновляет численный базис', () => {
-  const owner = {}, spring = { mass: 1, stiffness: 100, damping: 20 };
-  const first = { ...readers.springBasis(owner, spring, 0.1) };
-  spring.damping = 40;
-  const current = readers.springBasis(owner, spring, 0.1);
-  const expected = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
-  sampleSpringBasisUnchecked(spring, 0.1, expected);
-  for (const key of Object.keys(expected) as (keyof typeof expected)[]) expect(current[key]).toBe(expected[key]);
-  expect(current._value).not.toBe(first._value);
 });

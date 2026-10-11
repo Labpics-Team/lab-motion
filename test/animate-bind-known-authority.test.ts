@@ -8,7 +8,7 @@ import {
   type GroupRecord,
 } from '../src/animate/channels.js';
 import { MainUnit } from '../src/animate/main-unit.js';
-import { SurfaceBatch } from '../src/internal/surface.js';
+import { SurfaceBatch } from '../src/animate/surface-batch.js';
 import type { FrameLoop } from '../src/frame/index.js';
 
 function countSetAllocations<T>(run: () => T): { readonly result: T; readonly allocations: number } {
@@ -37,13 +37,13 @@ const element: AnimatableElement = {
 
 function record(owner?: GroupOwner): GroupRecord {
   const numeric = new Map<string, ChannelSnapshot>();
-  numeric.set('rotate', { value: 30, velocity: 0 });
-  numeric.set('skewX', { value: 5, velocity: 0 });
+  numeric.set('rotate', { _value: 30, _velocity: 0 });
+  numeric.set('skewX', { _value: 5, _velocity: 0 });
   return {
-    owner: owner,
-    locked: false,
-    numbers: numeric,
-    css: undefined,
+    _owner: owner,
+    _transition: false,
+    _numeric: numeric,
+    _cssValue: undefined,
   };
 }
 
@@ -68,25 +68,25 @@ describe('bindGroup transform key authority', () => {
     );
 
     expect(allocations).toBe(1);
-    expect(bound._transform!.rotate).toBe(30);
-    expect(bound._transform!.skewX).toBe(5);
+    expect(bound._residuals.get('rotate')).toBe(30);
+    expect(bound._residuals.get('skewX')).toBe(5);
     expect(bound._transform).toMatchObject({ x: 0, rotate: 30, skewX: 5 });
   });
 
   it('uses the live owner as complete key authority without a union Set', () => {
     const owner: GroupOwner = {
-      readNumber(key) {
-        if (key === 'rotate') return { value: 42, velocity: 7 };
-        if (key === 'skewX') return { value: 9, velocity: 3 };
+      _captureNum(key) {
+        if (key === 'rotate') return { _value: 42, _velocity: 7 };
+        if (key === 'skewX') return { _value: 9, _velocity: 3 };
         return undefined;
       },
-      readCss() {
+      _captureCss() {
         return undefined;
       },
-      keys() {
+      _numericKeys() {
         return ['x', 'rotate', 'skewX'];
       },
-      replace() {},
+      _supersede() {},
     };
 
     const { result: bound, allocations } = countSetAllocations(() =>
@@ -94,8 +94,8 @@ describe('bindGroup transform key authority', () => {
     );
 
     expect(allocations).toBe(1);
-    expect(bound._transform!.rotate).toBe(42);
-    expect(bound._transform!.skewX).toBe(9);
+    expect(bound._residuals.get('rotate')).toBe(42);
+    expect(bound._residuals.get('skewX')).toBe(9);
     expect(bound._transform).toMatchObject({ x: 0, rotate: 42, skewX: 9 });
   });
 
@@ -118,7 +118,7 @@ describe('bindGroup transform key authority', () => {
       _onDone() {},
       _startPaused: true,
     });
-    rec.owner = owner;
+    rec._owner = owner;
 
     try {
       const { result: bound, allocations } = countSetAllocations(() =>
@@ -126,9 +126,9 @@ describe('bindGroup transform key authority', () => {
       );
 
       expect(allocations).toBe(1);
-      expect(bound._transform!.x).toBe(0);
-      expect(bound._transform!.rotate).toBe(30);
-      expect(bound._transform!.skewX).toBe(5);
+      expect(bound._residuals.get('x')).toBe(0);
+      expect(bound._residuals.get('rotate')).toBe(30);
+      expect(bound._residuals.get('skewX')).toBe(5);
       expect(bound._transform).toMatchObject({ y: 0, x: 0, rotate: 30, skewX: 5 });
     } finally {
       owner.cancel();

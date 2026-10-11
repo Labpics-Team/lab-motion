@@ -4,7 +4,6 @@ import { animate } from '../src/nano/index.js';
 type Timing = KeyframeAnimationOptions & { easing?: string };
 
 interface RecordedAnimation {
-  playState: AnimationPlayState;
   readonly finished: Promise<RecordedAnimation>;
   readonly play: ReturnType<typeof vi.fn>;
   readonly pause: ReturnType<typeof vi.fn>;
@@ -25,18 +24,16 @@ function recordingElement() {
       let resolve!: (value: RecordedAnimation) => void;
       const finishListeners: Array<() => void> = [];
       const animation = {
-        playState: 'running' as AnimationPlayState,
         finished: new Promise<RecordedAnimation>((done) => { resolve = done; }),
         play: vi.fn(),
         pause: vi.fn(),
         reverse: vi.fn(),
-        cancel: vi.fn(() => { animation.playState = 'idle'; }),
+        cancel: vi.fn(),
         commitStyles: vi.fn(),
         addEventListener: vi.fn((type: string, listener: () => void) => {
           if (type === 'finish') finishListeners.push(listener);
         }),
         finish() {
-          animation.playState = 'finished';
           resolve(animation);
           for (const listener of finishListeners) listener();
         },

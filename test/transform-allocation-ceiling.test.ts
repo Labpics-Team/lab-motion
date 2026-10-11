@@ -14,7 +14,7 @@ import {
   type GroupRecord,
 } from '../src/animate/channels.js';
 import { MainUnit } from '../src/animate/main-unit.js';
-import { SurfaceBatch } from '../src/internal/surface.js';
+import { SurfaceBatch } from '../src/animate/surface-batch.js';
 import { WaapiUnit, type WaapiTarget } from '../src/animate/waapi-unit.js';
 import { __resetDetectionCache } from '../src/compositor/detect.js';
 import type { FrameLoop } from '../src/frame/index.js';
@@ -242,10 +242,10 @@ describe('transform hot path: direct-container AST gate', () => {
 
 function makeTransformBound(el: WaapiTarget): { bound: BoundGroup; record: GroupRecord } {
   const record: GroupRecord = {
-    owner: undefined,
-    locked: false,
-    numbers: new Map(),
-    css: undefined,
+    _owner: undefined,
+    _transition: false,
+    _numeric: new Map(),
+    _cssValue: undefined,
   };
   const bound = bindGroup(
     el,
@@ -345,7 +345,7 @@ describe.each([1, 1000])('transform Map/state evidence: N=$samples', (samples) =
       _batch: new SurfaceBatch(clock.frame),
       _onDone() {},
     });
-    record.owner = unit;
+    record._owner = unit;
 
     const maps = countHotMapAllocations(() => {
       for (let i = 0; i < samples; i++) clock.tick(i * 16);
@@ -392,6 +392,7 @@ describe.each([1, 1000])('transform Map/state evidence: N=$samples', (samples) =
           _group: 'transform',
           _record: record,
           _numeric: bound._numeric,
+          _residuals: bound._residuals,
           _transform: tracked.state,
           _spring: { mass: 1, stiffness: 100, damping: 10 },
           _delayMs: 0,
@@ -401,7 +402,7 @@ describe.each([1, 1000])('transform Map/state evidence: N=$samples', (samples) =
           _onDone() {},
           _artifact: ['linear(0, 1)', serialized, 1000],
         });
-        unit.capture();
+        unit._capture();
       });
     } finally {
       if (descriptor === undefined) delete (globalThis as { navigator?: unknown }).navigator;

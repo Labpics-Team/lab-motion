@@ -333,7 +333,7 @@ describe('animate WAAPI: точный long-delay timer', () => {
       });
       await controls.finished;
 
-      expect(record.owner).toBeUndefined();
+      expect(record._owner).toBeUndefined();
       expect(cancel).toHaveBeenCalledTimes(1);
       expect(onComplete).toHaveBeenCalledTimes(mode === 'resolve-then-reject' ? 1 : 0);
     },
@@ -605,6 +605,7 @@ describe('animate WAAPI: точный long-delay timer', () => {
       _group: 'opacity',
       _record: record,
       _numeric: bound._numeric,
+      _residuals: bound._residuals,
       _transform: bound._transform,
       _spring: SPRING,
       _delayMs: Number.MAX_VALUE,

@@ -1,4 +1,3 @@
-import { findSurfaceRecord } from '../src/internal/surface.js';
 import { expect, it } from 'vitest';
 import { harness } from './fixtures/motion-runtime.js';
 import { snapshot } from '../src/motion/model.js';
@@ -74,10 +73,10 @@ it('массив снимается по первоначальной длине
   Object.defineProperty(source, 0, { get() { source.push(7); reads++; return 0; } });
   expect(snapshot(source, 'values', 2)).toEqual([0, 1]); expect(reads).toBe(1);
   const hole = [0, , 1];
-  expect(() => snapshot(hole, 'values')).toThrow('LM189');
+  expect(() => snapshot(hole, 'values')).toThrow('пропущено');
   const prototype = Object.create(Array.prototype); prototype[1] = 2;
   Object.setPrototypeOf(hole, prototype);
-  expect(() => snapshot(hole, 'values')).toThrow('LM189');
+  expect(() => snapshot(hole, 'values')).toThrow('пропущено');
 });
 
 it('поздние невалидные опции не прерывают активные соседние свойства', () => {
@@ -130,8 +129,8 @@ it('10 000 повторных целей держат один эффект и �
     previous.stop(); previous.finish();
   }
   expect(h.effects).toHaveLength(1); expect(h.effects[0]!.cancelled).toBe(false);
-  const owner = findSurfaceRecord(h.element, 'transform')!.owner as unknown as { _tracks: Map<string, { _owner: unknown }> };
-  expect(owner._tracks.get('x')!._owner).toBe(current);
+  const registry = (h.runtime as unknown as { _surfaces: WeakMap<Element, Map<string, { _tracks: Map<string, { _owner: unknown }> }>> })._surfaces;
+  expect(registry.get(h.element)!.get('transform')!._tracks.get('x')!._owner).toBe(current);
   current.finish(); expect(await current.finished).toEqual({ status: 'finished' });
   expect(await first.finished).toEqual({ status: 'stopped' });
 });
@@ -139,7 +138,8 @@ it('10 000 повторных целей держат один эффект и �
 it('постоянный элемент не накапливает завершённые custom properties в реестре', () => {
   const h = harness();
   for (let i = 0; i < 10_000; i++) h.runtime.animate(h.element, { ['--test' + i]: [0, 1] }, { duration: 0 });
-  for (let i = 0; i < 10_000; i++) expect(findSurfaceRecord(h.element, '--test' + i)).toBeUndefined();
+  const registry = (h.runtime as unknown as { _surfaces: WeakMap<Element, Map<string, unknown>> })._surfaces;
+  expect(registry.get(h.element)?.size ?? 0).toBe(0);
   expect(h.updates.size + h.renders.size).toBe(0);
 });
 

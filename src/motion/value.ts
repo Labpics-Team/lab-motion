@@ -50,12 +50,12 @@ export function value(initial: number = 0): MotionValue {
       if (live) start(number(next, 'value'), { duration: 0 });
     },
     animate(next, options): Playback {
-      if (!live) throw new MotionError('LM212');
+      if (!live) throw new MotionError('Значение уже освобождено');
       return start(next, options);
     },
     subscribe(listener): () => void {
       if (!live) return () => {};
-      if (typeof listener !== 'function') throw new MotionError('LM214');
+      if (typeof listener !== 'function') throw new MotionError('subscribe ожидает функцию');
       const token = {};
       listeners.set(listener, token);
       // Сохранённый off не удерживает callback и не снимает новую регистрацию.

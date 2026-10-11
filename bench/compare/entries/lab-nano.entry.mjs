@@ -3,10 +3,8 @@ import { animate } from '../../../dist/nano/index.js';
 
 export const name = '@labpics/motion/nano';
 
-export function start(elements, px, durationMs, from = null) {
-  const target = 'translateX(' + px + 'px)';
-  const transform = from === null ? target : ['translateX(' + from + 'px)', target];
-  const controls = animate(elements, { transform }, {
+export function start(elements, px, durationMs) {
+  const controls = animate(elements, { transform: 'translateX(' + px + 'px)' }, {
     duration: durationMs, ease: 'linear',
   });
   return {

@@ -34,10 +34,6 @@
     "#kernel": {
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    },
-    "#surface": {
-      "import": "./dist/internal/surface.js",
-      "require": "./dist/internal/surface.cjs"
     }
   },
   "main": "./dist/motion/index.cjs",

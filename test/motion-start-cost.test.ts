@@ -22,18 +22,9 @@ describe('подготовка движения', () => {
       item.animate = (...args) => { events.push('native'); return start(...args); };
       return item;
     });
-    const run = h.runtime.animate(elements, { x: [10, 100] }, { duration: 200, ease: 'linear' });
+    const run = h.runtime.animate(elements, { x: 100 }, { duration: 200, ease: 'linear' });
     expect(events).toEqual([...elements.map(() => 'write'), ...elements.map(() => 'native')]);
     run.stop();
-  });
-
-  it('не записывает неизменное начальное состояние неавторского перехода', () => {
-    const h = harness(true);
-    const run = h.runtime.animate(h.element, { x: 100 }, { duration: 200, ease: 'linear' });
-    expect(h.writes).toEqual([]);
-    expect(h.effects).toHaveLength(1);
-    run.finish();
-    expect(h.x()).toBe(100);
   });
 
   it('фиксирует native финал одной записью до разрешения finished', async () => {

@@ -39,7 +39,7 @@ import {
   scaleSerializedVelocity,
 } from '../compositor/sample.js';
 import type { SpringParams } from '../spring.js';
-import { composeTransform as buildTransform } from '../internal/transform.js';
+import { buildTransform } from '../value/transform.js';
 import {
   channelAt,
   rebaseNumericChannels,
@@ -53,7 +53,7 @@ import {
   type NumericChannel,
 } from './channels.js';
 import { MainUnit } from './main-unit.js';
-import { SurfaceBatch } from '../internal/surface.js';
+import { SurfaceBatch } from './surface-batch.js';
 
 // Sampler синхронен и чист: единый scratch безопасен между unit и не создаёт
 // объект на каждый compositor-run.
@@ -88,6 +88,7 @@ export interface WaapiUnitOptions {
   readonly _group: GroupKey; // 'transform' | 'opacity'
   readonly _record: GroupRecord;
   readonly _numeric: NumericChannel[];
+  readonly _residuals: Map<string, number>;
   readonly _transform: Record<string, number> | undefined;
   readonly _spring: SpringParams;
   readonly _delayMs: number;
@@ -129,53 +130,53 @@ export class WaapiUnit implements GroupOwner {
 
   // ── GroupOwner ────────────────────────────────────────────────────────────
 
-  release(): void {
+  _release(): void {
     this._commit();
   }
 
-  capture(): void {
+  _capture(): void {
     if (this._done) return;
     const rec = this._o!._record;
-    if (this._delegate || rec.locked || this._locked) return;
+    if (this._delegate || rec._transition || this._locked) return;
     // currentTime — hostile host-boundary: nested animate не должен успеть
     // опубликовать owner, после чего внешний снимок перезапишет новое видимое
     // поколение. Общий commit-reservation даёт nested-вызову штатный LM157.
-    rec.locked = true;
+    rec._transition = true;
     try {
       this._syncSnapshot();
     } finally {
-      rec.locked = false;
+      rec._transition = false;
     }
   }
 
-  readNumber(key: string): ChannelSnapshot | undefined {
+  _captureNum(key: string): ChannelSnapshot | undefined {
     if (this._done) return undefined;
-    if (this._delegate) return this._delegate.readNumber(key);
+    if (this._delegate) return this._delegate._captureNum(key);
     const ch = this._o!._numeric.find((c) => c._key === key);
     if (ch) {
-      return { value: ch._value, velocity: ch._velocity };
+      return { _value: ch._value, _velocity: ch._velocity };
     }
-    const frozen = this._o!._transform?.[key];
-    return frozen === undefined ? undefined : { value: frozen, velocity: 0 };
+    const frozen = this._o!._residuals.get(key);
+    return frozen === undefined ? undefined : { _value: frozen, _velocity: 0 };
   }
 
-  readCss(): undefined {
+  _captureCss(): CssChannel | undefined {
     return undefined; // css-каналы на compositor-путь не маршрутизируются
   }
 
-  keys(): readonly string[] {
+  _numericKeys(): readonly string[] {
     if (this._done) return [];
-    if (this._delegate) return this._delegate.keys();
-    return this._o!._transform ? Object.keys(this._o!._transform) : this._o!._numeric.map(c => c._key);
+    if (this._delegate) return this._delegate._numericKeys();
+    return [...this._o!._numeric.map((c) => c._key), ...this._o!._residuals.keys()];
   }
 
-  replace(replacement?: () => void): void {
+  _supersede(replacement?: () => void): void {
     if (this._done) {
       return;
     }
     if (this._locked) throw new MotionParamError('LM157');
     if (this._delegate !== undefined) {
-      this._transaction(() => this._delegate!.replace(replacement));
+      this._transaction(() => this._delegate!._supersede(replacement));
       return;
     }
     // Inline hold проходит до destructive cleanup: hostile style не должен
@@ -203,7 +204,7 @@ export class WaapiUnit implements GroupOwner {
   // ── Контролы ──────────────────────────────────────────────────────────────
 
   pause(): void {
-    if (this._done || this._o!._record.locked || this._locked || this._paused) return;
+    if (this._done || this._o!._record._transition || this._locked || this._paused) return;
     if (this._delegate !== undefined) {
       this._transaction(() => {
         this._delegate!.pause();
@@ -221,7 +222,7 @@ export class WaapiUnit implements GroupOwner {
   }
 
   play(): void {
-    if (this._done || this._o!._record.locked || this._locked || !this._paused) return;
+    if (this._done || this._o!._record._transition || this._locked || !this._paused) return;
     if (this._delegate) {
       // Wrapper меняет состояние только после успешной подписки delegate:
       // бросок оставляет оба уровня повторяемо paused.
@@ -249,7 +250,7 @@ export class WaapiUnit implements GroupOwner {
   seek(tMs: number): void {
     if (
       this._done ||
-      this._o!._record.locked ||
+      this._o!._record._transition ||
       this._locked ||
       !Number.isFinite(tMs)
     ) return;
@@ -278,7 +279,7 @@ export class WaapiUnit implements GroupOwner {
 
   /** Стоп в текущей позиции: инлайн-фиксация ДО cancel (без отката к базе). */
   cancel(): void {
-    if (this._done || this._o!._record.locked || this._locked) return;
+    if (this._done || this._o!._record._transition || this._locked) return;
     if (this._delegate !== undefined) {
       this._transaction(() => this._delegate!.cancel());
       return;
@@ -348,7 +349,7 @@ export class WaapiUnit implements GroupOwner {
       this._transaction(() => {
         this._clearTimer();
         this._cancelAnim();
-        if (o._record.owner !== this || !this._paused) this._finish(false);
+        if (o._record._owner !== this || !this._paused) this._finish(false);
       });
       throw error;
     }
@@ -360,7 +361,7 @@ export class WaapiUnit implements GroupOwner {
     if (o._group === 'transform') {
       const state = o._transform!;
       for (const ch of o._numeric) state[ch._key] = channelAt(ch, p);
-      return buildTransform(state, this._o!._record.order);
+      return buildTransform(state);
     }
     return channelAt(o._numeric[0]!, p);
   }
@@ -454,6 +455,7 @@ export class WaapiUnit implements GroupOwner {
           _bound: {
             _numeric: o._numeric,
             _css: undefined,
+            _residuals: o._residuals,
             _transform: o._transform,
           },
           _mode: { _type: 'spring', _spring: o._spring },
@@ -481,9 +483,7 @@ export class WaapiUnit implements GroupOwner {
     if (o._group === 'transform') {
       const state = o._transform!;
       for (const ch of o._numeric) state[ch._key] = ch._value;
-      const text = buildTransform(state, this._o!._record.order);
-      o._el.style.setProperty('transform', text);
-      if (o._record.owner === this) o._record.transform = text;
+      o._el.style.setProperty('transform', buildTransform(state));
     } else {
       o._el.style.setProperty(o._group, String(o._numeric[0]!._value));
     }
@@ -573,7 +573,7 @@ export class WaapiUnit implements GroupOwner {
     this._commit();
     // Capture/host-транзакция может временно удерживать owner reservation.
     // Successor синхронно сделает supersede; failed plan оставит release этой job.
-    if (this._pendingNatural) void PROMISE_JOB.then(() => this.release());
+    if (this._pendingNatural) void PROMISE_JOB.then(() => this._release());
   }
 
   private _clearTimer(): void {
@@ -587,9 +587,9 @@ export class WaapiUnit implements GroupOwner {
   _commit(): void {
     if (
       this._done ||
-      this._o!._record.owner !== this ||
+      this._o!._record._owner !== this ||
       !this._pendingNatural ||
-      this._o!._record.locked ||
+      this._o!._record._transition ||
       this._locked
     ) return;
     this._transaction(() => {
@@ -615,7 +615,7 @@ export class WaapiUnit implements GroupOwner {
   private _writeBack(): void {
     const rec = this._o!._record;
     for (const ch of this._o!._numeric) {
-      rec.numbers.set(ch._key, { value: ch._value, velocity: 0 });
+      rec._numeric.set(ch._key, { _value: ch._value, _velocity: 0 });
     }
   }
 
@@ -623,7 +623,7 @@ export class WaapiUnit implements GroupOwner {
     if (this._done) return;
     this._done = true;
     const o = this._o!;
-    if (o._record.owner === this) o._record.owner = undefined;
+    if (o._record._owner === this) o._record._owner = undefined;
     // Завершённый слот может оставаться в ещё живом aggregate. Его trajectory
     // и handoff executor больше не нужны ни одному terminal control.
     this._samples = undefined;

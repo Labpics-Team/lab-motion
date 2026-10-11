@@ -56,7 +56,7 @@ import {
 import { type SpringParams, validateSpringForFrameLoop } from '../spring.js';
 import type { StaggerOptions } from '../stagger/index.js';
 import { scheduleStagger } from '../stagger/scheduler.js';
-import { composeTransform as buildTransform } from '../internal/transform.js';
+import { buildTransform } from '../value/transform.js';
 import {
   bindGroup,
   cssAt,
@@ -74,7 +74,7 @@ import {
   type MotionMode,
   type RequestFrameFn,
 } from './main-unit.js';
-import { surfaceBatchFor, type SurfaceBatch } from '../internal/surface.js';
+import { surfaceBatchFor, type SurfaceBatch } from './surface-batch.js';
 import {
   collectBoundedArrayLike,
   requireAnimateOptions,
@@ -182,9 +182,9 @@ const ASYNC_FINISH = {
 } as unknown as PromiseLike<void>;
 
 function releaseTransition(rec: GroupRecord, owner: GroupOwner | undefined): void {
-  rec.locked = false;
+  rec._transition = false;
   // User onComplete при release не должен скрыть исходный host-сбой successor.
-  try { owner?.release?.(); } catch { /* owner уже терминализирован */ }
+  try { owner?._release?.(); } catch { /* owner уже терминализирован */ }
 }
 
 // ─── Дефолтные швы (читаются в вызове — SSR-safe) ────────────────────────────
@@ -276,11 +276,11 @@ function resolveTargets(target: unknown): AnimatableElement[] {
 
 // ─── Снап (единая reduced-политика пакета: мгновенный финал, без кадров) ─────
 
-function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup, rec: ReturnType<typeof groupRecord>): void {
+function writeSnap(el: AnimatableElement, group: GroupKey, bound: BoundGroup): void {
   if (group === 'transform') {
     const state = bound._transform!;
     for (const ch of bound._numeric) state[ch._key] = ch._to;
-    el.style.setProperty('transform', buildTransform(state, rec.order));
+    el.style.setProperty('transform', buildTransform(state));
   } else if (bound._css !== undefined) {
     bound._css._css = cssAt(bound._css, 1);
     el.style.setProperty(group, String(bound._css._css));
@@ -295,9 +295,9 @@ function commitSnap(
   bound: BoundGroup,
 ): void {
   if (bound._css !== undefined) {
-    rec.css = bound._css._css;
+    rec._cssValue = bound._css._css;
   }
-  for (const ch of bound._numeric) rec.numbers.set(ch._key, { value: ch._to, velocity: 0 });
+  for (const ch of bound._numeric) rec._numeric.set(ch._key, { _value: ch._to, _velocity: 0 });
 }
 
 /**
@@ -478,20 +478,20 @@ export function animate(
   //    прервать юнит, созданный предыдущей записью того же commit.
   try {
     for (const [el, group, rec, bound, delayMs, execution] of plan) {
-      const previous = rec.owner;
-      if (rec.locked) throw new MotionParamError('LM157');
-      rec.locked = true;
+      const previous = rec._owner;
+      if (rec._transition) throw new MotionParamError('LM157');
+      rec._transition = true;
       if (execution === 3) {
         try {
-          if (previous) previous.replace(() => writeSnap(el, group, bound, rec));
-          else writeSnap(el, group, bound, rec);
+          if (previous) previous._supersede(() => writeSnap(el, group, bound));
+          else writeSnap(el, group, bound);
         } catch (error) {
           protectedOwner = previous;
           releaseTransition(rec, previous);
           throw error;
         }
         commitSnap(rec, bound);
-        rec.locked = false;
+        rec._transition = false;
         report(true);
         continue;
       }
@@ -505,6 +505,7 @@ export function animate(
             _group: group,
             _record: rec,
             _numeric: bound._numeric,
+            _residuals: bound._residuals,
             _transform: bound._transform,
             _spring: (mode as Extract<MotionMode, { _type: 'spring' }>)._spring,
             _delayMs: delayMs,
@@ -532,15 +533,15 @@ export function animate(
         throw error;
       }
       try {
-        previous?.replace();
+        previous?._supersede();
       } catch (error) {
         unit._rollback();
         protectedOwner = previous;
         releaseTransition(rec, previous);
         throw error;
       }
-      rec.owner = unit;
-      rec.locked = false;
+      rec._owner = unit;
+      rec._transition = false;
       units.push(unit);
       // Sync timer остаётся pending, пока не опубликованы все
       // owners: иначе duplicate target успевает записать target,
@@ -647,7 +648,7 @@ export function createAnimateScope(root: AnimateScopeRoot): AnimateScope {
       // из-за reservation юнита. Один финальный drain после текущего стека
       // снимает такую анимацию, включая handle, ещё не возвращённый setup-ом.
       // Это одна job на destroy, не второй кадровый цикл или retry-loop.
-      queueMicrotask(() => {
+      void new INTRINSIC_PROMISE<void>((resolve) => resolve()).then(() => {
         try { cancelRuns(); } catch (error) {
           try {
             (globalThis as { reportError?: (reason: unknown) => void }).reportError?.(error);

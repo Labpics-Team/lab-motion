@@ -28,7 +28,6 @@ function metadata() {
     imports: {
       '#frame': { import: './dist/frame/index.js', require: './dist/frame/index.cjs' },
       '#kernel': { import: './dist/index.js', require: './dist/index.cjs' },
-    '#surface': { import: './dist/internal/surface.js', require: './dist/internal/surface.cjs' },
     },
     typesVersions: { '*': { '*': ['dist/*/index.d.ts'] } },
     exports: {

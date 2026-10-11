@@ -15,12 +15,13 @@ function norm(anims) {
   };
 }
 
-export function start(els, px, durMs, from = 0) {
-  const target = 'translateX(' + px + 'px)';
-  const transform = from === null ? target : ['translateX(' + from + 'px)', target];
-  return norm(els.map(el => el.animate({ transform }, {
-    duration: durMs, easing: 'linear', fill: 'forwards',
-  })));
+export function start(els, px, durMs) {
+  return norm(els.map((el) =>
+    el.animate(
+      [{ transform: 'translateX(0px)' }, { transform: `translateX(${px}px)` }],
+      { duration: durMs, easing: 'linear', fill: 'forwards' },
+    ),
+  ));
 }
 
 export function startStagger(els, px, durMs, gapMs) {

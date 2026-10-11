@@ -3,7 +3,7 @@ import { MotionError } from './model.js';
 /** Регистрация имеет собственную идентичность и очищается также после once/abort. */
 export function listen(elements: readonly EventTarget[], type: string, callback: EventListener,
   options: AddEventListenerOptions | undefined, owner: Set<() => void>, active: () => boolean): () => void {
-  if (typeof callback !== 'function') throw new MotionError('LM214');
+  if (typeof callback !== 'function') throw new MotionError('on ожидает функцию');
   const capture = Boolean(options?.capture), once = Boolean(options?.once);
   const passive = options?.passive, inputSignal = options?.signal;
   const registration: AddEventListenerOptions = { capture, once,

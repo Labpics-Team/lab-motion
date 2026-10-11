@@ -47,7 +47,7 @@ describe('animate: hostile queueMicrotask', () => {
     callbacks.shift()?.(0);
 
     expect(frameRequests).toBe(requestsAfterCancel);
-    expect(groupRecord(target, 'opacity').owner).toBeUndefined();
+    expect(groupRecord(target, 'opacity')._owner).toBeUndefined();
     expect(failure).toBeUndefined();
     expect(controls).toBeDefined();
     await controls!.finished;
@@ -119,7 +119,7 @@ describe('animate: hostile queueMicrotask', () => {
     resolveHost();
     await controls!.finished;
     expect(completed).toBe(1);
-    expect(groupRecord(target, 'opacity').owner).toBeUndefined();
+    expect(groupRecord(target, 'opacity')._owner).toBeUndefined();
   });
 
   it('не прячет controls и не подвешивает finished', async () => {
