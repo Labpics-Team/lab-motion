@@ -125,6 +125,7 @@ export default defineConfig({
   // tsup запускает ESM/CJS minify параллельно, а Terser дописывает служебные
   // поля в nested options. Свежие объекты не дают форматам менять друг друга.
   terserOptions: {
+    ecma: 2022,
     get compress() { return { passes: 3, pure_getters: true }; },
     get mangle() { return { properties: { regex: /^_/ } }; },
   },
