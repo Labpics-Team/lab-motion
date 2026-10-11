@@ -171,7 +171,7 @@ class Run implements Playback {
 class Surface implements SurfaceUnit {
   slot = -1;
   readonly _tracks: Map<string, Track> = new Map();
-  readonly _rest: Map<string, Point> = new Map();
+  private _rest: Point | undefined;
   readonly _transforms: Record<string, number>;
   _stamp: number;
   _busy = false;
@@ -190,13 +190,13 @@ class Surface implements SurfaceUnit {
     if (this._written === inline) return;
     if (this.key === 'transform') Object.assign(this._transforms, initialTransforms(this._engine._host.styles(this.element)));
     this._written = inline;
-    this._rest.clear();
+    this._rest = undefined;
   }
   _read(key: string): { point: Point; _velocity: readonly number[] } {
     const track = this._tracks.get(key);
     if (track) return { point: { _coordinates: [...track.value], unit: track._program.unit }, _velocity: [...track._velocity] };
     if (isTransform(key)) return { point: { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], unit: '' }, _velocity: [0] };
-    const saved = this._rest.get(key);
+    const saved = this._rest;
     if (saved) return { point: saved, _velocity: saved._coordinates.map(() => 0) };
     const text = this._engine._host.styles(this.element).getPropertyValue(key);
     const initial = point(key, key === 'opacity' ? text === '' ? 1 : number(Number(text), 'opacity') : text || 0);
@@ -231,7 +231,7 @@ class Surface implements SurfaceUnit {
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {
-      const held = this._rest.get(this.key)!; return format(this.key, held._coordinates, held.unit);
+      const held = this._rest!; return format(this.key, held._coordinates, held.unit);
     }
     return format(track._program.key, at ? track._program._segments[0]![at] : track.value, track._program.unit);
   }
@@ -262,7 +262,7 @@ class Surface implements SurfaceUnit {
     if (track._done) return;
     track._done = true;
     if (this._tracks.get(track._program.key) === track) this._tracks.delete(track._program.key);
-    this._rest.set(track._program.key, { _coordinates: [...track.value], unit: track._program.unit });
+    if (this.key !== 'transform') this._rest = { _coordinates: [...track.value], unit: track._program.unit };
     if (isTransform(track._program.key)) this._transforms[track._program.key] = track.value[0]!;
     if (this._tracks.size === 0) {
       try { this._engine._idle(this); } catch (error) { failure ??= { error }; }
@@ -350,18 +350,16 @@ class Surface implements SurfaceUnit {
       this._engine._flush();
     } catch (error) { this._fail(error); throw error; }
   }
-  update(): void { this._tick(); }
-  render(): void { this._paint(); }
   abort(): void { this._control([...this._tracks.values()], 'stop', 0); }
   rollback(error?: unknown): void {
     this._engine._batch.remove(this, true);
     this._fail(error);
   }
-  _tick(): void {
+  update(): void {
     if (this._native || this._tracks.size === 0) return;
     try { this._sync(); } catch (error) { this._fail(error); }
   }
-  _paint(): void {
+  render(): void {
     if (this._native || this._tracks.size === 0) return;
     try {
       this._render();
@@ -374,13 +372,13 @@ class Surface implements SurfaceUnit {
 }
 
 export class Runtime {
-  private readonly _surfaces = new WeakMap<Element, Map<string, Surface>>();
+  private readonly _surfaces = new WeakMap<Element, Record<string, Surface>>();
   readonly _batch: SurfaceBatch;
   constructor(readonly _host: RuntimeHost = defaultHost) {
     this._batch = surfaceBatchForFrame(_host.frame);
   }
   _notify(element: Element, key: string, action: () => void): void {
-    const owner = this._surfaces.get(element)?.get(key)?._tracks.get(key)?._owner;
+    const owner = this._surfaces.get(element)?.[key]?._tracks.get(key)?._owner;
     owner?._hold();
     this._after(() => {
       try { action(); }
@@ -418,18 +416,18 @@ export class Runtime {
   _idle(surface: Surface): void {
     this._batch.remove(surface, false);
     const groups = this._surfaces.get(surface.element);
-    if (surface._tracks.size === 0 && surface.key !== 'transform' && groups?.get(surface.key) === surface)
-      groups.delete(surface.key);
+    if (surface._tracks.size === 0 && surface.key !== 'transform' && groups?.[surface.key] === surface)
+      delete groups[surface.key];
   }
   private _surface(element: Element, key: string): Surface {
     let groups = this._surfaces.get(element);
-    if (!groups) { groups = new Map(); this._surfaces.set(element, groups); }
+    if (!groups) { groups = Object.create(null) as Record<string, Surface>; this._surfaces.set(element, groups); }
     const name = isTransform(key) ? 'transform' : key;
-    let group = groups.get(name);
+    let group = groups[name];
     if (!group) {
       const candidate = new Surface(this, element, name);
       // Чтение host-стиля может синхронно принять другой прогон.
-      group = groups.get(name) ?? candidate; groups.set(name, group);
+      group = groups[name] ?? candidate; groups[name] = group;
     } else group._refresh();
     return group;
   }

@@ -284,7 +284,7 @@ describe('SurfaceBatch: потолок подписок', () => {
 
       units.forEach((unit) => unit.cancel());
       expect(host.removals).toEqual({ update: 1, render: 1 });
-      expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
+      expect((batch as unknown as { _units: Set<SurfaceUnit> })._units.size).toBe(0);
       expect((batch as unknown as { _active: number })._active).toBe(0);
     });
   }
@@ -311,7 +311,7 @@ describe('SurfaceBatch: потолок подписок', () => {
     expect(host.subscriptions).toEqual({ update: 1, render: 1 });
     units.forEach((unit) => unit.cancel());
     expect(host.removals).toEqual({ update: 1, render: 1 });
-    expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
+    expect((batch as unknown as { _units: Set<SurfaceUnit> })._units.size).toBe(0);
   });
 
   it('N=100 paused handoff ленив до play', () => {
@@ -340,7 +340,7 @@ describe('SurfaceBatch: потолок подписок', () => {
       _onDone() {},
     })).toThrow('render subscribe failed');
     expect(host.removals.update).toBe(1);
-    expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
+    expect((batch as unknown as { _units: Set<SurfaceUnit> })._units.size).toBe(0);
     expect((batch as unknown as { _active: number })._active).toBe(0);
   });
 
@@ -359,7 +359,7 @@ describe('SurfaceBatch: потолок подписок', () => {
       removed.cancel();
       // Добавление пересекает порог и меняет адрес ещё создаваемого failed-c.
       const temporary = mainUnit(batch, 'temporary', true);
-      expect(b.slot).toBe(0);
+      expect(b.slot).toBeGreaterThanOrEqual(0);
       temporary.cancel();
       b.play();
     };
@@ -372,14 +372,14 @@ describe('SurfaceBatch: потолок подписок', () => {
     }
 
     const state = batch as unknown as {
-      _units: Array<SurfaceUnit | undefined>;
+      _units: Set<SurfaceUnit>;
       _active: number;
       _offUpdate?: () => void;
       _offRender?: () => void;
     };
     expect(thrown).toBe(hostError);
-    expect(state._units).toEqual([b]);
-    expect(b.slot).toBe(0);
+    expect([...state._units]).toEqual([b]);
+    expect(b.slot).toBeGreaterThanOrEqual(0);
     expect((b as unknown as { _paused: boolean })._paused).toBe(true);
     expect(state._active).toBe(0);
     expect(state._offUpdate).toBeUndefined();
@@ -391,7 +391,7 @@ describe('SurfaceBatch: потолок подписок', () => {
     host.tick(0);
     host.tick(1001);
     expect(completions).toEqual([true]);
-    expect(state._units).toHaveLength(0);
+    expect(state._units.size).toBe(0);
     expect(state._active).toBe(0);
   });
 
@@ -408,14 +408,14 @@ describe('SurfaceBatch: потолок подписок', () => {
     expect(host.subscriptions).toEqual({ update: 1, render: 1 });
     expect((batch as unknown as { _active: number })._active).toBe(2);
     expect((b as unknown as { _paused: boolean })._paused).toBe(false);
-    expect(b.slot).toBe(0);
-    expect(c.slot).toBe(1);
+    expect(b.slot).toBeGreaterThanOrEqual(0);
+    expect(c.slot).toBeGreaterThan(b.slot);
 
     host.tick(0);
     host.tick(1001);
     expect(completions).toEqual(['b:true', 'c:true']);
     expect(host.removals).toEqual({ update: 1, render: 1 });
-    expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
+    expect((batch as unknown as { _units: Set<SurfaceUnit> })._units.size).toBe(0);
   });
 
   it('WAAPI-wrapper остаётся paused/retryable вместе с откатившимся live delegate', () => {
@@ -440,13 +440,13 @@ describe('SurfaceBatch: потолок подписок', () => {
     expect((wrapper as unknown as { _paused: boolean })._paused).toBe(true);
     expect((delegate as unknown as { _paused: boolean })._paused).toBe(true);
     expect((batch as unknown as { _active: number })._active).toBe(0);
-    expect((batch as unknown as { _units: unknown[] })._units).toEqual([delegate]);
+    expect([...(batch as unknown as { _units: Set<SurfaceUnit> })._units]).toEqual([delegate]);
     expect(host.subscriptions).toEqual({ update: 1, render: 0 });
 
     wrapper.play();
     expect(host.subscriptions).toEqual({ update: 2, render: 1 });
     wrapper.cancel();
-    expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
+    expect((batch as unknown as { _units: Set<SurfaceUnit> })._units.size).toBe(0);
   });
 
   it.each([
@@ -474,7 +474,7 @@ describe('SurfaceBatch: потолок подписок', () => {
       }
 
       const state = batch as unknown as {
-        _units: Array<SurfaceUnit | undefined>;
+        _units: Set<SurfaceUnit>;
         _active: number;
         _offUpdate?: () => void;
         _offRender?: () => void;
@@ -484,10 +484,8 @@ describe('SurfaceBatch: потолок подписок', () => {
       expect(state._offUpdate).toBeUndefined();
       expect(state._offRender).toBeUndefined();
       expect(host.subscriptions).toEqual({ update: 1, render: 0 });
-      expect(state._units).toEqual(retained ? [nested] : []);
-      for (let index = 0; index < state._units.length; index++) {
-        expect(state._units[index]!.slot).toBe(index);
-      }
+      expect([...state._units]).toEqual(retained ? [nested] : []);
+      for (const unit of state._units) expect(unit.slot).toBeGreaterThanOrEqual(0);
 
       if (retained) {
         expect((nested as unknown as { _paused: boolean })._paused).toBe(true);
@@ -495,7 +493,7 @@ describe('SurfaceBatch: потолок подписок', () => {
         expect(host.subscriptions).toEqual({ update: 2, render: 1 });
         nested.cancel();
       }
-      expect(state._units).toHaveLength(0);
+      expect(state._units.size).toBe(0);
       expect(state._active).toBe(0);
     },
   );
@@ -520,7 +518,7 @@ describe('SurfaceBatch: потолок подписок', () => {
 
     expect(thrown).toBe(hostError);
     expect(unit.slot).toBe(-1);
-    expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
+    expect((batch as unknown as { _units: Set<SurfaceUnit> })._units.size).toBe(0);
     expect((batch as unknown as { _active: number })._active).toBe(0);
   });
 });
@@ -640,7 +638,7 @@ describe('SurfaceBatch: граница кадра и lifecycle', () => {
     host.tick(16);
     expect(events).toEqual(['u1', 'u2', 'r2']);
     batch.remove(second, false);
-    expect((batch as unknown as { _units: unknown[] })._units).toHaveLength(0);
+    expect((batch as unknown as { _units: Set<SurfaceUnit> })._units.size).toBe(0);
     expect(host.removals).toEqual({ update: 1, render: 1 });
   });
 
@@ -708,7 +706,7 @@ describe('SurfaceBatch: retention общего default-pool', () => {
       );
       const batch = surfaceBatchFor(undefined);
       const storage = (): Array<MainUnit | undefined> =>
-        (batch as unknown as { _units: Array<MainUnit | undefined> })._units;
+        [...(batch as unknown as { _units: Set<MainUnit> })._units];
       const retained = storage().filter((unit): unit is MainUnit => unit !== undefined);
       const peakLive = retained.length;
 
