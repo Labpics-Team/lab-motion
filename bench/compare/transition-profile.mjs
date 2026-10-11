@@ -24,16 +24,25 @@ const optionalFile = file => { try { return readFileSync(file, 'utf8').trim(); }
 const group = process.argv[4] ?? 'full';
 if (!['full', 'native'].includes(group)) throw new Error('Expected full or native capability group');
 const ids = group === 'native'
-  ? ['lab', 'lab-nano', 'motion-mini', 'waapi-ctl']
+  ? ['lab-nano', 'motion-mini', 'waapi-ctl']
   : ['lab', 'motion', 'gsap', 'anime', 'waapi-ctl'];
+const baseline = process.argv[5] ? path.resolve(process.argv[5]) : undefined;
+if (baseline) ids.unshift('baseline');
 const counts = [1, 100, 1000];
 const rounds = 20, durationMs = 400, watchdogMs = 10_000;
 const entries = { 'lab-nano': 'lab-nano', lab: 'lab', motion: 'motion', gsap: 'gsap', anime: 'anime', 'waapi-ctl': 'waapi-control', 'motion-mini': 'motion-mini', 'anime-waapi': 'anime-waapi' };
-const adapters = Object.fromEntries(Object.entries(entries).map(([id, entry]) => {
-  const outputPath = path.join(output, 'adapters', `${id}.js`);
-  esbuild.buildSync({ ...PRODUCTION_ADAPTER_PROFILE, entryPoints: [path.join(benchPath, 'entries', `${entry}.entry.mjs`)], format: 'iife', globalName: '__adapterModule', outfile: outputPath });
+const adapters = Object.fromEntries(ids.map(id => {
+  const entry = id === 'baseline' ? group === 'native' ? 'lab-nano' : 'lab' : entries[id];
+  const source = path.join(benchPath, 'entries', entry + '.entry.mjs');
+  let contents = readFileSync(source, 'utf8');
+  if (id === 'baseline') contents = contents.replaceAll('../../../dist/', baseline.replaceAll('\\', '/') + '/');
+  const outputPath = path.join(output, 'adapters', id + '.js');
+  esbuild.buildSync({ ...PRODUCTION_ADAPTER_PROFILE,
+    stdin: { contents, sourcefile: source, resolveDir: path.dirname(source) },
+    format: 'iife', globalName: '__adapterModule', outfile: outputPath });
   const bytes = readFileSync(outputPath);
-  return [id, { path: outputPath, sha256: hash(bytes), raw: bytes.length, gzip: canonicalGzip(bytes).length, brotli: observationalBrotli(bytes).length }];
+  return [id, { path: outputPath, sha256: hash(bytes), raw: bytes.length,
+    gzip: canonicalGzip(bytes).length, brotli: observationalBrotli(bytes).length }];
 }));
 const root = JSON.parse(readFileSync(path.join(rootPath, 'package.json')));
 const manifest = JSON.parse(readFileSync(path.join(benchPath, 'package.json')));
@@ -47,10 +56,11 @@ const origin = await startBenchmarkOrigin();
 const browser = await chromium.launch({ headless: false, args: ['--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'] });
 const metadata = {
   schema: 1, generatedAt: new Date().toISOString(), revision: execFileSync('git', ['-C', rootPath, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  baselineRevision: process.env.COMPARISON_BASELINE_SHA ?? null,
   profileSha256: hash(readFileSync(new URL(import.meta.url))),
   versions: { lab: root.version, ...installed, chromium: browser.version(), node: process.version },
   environment: { cpu: os.cpus()[0].model, cpuMax: optionalFile('/sys/fs/cgroup/cpu.max'), memoryMax: optionalFile('/sys/fs/cgroup/memory.max') },
-  scenario: { group, counts, rounds, durationMs, watchdogMs, targetPx: 300, easing: 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
+  scenario: { group, endpoints: 'to-only; current style is the origin', counts, rounds, durationMs, watchdogMs, targetPx: 300, easing: 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
   adapters, orders,
 };
 writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
@@ -96,7 +106,7 @@ try {
         const before = await metrics(cdp);
         const started = await page.evaluate(duration => {
           const start = performance.now();
-          window.__control = window.__adapterModule.start(window.__targets, 300, duration);
+          window.__control = window.__adapterModule.start(window.__targets, 300, duration, null);
           return { apiMs: performance.now() - start, start };
         }, durationMs);
         const completionMs = await page.evaluate(async ({ start, watchdogMs }) => {
