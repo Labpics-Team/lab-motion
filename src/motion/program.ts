@@ -1,3 +1,4 @@
+import { composeTransform, TRANSFORM_AXES } from '../internal/transform.js';
 import { tryParseValue } from '../value/parse.js';
 import { settleTimeUpperBound } from '../spring.js';
 import { sampleSpringBasisUnchecked, type MutableSpringBasis } from '../internal/solver.js';
@@ -6,7 +7,7 @@ import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
 import { MotionError, number } from './model.js';
 import type { MotionScalar, Timing } from './types.js';
 
-export const TRANSFORMS: Readonly<Record<string, number>> = { x: 0, y: 0, rotate: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1 };
+export const TRANSFORMS: Readonly<Record<string, number>> = TRANSFORM_AXES;
 export const isTransform = (key: string): boolean => Object.hasOwn(TRANSFORMS, key);
 const PIXELS = /^(?:width|height|min-width|max-width|min-height|max-height|top|right|bottom|left|margin(?:-.+)?|padding(?:-.+)?|gap|row-gap|column-gap|border(?:-.+)?-width|border(?:-(?:top|bottom)-(?:left|right)|-(?:start|end)-(?:start|end))?-radius|font-size|letter-spacing|outline-width|outline-offset)$/;
 

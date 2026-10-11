@@ -471,7 +471,7 @@ export class Runtime {
     const reduced = clock.reduced || this._host.reduced();
     const author = authoredTiming(clock);
     const result: Draft[] = [], synced = new Set<Surface>();
-    const compiled = new Map<PropertyInput, { from: Point; velocity: readonly number[]; values: readonly MotionScalar[]; offset: number; plan: Program }>();
+    const compiled = new Map<PropertyInput, Program>();
     const equal = (a: readonly unknown[], b: readonly unknown[]): boolean => a.length === b.length && a.every((value, i) => Object.is(value, b[i]));
     try {
       for (let i = 0; i < elements.length; i++) {
@@ -482,11 +482,14 @@ export class Runtime {
           const values = property.values.map(v => this._resolveValue(element, property.key, v));
           const explicit = property.authored ? point(property.key, values[0]!) : origin?.(element, property.key);
           const current = explicit ? { point: explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property.key);
-          const at = offset + i * clock.stagger, previous = compiled.get(property);
-          const spec = previous && previous.offset === at && previous.from.unit === current.point.unit &&
-            equal(previous.from._coordinates, current.point._coordinates) && equal(previous.velocity, current._velocity) && equal(previous.values, values)
-            ? previous.plan : program(property.key, current.point, values, property.authored, property.authored ? author : clock, current._velocity, at);
-          if (spec !== previous?.plan) compiled.set(property, { from: current.point, velocity: current._velocity, values, offset: at, plan: spec });
+          const previous = clock.stagger ? undefined : compiled.get(property);
+          const first = previous?._segments[0];
+          const reusable = previous && first && previous.unit === current.point.unit &&
+            equal(first.from, current.point._coordinates) && equal(first.velocity, current._velocity) &&
+            values.every((value, index) => Object.is(value, property.values[index]));
+          const spec = reusable ? previous : program(property.key, current.point, values, property.authored,
+            property.authored ? author : clock, current._velocity, offset + i * clock.stagger);
+          if (!reusable) compiled.set(property, spec);
           result.push({ element, key: property.key, _program: spec, reduced });
         }
       }
