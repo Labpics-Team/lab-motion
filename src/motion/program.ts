@@ -3,8 +3,8 @@ import { settleTimeUpperBound } from '../spring.js';
 import { sampleSpringBasisUnchecked, type MutableSpringBasis } from '../internal/solver.js';
 import { tryCompileSpringExecutionArtifactTupleUnchecked, type SpringExecutionArtifactTuple } from '../compositor/curve.js';
 import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
-import { MotionError, number } from './model.js';
-import type { MotionScalar, Timing } from './types.js';
+import { MotionError, number, type Timing } from './model.js';
+import type { MotionScalar } from './types.js';
 
 export const TRANSFORMS: Readonly<Record<string, number>> = { x: 0, y: 0, rotate: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1 };
 export const isTransform = (key: string): boolean => Object.hasOwn(TRANSFORMS, key);
@@ -78,7 +78,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
     length = artifact?.[2] ?? settleTimeUpperBound(timing.spring, energy) * 1000;
   }
-  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length)) throw new MotionError('Непредставимая длительность движения');
+  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) throw new MotionError('Непредставимая длительность движения');
   return { at, end: at + length, from: from._coordinates, to: to._coordinates, velocity, timing, artifact };
 }
 
