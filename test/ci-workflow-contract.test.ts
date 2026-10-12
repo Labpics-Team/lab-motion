@@ -138,7 +138,8 @@ type Reference = { where: string; ref: string; comment: string };
 
 // `uses` заданий и шагов берётся из разобранного YAML, а не из текста: его нельзя ни пропустить
 // формой записи (`uses :`), ни подменить строкой внутри многострочного значения. Комментарий
-// версии читается с того же поля, поэтому относится именно к проверяемой ссылке.
+// версии читается с того же поля и той же строки: именно там его обновляет Dependabot, а
+// комментарий на соседней строке остался бы старым после обновления SHA и не был бы замечен.
 function references(name: string, source: string): Reference[] {
   const document = parseDocument(source);
   expect(document.errors, `${name}: workflow не разбирается`).toEqual([]);
@@ -659,9 +660,10 @@ function assertPinPolicy(files: Map<string, string>) {
   for (const [sha, versions] of versionBySha) expect([...versions], `${sha}: одна версия в комментариях`).toHaveLength(1);
 }
 
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const bumpAction = (files: Map<string, string>, action: string, sha: string, version: string) => new Map(
   [...files].map(([name, source]) => [name, source.replace(
-    new RegExp(`(uses:[ \\t]*${action}@)[0-9a-f]{40}([ \\t]+#[ \\t]*)v\\d+\\.\\d+\\.\\d+`, 'g'),
+    new RegExp(`(uses:[ \\t]*${escapeRegExp(action)}@)[0-9a-f]{40}([ \\t]+#[ \\t]*)v\\d+\\.\\d+\\.\\d+`, 'g'),
     `$1${sha}$2${version}`,
   )]),
 );
@@ -682,6 +684,8 @@ const pinMutants: ReadonlyArray<readonly [string, (source: string) => string]> =
   ['нет комментария версии', (source) => source.replace(/(actions\/checkout@[0-9a-f]{40})[ \t]+#.*/, '$1')],
   ['комментарий без патча', (source) => source.replace(/(actions\/checkout@[0-9a-f]{40}[ \t]+# v\d+)\.\d+\.\d+/, '$1')],
   ['второй SHA того же action', (source) => source.replace(/(actions\/checkout@)[0-9a-f]{40}/, `$1${'a'.repeat(40)}`)],
+  ['комментарий версии на следующей строке', (source) => source.replace(
+    /(uses: actions\/checkout@[0-9a-f]{40})[ \t]+# (v\d+\.\d+\.\d+)/, '$1\n        # $2')],
   ['две версии одного SHA', (source) => source.replace(/(actions\/checkout@[0-9a-f]{40}[ \t]+# )v\d+\.\d+\.\d+/, '$1v0.0.1')],
   ['reusable workflow из другого репозитория', (source) => source.replace(
     'uses: ./.github/workflows/docs.yml', 'uses: someone/repo/.github/workflows/docs.yml@main')],
