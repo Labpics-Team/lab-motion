@@ -11,7 +11,7 @@
 
 | Метрика | N |
 | --- | --- |
-| экспорт-субпутей package.json | 45 |
+| экспорт-субпутей package.json | 46 |
 | фреймворк-биндингов | 9 |
 | CSS-литералов `--lab-motion-*` в src | 2 |
 | CSS-литералов вне `--lab-motion-*` в src | 0 |
@@ -71,7 +71,7 @@
 | Группа | Субпути |
 | --- | --- |
 | Ядро анимации | `./nano` (platform-trusted WAAPI, ≤1 KB), `./animate` (низкоуровневый фасад), `./frame`, `./driver`, `./compositor`, `./compositor/stagger`, `./compositor/follow`, `./waapi`, `./auto` |
-| Значения и физика | `./value`, `./spring`, `./decay`, `./easing`, `./keyframes`, `./stagger`, `./timeline`, `./presets`, `./tokens`, `./utils` |
+| Значения и физика | `./repeat` (опциональное расписание авторской траектории), `./value`, `./spring`, `./decay`, `./easing`, `./keyframes`, `./stagger`, `./timeline`, `./presets`, `./tokens`, `./utils` |
 | Доменные эффекты | `./bindings`, `./flip`, `./projection`, `./smart`, `./gestures`, `./behaviors`, `./behaviors/reorder`, `./scroll`, `./in-view`, `./presence`, `./svg`, `./svg-morph`, `./a11y`, `./compiler/surface` (приватный executor compiled-поверхности, ≤1 KB gz) |
 | Биндинги (9) | `./react`, `./svelte`, `./vue`, `./lit`, `./solid`, `./preact`, `./angular`, `./wc`, `./qwik` |
 | Build-tool (не runtime-tier) | `./compiler/vite` (Vite-адаптер lowering), `./compiler/runtime` (private executor compiled-вызовов) |
