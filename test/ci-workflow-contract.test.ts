@@ -132,7 +132,7 @@ const requiredActions = {
     {
       "index": 2,
       "name": "Setup Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "24"
       }
@@ -163,7 +163,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "${{ matrix.node }}"
       }
@@ -191,7 +191,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "24"
       }
@@ -222,7 +222,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "24"
       }
@@ -242,7 +242,7 @@ const requiredActions = {
     {
       "index": 7,
       "name": "Setup registered native-clock Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "24.19.0"
       }
@@ -260,7 +260,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "24"
       }
