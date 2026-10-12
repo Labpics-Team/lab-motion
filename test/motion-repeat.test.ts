@@ -32,7 +32,7 @@ describe('повтор авторской траектории', () => {
 });
 
 for (const native of [false, true]) for (const repeatType of ['loop', 'reverse', 'mirror'] as const) {
-  it(`сохраняет controls и конечную чётность: , native=`, async () => {
+  it('controls и конечная чётность: ' + repeatType + ', native=' + native, async () => {
     const h = harness(native);
     const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 100, repeat: 1, repeatType });
     run.pause(); run.seek(125);
@@ -118,7 +118,7 @@ it('повтор требует authored arrays, а repeat:0 сохраняет 
   run.finish(); expect(h.x()).toBe(100);
 });
 
-for (const repeatType of ['loop', 'reverse', 'mirror'] as const) it(`бесконечный  имеет явное завершение и reduced-motion`, async () => {
+for (const repeatType of ['loop', 'reverse', 'mirror'] as const) it('бесконечный ' + repeatType + ': завершение и reduced-motion', async () => {
   for (const reducedMotion of [undefined, 'always'] as const) {
     const h = harness(true);
     const run = h.runtime.animate(h.element, { x: [10, 100] }, { duration: 100, repeat: Infinity, repeatType, reducedMotion });
@@ -190,4 +190,20 @@ it('исключение easing освобождает все повторяющ
   const run = h.runtime.animate(h.element, { x: [0, 100], opacity: [0, 1] }, { duration: 100, repeat: Infinity, ease(p) { if (p > .4) throw error; return p; } });
   h.step(50); await expect(run.finished).rejects.toBe(error);
   expect(run.state).toBe('failed'); expect(h.updates.size + h.renders.size).toBe(0);
+});
+
+it('общая шкала отклоняет опции траектории и вложенные повторения до host writes', () => {
+  const h = harness();
+  const step = [h.element, { x: [0, 100] }, { duration: 100 }] as const;
+  for (const options of [{ duration: 100 }, { spring: { response: 100 } }, { stagger: 10 }, { times: [0, 1] }]) {
+    expect(() => h.runtime.sequence([step], options as SequenceOptions)).toThrow();
+  }
+  expect(() => h.runtime.sequence([[h.element, { x: [0, 100] }, { duration: 100, repeat: 1 } as MotionOptions]])).toThrow();
+  expect(h.writes).toHaveLength(0);
+});
+
+it('положительная длительность не исчезает при большом абсолютном delay', () => {
+  const h = harness();
+  expect(() => h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1, delay: 2 ** 53 })).toThrow(/длительность/);
+  expect(h.writes).toHaveLength(0);
 });

@@ -2,7 +2,7 @@ import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, snapshot, type PropertyInput } from './model.js';
 import { TRANSFORMS, isTransform, format, point, program, repeatProgram, sample, transform, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState, SequenceOptions, SequenceStep } from './types.js';
-import { timing, authoredTiming, type Timing } from './timing.js';
+import { timing, authoredTiming, sequenceTiming, type Timing } from './timing.js';
 import { sameRepeat } from './repeat.js';
 
 export interface RuntimeHost {
@@ -528,7 +528,7 @@ export class Runtime {
   }
   sequence(steps: readonly SequenceStep[], options?: SequenceOptions): Playback {
     const list = snapshot(steps, 'sequence');
-    const sequenceClock = timing(options as MotionOptions | undefined, false, true);
+    const sequenceClock = sequenceTiming(options);
     const merged = new Map<Element, Map<string, Draft>>();
     let cursor = 0, previousStart = 0, end = 0, count = 0;
     for (const tuple of list) {

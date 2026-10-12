@@ -82,7 +82,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
     length = artifact?.[2] ?? settleTimeUpperBound(timing.spring, energy) * 1000;
   }
-  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length)) throw new MotionError('Непредставимая длительность движения');
+  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) throw new MotionError('Непредставимая длительность движения');
   return { at, end: at + length, from: from._coordinates, to: to._coordinates, velocity, timing, artifact };
 }
 
@@ -113,7 +113,7 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
 }
 
 /** Расписание оборачивает готовую траекторию, не размножая её сегменты. */
-export function repeatProgram(input: Program, options: RepeatOptions, start = input._segments[0]!.at, span = input.duration - start): Program {
+export function repeatProgram(input: Program, options: RepeatOptions, start: number = input._segments[0]!.at, span: number = input.duration - start): Program {
   if (input._segments.some(segment => segment.timing.spring !== undefined))
     throw new MotionError('Повтор авторской траектории использует duration/ease');
   const plan = repeatPlan(options, start, span);

@@ -3,7 +3,7 @@ import { cubicBezierUnchecked } from '../internal/cubic-bezier.js';
 import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
 import { MotionError, number, record, snapshot } from './model.js';
 import { readRepeat, type RepeatOptions } from './repeat.js';
-import type { MotionOptions, MotionSpring } from './types.js';
+import type { MotionOptions, MotionSpring, SequenceOptions } from './types.js';
 
 /** Внутренний снимок: пользовательские getters больше не читаются исполнителем. */
 export interface Timing {
@@ -60,8 +60,7 @@ export function timing(input: MotionOptions | undefined, authored = false, repea
   const repetition = repeatable ? readRepeat(source.repeat, source.repeatType, source.repeatDelay) : undefined;
   if (spring !== undefined && (duration !== undefined || ease !== undefined))
     throw new MotionError('Задайте spring или duration/ease');
-  if (reducedMotion !== undefined && reducedMotion !== 'user' && reducedMotion !== 'always')
-    throw new MotionError('reducedMotion: user или always');
+  const reduced = reduction(reducedMotion);
   let easeFunction: (p: number) => number = authored ? linear : standard;
   let cssEase: string | undefined = authored ? 'linear' : standardCss;
   if (ease !== undefined) {
@@ -89,7 +88,7 @@ export function timing(input: MotionOptions | undefined, authored = false, repea
     spring: duration !== undefined || ease !== undefined || authored && spring === undefined ? undefined : physics(spring as MotionSpring | undefined),
     duration: duration === undefined ? authored || ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
     ease: easeFunction, cssEase, delay: number(delay ?? 0, 'delay', 0), stagger: number(stagger ?? 0, 'stagger', 0),
-    times: stops, reduced: reducedMotion === 'always',
+    times: stops, reduced,
     ...(repetition ? { _repeat: repetition } : {}),
   };
 }
@@ -104,3 +103,22 @@ export function authoredTiming(clock: Timing): Timing {
   };
 }
 
+
+function reduction(input: unknown): boolean {
+  if (input !== undefined && input !== 'user' && input !== 'always')
+    throw new MotionError('reducedMotion: user или always');
+  return input === 'always';
+}
+
+/** Общая шкала не принимает параметры отдельных траекторий. */
+export function sequenceTiming(input: SequenceOptions | undefined): Pick<Timing, 'delay' | 'reduced' | '_repeat'> {
+  const source = input === undefined ? {} : record(input, 'sequence options');
+  for (const key of Object.keys(source)) {
+    if (!['delay', 'reducedMotion', 'repeat', 'repeatType', 'repeatDelay'].includes(key))
+      throw new MotionError('Неизвестная опция последовательности ' + key);
+  }
+  const { delay, reducedMotion, repeat, repeatType, repeatDelay } = source;
+  const repetition = readRepeat(repeat, repeatType, repeatDelay);
+  return { delay: number(delay ?? 0, 'delay', 0), reduced: reduction(reducedMotion),
+    ...(repetition ? { _repeat: repetition } : {}) };
+}

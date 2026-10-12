@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures/harness';
 
-for (const repeatType of ['loop', 'reverse', 'mirror'] as const) test(`повтор : native, JS и raw WAAPI имеют одинаковую шкалу`, async ({ page }) => {
+for (const repeatType of ['loop', 'reverse', 'mirror'] as const) test('повтор ' + repeatType + ': native, JS и raw WAAPI имеют одинаковую шкалу', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
   await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'));
   const result = await page.evaluate(async repeatType => {
@@ -33,13 +33,13 @@ for (const repeatType of ['loop', 'reverse', 'mirror'] as const) test(`повт�
   }, repeatType);
   expect(result.nativeCount).toBe(1); expect(result.fallbackCount).toBe(0); expect(result.sameEffect).toBe(true);
   for (const row of result.rows) {
-    expect(row.native, `native @ `).toBeCloseTo(row.control, 2);
-    expect(row.fallback, `fallback @ `).toBeCloseTo(row.control, 2);
+    expect(row.native, 'native @ ' + row.t).toBeCloseTo(row.control, 2);
+    expect(row.fallback, 'fallback @ ' + row.t).toBeCloseTo(row.control, 2);
   }
   expect(result.remaining).toBe(0);
 });
 
-for (const repeatType of ['reverse', 'mirror'] as const) test(`нелинейный  и repeatDelay сохраняют разные значения`, async ({ page }) => {
+for (const repeatType of ['reverse', 'mirror'] as const) test('нелинейный ' + repeatType + ' и repeatDelay сохраняют разные значения', async ({ page }) => {
   const result = await page.evaluate(async repeatType => {
     const { animate } = await import('/browser/.artifacts/motion-root.js');
     const el = document.createElement('div'); document.body.append(el);
