@@ -6,7 +6,6 @@ import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
 import { MotionError, number } from './model.js';
 import type { MotionScalar } from './types.js';
 import type { Timing } from './timing.js';
-import type { Repetition, RepeatPlan } from './repeat-contract.js';
 
 export const TRANSFORMS: Readonly<Record<string, number>> = { x: 0, y: 0, rotate: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1 };
 export const isTransform = (key: string): boolean => Object.hasOwn(TRANSFORMS, key);
@@ -57,7 +56,9 @@ export interface Program {
   /** Только точная форма, доступная нативному исполнителю. */
   readonly _nativeEase: string | undefined;
   readonly _identity: readonly unknown[] | undefined;
-  readonly _repeat?: RepeatPlan;
+  /** Опциональная authored-траектория не меняет базовый семплер. */
+  readonly _sample?: (time: number, value: number[], velocity: number[]) => void;
+  readonly _nativeTiming?: Readonly<{ iterations: number; direction: 'normal' | 'alternate' }>;
 }
 
 function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration?: number): Segment {
@@ -81,7 +82,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
     length = artifact?.[2] ?? settleTimeUpperBound(timing.spring, energy) * 1000;
   }
-  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) throw new MotionError('Непредставимая длительность движения');
+  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length)) throw new MotionError('Непредставимая длительность движения');
   return { at, end: at + length, from: from._coordinates, to: to._coordinates, velocity, timing, artifact };
 }
 
@@ -111,70 +112,26 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
     _identity };
 }
 
-/** Расписание оборачивает готовую траекторию, не размножая её сегменты. */
-export function repeatProgram(input: Program, options: Repetition, start: number = input._segments[0]!.at, span: number = input.duration - start): Program {
-  if (input._segments.some(segment => segment.timing.spring !== undefined))
-    throw new MotionError('Повтор авторской траектории использует duration/ease');
-  const clock = options(start, span);
-  const plan: RepeatPlan = { start, span, clock, _sample: { rate: 0 } };
-  const segment = input._segments[0]!;
-  // Разрывный loop требует точной полузакрытой границы; WAAPI округляет её иначе.
-  const connected = clock.direction !== 0 || segment.from.every((value, i) => value === segment.to[i]);
-  const native = connected && span > 0 && clock.gap === 0 && segment.at === start && segment.end === start + span &&
-    (clock.direction !== 2 || input._nativeEase === 'linear');
-  return { ...input, duration: clock.end, _repeat: plan, _nativeEase: native ? input._nativeEase : undefined, _identity: undefined };
-}
-
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
-/** Последняя авторская поза для явного finish/reduced; у finite reverse учитывается parity. */
 export function finishSample(program: Program, value: number[], velocity: number[]): void {
-  const clock = program._repeat?.clock;
-  const reversed = clock && clock.count !== Infinity && clock.direction !== 0 && clock.count % 2 === 1;
-  const endpoint = reversed ? program._segments[0]!.from : program.final;
-  for (let i = 0; i < endpoint.length; i++) { value[i] = endpoint[i]!; velocity[i] = 0; }
+  const final = program.final;
+  for (let i = 0; i < final.length; i++) { value[i] = final[i]!; velocity[i] = 0; }
 }
 
 export function sample(program: Program, time: number, value: number[], velocity: number[]): void {
+  if (program._sample) { program._sample(time, value, velocity); return; }
   const _segments = program._segments;
-  const repeat = program._repeat;
-  let mirrored = false, rate = 1;
-  if (repeat) {
-    if (time === Infinity) throw new MotionError('Непредставимый горизонт бесконечного повтора');
-    if (time < repeat.start) {
-      const initial = _segments[0]!.from;
-      for (let i = 0; i < initial.length; i++) { value[i] = initial[i]!; velocity[i] = 0; }
-      return;
-    }
-    if (repeat.clock.count !== Infinity && time >= repeat.clock.end) {
-      finishSample(program, value, velocity);
-      return;
-    }
-    const cursor = repeat.clock.cursor(time, repeat._sample);
-    rate = repeat._sample.rate;
-    mirrored = cursor < 0;
-    const progress = mirrored ? -1 - cursor : cursor;
-    // Конец активного участка, включая задержку, удерживается без движения.
-    if (progress === 1) {
-      const endpoint = mirrored ? _segments[0]!.from : program.final;
-      for (let i = 0; i < endpoint.length; i++) { value[i] = endpoint[i]!; velocity[i] = 0; }
-      return;
-    }
-    time = repeat.start + progress * repeat.span;
-  }
-  if (time === Infinity || time >= (repeat ? repeat.start + repeat.span : program.duration)) {
-    const endpoint = mirrored ? _segments[0]!.from : program.final;
-    for (let i = 0; i < endpoint.length; i++) { value[i] = endpoint[i]!; velocity[i] = 0; }
+  if (time >= program.duration) {
+    for (let i = 0; i < program.final.length; i++) { value[i] = program.final[i]!; velocity[i] = 0; }
     return;
   }
   let at = 0;
   while (at + 1 < _segments.length && time >= _segments[at + 1]!.at) at++;
   const segment = _segments[at]!;
-  const reflected = mirrored ? _segments[_segments.length - 1 - at]! : segment;
-  const from = mirrored ? reflected.to : segment.from, to = mirrored ? reflected.from : segment.to;
   const _elapsed = Math.max(0, time - segment.at), duration = segment.end - segment.at;
   if (time >= segment.end) {
-    for (let i = 0; i < to.length; i++) { value[i] = to[i]!; velocity[i] = 0; }
+    for (let i = 0; i < segment.to.length; i++) { value[i] = segment.to[i]!; velocity[i] = 0; }
     return;
   }
   let p = duration === 0 ? 1 : Math.min(1, _elapsed / duration), dp = 0;
@@ -190,14 +147,13 @@ export function sample(program: Program, time: number, value: number[], velocity
     p = ease(p);
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) throw new MotionError('Easing вернул нечисловой результат');
-  for (let i = 0; i < from.length; i++) {
-    const a = from[i]!, distance = to[i]! - a;
+  for (let i = 0; i < segment.from.length; i++) {
+    const a = segment.from[i]!, distance = segment.to[i]! - a;
     if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment.at ? 0 : segment.velocity[i] ?? 0; }
     else if (segment.timing.spring && !segment.artifact) {
       value[i] = a + distance * basis._value + (segment.velocity[i] ?? 0) * basis._valueV0;
       velocity[i] = distance * basis._velocity + (segment.velocity[i] ?? 0) * basis._velocityV0;
     } else { value[i] = a + distance * p; velocity[i] = distance * dp; }
-    if (repeat && rate !== 1) velocity[i] = rate === 0 ? 0 : velocity[i]! * rate;
     if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) throw new MotionError('Движение вышло за представимый диапазон');
   }
 }

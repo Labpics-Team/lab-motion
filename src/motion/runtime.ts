@@ -1,6 +1,6 @@
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, snapshot, type PropertyInput } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, repeatProgram, sample, finishSample, transform, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, sample, finishSample, transform, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState, SequenceOptions, SequenceStep } from './types.js';
 import { timing, playbackTiming, authoredTiming, sequenceTiming, type Timing } from './timing.js';
 
@@ -277,15 +277,11 @@ class Surface {
     if (active.every(track => track._paused)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
-    const commonRepeat = first._program._repeat?.clock;
+    const commonTiming = first._program._nativeTiming;
     const canNative = (this.key === 'transform' || this.key === 'opacity') && _nativeEase !== undefined && typeof this.element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
       active.every(track => !track._paused && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
-        (!commonRepeat ? !track._program._repeat : !!track._program._repeat &&
-          track._program._repeat.clock.count === commonRepeat.count &&
-          track._program._repeat.clock.direction === commonRepeat.direction &&
-          track._program._repeat.clock.gap === commonRepeat.gap &&
-          track._program._repeat.start === first._program._repeat!.start &&
-          track._program._repeat.span === first._program._repeat!.span) &&
+        track._program._nativeTiming?.iterations === commonTiming?.iterations &&
+        track._program._nativeTiming?.direction === commonTiming?.direction &&
         track._program._segments[0]!.end === seg.end &&
         track._program.duration === first._program.duration && track._program._segments[0]!.at === seg.at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
@@ -294,8 +290,7 @@ class Surface {
       this._busy = true;
       const effect = this.element.animate([{ [this.key]: this._text('from') }, { [this.key]: this._text('to') }], {
         duration: seg.end - seg.at, delay: seg.at, easing: _nativeEase, fill: 'both',
-        ...(first._program._repeat ? { iterations: first._program._repeat.clock.count + 1,
-          direction: first._program._repeat.clock.direction === 0 ? 'normal' as const : 'alternate' as const } : {}),
+        ...first._program._nativeTiming,
       });
       this._native = effect; this._nativeTime = first._elapsed;
       if (first._elapsed !== 0) effect.currentTime = first._elapsed;
@@ -532,7 +527,7 @@ export class Runtime {
     if (clock._repeat && input.some(property => !property.authored))
       throw new MotionError('Повтор требует явно заданного массива значений');
     const drafts = this._draft(target, input, clock);
-    return this._execute(clock._repeat ? drafts.map(draft => ({ ...draft, _program: repeatProgram(draft._program, clock._repeat!) })) : drafts);
+    return this._execute(clock._repeat ? drafts.map(draft => ({ ...draft, _program: clock._repeat!(draft._program, sample) })) : drafts);
   }
   sequence(steps: readonly SequenceStep[], options?: SequenceOptions): Playback {
     const list = snapshot(steps, 'sequence');
@@ -570,7 +565,7 @@ export class Runtime {
     }
     const drafts = [...merged.values()].flatMap(map => [...map.values()]).map(d => ({ ...d, reduced: d.reduced || sequenceClock.reduced, _program: { ...d._program, duration: end, _nativeEase: undefined, _identity: undefined } }));
     return sequenceClock._repeat
-      ? this._execute(drafts.map(draft => ({ ...draft, _program: repeatProgram(draft._program, sequenceClock._repeat!, sequenceClock.delay, end - sequenceClock.delay) })))
+      ? this._execute(drafts.map(draft => ({ ...draft, _program: sequenceClock._repeat!(draft._program, sample, sequenceClock.delay, end - sequenceClock.delay) })))
       : this._execute(drafts, drafts.every(draft => draft.reduced) ? 0 : end);
   }
 }

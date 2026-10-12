@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { program, repeatProgram, sample } from '../src/motion/program.js';
+import { program, sample } from '../src/motion/program.js';
 import { authoredTiming, timing } from '../src/motion/timing.js';
 import { repeat } from '../src/motion/repeat.js';
 import { repetition } from '../src/motion/repeat-contract.js';
@@ -17,11 +17,11 @@ it('направление скорости и удержание принадл
 
 it('одна траектория и одно рабочее место сохраняются при 10000 семплах', () => {
   const original = program('x', { _coordinates: [0], unit: '' }, [0, 100], true, authoredTiming(timing({ duration: 100 })), [0]);
-  const loop = repeatProgram(original, repetition(repeat(Infinity, { type: 'reverse', delay: 20 }).repeat)!);
-  const values = [0], velocity = [0], workspace = loop._repeat!._sample;
+  const loop = repetition(repeat(Infinity, { type: 'reverse', delay: 20 }).repeat)!(original, sample);
+  const values = [0], velocity = [0], sampler = loop._sample;
   for (let t = 0; t < 10000; t++) {
     sample(loop, t, values, velocity);
-    expect(loop._segments).toBe(original._segments); expect(loop._repeat!._sample).toBe(workspace);
+    expect(loop._segments).toBe(original._segments); expect(loop._sample).toBe(sampler);
   }
   sample(loop, 145, values, velocity); expect(values[0]).toBe(75); expect(velocity[0]).toBeCloseTo(-1000, 6);
   sample(loop, 110, values, velocity); expect(velocity[0]).toBe(0);

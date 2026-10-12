@@ -131,12 +131,9 @@ for (const repeatType of ['loop', 'reverse', 'mirror'] as const) it('беско�
     const run = h.runtime.animate(h.element, { x: [10, 100] }, repeating({ duration: 100, repeat: Infinity, repeatType, reducedMotion }));
     if (!reducedMotion) {
       expect(run.duration).toBe(Infinity);
-      if (repeatType === 'loop') {
-        expect(h.effects).toHaveLength(0); expect(h.updates.size).toBe(1);
-      } else {
-        expect(h.effects).toHaveLength(1); expect(h.effects[0]!.timing.iterations).toBe(Infinity);
-        expect(h.updates.size + h.renders.size).toBe(0);
-      }
+      // Бесконечную native-шкалу невозможно наблюдать на границе точного горизонта.
+      expect(h.effects).toHaveLength(0);
+      expect(h.updates.size).toBe(1);
       run.seek(125); expect(h.x()).toBe(repeatType === 'loop' ? 32.5 : 77.5);
       expect(() => run.seek(Infinity)).toThrow();
       run.finish();
@@ -165,7 +162,7 @@ it('сохраняет мгновенные итерации и отклоняе
 
 it('pause в промежутке и запоздалый native completion не возвращают старого владельца', async () => {
   const h = harness(true);
-  const old = h.runtime.animate(h.element, { x: [0, 100], opacity: [0, 1] }, repeating({ duration: 100, repeat: Infinity, repeatType: 'reverse' }));
+  const old = h.runtime.animate(h.element, { x: [0, 100], opacity: [0, 1] }, repeating({ duration: 100, repeat: 2, repeatType: 'reverse' }));
   const effects = [...h.effects];
   expect(effects).toHaveLength(2);
   const next = h.runtime.animate(h.element, { x: [100, 200] }, repeating({ duration: 100, repeat: 2, repeatType: 'reverse' }));

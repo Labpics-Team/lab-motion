@@ -38,8 +38,11 @@ it('установленный пакет предоставляет один ro
     const child = spawnSync(process.execPath, ['probe.mjs'], { cwd: work, encoding: 'utf8', timeout: 15_000 });
     expect(child.status, child.stdout + child.stderr).toBe(0);
     const source = `import {animate, scope, sequence, layout, value, type Playback, type MotionResult} from '@labpics/motion';
+import { repeat } from '@labpics/motion/repeat';
 const element=document.createElement('div');
 const a:Playback=animate(element,{x:[0,100,0]},{duration:200,ease:'ease-out'});
+const repeated=animate(element,{x:[0,100]},{duration:200,...repeat(2,{type:'reverse'})});
+repeated.finish();
 const b=animate(element,{x:200},{spring:{response:280,bounce:.1}});
 const area=scope(element); area.on(element,'click',e=>{const x:number=e.clientX;void x});
 sequence([[element,{x:100},{at:0,duration:200}]]);
@@ -52,6 +55,10 @@ animate(element,{x:1},{duration:200,spring:{response:200}});
 animate(element,{x:1},{spring:{response:'slow'}});
 // @ts-expect-error direct host clock belongs to tests
 animate(element,{x:1},{requestFrame:()=>0});
+// @ts-expect-error repeat accepts only a branded plan from repeat()
+animate(element,{x:[0,100]},{duration:200,repeat:2});
+// @ts-expect-error repeat count must be numeric
+repeat('twice');
 // @ts-expect-error controls expose one stop
 b.cancel();
 // @ts-expect-error invalid easing name
