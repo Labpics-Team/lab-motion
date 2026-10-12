@@ -132,7 +132,7 @@ const requiredActions = {
     {
       "index": 2,
       "name": "Setup Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "24"
       }
@@ -140,7 +140,7 @@ const requiredActions = {
     {
       "index": 17,
       "name": "Upload Node-floor candidate",
-      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
       "with": {
         "name": "node-floor-package-${{ github.sha }}-${{ github.run_id }}",
         "path": "node-floor-artifact/*.tgz",
@@ -163,7 +163,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "${{ matrix.node }}"
       }
@@ -171,7 +171,7 @@ const requiredActions = {
     {
       "index": 2,
       "name": "Download Node-floor candidate",
-      "uses": "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+      "uses": "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
       "with": {
         "name": "node-floor-package-${{ github.sha }}-${{ github.run_id }}",
         "path": "node-floor-artifact",
@@ -191,7 +191,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "24"
       }
@@ -200,7 +200,7 @@ const requiredActions = {
       "index": 8,
       "name": "Upload failure artifacts",
       "if": "failure()",
-      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
       "with": {
         "name": "browser-conformance-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.run_id }}",
         "path": "test-results/\nplaywright-report/\n",
@@ -222,7 +222,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "24"
       }
@@ -231,7 +231,7 @@ const requiredActions = {
       "index": 6,
       "name": "Upload Vitest diagnostics",
       "if": "failure() && steps.vitest.outcome == 'failure'",
-      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
       "with": {
         "name": "vitest-diagnostics-${{ github.run_id }}",
         "path": "vitest.log",
@@ -242,7 +242,7 @@ const requiredActions = {
     {
       "index": 7,
       "name": "Setup registered native-clock Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "24.19.0"
       }
@@ -260,7 +260,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@820762786026740c76f36085b0efc47a31fe5020",
+      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
       "with": {
         "node-version": "24"
       }

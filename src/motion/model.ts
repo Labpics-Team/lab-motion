@@ -1,7 +1,7 @@
 import { DEFAULT_DURATION_MS, DEFAULT_SPRING, STANDARD_EASING_COORDS } from '../internal/motion-defaults.js';
 import { cubicBezierUnchecked } from '../internal/cubic-bezier.js';
 import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
-import type { MotionOptions, MotionProperties, MotionScalar, MotionSpring, Timing, MotionResult } from './types.js';
+import type { MotionOptions, MotionProperties, MotionScalar, MotionSpring, MotionResult } from './types.js';
 
 export class MotionError extends Error {
   constructor(message: string) { super(message); this.name = 'MotionError'; }
@@ -37,6 +37,20 @@ export function snapshot<T>(input: readonly T[], name: string, minimum = 0): T[]
     result.push(input[i]!);
   }
   return result;
+}
+
+/** Внутренний снимок: пользовательские getters больше не читаются исполнителем. */
+export interface Timing {
+  readonly _defaultMotion: boolean;
+  readonly _defaultEase: boolean;
+  readonly spring: SpringParams | undefined;
+  readonly duration: number | undefined;
+  readonly ease: (progress: number) => number;
+  readonly cssEase: string | undefined;
+  readonly delay: number;
+  readonly stagger: number;
+  readonly times: readonly number[] | undefined;
+  readonly reduced: boolean;
 }
 
 export function physics(input: MotionSpring | undefined): SpringParams {
@@ -131,14 +145,18 @@ export function properties(input: MotionProperties): PropertyInput[] {
     if (key === 'scale') {
       if (Object.hasOwn(source, 'scaleX') || Object.hasOwn(source, 'scaleY')) throw new MotionError('scale уже задаёт scaleX и scaleY');
       result.push({ key: 'scaleX', values: values as MotionScalar[], authored }, { key: 'scaleY', values: values as MotionScalar[], authored });
-    } else result.push({ key: key.startsWith('--') ? key : key.replace(/[A-Z]/g, c => '-' + c.toLowerCase()), values: values as MotionScalar[], authored });
+    } else {
+      const name = key.startsWith('--') ? key : key.replace(/[A-Z]/g, c => '-' + c.toLowerCase());
+      const normalized = name === 'scale-x' ? 'scaleX' : name === 'scale-y' ? 'scaleY'
+        : name === 'skew-x' ? 'skewX' : name === 'skew-y' ? 'skewY' : name;
+      result.push({ key: normalized, values: values as MotionScalar[], authored });
+    }
   }
   if (result.reduce((sum, entry) => sum + entry.values.length, 0) > MAX_CHANNELS) throw new MotionError('Слишком много значений');
-  const normalized = result.map(entry => ({ ...entry, key: entry.key === 'scale-x' ? 'scaleX' : entry.key === 'scale-y' ? 'scaleY' : entry.key === 'skew-x' ? 'skewX' : entry.key === 'skew-y' ? 'skewY' : entry.key }));
   const declared = new Set<string>();
-  for (const entry of normalized) {
+  for (const entry of result) {
     if (declared.has(entry.key)) throw new MotionError(`Свойство ${entry.key} задано несколько раз`);
     declared.add(entry.key);
   }
-  return normalized;
+  return result;
 }
