@@ -171,7 +171,7 @@ const requiredActions = {
     {
       "index": 2,
       "name": "Download Node-floor candidate",
-      "uses": "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+      "uses": "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
       "with": {
         "name": "node-floor-package-${{ github.sha }}-${{ github.run_id }}",
         "path": "node-floor-artifact",
