@@ -127,25 +127,44 @@ export function repeatProgram(input: Program, options: Repetition, start: number
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
+/** Последняя авторская поза для явного finish/reduced; у finite reverse учитывается parity. */
+export function finishSample(program: Program, value: number[], velocity: number[]): void {
+  const clock = program._repeat?.clock;
+  const reversed = clock && clock.count !== Infinity && clock.direction !== 0 && clock.count % 2 === 1;
+  const endpoint = reversed ? program._segments[0]!.from : program.final;
+  for (let i = 0; i < endpoint.length; i++) { value[i] = endpoint[i]!; velocity[i] = 0; }
+}
+
 export function sample(program: Program, time: number, value: number[], velocity: number[]): void {
   const _segments = program._segments;
   const repeat = program._repeat;
   let mirrored = false, rate = 1;
-  if (repeat && time !== Infinity) {
+  if (repeat) {
+    if (time === Infinity) throw new MotionError('Непредставимый горизонт бесконечного повтора');
+    if (time < repeat.start) {
+      const initial = _segments[0]!.from;
+      for (let i = 0; i < initial.length; i++) { value[i] = initial[i]!; velocity[i] = 0; }
+      return;
+    }
+    if (repeat.clock.count !== Infinity && time >= repeat.clock.end) {
+      finishSample(program, value, velocity);
+      return;
+    }
     const cursor = repeat.clock.cursor(time, repeat._sample);
-    // Снимок сохраняется до вызова пользовательского easing, включая reentry.
     rate = repeat._sample.rate;
     mirrored = cursor < 0;
     const progress = mirrored ? -1 - cursor : cursor;
-    if (progress === 0 || progress === 1) {
-      const endpoint = (progress === 0) !== mirrored ? _segments[0]!.from : program.final;
+    // Конец активного участка, включая задержку, удерживается без движения.
+    if (progress === 1) {
+      const endpoint = mirrored ? _segments[0]!.from : program.final;
       for (let i = 0; i < endpoint.length; i++) { value[i] = endpoint[i]!; velocity[i] = 0; }
       return;
     }
     time = repeat.start + progress * repeat.span;
   }
   if (time === Infinity || time >= (repeat ? repeat.start + repeat.span : program.duration)) {
-    for (let i = 0; i < program.final.length; i++) { value[i] = mirrored ? _segments[0]!.from[i]! : program.final[i]!; velocity[i] = 0; }
+    const endpoint = mirrored ? _segments[0]!.from : program.final;
+    for (let i = 0; i < endpoint.length; i++) { value[i] = endpoint[i]!; velocity[i] = 0; }
     return;
   }
   let at = 0;

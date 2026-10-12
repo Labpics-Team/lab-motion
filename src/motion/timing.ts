@@ -126,14 +126,27 @@ function reduction(input: unknown): boolean {
   return input === 'always';
 }
 
-/** Общая шкала не принимает параметры отдельных траекторий. */
-export function sequenceTiming(input: SequenceOptions | undefined): Pick<Timing, 'delay' | 'reduced' | '_repeat'> {
+const SEQUENCE_KEYS = ['delay', 'reducedMotion', 'repeat'] as const;
+
+/** Снимок читает допустимые поля, включая accessors в прототипе, по одному разу. */
+export function snapshotSequenceOptions(input: SequenceOptions | undefined): SequenceOptions {
   const source = input === undefined ? {} : record(input, 'sequence options');
   for (const key of Object.keys(source)) {
-    if (!['delay', 'reducedMotion', 'repeat'].includes(key))
+    if (!(SEQUENCE_KEYS as readonly string[]).includes(key))
       throw new MotionError('Неизвестная опция последовательности ' + key);
   }
-  const { delay, reducedMotion, repeat } = source;
+  const result: { delay?: number; reducedMotion?: 'user' | 'always'; repeat?: SequenceOptions['repeat'] } = {};
+  const delay = (source as SequenceOptions).delay;
+  const reducedMotion = (source as SequenceOptions).reducedMotion;
+  const repeat = (source as SequenceOptions).repeat;
+  if (delay !== undefined) result.delay = delay;
+  if (reducedMotion !== undefined) result.reducedMotion = reducedMotion;
+  if (repeat !== undefined) result.repeat = repeat;
+  return result;
+}
+
+export function sequenceTiming(input: SequenceOptions | undefined): Pick<Timing, 'delay' | 'reduced' | '_repeat'> {
+  const { delay, reducedMotion, repeat } = snapshotSequenceOptions(input);
   const rule = repetition(repeat);
   return { delay: number(delay ?? 0, 'delay', 0), reduced: reduction(reducedMotion),
     ...(rule ? { _repeat: rule } : {}) };

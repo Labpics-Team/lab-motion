@@ -16,7 +16,7 @@ export async function buildMotionRoot(root, out, work, tarball) {
   const guide = readFileSync(join(packageRoot, 'docs/getting-started.md'), 'utf8');
   const example = rootRecipe(guide);
   const entry = join(work, 'root.ts');
-  writeFileSync(entry, `export { animate, scope, sequence, layout, value, MotionError } from '@labpics/motion';\n${example}\n`);
+  writeFileSync(entry, `export { animate, scope, sequence, layout, value, MotionError } from '@labpics/motion';\nexport { repeat } from '@labpics/motion/repeat';\n${example}\n`);
   const result = await build({ entryPoints: [entry], bundle: true, format: 'esm', platform: 'browser',
     target: 'es2022', minify: true, write: false, metafile: true, absWorkingDir: work });
   const inputs = Object.keys(result.metafile.inputs).map(file => resolve(work, file));

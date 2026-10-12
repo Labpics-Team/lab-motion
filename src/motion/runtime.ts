@@ -1,6 +1,6 @@
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, snapshot, type PropertyInput } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, repeatProgram, sample, transform, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, repeatProgram, sample, finishSample, transform, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState, SequenceOptions, SequenceStep } from './types.js';
 import { timing, playbackTiming, authoredTiming, sequenceTiming, type Timing } from './timing.js';
 
@@ -277,9 +277,15 @@ class Surface {
     if (active.every(track => track._paused)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
+    const commonRepeat = first._program._repeat?.clock;
     const canNative = (this.key === 'transform' || this.key === 'opacity') && _nativeEase !== undefined && typeof this.element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
       active.every(track => !track._paused && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
-        (track._program._repeat?.clock.direction ?? 0) === (first._program._repeat?.clock.direction ?? 0) &&
+        (!commonRepeat ? !track._program._repeat : !!track._program._repeat &&
+          track._program._repeat.clock.count === commonRepeat.count &&
+          track._program._repeat.clock.direction === commonRepeat.direction &&
+          track._program._repeat.clock.gap === commonRepeat.gap &&
+          track._program._repeat.start === first._program._repeat!.start &&
+          track._program._repeat.span === first._program._repeat!.span) &&
         track._program._segments[0]!.end === seg.end &&
         track._program.duration === first._program.duration && track._program._segments[0]!.at === seg.at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
@@ -337,7 +343,8 @@ class Surface {
         else if (action === 'play') track._paused = false;
         else if (action === 'seek') track._elapsed = time;
         else if (action === 'finish') track._elapsed = track._program.duration;
-        sample(track._program, track._elapsed, track.value, track._velocity);
+        if (action === 'finish') finishSample(track._program, track.value, track._velocity);
+        else sample(track._program, track._elapsed, track.value, track._velocity);
       }
       this._render();
       for (const track of selected) {
@@ -506,7 +513,8 @@ export class Runtime {
         const first = draft._program._segments[0]!.from;
         const track: Track = { _program: draft._program, _group: group, value: [...first], _velocity: first.map(() => 0),
           _owner: undefined, _elapsed: draft.reduced ? draft._program.duration : 0, _paused: false, _done: false };
-        sample(track._program, track._elapsed, track.value, track._velocity);
+        if (draft.reduced) finishSample(track._program, track.value, track._velocity);
+        else sample(track._program, track._elapsed, track.value, track._velocity);
         run._own(track); group._attach(track);
       }
       for (const group of touched) {

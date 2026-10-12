@@ -502,6 +502,16 @@
         "types": "./dist/bindings/index.d.cts",
         "default": "./dist/bindings/index.cjs"
       }
+    },
+    "./repeat": {
+      "import": {
+        "types": "./dist/repeat/index.d.ts",
+        "default": "./dist/repeat/index.js"
+      },
+      "require": {
+        "types": "./dist/repeat/index.d.cts",
+        "default": "./dist/repeat/index.cjs"
+      }
     }
   },
   "files": [

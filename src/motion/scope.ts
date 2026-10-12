@@ -1,5 +1,5 @@
 import { MotionError, STOPPED, record, snapshot } from './model.js';
-import { playbackTiming } from './timing.js';
+import { playbackTiming, snapshotSequenceOptions } from './timing.js';
 import { animate, sequence, targets } from './runtime.js';
 import { layout, type LayoutOptions } from './layout.js';
 import { value, type MotionValue } from './value.js';
@@ -81,6 +81,7 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
     },
     sequence(steps, options): Playback {
       if (!owner) return stopped;
+      const common = snapshotSequenceOptions(options);
       const { repeat, ...stepDefaults } = settings;
       const input = snapshot(steps, 'sequence').map(step => {
         const [target, properties, opt] = snapshot(step, 'sequence step', 2) as unknown as SequenceStep;
@@ -88,7 +89,7 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
         return [targets(target, owner), properties, { ...mergeOptions(stepDefaults as MotionOptions, motion), ...(at === undefined ? {} : { at }) }] as SequenceStep;
       });
       if (!owner) return stopped;
-      return adopt(sequence(input, { repeat, ...options }));
+      return adopt(sequence(input, { repeat, ...common }));
     },
     layout(mutate, options): Playback {
       if (!owner) return stopped;

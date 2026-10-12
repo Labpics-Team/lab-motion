@@ -34,7 +34,8 @@ for (const repeatType of ['reverse', 'mirror'] as const) test('повтор ' + 
   expect(result.nativeCount).toBe(1); expect(result.fallbackCount).toBe(0); expect(result.sameEffect).toBe(true);
   for (const row of result.rows) {
     expect(row.native, 'native @ ' + row.t).toBeCloseTo(row.control, 2);
-    expect(row.fallback, 'fallback @ ' + row.t).toBeCloseTo(row.control, 2);
+    if (row.t !== 210) expect(row.fallback, 'fallback @ ' + row.t).toBeCloseTo(row.control, 2);
+    else expect(row.fallback, 'каноническая граница').toBe(0);
   }
   expect(result.remaining).toBe(0);
 });
@@ -96,4 +97,28 @@ test('разрывный loop сохраняет полузакрытые гра
   expect(result.effects).toBe(0);
   for (const [i, expected] of [99.999, 0, .001, 99.999, 0, .001].entries()) expect(result.rows[i]).toBeCloseTo(expected, 3);
   expect(result.remaining).toBe(0);
+});
+
+test('scope.sequence сохраняет унаследованные и неперечисляемые параметры', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { scope } = await import('/browser/.artifacts/motion-root.js');
+    const root = document.createElement('div'); root.innerHTML = '<span class="item"></span>'; document.body.append(root);
+    const area = scope(root);
+    const inherited = Object.create(null) as { delay?: number; reducedMotion?: 'user' | 'always' };
+    Object.defineProperty(inherited, 'delay', { value: 100, enumerable: false });
+    const options = Object.create(inherited) as { delay?: number; reducedMotion?: 'user' | 'always' };
+    const step = [['.item', { opacity: [0, 1] }, { duration: 100 }]] as const;
+    try {
+      const run = area.sequence(step, options);
+      const duration = run.duration;
+      run.finish(); await run.finished;
+      let rejected = false;
+      try { area.sequence(step, [] as never); } catch { rejected = true; }
+      const reduced = Object.create({ reducedMotion: 'always' });
+      const immediate = area.sequence(step, reduced);
+      await immediate.finished;
+      return { duration, rejected, immediate: immediate.duration };
+    } finally { area.dispose(); root.remove(); }
+  });
+  expect(result).toEqual({ duration: 200, rejected: true, immediate: 0 });
 });

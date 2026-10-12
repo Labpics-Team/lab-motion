@@ -3,7 +3,8 @@
 Обычная работа использует один импорт:
 
 ```typescript
-import { animate, scope, sequence, layout, value, repeat } from '@labpics/motion';
+import { animate, scope, sequence, layout, value } from '@labpics/motion';
+import { repeat } from '@labpics/motion/repeat';
 ```
 
 ## `animate(target, properties, options?)`
@@ -79,7 +80,7 @@ animate('.indicator', { opacity: [0.3, 1] }, {
 });
 ```
 
-`repeat(count, { type, delay })` возвращает настройки для добавления к опциям движения.
+`repeat(count, { type, delay })` импортируется из `@labpics/motion/repeat` и возвращает настройки для добавления к опциям движения.
 `count` задаёт дополнительные итерации: целое число от 0 до 2147483647 либо
 `Infinity` (также по умолчанию). Тип `loop` повторяет исходный проход;
 `reverse` и `mirror` чередуют направление. `delay` задаёт конечные миллисекунды

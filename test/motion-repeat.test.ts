@@ -234,3 +234,35 @@ it('native loop допускается при совпадающих endpoints',
   expect(h.effects).toHaveLength(1); expect(h.updates.size + h.renders.size).toBe(0);
   run.stop(); expect(h.x()).toBe(20);
 });
+
+it('мгновенный первый шаг выполнен и на старте следующей итерации sequence', async () => {
+  const h = harness();
+  const run = h.runtime.sequence([
+    [h.element, { x: [0, 100] }, { duration: 0 }],
+    [h.element, { x: [100, 200] }, { at: 100, duration: 100 }],
+  ], { ...repeat(1) });
+  expect(h.x()).toBe(100);
+  run.pause(); run.seek(0); expect(h.x()).toBe(100);
+  run.seek(200); expect(h.x()).toBe(100);
+  run.seek(250); expect(h.x()).toBe(100);
+  run.finish(); expect(h.x()).toBe(200);
+  expect(await run.finished).toEqual({ status: 'finished' });
+});
+
+it('вложенный повтор запрещён также для настоящего repeat() primitive', () => {
+  const h = harness();
+  expect(() => h.runtime.sequence([
+    [h.element, { x: [0, 100] }, { duration: 100, ...repeat(2) }],
+  ], { ...repeat(1) })).toThrow(/опция/);
+  expect(h.writes).toHaveLength(0);
+});
+
+it('переполнение таймлайна после seek завершает бесконечный повтор ошибкой', async () => {
+  const h = harness();
+  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1e308, ...repeat(Infinity) });
+  run.seek(1e308);
+  h.step(Number.MAX_VALUE);
+  await expect(run.finished).rejects.toThrow(/горизонт/);
+  expect(run.state).toBe('failed');
+  expect(h.updates.size + h.renders.size).toBe(0);
+});
