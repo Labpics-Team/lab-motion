@@ -119,22 +119,36 @@ jobs:
       - name: Compiler lowering acceptance
         run: pnpm acceptance:compiler
 
-      # Exact Node-floor job не может запускать pnpm 11 (его собственный floor
-      # выше потребительского). Собираем кандидат на Node 24 и передаём байты.
+      # Сборка использует Node 24; оба consumer runtime читают один пакет
+      # из отдельной установки без dev dependencies и без передачи между jobs.
       - name: Pack Node-floor candidate
         run: |
           mkdir node-floor-artifact
           pnpm pack --pack-destination node-floor-artifact
 
-      - name: Upload Node-floor candidate
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - name: Consumer smoke on build runtime
+        shell: bash
+        run: |
+          shopt -s nullglob
+          archives=(node-floor-artifact/*.tgz)
+          [[ ${#archives[@]} -eq 1 ]] \
+            || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }
+          node scripts/pack-smoke.mjs "${archives[0]}"
+
+      - name: Setup consumer Node floor
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          name: node-floor-package-${{ github.sha }}-${{ github.run_id }}
-          path: node-floor-artifact/*.tgz
-          if-no-files-found: error
-          retention-days: 1
-          compression-level: 0
-          overwrite: false
+          node-version: "22.0.0"
+
+      - name: Consumer smoke on minimum runtime
+        shell: bash
+        run: |
+          test "$(node --version)" = v22.0.0
+          shopt -s nullglob
+          archives=(node-floor-artifact/*.tgz)
+          [[ ${#archives[@]} -eq 1 ]] \
+            || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }
+          node scripts/pack-smoke.mjs "${archives[0]}"
 
   # Независимые проверки исполняются на разных машинах, а не конкурируют
   # за CPU/RAM одного runner. Малый build дешевле дополнительного artifact join;
@@ -175,15 +189,6 @@ jobs:
           pnpm vitest run 2>&1 | tee vitest.log
           status=${PIPESTATUS[0]}
           exit "$status"
-
-      - name: Upload Vitest diagnostics
-        if: failure() && steps.vitest.outcome == 'failure'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: vitest-diagnostics-${{ github.run_id }}
-          path: vitest.log
-          if-no-files-found: error
-          retention-days: 7
 
       # Проверяем настоящий C/header/API на зарегистрированном Node, сохраняя
       # обычный suite выше на текущем Node24. Это не performance calibration.
@@ -227,47 +232,6 @@ jobs:
       - name: Driver mutation gate
         run: pnpm exec stryker run stryker.driver.config.mjs
 
-  node-floor:
-    name: consumer contract · Node ${{ matrix.node }}
-    needs: [verify]
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        node: ["22.0.0", "24"]
-
-    permissions:
-      actions: read
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-
-      - name: Setup Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ matrix.node }}
-
-      - name: Download Node-floor candidate
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: node-floor-package-${{ github.sha }}-${{ github.run_id }}
-          path: node-floor-artifact
-          digest-mismatch: error
-
-      - name: Exact runtime consumer smoke
-        shell: bash
-        run: |
-          shopt -s nullglob
-          archives=(node-floor-artifact/*.tgz)
-          [[ ${#archives[@]} -eq 1 ]] \
-            || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }
-          node scripts/pack-smoke.mjs "${archives[0]}"
-
   documentation:
     uses: ./.github/workflows/docs.yml
 
@@ -277,7 +241,7 @@ jobs:
   CI:
     name: CI
     if: ${{ always() }}
-    needs: [verify, tests, mutation, node-floor, browser-static, documentation]
+    needs: [verify, tests, mutation, browser-static, documentation]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -288,7 +252,6 @@ jobs:
           VERIFY_RESULT: ${{ needs.verify.result }}
           TESTS_RESULT: ${{ needs.tests.result }}
           MUTATION_RESULT: ${{ needs.mutation.result }}
-          NODE_FLOOR_RESULT: ${{ needs.node-floor.result }}
           BROWSER_RESULT: ${{ needs.browser-static.result }}
           DOCS_RESULT: ${{ needs.documentation.result }}
         run: |
@@ -296,6 +259,5 @@ jobs:
           [[ "$VERIFY_RESULT" == success ]]
           [[ "$TESTS_RESULT" == success ]]
           [[ "$MUTATION_RESULT" == success ]]
-          [[ "$NODE_FLOOR_RESULT" == success ]]
           [[ "$BROWSER_RESULT" == success ]]
           [[ "$DOCS_RESULT" == success ]]
