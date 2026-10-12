@@ -25,5 +25,10 @@ updates:
       time: "04:30"
       timezone: Europe/Berlin
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        update-types:
+          - minor
+          - patch
     commit-message:
       prefix: "ci"
