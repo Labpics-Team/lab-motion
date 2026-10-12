@@ -6,8 +6,7 @@ import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
 import { MotionError, number } from './model.js';
 import type { MotionScalar } from './types.js';
 import type { Timing } from './timing.js';
-import { repeatPlan, type RepeatOptions, type RepeatPlan } from './repeat.js';
-import { repeatCursor } from '../internal/repeat-cursor.js';
+import type { Repetition, RepeatPlan } from './repeat-contract.js';
 
 export const TRANSFORMS: Readonly<Record<string, number>> = { x: 0, y: 0, rotate: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1 };
 export const isTransform = (key: string): boolean => Object.hasOwn(TRANSFORMS, key);
@@ -113,14 +112,17 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
 }
 
 /** Расписание оборачивает готовую траекторию, не размножая её сегменты. */
-export function repeatProgram(input: Program, options: RepeatOptions, start: number = input._segments[0]!.at, span: number = input.duration - start): Program {
+export function repeatProgram(input: Program, options: Repetition, start: number = input._segments[0]!.at, span: number = input.duration - start): Program {
   if (input._segments.some(segment => segment.timing.spring !== undefined))
     throw new MotionError('Повтор авторской траектории использует duration/ease');
-  const plan = repeatPlan(options, start, span);
+  const clock = options(start, span);
+  const plan: RepeatPlan = { start, span, clock, _sample: { rate: 0 } };
   const segment = input._segments[0]!;
-  const native = plan.span > 0 && plan.delay === 0 && segment.at === start && segment.end === start + span &&
-    (plan.direction !== 2 || input._nativeEase === 'linear');
-  return { ...input, duration: plan.end, _repeat: plan, _nativeEase: native ? input._nativeEase : undefined, _identity: undefined };
+  // Разрывный loop требует точной полузакрытой границы; WAAPI округляет её иначе.
+  const connected = clock.direction !== 0 || segment.from.every((value, i) => value === segment.to[i]);
+  const native = connected && span > 0 && clock.gap === 0 && segment.at === start && segment.end === start + span &&
+    (clock.direction !== 2 || input._nativeEase === 'linear');
+  return { ...input, duration: clock.end, _repeat: plan, _nativeEase: native ? input._nativeEase : undefined, _identity: undefined };
 }
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
@@ -130,7 +132,7 @@ export function sample(program: Program, time: number, value: number[], velocity
   const repeat = program._repeat;
   let mirrored = false, rate = 1;
   if (repeat && time !== Infinity) {
-    const cursor = repeatCursor(time, repeat.start, repeat.span, repeat.count, repeat.delay, repeat.direction, repeat._sample);
+    const cursor = repeat.clock.cursor(time, repeat._sample);
     // Снимок сохраняется до вызова пользовательского easing, включая reentry.
     rate = repeat._sample.rate;
     mirrored = cursor < 0;

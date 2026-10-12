@@ -10,7 +10,7 @@
 ### Добавлено
 
 - Повтор авторских траекторий `animate`, `value.animate` и всей `sequence` через
-  `repeat`, `repeatType` и `repeatDelay`, с единым Playback и reduced-motion.
+  `...repeat(count, { type, delay })`, с единым Playback и reduced-motion.
   Подходящие двухточечные траектории делегируются одному нативному эффекту.
 
 ### Исправлено

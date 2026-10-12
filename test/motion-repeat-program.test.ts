@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
 import { program, repeatProgram, sample } from '../src/motion/program.js';
 import { authoredTiming, timing } from '../src/motion/timing.js';
+import { repeat } from '../src/motion/repeat.js';
+import { repetition } from '../src/motion/repeat-contract.js';
 import { repeatCursor } from '../src/internal/repeat-cursor.js';
 import { harness } from './fixtures/motion-runtime.js';
 
@@ -15,7 +17,7 @@ it('направление скорости и удержание принадл
 
 it('одна траектория и одно рабочее место сохраняются при 10000 семплах', () => {
   const original = program('x', { _coordinates: [0], unit: '' }, [0, 100], true, authoredTiming(timing({ duration: 100 })), [0]);
-  const loop = repeatProgram(original, { count: Infinity, direction: 1, delay: 20 });
+  const loop = repeatProgram(original, repetition(repeat(Infinity, { type: 'reverse', delay: 20 }).repeat)!);
   const values = [0], velocity = [0], workspace = loop._repeat!._sample;
   for (let t = 0; t < 10000; t++) {
     sample(loop, t, values, velocity);
@@ -27,7 +29,7 @@ it('одна траектория и одно рабочее место сохр
 
 it('retarget пружины получает отрицательную скорость обратного прохода', () => {
   const h = harness();
-  h.runtime.animate(h.element, { x: [0, 100] }, { duration: 100, repeat: 1, repeatType: 'reverse' });
+  h.runtime.animate(h.element, { x: [0, 100] }, { duration: 100, ...repeat(1, { type: 'reverse' }) });
   h.step(125); expect(h.x()).toBe(75);
   const successor = h.runtime.animate(h.element, { x: 200 });
   h.step(125.001); expect(h.x()).toBeLessThan(75);
@@ -35,9 +37,9 @@ it('retarget пружины получает отрицательную скор
 });
 
 it('не объявляет repeatDelay и нелинейный mirror эквивалентными WAAPI alternate', () => {
-  for (const options of [{ repeatDelay: 10 }, { repeatType: 'mirror' as const, ease: 'ease-in' as const }]) {
+  for (const options of [{ ...repeat(1, { delay: 10 }) }, { ...repeat(1, { type: 'mirror' }), ease: 'ease-in' as const }]) {
     const h = harness(true);
-    const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 100, repeat: 1, ...options });
+    const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 100, ...options });
     expect(h.effects).toHaveLength(0); expect(h.updates.size).toBe(1); run.stop();
   }
 });

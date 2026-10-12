@@ -18,13 +18,10 @@ interface MotionCommon {
   /** По умолчанию учитывается системная настройка. always завершает движение сразу. */
   readonly reducedMotion?: 'user' | 'always';
 }
+declare const repetitionBrand: unique symbol;
 interface RepetitionOptions {
-  /** Дополнительные итерации: целое число от 0 до 2147483647 либо Infinity. */
-  readonly repeat?: number;
-  /** reverse обращает время; mirror обращает значения, сохраняя easing. */
-  readonly repeatType?: 'loop' | 'reverse' | 'mirror';
-  /** Миллисекунды между итерациями, без задержки после последней. */
-  readonly repeatDelay?: number;
+  /** Настройки из repeat(); готовый план повторения задаётся вместе с duration/ease. */
+  readonly repeat?: { readonly [repetitionBrand]: true };
 }
 type TransitionOptions = (
   | { readonly spring?: MotionSpring; readonly duration?: never; readonly ease?: never }

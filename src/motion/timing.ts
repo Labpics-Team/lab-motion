@@ -2,7 +2,7 @@ import { DEFAULT_DURATION_MS, DEFAULT_SPRING, STANDARD_EASING_COORDS } from '../
 import { cubicBezierUnchecked } from '../internal/cubic-bezier.js';
 import { validateSpringForFrameLoop, type SpringParams } from '../spring.js';
 import { MotionError, number, record, snapshot } from './model.js';
-import { readRepeat, type RepeatOptions } from './repeat.js';
+import { repetition, type Repetition } from './repeat-contract.js';
 import type { MotionOptions, MotionSpring, SequenceOptions } from './types.js';
 
 /** Внутренний снимок: пользовательские getters больше не читаются исполнителем. */
@@ -17,7 +17,7 @@ export interface Timing {
   readonly stagger: number;
   readonly times: readonly number[] | undefined;
   readonly reduced: boolean;
-  readonly _repeat?: RepeatOptions;
+  readonly _repeat?: Repetition;
 }
 const linear = (t: number): number => t;
 const EASES: Readonly<Record<string, readonly [number, number, number, number]>> = {
@@ -49,15 +49,32 @@ export function physics(input: MotionSpring | undefined): SpringParams {
   return result;
 }
 
-export function timing(input: MotionOptions | undefined, authored = false, repeatable = false): Timing {
+const TIMING_KEYS = ['spring', 'duration', 'ease', 'delay', 'stagger', 'times', 'reducedMotion'];
+const REPEAT_KEYS = ['repeat'];
+
+function options(input: MotionOptions | undefined, repeatable = false): Record<string, unknown> {
   const source = input === undefined ? {} : record(input, 'options');
   for (const key of Object.keys(source)) {
-    if (!['spring', 'duration', 'ease', 'delay', 'stagger', 'times', 'reducedMotion'].includes(key) &&
-      !(repeatable && ['repeat', 'repeatType', 'repeatDelay'].includes(key)))
-      throw new MotionError(`Неизвестная опция ${key}`);
+    if (!TIMING_KEYS.includes(key) && !(repeatable && REPEAT_KEYS.includes(key)))
+      throw new MotionError('Неизвестная опция ' + key);
   }
+  return source;
+}
+
+export function timing(input: MotionOptions | undefined, authored = false): Timing {
+  return readTiming(options(input), authored);
+}
+
+/** Расписание подключается только к операциям, которые исполняют повтор. */
+export function playbackTiming(input: MotionOptions | undefined): Timing {
+  const source = options(input, true);
+  const clock = readTiming(source, false);
+  const rule = repetition(source.repeat);
+  return rule ? { ...clock, _repeat: rule } : clock;
+}
+
+function readTiming(source: Record<string, unknown>, authored: boolean): Timing {
   const { spring, duration, ease, delay, stagger, times, reducedMotion } = source;
-  const repetition = repeatable ? readRepeat(source.repeat, source.repeatType, source.repeatDelay) : undefined;
   if (spring !== undefined && (duration !== undefined || ease !== undefined))
     throw new MotionError('Задайте spring или duration/ease');
   const reduced = reduction(reducedMotion);
@@ -89,7 +106,6 @@ export function timing(input: MotionOptions | undefined, authored = false, repea
     duration: duration === undefined ? authored || ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
     ease: easeFunction, cssEase, delay: number(delay ?? 0, 'delay', 0), stagger: number(stagger ?? 0, 'stagger', 0),
     times: stops, reduced,
-    ...(repetition ? { _repeat: repetition } : {}),
   };
 }
 
@@ -114,11 +130,11 @@ function reduction(input: unknown): boolean {
 export function sequenceTiming(input: SequenceOptions | undefined): Pick<Timing, 'delay' | 'reduced' | '_repeat'> {
   const source = input === undefined ? {} : record(input, 'sequence options');
   for (const key of Object.keys(source)) {
-    if (!['delay', 'reducedMotion', 'repeat', 'repeatType', 'repeatDelay'].includes(key))
+    if (!['delay', 'reducedMotion', 'repeat'].includes(key))
       throw new MotionError('Неизвестная опция последовательности ' + key);
   }
-  const { delay, reducedMotion, repeat, repeatType, repeatDelay } = source;
-  const repetition = readRepeat(repeat, repeatType, repeatDelay);
+  const { delay, reducedMotion, repeat } = source;
+  const rule = repetition(repeat);
   return { delay: number(delay ?? 0, 'delay', 0), reduced: reduction(reducedMotion),
-    ...(repetition ? { _repeat: repetition } : {}) };
+    ...(rule ? { _repeat: rule } : {}) };
 }

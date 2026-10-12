@@ -1,5 +1,5 @@
 import { MotionError, STOPPED, record, snapshot } from './model.js';
-import { timing } from './timing.js';
+import { playbackTiming } from './timing.js';
 import { animate, sequence, targets } from './runtime.js';
 import { layout, type LayoutOptions } from './layout.js';
 import { value, type MotionValue } from './value.js';
@@ -14,7 +14,7 @@ export function snapshotOptions(input: MotionOptions | undefined): MotionOptions
   if (result.spring !== undefined) result.spring = { ...record(result.spring, 'spring') };
   if (result.times !== undefined) result.times = snapshot(result.times as readonly number[], 'times');
   if (Array.isArray(result.ease)) result.ease = snapshot(result.ease, 'ease');
-  timing(result as MotionOptions, false, true);
+  playbackTiming(result as MotionOptions);
   return result as MotionOptions;
 }
 export function mergeOptions(defaults: MotionOptions, local: MotionOptions | undefined): MotionOptions {
@@ -81,20 +81,20 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
     },
     sequence(steps, options): Playback {
       if (!owner) return stopped;
-      const { repeat, repeatType, repeatDelay, ...stepDefaults } = settings;
+      const { repeat, ...stepDefaults } = settings;
       const input = snapshot(steps, 'sequence').map(step => {
         const [target, properties, opt] = snapshot(step, 'sequence step', 2) as unknown as SequenceStep;
         const { at, ...motion } = opt ?? {};
         return [targets(target, owner), properties, { ...mergeOptions(stepDefaults as MotionOptions, motion), ...(at === undefined ? {} : { at }) }] as SequenceStep;
       });
       if (!owner) return stopped;
-      return adopt(sequence(input, { repeat, repeatType, repeatDelay, ...options }));
+      return adopt(sequence(input, { repeat, ...options }));
     },
     layout(mutate, options): Playback {
       if (!owner) return stopped;
       const root = owner as Element;
       if (typeof root.getBoundingClientRect !== 'function') throw new MotionError('layout требует Element-контейнер');
-      const { times: _times, stagger: _stagger, repeat: _repeat, repeatType: _repeatType, repeatDelay: _repeatDelay, ...defaults } = settings;
+      const { times: _times, stagger: _stagger, repeat: _repeat, ...defaults } = settings;
       return adopt(layout(root, mutate, mergeOptions(defaults as MotionOptions, options) as LayoutOptions));
     },
     value(initial): MotionValue {

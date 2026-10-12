@@ -7,3 +7,4 @@ export type {
   MotionScalar, MotionProperties, MotionTarget, MotionEase, MotionSpring, MotionOptions,
   MotionResult, Playback, PlaybackState, Disposable, SequenceStep, SequenceOptions,
 } from './types.js';
+export { repeat, type RepeatOptions } from './repeat.js';

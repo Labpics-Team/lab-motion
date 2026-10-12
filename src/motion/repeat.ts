@@ -1,42 +1,32 @@
 import {
-  isRepeatCount, isRepeatScheduleRepresentable, repeatEndTime,
-  type RepeatDirection, type RepeatSample,
+  isRepeatCount, isRepeatScheduleRepresentable, repeatEndTime, repeatCursor,
+  type RepeatDirection,
 } from '../internal/repeat-cursor.js';
-import { MotionError, number } from './model.js';
+import { MotionError, number, record } from './model.js';
+import { authoredRepetition, type Repetition } from './repeat-contract.js';
+import type { MotionOptions } from './types.js';
 
 export interface RepeatOptions {
-  readonly count: number;
-  readonly direction: RepeatDirection;
-  readonly delay: number;
-}
-export interface RepeatPlan extends RepeatOptions {
-  readonly start: number;
-  readonly span: number;
-  readonly end: number;
-  /** Рабочее место синхронного семплера; не удерживает target или Playback. */
-  readonly _sample: RepeatSample;
+  readonly type?: 'loop' | 'reverse' | 'mirror';
+  readonly delay?: number;
 }
 
-export function readRepeat(count: unknown, direction: unknown, delay: unknown): RepeatOptions | undefined {
-  const repeats = count === undefined ? 0 : count;
-  if (typeof repeats !== 'number' || !isRepeatCount(repeats))
-    throw new MotionError('repeat: целое число от 0 до 2147483647 либо Infinity');
-  if (direction !== undefined && direction !== 'loop' && direction !== 'reverse' && direction !== 'mirror')
-    throw new MotionError('repeatType: loop, reverse или mirror');
-  const gap = number(delay === undefined ? 0 : delay, 'repeatDelay', 0);
-  return repeats === 0 ? undefined : {
-    count: repeats, direction: direction === 'reverse' ? 1 : direction === 'mirror' ? 2 : 0, delay: gap,
+/** Дополнительные итерации готовой траектории; результат добавляется к опциям движения. */
+export function repeat(count: number = Infinity, options?: RepeatOptions): Pick<MotionOptions, 'repeat'> {
+  if (!isRepeatCount(count)) throw new MotionError('repeat: целое число от 0 до 2147483647 либо Infinity');
+  const source = options === undefined ? {} : record(options, 'repeat');
+  for (const key of Object.keys(source)) if (key !== 'type' && key !== 'delay')
+    throw new MotionError('Неизвестная опция повторения ' + key);
+  const { type, delay } = source;
+  if (type !== undefined && type !== 'loop' && type !== 'reverse' && type !== 'mirror')
+    throw new MotionError('repeat type: loop, reverse или mirror');
+  const direction: RepeatDirection = type === 'reverse' ? 1 : type === 'mirror' ? 2 : 0;
+  const gap = number(delay === undefined ? 0 : delay, 'repeat delay', 0);
+  if (count === 0) return {};
+  const create: Repetition = (start, span) => {
+    if (!isRepeatScheduleRepresentable(start, span, count, gap)) throw new MotionError('Непредставимое расписание повторений');
+    return { end: repeatEndTime(start, span, count, gap), count, direction, gap,
+      cursor: (time, output) => repeatCursor(time, start, span, count, gap, direction, output) };
   };
-}
-
-export function repeatPlan(options: RepeatOptions, start: number, span: number): RepeatPlan {
-  if (!isRepeatScheduleRepresentable(start, span, options.count, options.delay))
-    throw new MotionError('Непредставимое расписание повторений');
-  return { ...options, start, span, end: repeatEndTime(start, span, options.count, options.delay), _sample: { rate: 0 } };
-}
-
-/** Оси одной физической поверхности могут разделять только одинаковое время. */
-export function sameRepeat(a: RepeatPlan | undefined, b: RepeatPlan | undefined): boolean {
-  return a === b || !!a && !!b && a.start === b.start && a.span === b.span &&
-    a.count === b.count && a.direction === b.direction && a.delay === b.delay;
+  return { repeat: authoredRepetition(create) as unknown as NonNullable<MotionOptions['repeat']> };
 }

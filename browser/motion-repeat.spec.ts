@@ -1,21 +1,21 @@
 import { expect, test } from './fixtures/harness';
 
-for (const repeatType of ['loop', 'reverse', 'mirror'] as const) test('повтор ' + repeatType + ': native, JS и raw WAAPI имеют одинаковую шкалу', async ({ page }) => {
+for (const repeatType of ['reverse', 'mirror'] as const) test('повтор ' + repeatType + ': native, JS и raw WAAPI имеют одинаковую шкалу', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
   await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'));
   const result = await page.evaluate(async repeatType => {
-    const { animate } = await import('/browser/.artifacts/motion-root.js');
+    const { animate, repeat } = await import('/browser/.artifacts/motion-root.js');
     const elements = Array.from({ length: 3 }, () => {
       const el = document.createElement('div'); el.style.cssText = 'width:10px;height:10px'; document.body.append(el); return el;
     });
     const [nativeTarget, fallbackTarget, controlTarget] = elements as [HTMLDivElement, HTMLDivElement, HTMLDivElement];
-    const options = { duration: 100, delay: 10, repeat: 2, repeatType };
+    const options = { duration: 100, delay: 10, ...repeat(2, { type: repeatType }) };
     const native = animate(nativeTarget, { x: [0, 100] }, options);
     const fallback = animate(fallbackTarget, { x: [0, 100] }, { ...options, ease: p => p });
     const nativeEffects = nativeTarget.getAnimations(), fallbackEffects = fallbackTarget.getAnimations();
     const effect = nativeEffects[0]!;
     const control = controlTarget.animate([{ transform: 'translateX(0px)' }, { transform: 'translateX(100px)' }], {
-      duration: 100, delay: 10, iterations: 3, direction: repeatType === 'loop' ? 'normal' : 'alternate', fill: 'both', easing: 'linear',
+      duration: 100, delay: 10, iterations: 3, direction: 'alternate', fill: 'both', easing: 'linear',
     });
     effect.pause(); control.pause(); fallback.pause();
     const x = (el: Element) => new DOMMatrixReadOnly(getComputedStyle(el).transform).m41;
@@ -41,9 +41,9 @@ for (const repeatType of ['loop', 'reverse', 'mirror'] as const) test('повт�
 
 for (const repeatType of ['reverse', 'mirror'] as const) test('нелинейный ' + repeatType + ' и repeatDelay сохраняют разные значения', async ({ page }) => {
   const result = await page.evaluate(async repeatType => {
-    const { animate } = await import('/browser/.artifacts/motion-root.js');
+    const { animate, repeat } = await import('/browser/.artifacts/motion-root.js');
     const el = document.createElement('div'); document.body.append(el);
-    const run = animate(el, { x: [0, 100] }, { duration: 100, repeat: 1, repeatDelay: 20, repeatType, ease: p => p * p });
+    const run = animate(el, { x: [0, 100] }, { duration: 100, ...repeat(1, { delay: 20, type: repeatType }), ease: p => p * p });
     try {
       const effects = el.getAnimations().length;
       run.pause();
@@ -61,9 +61,9 @@ for (const repeatType of ['reverse', 'mirror'] as const) test('нелинейн�
 test('scope применяет повтор к последовательности, освобождает infinite и не повторяет layout mutation', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const result = await page.evaluate(async () => {
-    const { scope } = await import('/browser/.artifacts/motion-root.js');
+    const { scope, repeat } = await import('/browser/.artifacts/motion-root.js');
     const el = document.createElement('section'); el.innerHTML = '<div class="item"></div>'; document.body.append(el);
-    const area = scope(el, { repeat: Infinity, duration: 100 });
+    const area = scope(el, { ...repeat(Infinity), duration: 100 });
     let mutations = 0;
     const loop = area.animate('.item', { x: [0, 100] });
     const series = area.sequence([['.item', { x: [0, 100] }, { duration: 100 }]]);
@@ -76,4 +76,24 @@ test('scope применяет повтор к последовательнос�
     } finally { area.dispose(); el.remove(); }
   });
   expect(result).toEqual({ mutations: 1, duration: [0, 0], effects: 0, value: 100 });
+});
+
+test('разрывный loop сохраняет полузакрытые границы независимо от округления WAAPI', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { animate, repeat } = await import('/browser/.artifacts/motion-root.js');
+    const el = document.createElement('div'); document.body.append(el);
+    const run = animate(el, { x: [0, 100] }, { duration: 100, delay: 10, ...repeat(2) });
+    try {
+      const effects = el.getAnimations().length;
+      run.pause();
+      const rows = [109.999, 110, 110.001, 209.999, 210, 210.001].map(t => {
+        run.seek(t); return new DOMMatrixReadOnly(getComputedStyle(el).transform).m41;
+      });
+      run.finish(); await run.finished;
+      return { effects, rows, remaining: el.getAnimations().length };
+    } finally { run.stop(); el.remove(); }
+  });
+  expect(result.effects).toBe(0);
+  for (const [i, expected] of [99.999, 0, .001, 99.999, 0, .001].entries()) expect(result.rows[i]).toBeCloseTo(expected, 3);
+  expect(result.remaining).toBe(0);
 });

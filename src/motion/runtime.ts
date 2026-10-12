@@ -2,8 +2,7 @@ import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, snapshot, type PropertyInput } from './model.js';
 import { TRANSFORMS, isTransform, format, point, program, repeatProgram, sample, transform, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState, SequenceOptions, SequenceStep } from './types.js';
-import { timing, authoredTiming, sequenceTiming, type Timing } from './timing.js';
-import { sameRepeat } from './repeat.js';
+import { timing, playbackTiming, authoredTiming, sequenceTiming, type Timing } from './timing.js';
 
 export interface RuntimeHost {
   readonly frame: FrameLoop;
@@ -280,7 +279,8 @@ class Surface {
     const _nativeEase = first._program._nativeEase;
     const canNative = (this.key === 'transform' || this.key === 'opacity') && _nativeEase !== undefined && typeof this.element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
       active.every(track => !track._paused && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
-        sameRepeat(track._program._repeat, first._program._repeat) &&
+        (track._program._repeat?.clock.direction ?? 0) === (first._program._repeat?.clock.direction ?? 0) &&
+        track._program._segments[0]!.end === seg.end &&
         track._program.duration === first._program.duration && track._program._segments[0]!.at === seg.at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
     const token = {}; this._token = token;
@@ -288,8 +288,8 @@ class Surface {
       this._busy = true;
       const effect = this.element.animate([{ [this.key]: this._text('from') }, { [this.key]: this._text('to') }], {
         duration: seg.end - seg.at, delay: seg.at, easing: _nativeEase, fill: 'both',
-        ...(first._program._repeat ? { iterations: first._program._repeat.count + 1,
-          direction: first._program._repeat.direction === 0 ? 'normal' as const : 'alternate' as const } : {}),
+        ...(first._program._repeat ? { iterations: first._program._repeat.clock.count + 1,
+          direction: first._program._repeat.clock.direction === 0 ? 'normal' as const : 'alternate' as const } : {}),
       });
       this._native = effect; this._nativeTime = first._elapsed;
       if (first._elapsed !== 0) effect.currentTime = first._elapsed;
@@ -520,7 +520,7 @@ export class Runtime {
   }
   animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): Playback {
     const input = properties(props);
-    const clock = timing(options, false, true);
+    const clock = playbackTiming(options);
     if (clock._repeat && input.some(property => !property.authored))
       throw new MotionError('Повтор требует явно заданного массива значений');
     const drafts = this._draft(target, input, clock);
