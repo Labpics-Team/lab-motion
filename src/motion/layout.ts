@@ -1,4 +1,5 @@
-import { FINISHED, STOPPED, MotionError, number, timing } from './model.js';
+import { FINISHED, STOPPED, MotionError, number } from './model.js';
+import { timing } from './timing.js';
 import { program } from './program.js';
 import type { MotionEase, MotionOptions, MotionResult, MotionSpring, Playback, PlaybackState } from './types.js';
 

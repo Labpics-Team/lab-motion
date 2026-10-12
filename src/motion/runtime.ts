@@ -1,7 +1,9 @@
 import { frame, type FrameLoop } from '../frame/index.js';
-import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, authoredTiming, snapshot, type PropertyInput } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
-import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState, SequenceOptions, SequenceStep, Timing } from './types.js';
+import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, snapshot, type PropertyInput } from './model.js';
+import { TRANSFORMS, isTransform, format, point, program, repeatProgram, sample, transform, type Point, type Program, type Segment } from './program.js';
+import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState, SequenceOptions, SequenceStep } from './types.js';
+import { timing, authoredTiming, type Timing } from './timing.js';
+import { sameRepeat } from './repeat.js';
 
 export interface RuntimeHost {
   readonly frame: FrameLoop;
@@ -278,6 +280,7 @@ class Surface {
     const _nativeEase = first._program._nativeEase;
     const canNative = (this.key === 'transform' || this.key === 'opacity') && _nativeEase !== undefined && typeof this.element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
       active.every(track => !track._paused && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
+        sameRepeat(track._program._repeat, first._program._repeat) &&
         track._program.duration === first._program.duration && track._program._segments[0]!.at === seg.at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
     const token = {}; this._token = token;
@@ -285,6 +288,8 @@ class Surface {
       this._busy = true;
       const effect = this.element.animate([{ [this.key]: this._text('from') }, { [this.key]: this._text('to') }], {
         duration: seg.end - seg.at, delay: seg.at, easing: _nativeEase, fill: 'both',
+        ...(first._program._repeat ? { iterations: first._program._repeat.count + 1,
+          direction: first._program._repeat.direction === 0 ? 'normal' as const : 'alternate' as const } : {}),
       });
       this._native = effect; this._nativeTime = first._elapsed;
       if (first._elapsed !== 0) effect.currentTime = first._elapsed;
@@ -515,12 +520,15 @@ export class Runtime {
   }
   animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): Playback {
     const input = properties(props);
-    const clock = timing(options);
-    return this._execute(this._draft(target, input, clock));
+    const clock = timing(options, false, true);
+    if (clock._repeat && input.some(property => !property.authored))
+      throw new MotionError('Повтор требует явно заданного массива значений');
+    const drafts = this._draft(target, input, clock);
+    return this._execute(clock._repeat ? drafts.map(draft => ({ ...draft, _program: repeatProgram(draft._program, clock._repeat!) })) : drafts);
   }
   sequence(steps: readonly SequenceStep[], options?: SequenceOptions): Playback {
     const list = snapshot(steps, 'sequence');
-    const sequenceClock = timing(options as MotionOptions | undefined);
+    const sequenceClock = timing(options as MotionOptions | undefined, false, true);
     const merged = new Map<Element, Map<string, Draft>>();
     let cursor = 0, previousStart = 0, end = 0, count = 0;
     for (const tuple of list) {
@@ -529,6 +537,8 @@ export class Runtime {
       const { at, ...rest } = option ?? {};
       const offset = at === '<' ? previousStart : at === undefined || at === '>' ? cursor : number(at, 'at', 0);
       const input = properties(props), clock = timing(rest);
+      if (sequenceClock._repeat && input.some(property => !property.authored))
+        throw new MotionError('Повтор последовательности требует авторских массивов значений');
       const drafts = this._draft(target, input, clock, offset + sequenceClock.delay, (element, key) => {
         const prior = merged.get(element)?.get(key)?._program;
         return prior && { _coordinates: prior.final, unit: prior.unit };
@@ -551,7 +561,9 @@ export class Runtime {
       previousStart = offset; cursor = Math.max(0, end - sequenceClock.delay);
     }
     const drafts = [...merged.values()].flatMap(map => [...map.values()]).map(d => ({ ...d, reduced: d.reduced || sequenceClock.reduced, _program: { ...d._program, duration: end, _nativeEase: undefined, _identity: undefined } }));
-    return this._execute(drafts, drafts.every(draft => draft.reduced) ? 0 : end);
+    return sequenceClock._repeat
+      ? this._execute(drafts.map(draft => ({ ...draft, _program: repeatProgram(draft._program, sequenceClock._repeat!, sequenceClock.delay, end - sequenceClock.delay) })))
+      : this._execute(drafts, drafts.every(draft => draft.reduced) ? 0 : end);
   }
 }
 

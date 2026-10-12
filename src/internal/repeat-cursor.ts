@@ -17,6 +17,9 @@ import { MotionParamError } from '../errors.js';
 
 export type RepeatDirection = 0 | 1 | 2;
 
+/** Скорость локального времени относительно общей шкалы; удержание имеет нулевую скорость. */
+export interface RepeatSample { rate: number }
+
 export function isRepeatCount(value: number): boolean {
   return value === Infinity || (
     Number.isInteger(value) && value >= 0 && value <= SCHEDULE_V1_INT32_MAX
@@ -77,6 +80,7 @@ export function repeatCursor(
   repeat: number,
   repeatDelay: number,
   direction: RepeatDirection,
+  sample?: RepeatSample,
 ): number {
   const terminal = repeatEndTime(start, duration, repeat, repeatDelay);
   if (time === Infinity && repeat === Infinity) throw new MotionParamError('LM166');
@@ -86,6 +90,7 @@ export function repeatCursor(
       ? time
       : 0;
   let progress: number;
+  let rate = 0;
   let odd = false;
 
   if (t < start) {
@@ -112,11 +117,13 @@ export function repeatCursor(
     const local = t - iterationStart;
     const motionSpan = motionEnd - iterationStart;
     odd = direction !== 0 && iteration % 2 === 1;
+    if (sample && duration !== 0 && local < motionSpan) rate = duration / motionSpan;
     progress = duration === 0 || local >= motionSpan
       ? 1
       : Math.min(local / motionSpan, 1 - Number.EPSILON / 2);
   }
 
+  if (sample) sample.rate = odd && direction === 1 && rate !== 0 ? -rate : rate;
   if (!odd) return progress;
   if (direction === 1) return 1 - progress;
   return -1 - progress;

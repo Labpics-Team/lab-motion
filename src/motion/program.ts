@@ -4,7 +4,10 @@ import { sampleSpringBasisUnchecked, type MutableSpringBasis } from '../internal
 import { tryCompileSpringExecutionArtifactTupleUnchecked, type SpringExecutionArtifactTuple } from '../compositor/curve.js';
 import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
 import { MotionError, number } from './model.js';
-import type { MotionScalar, Timing } from './types.js';
+import type { MotionScalar } from './types.js';
+import type { Timing } from './timing.js';
+import { repeatPlan, type RepeatOptions, type RepeatPlan } from './repeat.js';
+import { repeatCursor } from '../internal/repeat-cursor.js';
 
 export const TRANSFORMS: Readonly<Record<string, number>> = { x: 0, y: 0, rotate: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1 };
 export const isTransform = (key: string): boolean => Object.hasOwn(TRANSFORMS, key);
@@ -55,6 +58,7 @@ export interface Program {
   /** Только точная форма, доступная нативному исполнителю. */
   readonly _nativeEase: string | undefined;
   readonly _identity: readonly unknown[] | undefined;
+  readonly _repeat?: RepeatPlan;
 }
 
 function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration?: number): Segment {
@@ -108,20 +112,48 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
     _identity };
 }
 
+/** Расписание оборачивает готовую траекторию, не размножая её сегменты. */
+export function repeatProgram(input: Program, options: RepeatOptions, start = input._segments[0]!.at, span = input.duration - start): Program {
+  if (input._segments.some(segment => segment.timing.spring !== undefined))
+    throw new MotionError('Повтор авторской траектории использует duration/ease');
+  const plan = repeatPlan(options, start, span);
+  const segment = input._segments[0]!;
+  const native = plan.span > 0 && plan.delay === 0 && segment.at === start && segment.end === start + span &&
+    (plan.direction !== 2 || input._nativeEase === 'linear');
+  return { ...input, duration: plan.end, _repeat: plan, _nativeEase: native ? input._nativeEase : undefined, _identity: undefined };
+}
+
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
 export function sample(program: Program, time: number, value: number[], velocity: number[]): void {
   const _segments = program._segments;
-  if (time >= program.duration) {
-    for (let i = 0; i < program.final.length; i++) { value[i] = program.final[i]!; velocity[i] = 0; }
+  const repeat = program._repeat;
+  let mirrored = false, rate = 1;
+  if (repeat && time !== Infinity) {
+    const cursor = repeatCursor(time, repeat.start, repeat.span, repeat.count, repeat.delay, repeat.direction, repeat._sample);
+    // Снимок сохраняется до вызова пользовательского easing, включая reentry.
+    rate = repeat._sample.rate;
+    mirrored = cursor < 0;
+    const progress = mirrored ? -1 - cursor : cursor;
+    if (progress === 0 || progress === 1) {
+      const endpoint = (progress === 0) !== mirrored ? _segments[0]!.from : program.final;
+      for (let i = 0; i < endpoint.length; i++) { value[i] = endpoint[i]!; velocity[i] = 0; }
+      return;
+    }
+    time = repeat.start + progress * repeat.span;
+  }
+  if (time === Infinity || time >= (repeat ? repeat.start + repeat.span : program.duration)) {
+    for (let i = 0; i < program.final.length; i++) { value[i] = mirrored ? _segments[0]!.from[i]! : program.final[i]!; velocity[i] = 0; }
     return;
   }
   let at = 0;
   while (at + 1 < _segments.length && time >= _segments[at + 1]!.at) at++;
   const segment = _segments[at]!;
+  const reflected = mirrored ? _segments[_segments.length - 1 - at]! : segment;
+  const from = mirrored ? reflected.to : segment.from, to = mirrored ? reflected.from : segment.to;
   const _elapsed = Math.max(0, time - segment.at), duration = segment.end - segment.at;
   if (time >= segment.end) {
-    for (let i = 0; i < segment.to.length; i++) { value[i] = segment.to[i]!; velocity[i] = 0; }
+    for (let i = 0; i < to.length; i++) { value[i] = to[i]!; velocity[i] = 0; }
     return;
   }
   let p = duration === 0 ? 1 : Math.min(1, _elapsed / duration), dp = 0;
@@ -137,13 +169,14 @@ export function sample(program: Program, time: number, value: number[], velocity
     p = ease(p);
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) throw new MotionError('Easing вернул нечисловой результат');
-  for (let i = 0; i < segment.from.length; i++) {
-    const a = segment.from[i]!, distance = segment.to[i]! - a;
+  for (let i = 0; i < from.length; i++) {
+    const a = from[i]!, distance = to[i]! - a;
     if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment.at ? 0 : segment.velocity[i] ?? 0; }
     else if (segment.timing.spring && !segment.artifact) {
       value[i] = a + distance * basis._value + (segment.velocity[i] ?? 0) * basis._valueV0;
       velocity[i] = distance * basis._velocity + (segment.velocity[i] ?? 0) * basis._velocityV0;
     } else { value[i] = a + distance * p; velocity[i] = distance * dp; }
+    if (repeat && rate !== 1) velocity[i] = rate === 0 ? 0 : velocity[i]! * rate;
     if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) throw new MotionError('Движение вышло за представимый диапазон');
   }
 }

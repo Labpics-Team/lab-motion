@@ -3,7 +3,7 @@ import { build } from 'esbuild';
 import { resolve } from 'node:path';
 import { spring } from '../src/tokens/index.js';
 import { DEFAULT_SPRING, SNAPPY_SPRING } from '../src/internal/motion-defaults.js';
-import { physics, timing } from '../src/motion/model.js';
+import { physics, timing } from '../src/motion/timing.js';
 
 const defaults = { mass: 1, stiffness: 170, damping: 26 };
 
