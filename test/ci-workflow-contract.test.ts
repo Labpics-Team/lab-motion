@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parse, stringify } from 'yaml';
+import { isMap, isScalar, isSeq, parse, parseDocument, stringify } from 'yaml';
 import vitestConfig from '../vitest.config.js';
 
 type Step = {
@@ -117,13 +117,69 @@ const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
   + '  || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }\n'
   + 'node scripts/pack-smoke.mjs "${archives[0]}"';
 
+// Закрепление внешних actions проверяется правилом, а не значениями: SHA и версию меняет
+// Dependabot, поэтому контракт требует полный SHA разрешённого репозитория, а не конкретный.
+const allowedActions = new Set([
+  'actions/checkout', 'actions/setup-node', 'actions/upload-artifact', 'actions/download-artifact',
+]);
+const externalAction = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$/;
+const localWorkflow = /^\.\/\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/;
+const versionComment = /^v\d+\.\d+\.\d+$/;
+
+function unpin(uses: string): string {
+  const match = externalAction.exec(uses);
+  if (!match || !allowedActions.has(match[1]!)) {
+    throw new Error(`Action должен быть закреплён полным SHA разрешённого репозитория: ${uses}`);
+  }
+  return `${match[1]}@<sha>`;
+}
+
+type Reference = { where: string; ref: string; comment: string };
+
+// `uses` заданий и шагов берётся из разобранного YAML, а не из текста: его нельзя ни пропустить
+// формой записи (`uses :`), ни подменить строкой внутри многострочного значения. Комментарий
+// версии читается с того же поля и той же строки: именно там его обновляет Dependabot, а
+// комментарий на соседней строке остался бы старым после обновления SHA и не был бы замечен.
+function references(name: string, source: string): Reference[] {
+  const document = parseDocument(source);
+  expect(document.errors, `${name}: workflow не разбирается`).toEqual([]);
+  const found: Reference[] = [];
+  const take = (owner: unknown, where: string) => {
+    if (!isMap(owner)) return;
+    const node = owner.get('uses', true);
+    if (node === undefined) return;
+    if (!isScalar(node) || typeof node.value !== 'string') throw new Error(`${where}: uses должен быть строкой`);
+    found.push({ where, ref: node.value, comment: (node.comment ?? '').split('\n')[0]!.trim() });
+  };
+  const jobs = document.get('jobs', true);
+  if (!isMap(jobs)) return found;
+  for (const pair of jobs.items) {
+    const where = `${name}: ${isScalar(pair.key) ? String(pair.key.value) : '?'}`;
+    take(pair.value, where);
+    const steps = isMap(pair.value) ? pair.value.get('steps', true) : undefined;
+    if (isSeq(steps)) steps.items.forEach((step, index) => take(step, `${where}.steps[${index}]`));
+  }
+  return found;
+}
+
+// Каждый внешний action закреплён полным SHA разрешённого репозитория, включая jobs без
+// ожидаемого списка (docs.yml, release.yml): reusable workflow допускается только локальный.
+function assertPinned(files: Map<string, string>) {
+  for (const [name, source] of files) {
+    for (const { where, ref } of references(name, source)) {
+      if (ref.startsWith('./')) expect(ref, `${where}: reusable workflow только из этого репозитория`).toMatch(localWorkflow);
+      else unpin(ref);
+    }
+  }
+}
+
 // Порядок и inputs actions задают реальную ОС, Node и передачу проверенного архива.
 const requiredActions = {
   "verify": [
     {
       "index": 0,
       "name": "Checkout",
-      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "uses": "actions/checkout@<sha>",
       "with": {
         "persist-credentials": false,
         "fetch-depth": 0
@@ -132,7 +188,7 @@ const requiredActions = {
     {
       "index": 2,
       "name": "Setup Node",
-      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "uses": "actions/setup-node@<sha>",
       "with": {
         "node-version": "24"
       }
@@ -140,7 +196,7 @@ const requiredActions = {
     {
       "index": 17,
       "name": "Upload Node-floor candidate",
-      "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+      "uses": "actions/upload-artifact@<sha>",
       "with": {
         "name": "node-floor-package-${{ github.sha }}-${{ github.run_id }}",
         "path": "node-floor-artifact/*.tgz",
@@ -155,7 +211,7 @@ const requiredActions = {
     {
       "index": 0,
       "name": "Checkout",
-      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "uses": "actions/checkout@<sha>",
       "with": {
         "persist-credentials": false
       }
@@ -163,7 +219,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "uses": "actions/setup-node@<sha>",
       "with": {
         "node-version": "${{ matrix.node }}"
       }
@@ -171,7 +227,7 @@ const requiredActions = {
     {
       "index": 2,
       "name": "Download Node-floor candidate",
-      "uses": "actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+      "uses": "actions/download-artifact@<sha>",
       "with": {
         "name": "node-floor-package-${{ github.sha }}-${{ github.run_id }}",
         "path": "node-floor-artifact",
@@ -183,7 +239,7 @@ const requiredActions = {
     {
       "index": 0,
       "name": "Checkout",
-      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "uses": "actions/checkout@<sha>",
       "with": {
         "persist-credentials": false
       }
@@ -191,7 +247,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "uses": "actions/setup-node@<sha>",
       "with": {
         "node-version": "24"
       }
@@ -200,7 +256,7 @@ const requiredActions = {
       "index": 8,
       "name": "Upload failure artifacts",
       "if": "failure()",
-      "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+      "uses": "actions/upload-artifact@<sha>",
       "with": {
         "name": "browser-conformance-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.run_id }}",
         "path": "test-results/\nplaywright-report/\n",
@@ -213,7 +269,7 @@ const requiredActions = {
     {
       "index": 0,
       "name": "Checkout",
-      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "uses": "actions/checkout@<sha>",
       "with": {
         "persist-credentials": false,
         "fetch-depth": 0
@@ -222,7 +278,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "uses": "actions/setup-node@<sha>",
       "with": {
         "node-version": "24"
       }
@@ -231,7 +287,7 @@ const requiredActions = {
       "index": 6,
       "name": "Upload Vitest diagnostics",
       "if": "failure() && steps.vitest.outcome == 'failure'",
-      "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+      "uses": "actions/upload-artifact@<sha>",
       "with": {
         "name": "vitest-diagnostics-${{ github.run_id }}",
         "path": "vitest.log",
@@ -242,7 +298,7 @@ const requiredActions = {
     {
       "index": 7,
       "name": "Setup registered native-clock Node",
-      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "uses": "actions/setup-node@<sha>",
       "with": {
         "node-version": "24.19.0"
       }
@@ -252,7 +308,7 @@ const requiredActions = {
     {
       "index": 0,
       "name": "Checkout",
-      "uses": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "uses": "actions/checkout@<sha>",
       "with": {
         "persist-credentials": false
       }
@@ -260,7 +316,7 @@ const requiredActions = {
     {
       "index": 1,
       "name": "Setup Node",
-      "uses": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "uses": "actions/setup-node@<sha>",
       "with": {
         "node-version": "24"
       }
@@ -286,6 +342,7 @@ function assertCommands(job: Job, commands: string[]) {
 }
 
 function assertNativeGraph(files: Map<string, string>) {
+  assertPinned(files);
   const workflows = new Map([...files].map(([name, source]) => [name, parse(source) as Workflow]));
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
@@ -357,7 +414,8 @@ function assertNativeGraph(files: Map<string, string>) {
     ACTIONLINT_ARCHIVE_SHA256: '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8',
   });
   for (const [name, job] of Object.entries({ verify, tests, mutation, floor, conformance })) {
-    expect(job.steps!.map((item, index) => ({ index, ...item })).filter((item) => item.uses))
+    expect(job.steps!.map((item, index) => ({ index, ...item })).filter((item) => item.uses)
+      .map((item) => ({ ...item, uses: unpin(item.uses!) })))
       .toEqual(requiredActions[name as keyof typeof requiredActions]);
   }
   assertCommands(verify, verifyCommands);
@@ -576,5 +634,100 @@ describe('Единый полный набор Vitest', () => {
     for (const name of ['ci.yml', 'release.yml']) {
       expect(sources().get(name)).not.toContain('pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts');
     }
+  });
+});
+
+// Политика закрепления: к проверке формы ссылки добавляются комментарий версии `vX.Y.Z`, один SHA на
+// action и одна версия на SHA во всех workflow. Читает комментарии, поэтому работает только на
+// исходном тексте; мутации графа выше пересобирают YAML и комментарии теряют.
+function assertPinPolicy(files: Map<string, string>) {
+  assertPinned(files);
+  const shaByAction = new Map<string, Set<string>>();
+  const versionBySha = new Map<string, Set<string>>();
+  let external = 0;
+  for (const [name, source] of files) {
+    for (const { where, ref, comment } of references(name, source)) {
+      if (ref.startsWith('./')) continue;
+      external += 1;
+      const [, action, sha] = externalAction.exec(ref)!;
+      expect(comment, `${where}: у ${ref} нет комментария версии vX.Y.Z`).toMatch(versionComment);
+      shaByAction.set(action!, (shaByAction.get(action!) ?? new Set()).add(sha!));
+      versionBySha.set(sha!, (versionBySha.get(sha!) ?? new Set()).add(comment));
+    }
+  }
+  expect(external).toBeGreaterThan(0);
+  for (const [action, shas] of shaByAction) expect([...shas], `${action}: один SHA на все workflow`).toHaveLength(1);
+  for (const [sha, versions] of versionBySha) expect([...versions], `${sha}: одна версия в комментариях`).toHaveLength(1);
+}
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const bumpAction = (files: Map<string, string>, action: string, sha: string, version: string) => new Map(
+  [...files].map(([name, source]) => [name, source.replace(
+    new RegExp(`(uses:[ \\t]*${escapeRegExp(action)}@)[0-9a-f]{40}([ \\t]+#[ \\t]*)v\\d+\\.\\d+\\.\\d+`, 'g'),
+    `$1${sha}$2${version}`,
+  )]),
+);
+const mutateFirst = (files: Map<string, string>, mutate: (source: string) => string) => {
+  for (const [name, source] of files) {
+    const mutated = mutate(source);
+    if (mutated !== source) return new Map(files).set(name, mutated);
+  }
+  throw new Error('Мутация не изменила ни один workflow');
+};
+const checkoutPin = /uses:([ \t]*)actions\/checkout@[0-9a-f]{40}/;
+const pinMutants: ReadonlyArray<readonly [string, (source: string) => string]> = [
+  ['тег вместо SHA', (source) => source.replace(/(actions\/checkout@)[0-9a-f]{40}/, '$1v7')],
+  ['изменяемая ветка вместо SHA', (source) => source.replace(/(actions\/checkout@)[0-9a-f]{40}/, '$1main')],
+  ['сокращённый SHA', (source) => source.replace(/(actions\/checkout@)[0-9a-f]{40}/, (_, prefix: string) => `${prefix}3d3c42e`)],
+  ['чужой владелец action', (source) => source.replace('actions/checkout@', 'someone/checkout@')],
+  ['тег в записи `uses :` с пробелом перед двоеточием', (source) => source.replace(checkoutPin, 'uses : actions/checkout@v7')],
+  ['нет комментария версии', (source) => source.replace(/(actions\/checkout@[0-9a-f]{40})[ \t]+#.*/, '$1')],
+  ['комментарий без патча', (source) => source.replace(/(actions\/checkout@[0-9a-f]{40}[ \t]+# v\d+)\.\d+\.\d+/, '$1')],
+  ['второй SHA того же action', (source) => source.replace(/(actions\/checkout@)[0-9a-f]{40}/, `$1${'a'.repeat(40)}`)],
+  ['комментарий версии на следующей строке', (source) => source.replace(
+    /(uses: actions\/checkout@[0-9a-f]{40})[ \t]+# (v\d+\.\d+\.\d+)/, '$1\n        # $2')],
+  ['две версии одного SHA', (source) => source.replace(/(actions\/checkout@[0-9a-f]{40}[ \t]+# )v\d+\.\d+\.\d+/, '$1v0.0.1')],
+  ['reusable workflow из другого репозитория', (source) => source.replace(
+    'uses: ./.github/workflows/docs.yml', 'uses: someone/repo/.github/workflows/docs.yml@main')],
+];
+const decoy = (sha: string) => '      - name: Decoy\n        env:\n          TEXT: |\n'
+  + `            uses: actions/checkout@${sha} # v7.0.1\n        run: "true"\n`;
+
+describe('закрепление внешних actions', () => {
+  it('закрепляет каждый внешний action полным SHA с комментарием версии', () => assertPinPolicy(sources()));
+
+  it.each([...allowedActions])('принимает обновление %s: новый SHA и версия во всех workflow', (action) => {
+    const files = sources();
+    assertPinPolicy(files);
+    assertNativeGraph(files);
+    const bumped = bumpAction(files, action, 'f'.repeat(40), 'v99.0.1');
+    expect(bumped).not.toEqual(files);
+    assertPinPolicy(bumped);
+    assertNativeGraph(bumped);
+  });
+
+  it.each(pinMutants)('отвергает закрепление: %s', (_, mutate) => {
+    const files = sources();
+    assertPinPolicy(files);
+    expect(() => assertPinPolicy(mutateFirst(files, mutate))).toThrow();
+  });
+
+  it('отвергает закрепление в jobs без ожидаемого списка actions: docs.yml', () => {
+    const files = sources();
+    const docs = files.get('docs.yml')!;
+    const broken = new Map(files).set('docs.yml', docs.replace(/(actions\/setup-node@)[0-9a-f]{40}/, '$1v7'));
+    expect(() => assertNativeGraph(broken)).toThrow(/закреплён полным SHA/);
+  });
+
+  it('читает uses из разобранного YAML: строка внутри многострочного значения не action и не прикрывает тег', () => {
+    const files = sources();
+    const docs = files.get('docs.yml')!;
+    const sha = /actions\/checkout@([0-9a-f]{40})/.exec(docs)![1]!;
+    // Строка с корректным закреплением в env лишь текст: она не может ни считаться action, ни компенсировать тег.
+    const inert = new Map(files).set('docs.yml', docs + decoy(sha));
+    assertPinPolicy(inert);
+    const hidden = new Map(files).set('docs.yml', docs.replace(checkoutPin, 'uses : actions/checkout@v7') + decoy(sha));
+    expect(() => assertPinPolicy(hidden)).toThrow(/закреплён полным SHA/);
+    expect(() => assertNativeGraph(hidden)).toThrow(/закреплён полным SHA/);
   });
 });
