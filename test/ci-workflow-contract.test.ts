@@ -140,7 +140,7 @@ const requiredActions = {
     {
       "index": 17,
       "name": "Upload Node-floor candidate",
-      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
       "with": {
         "name": "node-floor-package-${{ github.sha }}-${{ github.run_id }}",
         "path": "node-floor-artifact/*.tgz",
@@ -200,7 +200,7 @@ const requiredActions = {
       "index": 8,
       "name": "Upload failure artifacts",
       "if": "failure()",
-      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
       "with": {
         "name": "browser-conformance-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.run_id }}",
         "path": "test-results/\nplaywright-report/\n",
@@ -231,7 +231,7 @@ const requiredActions = {
       "index": 6,
       "name": "Upload Vitest diagnostics",
       "if": "failure() && steps.vitest.outcome == 'failure'",
-      "uses": "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "uses": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
       "with": {
         "name": "vitest-diagnostics-${{ github.run_id }}",
         "path": "vitest.log",
