@@ -1,5 +1,3 @@
-import type { SpringParams } from '../spring.js';
-
 export type MotionScalar = number | string;
 export type MotionProperties = Readonly<Record<string, MotionScalar | readonly MotionScalar[]>>;
 export type MotionTarget = Element | string | Iterable<Element> | ArrayLike<Element>;
@@ -44,17 +42,3 @@ export interface Playback {
 export interface Disposable { dispose(): void }
 export type SequenceStep = readonly [MotionTarget, MotionProperties, (MotionOptions & { readonly at?: number | '<' | '>' })?];
 export type SequenceOptions = Omit<MotionCommon, 'times' | 'stagger'>;
-
-/** Внутренний снимок: пользовательские getters больше не читаются исполнителем. */
-export interface Timing {
-  readonly _defaultMotion: boolean;
-  readonly _defaultEase: boolean;
-  readonly spring: SpringParams | undefined;
-  readonly duration: number | undefined;
-  readonly ease: (progress: number) => number;
-  readonly cssEase: string | undefined;
-  readonly delay: number;
-  readonly stagger: number;
-  readonly times: readonly number[] | undefined;
-  readonly reduced: boolean;
-}
