@@ -245,22 +245,11 @@ cat "$GITHUB_OUTPUT"
 
 function assertVitestDiagnostics(source: string): void {
   const vitestStep = namedStep(source, 'Vitest');
-  const uploadStep = namedStep(source, 'Upload Vitest diagnostics');
   const id = /^        id: ([a-z][a-z0-9_-]*)$/m.exec(vitestStep)?.[1];
   if (id === undefined) throw new Error('Vitest diagnostics: id шага отсутствует');
-  const condition = /^        if: (.+)$/m.exec(uploadStep)?.[1];
-  if (condition !== `failure() && steps.${id}.outcome == 'failure'`) {
-    throw new Error('Vitest diagnostics: upload не связан с failure шага Vitest');
-  }
-  if (!/^        uses: actions\/upload-artifact@[0-9a-f]{40}(?:\s+#.*)?$/m.test(uploadStep)) {
-    throw new Error('Vitest diagnostics: upload-artifact отсутствует или не закреплён');
-  }
-  if (!/^          if-no-files-found: error$/m.test(uploadStep)) {
-    throw new Error('Vitest diagnostics: потеря файла не завершает upload ошибкой');
-  }
-  const artifactPath = /^          path: ([A-Za-z0-9._/-]+)$/m.exec(uploadStep)?.[1];
-  if (artifactPath === undefined || artifactPath.includes('..') || artifactPath.startsWith('/')) {
-    throw new Error('Vitest diagnostics: требуется один безопасный относительный путь');
+  const artifactPath = 'vitest.log';
+  if (/uses:\s*actions\/upload-artifact@/.test(source)) {
+    throw new Error('Vitest diagnostics: журнал обычного CI не требует повторного архива');
   }
 
   const workspace = mkdtempSync(join(tmpdir(), 'labmotion-vitest-diagnostics-'));
@@ -365,14 +354,15 @@ describe('release workflow: граница тега и npm OIDC', () => {
     expect(checkout).toContain('          fetch-depth: 0');
   });
 
-  it('CI сохраняет diagnostic и загружает его только после падения того же Vitest-step', () => {
+  it('CI сохраняет диагностический вывод и исходный отказ без отдельного архива', () => {
     expect(() => assertVitestDiagnostics(ciWorkflow)).not.toThrow();
 
     const mutants = [
       ciWorkflow.replace('        id: vitest\n', ''),
       ciWorkflow.replace(' 2>&1 | tee vitest.log', ''),
-      ciWorkflow.replace('          path: vitest.log\n', ''),
-      ciWorkflow.replace("failure() && steps.vitest.outcome == 'failure'", 'failure()'),
+      ciWorkflow.replace('status=${PIPESTATUS[0]}', 'status=0'),
+      ciWorkflow.replace('exit "$status"', 'exit 0'),
+      ciWorkflow + '\n# producer\nuses: actions/upload-artifact@0123456789012345678901234567890123456789\n',
     ];
     for (const mutant of mutants) {
       expect(() => assertVitestDiagnostics(mutant)).toThrow(/Vitest diagnostics/);

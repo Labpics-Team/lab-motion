@@ -56,12 +56,12 @@ const events = (value: unknown): string[] => {
 };
 const bash = process.platform === 'win32'
   ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git/bin/bash.exe') : 'bash';
-const peers = ['verify', 'tests', 'mutation', 'node-floor', 'browser-static', 'documentation'];
+const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation'];
 const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
   + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
-  + '[[ "$NODE_FLOOR_RESULT" == success ]]\n[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]';
+  + '[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]';
 const actionlintCommand = [
   'archive="$RUNNER_TEMP/actionlint.tar.gz"',
   'install_dir="$RUNNER_TEMP/actionlint"',
@@ -73,6 +73,12 @@ const actionlintCommand = [
   'tar -xzf "$archive" -C "$install_dir"',
   '"$install_dir/actionlint"',
 ].join('\n');
+const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
+  + '[[ ${#archives[@]} -eq 1 ]] \\\n'
+  + '  || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }\n'
+  + 'node scripts/pack-smoke.mjs "${archives[0]}"';
+const floorMinimumCommand = 'test "$(node --version)" = v22.0.0\n' + floorCommand;
+
 const verifyCommands = [
   actionlintCommand,
   activatePnpm,
@@ -90,6 +96,8 @@ const verifyCommands = [
   'pnpm pack:compat',
   'pnpm acceptance:compiler',
   'mkdir node-floor-artifact\npnpm pack --pack-destination node-floor-artifact',
+  floorCommand,
+  floorMinimumCommand,
 ];
 const testCommands = [
   activatePnpm,
@@ -112,10 +120,7 @@ const browserCommands = [
   'pnpm build',
   'pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }} --fail-on-flaky-tests',
 ];
-const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
-  + '[[ ${#archives[@]} -eq 1 ]] \\\n'
-  + '  || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }\n'
-  + 'node scripts/pack-smoke.mjs "${archives[0]}"';
+
 
 // Закрепление внешних actions проверяется правилом, а не значениями: SHA и версию меняет
 // Dependabot, поэтому контракт требует полный SHA разрешённого репозитория, а не конкретный.
@@ -194,44 +199,11 @@ const requiredActions = {
       }
     },
     {
-      "index": 17,
-      "name": "Upload Node-floor candidate",
-      "uses": "actions/upload-artifact@<sha>",
-      "with": {
-        "name": "node-floor-package-${{ github.sha }}-${{ github.run_id }}",
-        "path": "node-floor-artifact/*.tgz",
-        "if-no-files-found": "error",
-        "retention-days": 1,
-        "compression-level": 0,
-        "overwrite": false
-      }
-    }
-  ],
-  "floor": [
-    {
-      "index": 0,
-      "name": "Checkout",
-      "uses": "actions/checkout@<sha>",
-      "with": {
-        "persist-credentials": false
-      }
-    },
-    {
-      "index": 1,
-      "name": "Setup Node",
+      "index": 18,
+      "name": "Setup consumer Node floor",
       "uses": "actions/setup-node@<sha>",
       "with": {
-        "node-version": "${{ matrix.node }}"
-      }
-    },
-    {
-      "index": 2,
-      "name": "Download Node-floor candidate",
-      "uses": "actions/download-artifact@<sha>",
-      "with": {
-        "name": "node-floor-package-${{ github.sha }}-${{ github.run_id }}",
-        "path": "node-floor-artifact",
-        "digest-mismatch": "error"
+        "node-version": "22.0.0"
       }
     }
   ],
@@ -261,7 +233,7 @@ const requiredActions = {
         "name": "browser-conformance-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.run_id }}",
         "path": "test-results/\nplaywright-report/\n",
         "if-no-files-found": "ignore",
-        "retention-days": 7
+        "retention-days": 1
       }
     }
   ],
@@ -285,18 +257,6 @@ const requiredActions = {
     },
     {
       "index": 6,
-      "name": "Upload Vitest diagnostics",
-      "if": "failure() && steps.vitest.outcome == 'failure'",
-      "uses": "actions/upload-artifact@<sha>",
-      "with": {
-        "name": "vitest-diagnostics-${{ github.run_id }}",
-        "path": "vitest.log",
-        "if-no-files-found": "error",
-        "retention-days": 7
-      }
-    },
-    {
-      "index": 7,
       "name": "Setup registered native-clock Node",
       "uses": "actions/setup-node@<sha>",
       "with": {
@@ -357,7 +317,7 @@ function assertNativeGraph(files: Map<string, string>) {
     } } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'node-floor', 'profile-baseline', 'tests', 'verify']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'profile-baseline', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}",
     uses: './.github/workflows/profile-01.yml',
@@ -375,9 +335,8 @@ function assertNativeGraph(files: Map<string, string>) {
   const verify = ci.jobs.verify!;
   const tests = ci.jobs.tests!;
   const mutation = ci.jobs.mutation!;
-  const floor = ci.jobs['node-floor']!;
   const conformance = browser.jobs.conformance!;
-  for (const job of [verify, tests, mutation, floor, conformance]) {
+  for (const job of [verify, tests, mutation, conformance]) {
     expect(job['runs-on']).toBe('ubuntu-latest');
     expect(job.if).toBeUndefined();
   }
@@ -390,8 +349,6 @@ function assertNativeGraph(files: Map<string, string>) {
     'pnpm exec playwright install --with-deps chromium firefox webkit', 'pnpm docs:test']);
   // Нет ложных последовательных зависимостей: всё сходится только в CI.
   for (const job of [verify, tests, mutation]) expect(job.needs).toBeUndefined();
-  expect(floor.needs).toEqual(['verify']);
-  expect(floor.strategy).toEqual({ 'fail-fast': false, matrix: { node: ['22.0.0', '24'] } });
   expect(conformance.name).toBe('${{ matrix.browser }} · ${{ matrix.shard }}/${{ matrix.shards }}');
   expect(conformance.needs).toBeUndefined();
   // Полнота задаётся независимо от workflow: потеря/дубль доли не может стать GREEN.
@@ -413,7 +370,7 @@ function assertNativeGraph(files: Map<string, string>) {
     ACTIONLINT_VERSION: '1.7.12',
     ACTIONLINT_ARCHIVE_SHA256: '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8',
   });
-  for (const [name, job] of Object.entries({ verify, tests, mutation, floor, conformance })) {
+  for (const [name, job] of Object.entries({ verify, tests, mutation, conformance })) {
     expect(job.steps!.map((item, index) => ({ index, ...item })).filter((item) => item.uses)
       .map((item) => ({ ...item, uses: unpin(item.uses!) })))
       .toEqual(requiredActions[name as keyof typeof requiredActions]);
@@ -421,10 +378,8 @@ function assertNativeGraph(files: Map<string, string>) {
   assertCommands(verify, verifyCommands);
   assertCommands(tests, testCommands);
   assertCommands(mutation, mutationCommands);
-  assertCommands(floor, [floorCommand]);
   assertCommands(conformance, browserCommands);
   expect(step(tests, 'Vitest').id).toBe('vitest');
-  expect(step(tests, 'Upload Vitest diagnostics').if).toBe("failure() && steps.vitest.outcome == 'failure'");
   const gate = ci.jobs.CI!;
   expect(gate.name).toBe('CI');
   expect(gate.if).toBe('${{ always() }}');
@@ -438,7 +393,6 @@ function assertNativeGraph(files: Map<string, string>) {
       VERIFY_RESULT: '${{ needs.verify.result }}',
       TESTS_RESULT: '${{ needs.tests.result }}',
       MUTATION_RESULT: '${{ needs.mutation.result }}',
-      NODE_FLOOR_RESULT: '${{ needs.node-floor.result }}',
       BROWSER_RESULT: '${{ needs.browser-static.result }}',
       DOCS_RESULT: '${{ needs.documentation.result }}',
     },
@@ -458,21 +412,23 @@ describe('нативный граф CI', () => {
     }] as const),
     ['tests ждёт verify без необходимости', 'ci.yml', (w: Workflow) => { w.jobs.tests!.needs = ['verify']; }],
     ['mutation ждёт tests без необходимости', 'ci.yml', (w: Workflow) => { w.jobs.mutation!.needs = ['tests']; }],
-    ['Node floor ждёт mutation без необходимости', 'ci.yml', (w: Workflow) => { w.jobs['node-floor']!.needs = ['verify', 'mutation']; }],
     ['новая job вне итога', 'ci.yml', (w: Workflow) => { w.jobs.extra = { 'runs-on': 'ubuntu-latest' }; }],
+    ['архив обычного CI', 'ci.yml', (w: Workflow) => {
+      w.jobs.verify!.steps!.push({ name: 'Keep package', uses: 'actions/upload-artifact@0123456789012345678901234567890123456789', with: { path: 'node-floor-artifact' } });
+    }],
     ['игнорирование verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!['continue-on-error'] = true; }],
     ['пропуск verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!.if = false; }],
     ['игнорирование browser caller', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!['continue-on-error'] = true; }],
     ['другой browser worker', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!.uses = './.github/workflows/release.yml'; }],
-    ['нет Node floor', 'ci.yml', (w: Workflow) => { w.jobs['node-floor']!.strategy!.matrix.node = ['24']; }],
+    ['нет Node floor', 'ci.yml', (w: Workflow) => { w.jobs.verify!.steps = w.jobs.verify!.steps!.filter(item => item.name !== 'Consumer smoke on minimum runtime'); }],
     ['подмена Node floor настройкой Node 24', 'ci.yml', (w: Workflow) => {
-      step(w.jobs['node-floor']!, 'Setup Node').with!['node-version'] = '24';
+      step(w.jobs.verify!, 'Setup consumer Node floor').with!['node-version'] = '24';
     }],
     ['пропуск browser Setup Node', 'browser.yml', (w: Workflow) => {
       step(w.jobs.conformance!, 'Setup Node').if = false;
     }],
-    ['скрытые diagnostics', 'ci.yml', (w: Workflow) => {
-      step(w.jobs.tests!, 'Upload Vitest diagnostics').if = "steps.vitest.outcome == 'failure'";
+    ['пропущенный consumer', 'ci.yml', (w: Workflow) => {
+      step(w.jobs.verify!, 'Consumer smoke on minimum runtime').if = false;
     }],
     ['другой Vitest outcome', 'ci.yml', (w: Workflow) => { step(w.jobs.tests!, 'Vitest').id = 'other'; }],
     ['фальшивый итог', 'ci.yml', (w: Workflow) => { w.jobs.CI!.steps![0]!.env!.BROWSER_RESULT = 'success'; }],
@@ -532,7 +488,6 @@ describe('нативный граф CI', () => {
     ['ci.yml', 'verify', verifyCommands],
     ['ci.yml', 'tests', testCommands],
     ['ci.yml', 'mutation', mutationCommands],
-    ['ci.yml', 'node-floor', [floorCommand]],
     ['browser.yml', 'conformance', browserCommands],
   ] as const)('%s/%s сохраняет каждую обязательную команду', (file, jobId, commands) => {
     const original = sources();
@@ -556,7 +511,6 @@ describe('нативный граф CI', () => {
     ['ci.yml', 'verify'],
     ['ci.yml', 'tests'],
     ['ci.yml', 'mutation'],
-    ['ci.yml', 'node-floor'],
     ['browser.yml', 'conformance'],
   ] as const)('%s/%s сохраняет настройку каждого action', (file, jobId) => {
     const original = sources();
@@ -584,14 +538,14 @@ describe('нативный граф CI', () => {
     }
   });
 
-  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'NODE_FLOOR_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT']
+  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT']
     .flatMap((key) => ['success', 'failure', 'cancelled', 'skipped', 'neutral', 'pending', '', undefined]
       .map((result) => ({ key, result }))))('shell итога проверяет $key=$result', ({ key, result }) => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
     const program = ci.jobs.CI!.steps![0]!.run!;
     const env: NodeJS.ProcessEnv = {
       ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
-      MUTATION_RESULT: 'success', NODE_FLOOR_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
+      MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
     };
     delete env[key];
     if (result !== undefined) env[key] = result;
