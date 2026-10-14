@@ -5,8 +5,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { BINDINGS, ROOT, collectInventory } from './naming-inventory.mjs';
 
-// Публичный путь должен разрешаться в исходный модуль.
-/** Каждый субпуть обязан разрешаться в исходник. */
+/** Каждый публичный субпуть разрешается в исходный модуль. */
 export function subpathSrcErrors(subpaths, root = ROOT) {
   const errs = [];
   const packagePath = join(root, 'package.json');
@@ -25,8 +24,7 @@ export function subpathSrcErrors(subpaths, root = ROOT) {
   return errs;
 }
 
-// Зарегистрированные биндинги должны иметь публичные точки входа.
-
+/** Зарегистрированные биндинги должны иметь публичные точки входа. */
 export function bindingErrors(inv, root = ROOT) {
   const errs = [];
   const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
@@ -46,9 +44,6 @@ export function bindingErrors(inv, root = ROOT) {
   return errs;
 }
 
-/* ------------------------------------------------------------------ *
- * 6–7. Известные отступления                                          *
- * ------------------------------------------------------------------ */
 
 /** Текст раздела «Известные отступления» (до следующего `## `). */
 export function deviationsSection(text) {
@@ -77,14 +72,16 @@ export function cssLawErrors(section, alienVars) {
 }
 
 export function fileLawErrors(section, nonKebab) {
-  return nonKebab
-    .filter((f) => !section.includes(f))
-    .map((f) => `файл вне закона имён не зафиксирован в «Известных отступлениях»: ${f}`);
+  const declared = new Set(nonKebab);
+  const errors = nonKebab
+    .filter((file) => !section.includes(file))
+    .map((file) => `файл вне соглашения об именах не указан в отступлениях: ${file}`);
+  for (const [, file] of section.matchAll(/`((?:src|test|scripts|docs)\/[A-Za-z0-9_.\/-]+)`/g)) {
+    if (!declared.has(file)) errors.push(`устаревшее отступление в документации: ${file}`);
+  }
+  return errors;
 }
 
-/* ------------------------------------------------------------------ *
- * Аудит целиком                                                       *
- * ------------------------------------------------------------------ */
 
 export function auditRepo(root = ROOT) {
   const errors = [];
@@ -107,7 +104,6 @@ export function auditRepo(root = ROOT) {
   return { errors, inv };
 }
 
-/* ------------------------------------------------------------------ */
 
 const isCLI = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 

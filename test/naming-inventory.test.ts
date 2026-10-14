@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { auditRepo } from '../scripts/check-docs-drift.mjs';
+import { auditRepo, fileLawErrors } from '../scripts/check-docs-drift.mjs';
 import { BINDINGS } from '../scripts/naming-inventory.mjs';
 
 function workspace() {
@@ -43,6 +43,12 @@ describe('Именование модулей', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('отклоняет устаревшее исключение из документации', () => {
+    expect(fileLawErrors('`src/LegacyName.ts`', [])).toContainEqual(
+      expect.stringContaining('src/LegacyName.ts'),
+    );
   });
 
   it('отклоняет чужое CSS-имя без записи в отступлениях', () => {
