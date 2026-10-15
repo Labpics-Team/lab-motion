@@ -19,7 +19,7 @@ it('завершение записывает конечный CSS один ра
   expect(h.updates.size + h.renders.size).toBe(0);
 });
 
-it('ошибка CSS остаётся причиной, даже когда снятие эффекта тоже отказывает', async () => {
+it('ошибка фиксации при паузе остаётся причиной, даже когда снятие эффекта тоже отказывает', async () => {
   const h = harness(true);
   const run = h.runtime.animate(h.element, { opacity: [0, 1] }, { duration: 100, ease: 'linear' });
   const writeFailure = new Error('style write failed');
@@ -27,7 +27,7 @@ it('ошибка CSS остаётся причиной, даже когда сн
   let cancellations = 0;
   h.element.style.setProperty = () => { throw writeFailure; };
   h.effects[0]!.cancel = () => { cancellations++; throw cancelFailure; };
-  h.effects[0]!.complete();
+  expect(() => run.pause()).toThrow(writeFailure);
   await expect(run.finished).rejects.toBe(writeFailure);
   expect(run.state).toBe('failed');
   expect(cancellations).toBe(1);

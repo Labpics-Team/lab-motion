@@ -184,7 +184,7 @@ class Surface {
   private _lock(busy: boolean): void {
     if (this._busy === busy) return;
     this._busy = busy;
-    this._engine._operations += busy ? 1 : -1;
+    this._engine._operation(busy);
   }
   _refresh(): void {
     if (this._tracks.size || this._written === (this.element as HTMLElement).style.getPropertyValue(this.key)) return;
@@ -378,9 +378,10 @@ export class Runtime {
   private _pending: Array<() => void> = [];
   private _prepared: Surface[] = [];
   private _draining = false;
-  _operations = 0;
+  private _operations = 0;
   private _subscribing = false;
   constructor(readonly _host: RuntimeHost = defaultHost) {}
+  _operation(enter: boolean): void { this._operations += enter ? 1 : -1; }
   _notify(element: Element, key: string, action: () => void): void {
     const owner = this._surfaces.get(element)?.get(key)?._tracks.get(key)?._owner;
     owner?._hold();
