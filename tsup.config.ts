@@ -12,6 +12,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 const sharedFramePlugin = {
   name: 'shared-package-frame',
   setup(build: { onResolve: (options: { filter: RegExp }, callback: () => object) => void }) {
+    build.onResolve({ filter: /^(?:\.\.\/)+internal\/surface-batch\.js$/ }, () => ({ path: '#surface-batch', external: true }));
     build.onResolve({ filter: /^(?:\.\.\/)+frame\/index\.js$/ }, () => ({
       path: '#frame',
       external: true,
@@ -28,6 +29,7 @@ const sharedFramePlugin = {
 async function makeSharedFrameBrowserNative(): Promise<void> {
   const dist = resolve('dist');
   const frame = join(dist, 'frame', 'index.js');
+  const shared = new Map([['#frame', frame], ['#surface-batch', join(dist, 'internal', 'surface-batch.js')]]);
   if (!existsSync(frame)) throw new Error('build: отсутствует dist/frame/index.js');
   const pending = [dist];
   while (pending.length > 0) {
@@ -40,14 +42,15 @@ async function makeSharedFrameBrowserNative(): Promise<void> {
       }
       if (!entry.name.endsWith('.js')) continue;
       const source = readFileSync(file, 'utf8');
-      if (!source.includes('#frame')) continue;
-      let specifier = relative(dirname(file), frame).replaceAll('\\', '/');
-      if (!specifier.startsWith('.')) specifier = './' + specifier;
-      const rewritten = source.replace(/(["'])#frame\1/g, JSON.stringify(specifier));
-      if (rewritten.includes('#frame')) {
-        throw new Error(`build: не переписан browser-import #frame в ${file}`);
+      let rewritten = source;
+      for (const [key, target] of shared) {
+        let specifier = relative(dirname(file), target).replaceAll('\\', '/');
+        if (!specifier.startsWith('.')) specifier = './' + specifier;
+        rewritten = rewritten.replaceAll('"' + key + '"', JSON.stringify(specifier))
+          .replaceAll("'" + key + "'", JSON.stringify(specifier));
+        if (rewritten.includes(key)) throw new Error('build: не переписан browser-import ' + key);
       }
-      writeFileSync(file, rewritten);
+      if (rewritten !== source) writeFileSync(file, rewritten);
     }
   }
 }

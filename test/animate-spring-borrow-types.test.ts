@@ -7,10 +7,10 @@ it('не предоставляет consumer право записи в бази
   const root = resolve(import.meta.dirname, '..');
   const file = resolve(root, 'src/animate/__borrow_contract__.ts');
   const source = [
-    "import type { SurfaceBatch } from './surface-batch.js';",
-    "import { readSpringFromBasisUnchecked, sampleSpringFromBasisUnchecked } from '../internal/read-spring.js';",
+    "import type { SurfaceBatch } from '../internal/surface-batch.js';",
+    "import { springBasis, readSpringFromBasisUnchecked, sampleSpringFromBasisUnchecked } from '../internal/read-spring.js';",
     'declare const batch: SurfaceBatch;',
-    'const basis = batch._springBasis({ mass: 1, stiffness: 100, damping: 20 }, 0);',
+    'const basis = springBasis(batch, { mass: 1, stiffness: 100, damping: 20 }, 0);',
     'const result = readSpringFromBasisUnchecked(basis, 0, 100, 0);',
     'void [basis._value, result.value, result.velocity];',
     'basis._value = 17;',

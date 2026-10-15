@@ -4,6 +4,7 @@ import { scaleSerializedVelocity } from '../compositor/sample.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from '../internal/constants.js';
 import { finiteOrZero } from '../internal/finite.js';
 import {
+  springBasis,
   readSpringFromBasisUnchecked,
   sampleSpringFromBasisUnchecked,
 } from '../internal/read-spring.js';
@@ -22,7 +23,7 @@ import {
   type GroupOwner,
   type GroupRecord,
 } from './channels.js';
-import { SurfaceBatch, type SurfaceUnit } from './surface-batch.js';
+import { SurfaceBatch, type SurfaceUnit } from '../internal/surface-batch.js';
 
 export type MotionMode =
   | { readonly _type: 'spring'; readonly _spring: SpringParams }
@@ -48,7 +49,7 @@ const EASE_DERIV_H = 1e-3;
 
 /** Unit хранит семантику группы; scheduler и spring-basis принадлежат aggregate. */
 export class MainUnit implements GroupOwner, SurfaceUnit {
-  _batchSlot = -1;
+  slot = -1;
   private _o: MainUnitOptions | undefined;
   private _done = false;
   private _paused: boolean;
@@ -73,7 +74,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     this._paused = options._startPaused === true;
     this._phaseMs = -options._delayMs;
     try {
-      options._batch._add(this, this._paused);
+      options._batch.add(this, this._paused);
     } catch (error) {
       this._done = true;
       this._o = undefined;
@@ -141,7 +142,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     this._lastTs = undefined;
     this._paused = false;
     try {
-      this._o!._batch._activate(this);
+      this._o!._batch.activate(this);
     } catch (error) {
       this._paused = true;
       throw error;
@@ -151,7 +152,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   pause(): void {
     if (this._done || this._paused || this._o!._record._transition) return;
     this._paused = true;
-    this._o!._batch._deactivate(this);
+    this._o!._batch.deactivate(this);
   }
 
   seek(tMs: number): void {
@@ -167,10 +168,10 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   cancel(): void {
     if (this._done || this._o!._record._transition) return;
-    this._batchAbort();
+    this.abort();
   }
 
-  _updateStep(ts: number | undefined): void {
+  update(ts: number | undefined): void {
     if (this._done || this._paused || this._o!._record._transition) return;
     let dt: number;
     if (ts === undefined || !Number.isFinite(ts)) {
@@ -198,19 +199,19 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     }
   }
 
-  _renderStep(): void {
+  render(): void {
     if (this._done || this._paused || this._o!._record._transition) return;
     if (this._converged) this._settle();
     else if (this._active) this._write();
   }
 
-  _batchAbort(): void {
+  abort(): void {
     if (this._done) return;
     this._writeBack();
     this._finish(false);
   }
 
-  _batchRollback(): void {
+  rollback(): void {
     if (this._done) return;
     this._paused = true;
     this._o!._onRollback?.();
@@ -233,7 +234,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
       return false;
     }
 
-    const basis = o._batch._springBasis(o._mode._spring, this._phaseMs / 1000);
+    const basis = springBasis(o._batch, o._mode._spring, this._phaseMs / 1000);
     let converged = true;
     for (const channel of bound._numeric) {
       const range = channel._solverTo - channel._from;
@@ -370,7 +371,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
     if (this._done) return;
     this._done = true;
     const o = this._o!;
-    o._batch._remove(this, this._paused);
+    o._batch.remove(this, this._paused);
     if (o._record._owner === this) o._record._owner = undefined;
     const done = o._onDone;
     this._o = undefined;

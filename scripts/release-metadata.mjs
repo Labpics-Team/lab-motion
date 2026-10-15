@@ -36,6 +36,7 @@ const EXACT_FIELDS = Object.freeze({
       require: './dist/frame/index.cjs',
     },
     '#kernel': { import: './dist/index.js', require: './dist/index.cjs' },
+    '#surface-batch': { import: './dist/internal/surface-batch.js', require: './dist/internal/surface-batch.cjs' },
   },
   files: [
     'dist',
