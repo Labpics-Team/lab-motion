@@ -169,7 +169,7 @@ class Run implements Playback {
 
 class Surface {
   readonly _tracks: Map<string, Track> = new Map();
-  readonly _rest: Map<string, Point> = new Map();
+  private _rest: Point | undefined;
   readonly _transforms: Record<string, number>;
   _stamp: number;
   _busy = false;
@@ -181,16 +181,21 @@ class Surface {
     this._transforms = key === 'transform' ? initialTransforms(_engine._host.styles(element)) : {};
     this._stamp = number(_engine._host.now(), 'clock');
   }
+  private _lock(busy: boolean): void {
+    if (this._busy === busy) return;
+    this._busy = busy;
+    this._engine._operation(busy);
+  }
   _refresh(): void {
     if (this._tracks.size || this._written === (this.element as HTMLElement).style.getPropertyValue(this.key)) return;
     if (this.key === 'transform') Object.assign(this._transforms, initialTransforms(this._engine._host.styles(this.element)));
-    this._rest.clear();
+    this._rest = undefined;
   }
   _read(key: string): { point: Point; _velocity: readonly number[] } {
     const track = this._tracks.get(key);
     if (track) return { point: { _coordinates: [...track.value], unit: track._program.unit }, _velocity: [...track._velocity] };
     if (isTransform(key)) return { point: { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], unit: '' }, _velocity: [0] };
-    const saved = this._rest.get(key);
+    const saved = this._rest;
     if (saved) return { point: saved, _velocity: saved._coordinates.map(() => 0) };
     const text = this._engine._host.styles(this.element).getPropertyValue(key);
     const initial = point(key, key === 'opacity' ? text === '' ? 1 : number(Number(text), 'opacity') : text || 0);
@@ -198,7 +203,7 @@ class Surface {
   }
   _sync(): void {
     if (this._busy) throw new MotionError('Easing должен быть чистой функцией');
-    this._busy = true;
+    this._lock(true);
     try {
       const now = number(this._engine._host.now(), 'clock');
       let delta = Math.max(0, now - this._stamp);
@@ -212,7 +217,7 @@ class Surface {
         if (!track._paused) track._elapsed = Math.max(0, track._elapsed + delta);
         sample(track._program, track._elapsed, track.value, track._velocity);
       }
-    } finally { this._busy = false; }
+    } finally { this._lock(false); }
   }
   private _text(at?: 'from' | 'to'): string {
     if (this.key === 'transform') {
@@ -225,25 +230,30 @@ class Surface {
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {
-      const held = this._rest.get(this.key)!; return format(this.key, held._coordinates, held.unit);
+      const held = this._rest!; return format(this.key, held._coordinates, held.unit);
     }
     return format(track._program.key, at ? track._program._segments[0]![at] : track.value, track._program.unit);
   }
   _render(): void {
     if (this._busy) throw new MotionError('Повторная запись свойства');
-    this._busy = true;
+    this._lock(true);
     try {
       const text = this._text();
       (this.element as HTMLElement).style.setProperty(this.key, text);
       this._written = text;
     }
-    finally { this._busy = false; }
+    finally { this._lock(false); }
   }
   _detach(): void {
     const previous = this._native;
     this._native = undefined; this._token = undefined;
     if (previous) {
-      try { this._render(); } finally { previous.cancel(); }
+      try { this._render(); }
+      catch (error) {
+        try { previous.cancel(); } catch { /* ошибка CSS-записи остаётся причиной */ }
+        throw error;
+      }
+      previous.cancel();
     }
   }
   _attach(track: Track): void {
@@ -256,7 +266,7 @@ class Surface {
     if (track._done) return;
     track._done = true;
     if (this._tracks.get(track._program.key) === track) this._tracks.delete(track._program.key);
-    this._rest.set(track._program.key, { _coordinates: [...track.value], unit: track._program.unit });
+    if (this.key !== 'transform') this._rest = { _coordinates: [...track.value], unit: track._program.unit };
     if (isTransform(track._program.key)) this._transforms[track._program.key] = track.value[0]!;
     if (this._tracks.size === 0) {
       try { this._engine._idle(this); } catch (error) { failure ??= { error }; }
@@ -282,7 +292,7 @@ class Surface {
     if (!canNative) { this._engine._wake(this); return; }
     const token = {}; this._token = token;
     try {
-      this._busy = true;
+      this._lock(true);
       const effect = this.element.animate([{ [this.key]: this._text('from') }, { [this.key]: this._text('to') }], {
         duration: seg.end - seg.at, delay: seg.at, easing: _nativeEase, fill: 'both',
       });
@@ -290,14 +300,14 @@ class Surface {
       if (first._elapsed !== 0) effect.currentTime = first._elapsed;
       const finished = effect.finished;
       if (!finished || typeof finished.then !== 'function') throw new MotionError('Native effect не предоставляет finished');
-      this._busy = false;
+      this._lock(false);
       void finished.then(() => {
         if (this._token !== token) return;
         try {
           for (const track of this._tracks.values()) {
             track._elapsed = track._program.duration; sample(track._program, track._elapsed, track.value, track._velocity);
           }
-          this._render(); this._detach();
+          this._detach();
           for (const track of [...this._tracks.values()]) this._end(track, true);
           this._engine._idle(this);
         } catch (error) { this._fail(error); }
@@ -310,7 +320,7 @@ class Surface {
         } else this._fail(error);
       });
       this._engine._idle(this);
-    } catch (error) { this._busy = false; this._fail(error); throw error; }
+    } catch (error) { this._lock(false); this._fail(error); throw error; }
   }
   _control(selected: readonly Track[], action: 'pause' | 'play' | 'seek' | 'stop' | 'finish', time: number, owner?: Run): void {
     const owns = (track: Track): boolean => !track._done && this._tracks.get(track._program.key) === track &&
@@ -368,8 +378,10 @@ export class Runtime {
   private _pending: Array<() => void> = [];
   private _prepared: Surface[] = [];
   private _draining = false;
+  private _operations = 0;
   private _subscribing = false;
   constructor(readonly _host: RuntimeHost = defaultHost) {}
+  _operation(enter: boolean): void { this._operations += enter ? 1 : -1; }
   _notify(element: Element, key: string, action: () => void): void {
     const owner = this._surfaces.get(element)?.get(key)?._tracks.get(key)?._owner;
     owner?._hold();
@@ -385,15 +397,14 @@ export class Runtime {
   }
   _flush(): void { this._drain(); }
   private _drain(): void {
-    if (this._draining) return;
+    if (this._pending.length === 0 || this._draining || this._operations) return;
     this._draining = true;
     const failures: unknown[] = [];
     try {
-      while (this._pending.length) {
-        const actions = this._pending; this._pending = [];
-        for (const action of actions) { try { action(); } catch (error) { failures.push(error); } }
+      for (const action of this._pending) {
+        try { action(); } catch (error) { failures.push(error); }
       }
-    } finally { this._draining = false; }
+    } finally { this._pending.length = 0; this._draining = false; }
     if (failures.length) throw failures.length === 1 ? failures[0] : new AggregateError(failures, 'Ошибка отложенного управления');
   }
   _wake(surface: Surface): void {
