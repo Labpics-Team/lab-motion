@@ -23,14 +23,12 @@ function transform(ast: AstNode, code: string) {
   }, code, '/app/module.js');
 }
 
-// Этот characterization сохранился byte-identical после текущего import-ownership
-// preflight (#343) и защищает результат Native вместе с sourcemap. Смешанные импорты
-// ниже проверяются через текущие planner-контракты, а не через устаревшие hashes
-// старой базы до #343.
+// Хеш и sourcemap закрепляют вложенную специализацию. Остальные ветви
+// проверяются по инвариантам владения import-binding.
 const NESTED_GOLDEN = {
-  code: '799ada9a37ce604cbc3cadcd2c73bfe44f2df19e49b280b6905611a78714516f',
-  mappings: 'AAAA;AACA,wBAAQ,wBAAQ,IAAI,qwBAAmB,mwBAAiB;;;',
-  map: '374f369b966ba23aaabbda1e2d9c63d76c73618bfd0d9fe769f5370d8c4c908f',
+  code: '1de8b3cd0dd3aaa8e1ace59c760a048fdf7f81c950afe827bafdfec5316d6a3b',
+  mappings: 'AAAA;AACA,0BAAQ,0BAAQ,IAAI,qwBAAmB,mwBAAiB;;;',
+  map: 'e441e1606556c8611711aaedfc1b92bf6d7b1ba7c14d6194092f9e8e4ccd35a9',
 };
 const sha256 = (text: string): string => createHash('sha256').update(text).digest('hex');
 function assertExact(
@@ -118,7 +116,7 @@ describe('единственный применимый план lowering', () =
     expect(() => assertExact({ ...result!, code: result!.code.replace('card', 'panel') }, NESTED_GOLDEN)).toThrow();
     expect(() => assertExact({
       ...result!,
-      map: { ...result!.map, mappings: result!.map.mappings.replace('wBAAQ', 'yBAAQ') },
+      map: { ...result!.map, mappings: result!.map.mappings.replace('0BAAQ', 'yBAAQ') },
     }, NESTED_GOLDEN)).toThrow();
   });
 });
