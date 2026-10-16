@@ -56,12 +56,13 @@ const events = (value: unknown): string[] => {
 };
 const bash = process.platform === 'win32'
   ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git/bin/bash.exe') : 'bash';
-const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation'];
+const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation', 'security'];
 const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
   + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
-  + '[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]';
+  + '[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]\n'
+  + '[[ "$SECURITY_RESULT" == success ]]';
 const actionlintCommand = [
   'archive="$RUNNER_TEMP/actionlint.tar.gz"',
   'install_dir="$RUNNER_TEMP/actionlint"',
@@ -72,6 +73,29 @@ const actionlintCommand = [
   'mkdir "$install_dir"',
   'tar -xzf "$archive" -C "$install_dir"',
   '"$install_dir/actionlint"',
+].join('\n');
+// Скан зависимостей, конфигурации и секретов: trivy закреплён по sha256, принятые записи берутся
+// только из .trivyignore.yaml, уязвимость с вышедшим исправлением блокирует и при записи, а секреты
+// ищутся и в тестах, примерах и документации.
+const securityCommand = [
+  'set -euo pipefail',
+  'version=0.74.0',
+  'sum=2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a',
+  'dir="$RUNNER_TEMP/trivy"',
+  'mkdir -p "$dir"',
+  'curl -fsSL --retry 3 --retry-all-errors -o "$dir/trivy.tgz" \\',
+  '  "https://github.com/aquasecurity/trivy/releases/download/v$version/trivy_${version}_Linux-64bit.tar.gz"',
+  'echo "$sum  $dir/trivy.tgz" | sha256sum -c -',
+  'tar -xzf "$dir/trivy.tgz" -C "$dir" trivy',
+  'accepted=(--ignorefile /dev/null)',
+  '[ -f .trivyignore.yaml ] && accepted=(--ignorefile .trivyignore.yaml)',
+  'scan() { "$dir/trivy" fs --cache-dir "$dir/cache" --exit-code 1 --no-progress "$@" .; }',
+  'scan --scanners vuln,misconfig --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps "${accepted[@]}"',
+  '# Исправление вышло — принятая раньше уязвимость снова блокирует.',
+  'scan --scanners vuln --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps --ignore-unfixed --ignorefile /dev/null',
+  '# Секрет в тестах, примерах и документации — такая же утечка: встроенные исключения trivy для них сняты.',
+  String.raw`printf 'disable-allow-rules:\n  - tests\n  - examples\n  - markdown\n' > "$dir/secret.yaml"`,
+  'scan --scanners secret --secret-config "$dir/secret.yaml" "${accepted[@]}"',
 ].join('\n');
 const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
   + '[[ ${#archives[@]} -eq 1 ]] \\\n'
@@ -106,6 +130,7 @@ const testCommands = [
   vitestCommand,
   'node test/fixtures/server-thread-cpu-clock-check.mjs',
 ];
+const securityCommands = [securityCommand];
 const mutationCommands = [
   activatePnpm,
   'pnpm install --frozen-lockfile',
@@ -281,6 +306,16 @@ const requiredActions = {
         "node-version": "24"
       }
     }
+  ],
+  "security": [
+    {
+      "index": 0,
+      "name": "Checkout",
+      "uses": "actions/checkout@<sha>",
+      "with": {
+        "persist-credentials": false
+      }
+    }
   ]
 };
 
@@ -317,7 +352,7 @@ function assertNativeGraph(files: Map<string, string>) {
     } } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'profile-baseline', 'tests', 'verify']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'profile-baseline', 'security', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}",
     uses: './.github/workflows/profile-01.yml',
@@ -335,8 +370,9 @@ function assertNativeGraph(files: Map<string, string>) {
   const verify = ci.jobs.verify!;
   const tests = ci.jobs.tests!;
   const mutation = ci.jobs.mutation!;
+  const security = ci.jobs.security!;
   const conformance = browser.jobs.conformance!;
-  for (const job of [verify, tests, mutation, conformance]) {
+  for (const job of [verify, tests, mutation, security, conformance]) {
     expect(job['runs-on']).toBe('ubuntu-latest');
     expect(job.if).toBeUndefined();
   }
@@ -348,7 +384,7 @@ function assertNativeGraph(files: Map<string, string>) {
   assertCommands(reader, [activatePnpm, 'pnpm install --frozen-lockfile', 'pnpm docs:build',
     'pnpm exec playwright install --with-deps chromium firefox webkit', 'pnpm docs:test']);
   // Нет ложных последовательных зависимостей: всё сходится только в CI.
-  for (const job of [verify, tests, mutation]) expect(job.needs).toBeUndefined();
+  for (const job of [verify, tests, mutation, security]) expect(job.needs).toBeUndefined();
   expect(conformance.name).toBe('${{ matrix.browser }} · ${{ matrix.shard }}/${{ matrix.shards }}');
   expect(conformance.needs).toBeUndefined();
   // Полнота задаётся независимо от workflow: потеря/дубль доли не может стать GREEN.
@@ -370,7 +406,7 @@ function assertNativeGraph(files: Map<string, string>) {
     ACTIONLINT_VERSION: '1.7.12',
     ACTIONLINT_ARCHIVE_SHA256: '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8',
   });
-  for (const [name, job] of Object.entries({ verify, tests, mutation, conformance })) {
+  for (const [name, job] of Object.entries({ verify, tests, mutation, security, conformance })) {
     expect(job.steps!.map((item, index) => ({ index, ...item })).filter((item) => item.uses)
       .map((item) => ({ ...item, uses: unpin(item.uses!) })))
       .toEqual(requiredActions[name as keyof typeof requiredActions]);
@@ -378,6 +414,7 @@ function assertNativeGraph(files: Map<string, string>) {
   assertCommands(verify, verifyCommands);
   assertCommands(tests, testCommands);
   assertCommands(mutation, mutationCommands);
+  assertCommands(security, securityCommands);
   assertCommands(conformance, browserCommands);
   expect(step(tests, 'Vitest').id).toBe('vitest');
   const gate = ci.jobs.CI!;
@@ -395,6 +432,7 @@ function assertNativeGraph(files: Map<string, string>) {
       MUTATION_RESULT: '${{ needs.mutation.result }}',
       BROWSER_RESULT: '${{ needs.browser-static.result }}',
       DOCS_RESULT: '${{ needs.documentation.result }}',
+      SECURITY_RESULT: '${{ needs.security.result }}',
     },
     run: `${gateCommand}\n`,
   }]);
@@ -488,6 +526,7 @@ describe('нативный граф CI', () => {
     ['ci.yml', 'verify', verifyCommands],
     ['ci.yml', 'tests', testCommands],
     ['ci.yml', 'mutation', mutationCommands],
+    ['ci.yml', 'security', securityCommands],
     ['browser.yml', 'conformance', browserCommands],
   ] as const)('%s/%s сохраняет каждую обязательную команду', (file, jobId, commands) => {
     const original = sources();
@@ -505,12 +544,13 @@ describe('нативный граф CI', () => {
         expect(() => assertNativeGraph(files), `${jobId}: ${command}; ${mutation}`).toThrow();
       }
     }
-  });
+  }, 30_000);
 
   it.each([
     ['ci.yml', 'verify'],
     ['ci.yml', 'tests'],
     ['ci.yml', 'mutation'],
+    ['ci.yml', 'security'],
     ['browser.yml', 'conformance'],
   ] as const)('%s/%s сохраняет настройку каждого action', (file, jobId) => {
     const original = sources();
@@ -538,7 +578,7 @@ describe('нативный граф CI', () => {
     }
   });
 
-  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT']
+  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT', 'SECURITY_RESULT']
     .flatMap((key) => ['success', 'failure', 'cancelled', 'skipped', 'neutral', 'pending', '', undefined]
       .map((result) => ({ key, result }))))('shell итога проверяет $key=$result', ({ key, result }) => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
@@ -546,6 +586,7 @@ describe('нативный граф CI', () => {
     const env: NodeJS.ProcessEnv = {
       ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
       MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
+      SECURITY_RESULT: 'success',
     };
     delete env[key];
     if (result !== undefined) env[key] = result;
