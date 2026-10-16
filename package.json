@@ -433,14 +433,14 @@
         "default": "./dist/animate/index.cjs"
       }
     },
-    "./nano": {
+    "./native": {
       "import": {
-        "types": "./dist/nano/index.d.ts",
-        "default": "./dist/nano/index.js"
+        "types": "./dist/native/index.d.ts",
+        "default": "./dist/native/index.js"
       },
       "require": {
-        "types": "./dist/nano/index.d.cts",
-        "default": "./dist/nano/index.cjs"
+        "types": "./dist/native/index.d.cts",
+        "default": "./dist/native/index.cjs"
       }
     },
     "./compiler/vite": {

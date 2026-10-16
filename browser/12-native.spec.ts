@@ -1,10 +1,10 @@
 import { expect, test } from './fixtures/harness';
 
-test('nano исполняет spring/tween/stagger на native WAAPI и сохраняет финал', async ({
+test('native исполняет spring/tween/stagger на native WAAPI и сохраняет финал', async ({
   page,
 }) => {
   const result = await page.evaluate(async () => {
-    const { animate } = await import('/dist/nano/index.js');
+    const { animate } = await import('/dist/native/index.js');
     const elements = Array.from({ length: 3 }, () => {
       const element = document.createElement('div');
       element.style.translate = '0px 0px';
@@ -66,9 +66,9 @@ test('nano исполняет spring/tween/stagger на native WAAPI и сохр
   expect(result.retained).toEqual([0, 0, 0]);
 });
 
-test('nano reduced motion схлопывает duration и delay без wall-clock ожидания', async ({ page }) => {
+test('native reduced motion схлопывает duration и delay без wall-clock ожидания', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { animate } = await import('/dist/nano/index.js');
+    const { animate } = await import('/dist/native/index.js');
     const element = document.createElement('div');
     document.body.appendChild(element);
     const controls = animate(element, { translate: '100px 0px' }, {
@@ -86,9 +86,9 @@ test('nano reduced motion схлопывает duration и delay без wall-clo
   expect(result).toEqual({ duration: 0, delay: 0 });
 });
 
-test('nano чистит native effect после каждого replay и не занимает onfinish', async ({ page }) => {
+test('native чистит native effect после каждого replay и не занимает onfinish', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { animate } = await import('/dist/nano/index.js');
+    const { animate } = await import('/dist/native/index.js');
     const element = document.createElement('div');
     document.body.append(element);
     const controls = animate(element, { opacity: 0.25 }, { duration: 100 });
@@ -120,10 +120,10 @@ test('nano чистит native effect после каждого replay и не �
   });
 });
 
-test('nano сохраняет финал при естественном завершении spring в реальном движке', async ({ page }) => {
+test('native сохраняет финал при естественном завершении spring в реальном движке', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   const result = await page.evaluate(async () => {
-    const { animate } = await import('/dist/nano/index.js');
+    const { animate } = await import('/dist/native/index.js');
     const element = document.createElement('div');
     element.style.opacity = '1';
     document.body.appendChild(element);

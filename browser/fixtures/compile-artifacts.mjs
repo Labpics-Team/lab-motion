@@ -1,11 +1,11 @@
 /**
- * compile-artifacts.mjs — playwright globalSetup для 17-compiler-nano.spec и
+ * compile-artifacts.mjs — playwright globalSetup для 17-compiler-native.spec и
  * 19-surface-compiler.spec.
  *
  * Собирает ДВА fixture реальным Vite, каждый дважды — с плагином
  * motionCompiler() (compiled) и без (uncompiled) — в самодостаточные
  * ESM-бандлы `browser/.artifacts/`:
- *   • nano: буквальный recipe из docs/compiler.md — compiled/uncompiled;
+ *   • native: буквальный recipe из docs/compiler.md — compiled/uncompiled;
  *   • surface: `animate(el, { width: [240, 360] }, { layout: 'project' })`
  *     и list-вариант — surface-compiled/surface-uncompiled.
  * Спеки грузят бандлы по http и сверяют наблюдаемое в РЕАЛЬНОМ движке
@@ -24,7 +24,7 @@ import { buildMotionRoot } from './motion-root.mjs';
 import { buildScopeRecipes } from './scope-recipes.mjs';
 import { buildPackagedCompositorFollowRecipes } from './compositor-follow-recipes.mjs';
 import { buildPresenceScopeResource } from './presence-scope-resource.mjs';
-import { readCompilerNanoRecipe } from '../../scripts/compiler-doc-recipe.mjs';
+import { readCompilerNativeRecipe } from '../../scripts/compiler-doc-recipe.mjs';
 import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,12 +35,12 @@ const OUT = resolve(ROOT, 'browser', '.artifacts');
 const TMP = resolve(OUT, '.tmp');
 
 const ALIAS = {
-  '@labpics/motion/nano': resolve(DIST, 'nano/index.js'),
+  '@labpics/motion/native': resolve(DIST, 'native/index.js'),
   '@labpics/motion/compiler/runtime': resolve(DIST, 'compiler/runtime/index.js'),
   '@labpics/motion/animate': resolve(DIST, 'animate/index.js'),
   '@labpics/motion/compiler/surface': resolve(DIST, 'compiler/surface/index.js'),
 };
-const NANO_FIXTURE = readCompilerNanoRecipe(ROOT);
+const NATIVE_FIXTURE = readCompilerNativeRecipe(ROOT);
 // Позитивная форма после hotfix наблюдаемой эквивалентности (PR-1 Future
 // Layout): lowering сертифицируется ТОЛЬКО для голого expression statement —
 // результат не присваивается, не return'ится, не await'ится: неполные
@@ -92,14 +92,14 @@ export default async function globalSetup() {
   rmSync(OUT, { recursive: true, force: true });
   mkdirSync(TMP, { recursive: true });
   try {
-    const compiled = await bundle(motionCompiler, NANO_FIXTURE, true);
-    const uncompiled = await bundle(motionCompiler, NANO_FIXTURE, false);
+    const compiled = await bundle(motionCompiler, NATIVE_FIXTURE, true);
+    const uncompiled = await bundle(motionCompiler, NATIVE_FIXTURE, false);
     const surfaceCompiled = await bundle(motionCompiler, SURFACE_FIXTURE, true);
     const surfaceUncompiled = await bundle(motionCompiler, SURFACE_FIXTURE, false);
     // Санити globalSetup: бандлы самодостаточны (браузер грузит их как есть) и
     // несут ожидаемую форму — иначе спека упала бы позже с мутным import-сбоем.
-    assertSelfContained(compiled, 'nano compiled');
-    assertSelfContained(uncompiled, 'nano uncompiled');
+    assertSelfContained(compiled, 'native compiled');
+    assertSelfContained(uncompiled, 'native uncompiled');
     assertSelfContained(surfaceCompiled, 'surface compiled');
     assertSelfContained(surfaceUncompiled, 'surface uncompiled');
     if (!/linear\(/.test(compiled)) {
