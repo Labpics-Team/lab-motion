@@ -244,6 +244,8 @@ jobs:
       - name: Scan dependencies, configuration and secrets
         run: |
           set -euo pipefail
+          # trivy читает переменные TRIVY_* как флаги: охват проверки задаёт только этот шаг.
+          unset "${!TRIVY_@}"
           version=0.74.0
           sum=2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
           dir="$RUNNER_TEMP/trivy"
