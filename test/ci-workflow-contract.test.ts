@@ -77,7 +77,7 @@ const actionlintCommand = [
 // Скан зависимостей, конфигурации и секретов: trivy закреплён по sha256, принятые записи берутся
 // только из .trivyignore.yaml, ни переменные TRIVY_*, ни trivy.yaml проверяемого дерева настройки не
 // меняют, уязвимость с вышедшим исправлением блокирует и при записи, а секреты ищутся и в тестах,
-// примерах и документации.
+// примерах и документации и не принимаются никакими записями.
 const securityCommand = [
   'set -euo pipefail',
   '# trivy читает переменные TRIVY_* как флаги: охват проверки задаёт только этот шаг.',
@@ -97,9 +97,10 @@ const securityCommand = [
   'scan --scanners vuln,misconfig --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps "${accepted[@]}"',
   '# Исправление вышло — принятая раньше уязвимость снова блокирует.',
   'scan --scanners vuln --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps --ignore-unfixed --ignorefile /dev/null',
-  '# Секрет в тестах, примерах и документации — такая же утечка: встроенные исключения trivy для них сняты.',
+  '# Секрет в тестах, примерах и документации — такая же утечка: встроенные исключения trivy для них сняты,',
+  '# а записи .trivyignore.yaml к секретам не применяются.',
   String.raw`printf 'disable-allow-rules:\n  - tests\n  - examples\n  - markdown\n' > "$dir/secret.yaml"`,
-  'scan --scanners secret --secret-config "$dir/secret.yaml" "${accepted[@]}"',
+  'scan --scanners secret --secret-config "$dir/secret.yaml" --ignorefile /dev/null',
 ].join('\n');
 const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
   + '[[ ${#archives[@]} -eq 1 ]] \\\n'

@@ -261,9 +261,10 @@ jobs:
           scan --scanners vuln,misconfig --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps "${accepted[@]}"
           # Исправление вышло — принятая раньше уязвимость снова блокирует.
           scan --scanners vuln --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps --ignore-unfixed --ignorefile /dev/null
-          # Секрет в тестах, примерах и документации — такая же утечка: встроенные исключения trivy для них сняты.
+          # Секрет в тестах, примерах и документации — такая же утечка: встроенные исключения trivy для них сняты,
+          # а записи .trivyignore.yaml к секретам не применяются.
           printf 'disable-allow-rules:\n  - tests\n  - examples\n  - markdown\n' > "$dir/secret.yaml"
-          scan --scanners secret --secret-config "$dir/secret.yaml" "${accepted[@]}"
+          scan --scanners secret --secret-config "$dir/secret.yaml" --ignorefile /dev/null
 
   documentation:
     uses: ./.github/workflows/docs.yml
