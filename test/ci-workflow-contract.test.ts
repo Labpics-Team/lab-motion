@@ -75,8 +75,8 @@ const actionlintCommand = [
   '"$install_dir/actionlint"',
 ].join('\n');
 // Скан зависимостей, конфигурации и секретов: trivy закреплён по sha256, принятые записи берутся
-// только из .trivyignore.yaml, уязвимость с вышедшим исправлением блокирует и при записи, а секреты
-// ищутся и в тестах, примерах и документации.
+// только из .trivyignore.yaml, trivy.yaml проверяемого дерева настройки не меняет, уязвимость с
+// вышедшим исправлением блокирует и при записи, а секреты ищутся и в тестах, примерах и документации.
 const securityCommand = [
   'set -euo pipefail',
   'version=0.74.0',
@@ -89,7 +89,8 @@ const securityCommand = [
   'tar -xzf "$dir/trivy.tgz" -C "$dir" trivy',
   'accepted=(--ignorefile /dev/null)',
   '[ -f .trivyignore.yaml ] && accepted=(--ignorefile .trivyignore.yaml)',
-  'scan() { "$dir/trivy" fs --cache-dir "$dir/cache" --exit-code 1 --no-progress "$@" .; }',
+  '# Настройки сканера задаёт шаг: trivy.yaml из проверяемого дерева их не меняет.',
+  'scan() { "$dir/trivy" fs --config /dev/null --cache-dir "$dir/cache" --exit-code 1 --no-progress "$@" .; }',
   'scan --scanners vuln,misconfig --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps "${accepted[@]}"',
   '# Исправление вышло — принятая раньше уязвимость снова блокирует.',
   'scan --scanners vuln --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps --ignore-unfixed --ignorefile /dev/null',
