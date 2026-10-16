@@ -22,7 +22,7 @@ export default { plugins: [motionCompiler()] };
 
 Поддерживается ровно один класс вызовов: статический
 `animate(target, { opacity: N })` из прямого именованного импорта
-`@labpics/motion/nano` без опций. Всё остальное приводит к консервативному
+`@labpics/motion/native` без опций. Всё остальное приводит к консервативному
 отказу от специализации: исходный код сохраняет прежнюю семантику и исполняется
 обычным путём среды выполнения. Непредставимая программа или расхождение
 проекции — **ошибка сборки, а не скрытый запасной путь**.
@@ -33,25 +33,25 @@ export default { plugins: [motionCompiler()] };
 `scripts/compiler-acceptance.mjs` и сравнительной проверки в браузере. Эти
 проверки не хранят собственных копий исходного кода примера.
 
-<!-- compiler-nano-recipe -->
+<!-- compiler-native-recipe -->
 ```typescript
-import { animate } from '@labpics/motion/nano';
+import { animate } from '@labpics/motion/native';
 export function play(el) { return animate(el, { opacity: 0.5 }); }
 ```
 
 Браузерный стенд `browser/fixtures/compiler-playground.html` исполняет уже
 собранный `browser/.artifacts/compiled.js`. Этот артефакт создаёт
 `browser/fixtures/compile-artifacts.mjs` из буквального блока выше через
-`readCompilerNanoRecipe`. Стенд, сравнительная проверка и приёмочная проверка
+`readCompilerNativeRecipe`. Стенд, сравнительная проверка и приёмочная проверка
 имеют один вход; второго пути компиляции и отдельной среды выполнения не
 появляется.
 
 ## Как строится доверенный артефакт
 
-Цепочка: единственный источник nano (`springLinear`) → кандидат
+Цепочка: единственный источник native (`springLinear`) → кандидат
 `MotionProgram V1` → `parseMotionProgramV1` (единственный оракул доверия) →
 проекция обратно в `{ frame, durationMs, cssLinear }` с обязательным побитовым
-совпадением с исходным nano-артефактом. Ядро компилятора не зависит от парсера:
+совпадением с исходным native-артефактом. Ядро компилятора не зависит от парсера:
 адаптер передаёт ESTree-совместимое дерево `Program` (для Vite/Rollup — штатный
 `this.parse`, `acorn`) и сам применяет возвращённые байтовые правки.
 

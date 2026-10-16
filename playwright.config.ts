@@ -9,7 +9,7 @@ const BASE_URL = `http://127.0.0.1:${PORT}`;
 export default defineConfig({
   testDir: 'browser',
   testMatch: /.*\.spec\.ts$/,
-  // Собирает compiled/uncompiled fixture-бандлы для 17-compiler-nano.spec один
+  // Собирает compiled/uncompiled fixture-бандлы для 17-compiler-native.spec один
   // раз до прогона (реальный Vite + плагин, alias на dist). Прочие спеки грузят
   // dist напрямую и этот шаг игнорируют.
   globalSetup: './browser/fixtures/compile-artifacts.mjs',

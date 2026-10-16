@@ -79,7 +79,7 @@ function fixture() {
     exports: {
       '.': './dist/index.js',
       './animate': './dist/animate/index.js',
-      './nano': './dist/nano/index.js',
+      './native': './dist/native/index.js',
     },
   }));
   writeFileSync(path.join(root, 'pnpm-lock.yaml'), 'root-lock');
@@ -469,7 +469,7 @@ describe('Происхождение измеряемого бенчмарком
     expect(() => prepareBenchmarkCheckout({
       root: f.root,
       benchDirectory: f.benchDirectory,
-      requiredDist: ['dist/nano/index.js'],
+      requiredDist: ['dist/native/index.js'],
       build() {},
       readState: () => f.state,
       captureEnvironment: () => ({ node: 'v24.0.0', pnpm: '11.11.0', packages: {} }),

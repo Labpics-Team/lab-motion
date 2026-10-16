@@ -133,7 +133,7 @@ describe('PROFILE: замороженный протокол проверяет�
     expect(registered.core).toBe(gate.CORE_GATE_BYTES);
     expect(registered.subpath).toBe(gate.SUBPATH_GATE_BYTES);
     expect(registered.fullCoreConsumer).toBe(gate.FULL_CORE_CONSUMER_GATE_BYTES);
-    expect(registered.nano).toBe(gate.NANO_GATE_BYTES);
+    expect(registered.native).toBe(gate.NATIVE_GATE_BYTES);
     expect(registered.compiledRuntime).toBe(gate.BESPOKE_SUBPATH_GATES['./compiler/runtime']);
     expect(registered.compilerSurface).toBe(gate.BESPOKE_SUBPATH_GATES['./compiler/surface']);
     expect(registered.inView).toBe(gate.IN_VIEW_GATE_BYTES);

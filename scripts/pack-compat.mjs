@@ -69,7 +69,7 @@ const RUNNABLE = Object.keys(pkg.exports).filter((k) => !PEER_BINDING_SUBPATHS.h
 const specOf = (sub) => (sub === '.' ? pkg.name : `${pkg.name}/${sub.slice(2)}`);
 
 /** DOM-facing субпути — их SSR-import (в Node без DOM) обязан НЕ падать. */
-const DOM_FACING = ['./compositor', './compositor/stagger', './animate', './nano', './gestures', './projection', './a11y', './presence', './flip', './waapi']
+const DOM_FACING = ['./compositor', './compositor/stagger', './animate', './native', './gestures', './projection', './a11y', './presence', './flip', './waapi']
   .filter((s) => RUNNABLE.includes(s));
 
 const work = mkdtempSync(join(tmpdir(), 'labmotion-pack-compat-'));
@@ -204,7 +204,7 @@ try {
         `import { createCompositorFollow, type CompositorFollow } from '${pkg.name}/compositor/follow';\n` +
         `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan, type CompositorStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         `import { animate, type AnimateControls } from '${pkg.name}/animate';\n` +
-        `import { animate as nanoAnimate, type NanoControls } from '${pkg.name}/nano';\n` +
+        `import { animate as nativeAnimate, type NativeControls } from '${pkg.name}/native';\n` +
         `import { createDrag } from '${pkg.name}/gestures';\n` +
         `import { createMotionConfig } from '${pkg.name}/a11y';\n` +
         compositorSubclassContract +
@@ -223,11 +223,11 @@ try {
         `const read = readCompositorSpring({ mass: 1, stiffness: 200, damping: 20 }, { t: 0.1 });\n` +
         `const drag = createDrag({ inertia: false });\n` +
         `const cfg = createMotionConfig({ reducedMotion: 'system' });\n` +
-        `const nano: NanoControls = nanoAnimate(document.body, { translate: '10px 20px' }, { duration: 100 });\n` +
+        `const native: NativeControls = nativeAnimate(document.body, { translate: '10px 20px' }, { duration: 100 });\n` +
         `// @ts-expect-error spring и tween — взаимоисключающие режимы.\n` +
-        `nanoAnimate(document.body, { opacity: 1 }, { duration: 100, spring: { mass: 1, stiffness: 100, damping: 10 } });\n` +
+        `nativeAnimate(document.body, { opacity: 1 }, { duration: 100, spring: { mass: 1, stiffness: 100, damping: 10 } });\n` +
         `export function use(): number { single.destroy(); group.destroy(); return v + plan.duration + staggerPlan.count + read.value + drag.x + (cfg.prefersReduced() ? 1 : 0); }\n` +
-        `export type C = AnimateControls; export type N = NanoControls; export const a = animate; export const n = nanoAnimate;\n`,
+        `export type C = AnimateControls; export type N = NativeControls; export const a = animate; export const n = nativeAnimate;\n`,
     );
     execSync(`node "${TSC_BIN}" --project tsconfig.json`, { cwd: dir, stdio: 'pipe' });
     log('TS: nodenext-резолв exports + типы прошли tsc --noEmit ✓');
@@ -309,11 +309,11 @@ try {
       join(dir, 'consumer.ts'),
       `import { spring } from '${pkg.name}/driver';\n` +
         `import { clamp } from '${pkg.name}/utils';\n` +
-        `import { animate as nanoAnimate } from '${pkg.name}/nano';\n` +
+        `import { animate as nativeAnimate } from '${pkg.name}/native';\n` +
         `import { CompositorSpring, compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
         compositorSubclassContract +
         `export const value: number = clamp(0, 1, spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1).value);\n` +
-        `export const motion = [nanoAnimate, compileStaggerPlan] as const;\n`,
+        `export const motion = [nativeAnimate, compileStaggerPlan] as const;\n`,
     );
     const trace = execSync(`node "${TSC_BIN}" --project tsconfig.json --traceResolution`, {
       cwd: dir,
@@ -321,7 +321,7 @@ try {
     }).replaceAll('\\', '/');
     for (const declaration of [
       'dist/utils/index.d.ts',
-      'dist/nano/index.d.ts',
+      'dist/native/index.d.ts',
       'dist/compositor/stagger/index.d.ts',
     ]) {
       if (!trace.includes(declaration)) fail(`TS Node10 не разрешил typesVersions: ${declaration}`);
@@ -374,21 +374,21 @@ try {
       `import { animate as rootAnimate } from '${pkg.name}';\n` +
       `import { spring, type SpringResult } from '${pkg.name}/driver';\n` +
         `import { CompositorSpring, CompositorStaggerGroup, compileSpringPlan, compileStaggerPlan } from '${pkg.name}/compositor/stagger';\n` +
-        `import { animate as nanoAnimate, type NanoControls } from '${pkg.name}/nano';\n` +
+        `import { animate as nativeAnimate, type NativeControls } from '${pkg.name}/native';\n` +
         compositorSubclassContract +
         `const r: SpringResult = spring({ mass: 1, stiffness: 200, damping: 20 }, 0.1);\n` +
         `const physics = { mass: 1, stiffness: 200, damping: 20 };\n` +
         `const single = new CompositorSpring({ spring: physics, property: 'opacity', from: 0, to: 1 });\n` +
         `const group = new CompositorStaggerGroup({ spring: physics, property: 'opacity', from: 0, to: 1, targets: [] });\n` +
         `export const duration: number = compileSpringPlan({ spring: physics, property: 'opacity', from: 0, to: 1 }).duration + compileStaggerPlan({ spring: physics, property: 'opacity', from: 0, to: 1, count: 0 }).count + r.value;\n` +
-        `export type N = NanoControls; export const nano = nanoAnimate;\n` +
+        `export type N = NativeControls; export const native = nativeAnimate;\n` +
         `single.destroy(); group.destroy();\n`,
     );
     const trace = execSync(`node "${TSC_BIN}" --project tsconfig.json --traceResolution`, {
       cwd: dir,
       encoding: 'utf8',
     }).replaceAll('\\', '/');
-    for (const declaration of ['dist/motion/index.d.cts', 'dist/driver/index.d.cts', 'dist/compositor/stagger/index.d.cts', 'dist/nano/index.d.cts']) {
+    for (const declaration of ['dist/motion/index.d.cts', 'dist/driver/index.d.cts', 'dist/compositor/stagger/index.d.cts', 'dist/native/index.d.cts']) {
       if (!trace.includes(declaration)) {
         fail(`TS CJS резолвит не CommonJS-декларацию: ${declaration} не найден в trace`);
       }
@@ -448,7 +448,7 @@ try {
 
   // ── Vite-фикстура с ПЛАГИНОМ: build-time lowering поверх упакованного пакета ──
   // Приёмка компилятора #208 у РЕАЛЬНОГО потребителя: motionCompiler() из
-  // установленного tarball понижает статический nano-вызов, инъектируя
+  // установленного tarball понижает статический native-вызов, инъектируя
   // '@labpics/motion/compiler/runtime'. Доказывает резолюцию exports ОБОИХ
   // compiler-субпутей (плагин + executor) и элиминацию solver из бандла —
   // node-гейт scripts/compiler-acceptance.mjs делает то же на dist через alias;
@@ -457,7 +457,7 @@ try {
     const dir = installFixture('vite-compiler', { name: 'vite-compiler-fx', private: true, type: 'module' }, tarball);
     writeFileSync(
       join(dir, 'entry.js'),
-      `import { animate } from '${pkg.name}/nano';\n` +
+      `import { animate } from '${pkg.name}/native';\n` +
         `export function play(el) { return animate(el, { opacity: 0.5 }); }\n`,
     );
     writeFileSync(

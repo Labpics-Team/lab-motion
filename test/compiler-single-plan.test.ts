@@ -3,14 +3,14 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { parseAstAsync } from 'vite';
 import {
-  planNanoOpacityLowering,
+  planNativeOpacityLowering,
   planSurfaceLowering,
   type AstNode,
 } from '../src/compiler/core.js';
-import { nanoDefaultArtifactLiteral } from '../src/compiler/nano-default-artifact.js';
+import { nativeDefaultArtifactLiteral } from '../src/compiler/native-default-artifact.js';
 import { motionCompiler } from '../src/compiler/vite/index.js';
 
-const NANO = '@labpics/motion/nano';
+const NATIVE = '@labpics/motion/native';
 const SURFACE = '@labpics/motion/animate';
 const BODY = `animate(card, { opacity: 1 });
 animate(panel, { width: [100, 200] }, { layout: 'project' });
@@ -24,7 +24,7 @@ function transform(ast: AstNode, code: string) {
 }
 
 // Этот characterization сохранился byte-identical после текущего import-ownership
-// preflight (#343) и защищает результат Nano вместе с sourcemap. Смешанные импорты
+// preflight (#343) и защищает результат Native вместе с sourcemap. Смешанные импорты
 // ниже проверяются через текущие planner-контракты, а не через устаревшие hashes
 // старой базы до #343.
 const NESTED_GOLDEN = {
@@ -44,7 +44,7 @@ function assertExact(
 
 describe('единственный применимый план lowering', () => {
   it('два прямых импорта с локальным именем animate отвергаются независимым ESM-парсером', () => {
-    const code = `import { animate } from '${NANO}';\nimport { animate } from '${SURFACE}';\n`;
+    const code = `import { animate } from '${NATIVE}';\nimport { animate } from '${SURFACE}';\n`;
     const invalid = spawnSync(process.execPath, ['--input-type=module', '--check'], {
       input: code,
       encoding: 'utf8',
@@ -63,19 +63,19 @@ describe('единственный применимый план lowering', () =
   });
 
   it('смешанные импорты и их порядок сохраняют ровно своего владельца', async () => {
-    for (const [nano, surface] of [['animate', 'surface'], ['nano', 'animate'], ['nano', 'surface']]) {
+    for (const [native, surface] of [['animate', 'surface'], ['native', 'animate'], ['native', 'surface']]) {
       const imports = [
-        `import { animate as ${nano} } from '${NANO}';`,
+        `import { animate as ${native} } from '${NATIVE}';`,
         `import { animate as ${surface} } from '${SURFACE}';`,
       ];
       for (const ordered of [imports, [...imports].reverse()]) {
         const code = ordered.join('\n') + '\n' + BODY;
         const ast = await parseAstAsync(code) as unknown as AstNode;
         const plans = [
-          planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral),
+          planNativeOpacityLowering(ast, code, nativeDefaultArtifactLiteral),
           planSurfaceLowering(ast, code),
         ].filter((plan) => plan !== undefined);
-        expect(plans.length).toBe(nano === 'animate' || surface === 'animate' ? 1 : 0);
+        expect(plans.length).toBe(native === 'animate' || surface === 'animate' ? 1 : 0);
         const result = transform(ast, code);
         if (plans.length === 0) {
           expect(result).toBeUndefined();
@@ -94,8 +94,8 @@ describe('единственный применимый план lowering', () =
     }
   });
 
-  it('успешный Nano не оплачивает проверку владения второго planner', async () => {
-    const code = `import { animate } from '${NANO}';\nanimate(animate(card, { opacity: 0.5 }), { opacity: 1 });\n`;
+  it('успешный Native не оплачивает проверку владения второго planner', async () => {
+    const code = `import { animate } from '${NATIVE}';\nanimate(animate(card, { opacity: 0.5 }), { opacity: 1 });\n`;
     const parsed = await parseAstAsync(code) as unknown as AstNode;
     const body = parsed.body;
     let bodyReads = 0;
@@ -105,7 +105,7 @@ describe('единственный применимый план lowering', () =
     const ast: AstNode = { ...parsed, get body() { bodyReads++; return body; } };
     const result = transform(ast, code);
     expect(result).toBeDefined();
-    expect(result!.code.match(/__labMotionNanoCompiled\(/g)).toHaveLength(2);
+    expect(result!.code.match(/__labMotionNativeCompiled\(/g)).toHaveLength(2);
     assertExact(result!, NESTED_GOLDEN);
     expect(bodyReads).toBe(3);
 

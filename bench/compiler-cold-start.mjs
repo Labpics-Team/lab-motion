@@ -1,12 +1,12 @@
 /**
  * Диагностический бенч компиляторного среза (#208) против собранного dist.
  *
- * Меряет РАНТАЙМОВУЮ работу, которую build-time lowering убирает: nano.animate
+ * Меряет РАНТАЙМОВУЮ работу, которую build-time lowering убирает: native.animate
  * пересчитывает springLinear() (замкнутая форма + ~118 узлов linear()) на
  * КАЖДЫЙ вызов; animateCompiled читает precomputed-литерал и сразу зовёт WAAPI.
  * element.animate заглушён (одинаков для обоих путей) — изолируем именно
  * элиминированное вычисление. Это НЕ CI-гейт (структурную элиминацию из бандла
- * запечатывают scripts/compiler-acceptance.mjs и browser/17-compiler-nano);
+ * запечатывают scripts/compiler-acceptance.mjs и browser/17-compiler-native);
  * тут — воспроизводимая величина per-call выигрыша, публикуемая как факт.
  */
 
@@ -32,10 +32,10 @@ function fakeElement() {
 }
 globalThis.matchMedia = () => ({ matches: false });
 
-const { animate } = await import('../dist/nano/index.js');
+const { animate } = await import('../dist/native/index.js');
 const { animateCompiled } = await import('../dist/compiler/runtime/index.js');
 
-// Артефакт, который инъектирует компилятор, — ровно то, что nano вычисляет в
+// Артефакт, который инъектирует компилятор, — ровно то, что native вычисляет в
 // рантайме: снимаем duration/easing одним прогоном uncompiled через шов.
 let captured;
 animate(
@@ -62,7 +62,7 @@ function measure(label, run, iterations, samples = 9) {
 
 const element = fakeElement();
 const uncompiled = measure(
-  'nano.animate (springLinear рантайм)',
+  'native.animate (springLinear рантайм)',
   () => animate(element, { opacity: 0.5 }).length,
   50_000,
 );
@@ -72,7 +72,7 @@ const compiled = measure(
   50_000,
 );
 
-console.log(`nano.animate (springLinear рантайм)   ${uncompiled.toFixed(1).padStart(9)} ns/op`);
+console.log(`native.animate (springLinear рантайм)   ${uncompiled.toFixed(1).padStart(9)} ns/op`);
 console.log(`animateCompiled (precomputed)         ${compiled.toFixed(1).padStart(9)} ns/op`);
 console.log(
   `per-call выигрыш lowering              ${(uncompiled - compiled).toFixed(1).padStart(9)} ns/op ` +

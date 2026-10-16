@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { COMPILER_NANO_RECIPE_MARKER, readCompilerNanoRecipe } from '../scripts/compiler-doc-recipe.mjs';
+import { COMPILER_NATIVE_RECIPE_MARKER, readCompilerNativeRecipe } from '../scripts/compiler-doc-recipe.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const script = fileURLToPath(new URL('../scripts/compiler-acceptance.mjs', import.meta.url));
@@ -30,7 +30,7 @@ type TraceRecord = {
 const expectedTrace: TraceRecord[] = [
   {
     schemaVersion: traceSchemaVersion,
-    id: 'nano-static',
+    id: 'native-static',
     goal: 'static opacity=0.5',
     owner: '@labpics/motion/compiler/runtime',
     path: 'dist/compiler/runtime/index.js',
@@ -39,10 +39,10 @@ const expectedTrace: TraceRecord[] = [
   },
   {
     schemaVersion: traceSchemaVersion,
-    id: 'nano-dynamic',
+    id: 'native-dynamic',
     goal: 'dynamic opacity',
-    owner: '@labpics/motion/nano',
-    path: 'dist/nano/index.js',
+    owner: '@labpics/motion/native',
+    path: 'dist/native/index.js',
     execution: 'runtime',
     refusal: 'opacity is not build-known',
   },
@@ -116,19 +116,19 @@ afterEach(() => {
 
 describe('compiler tooling trace', () => {
   it('использует один буквальный docs-рецепт в acceptance, browser proof и playground', () => {
-    const recipe = readCompilerNanoRecipe(root);
-    expect(recipe).toContain("from '@labpics/motion/nano'");
+    const recipe = readCompilerNativeRecipe(root);
+    expect(recipe).toContain("from '@labpics/motion/native'");
     expect(recipe).toContain('opacity: 0.5');
 
     for (const consumer of [script, browserCompilerSetup]) {
       const source = readFileSync(consumer, 'utf8');
-      expect(source).toContain('readCompilerNanoRecipe');
+      expect(source).toContain('readCompilerNativeRecipe');
       expect(source).not.toContain("export function play(el) { return animate(el, { opacity: 0.5 }); }");
     }
 
     const playground = readFileSync(browserPlayground, 'utf8');
     expect(playground).toContain("from '../.artifacts/compiled.js'");
-    expect(playground).not.toContain("from '@labpics/motion/nano'");
+    expect(playground).not.toContain("from '@labpics/motion/native'");
     expect(playground).not.toContain('animate(');
   });
 
@@ -144,9 +144,9 @@ describe('compiler tooling trace', () => {
       mkdirSync(join(fixtureRoot, 'docs'));
       writeFileSync(
         join(fixtureRoot, 'docs/compiler.md'),
-        `${COMPILER_NANO_RECIPE_MARKER}\n\`\`\`typescript\nexport const first = 1;\n\`\`\`\n${COMPILER_NANO_RECIPE_MARKER}\n\`\`\`typescript\nexport const second = 2;\n\`\`\`\n`,
+        `${COMPILER_NATIVE_RECIPE_MARKER}\n\`\`\`typescript\nexport const first = 1;\n\`\`\`\n${COMPILER_NATIVE_RECIPE_MARKER}\n\`\`\`typescript\nexport const second = 2;\n\`\`\`\n`,
       );
-      expect(() => readCompilerNanoRecipe(fixtureRoot)).toThrow('Ожидается ровно один');
+      expect(() => readCompilerNativeRecipe(fixtureRoot)).toThrow('Ожидается ровно один');
     } finally {
       rmSync(fixtureRoot, { recursive: true, force: true });
     }
@@ -180,10 +180,10 @@ describe('compiler tooling trace', () => {
 
   it('не печатает trace при неоднозначном owner фактически собранного результата', () => {
     const source = readFileSync(script, 'utf8');
-    const original = "recordTrace('nano-static', 'static opacity=0.5', compiled);";
+    const original = "recordTrace('native-static', 'static opacity=0.5', compiled);";
     const changed = source.replace(
       original,
-      "recordTrace('nano-static', 'static opacity=0.5', { ...compiled, modules: [...compiled.modules, NANO_MODULE] });",
+      "recordTrace('native-static', 'static opacity=0.5', { ...compiled, modules: [...compiled.modules, NATIVE_MODULE] });",
     );
     expect(changed).not.toBe(source);
     writeFileSync(brokenScript, changed);
@@ -196,10 +196,10 @@ describe('compiler tooling trace', () => {
 
   it('не печатает trace при отсутствии owner фактически собранного результата', () => {
     const source = readFileSync(script, 'utf8');
-    const original = "recordTrace('nano-static', 'static opacity=0.5', compiled);";
+    const original = "recordTrace('native-static', 'static opacity=0.5', compiled);";
     const changed = source.replace(
       original,
-      "recordTrace('nano-static', 'static opacity=0.5', { ...compiled, modules: ['unregistered/module.js'] });",
+      "recordTrace('native-static', 'static opacity=0.5', { ...compiled, modules: ['unregistered/module.js'] });",
     );
     expect(changed).not.toBe(source);
     writeFileSync(brokenScript, changed);
@@ -211,11 +211,11 @@ describe('compiler tooling trace', () => {
   });
 
   it.each([
-    ['отсутствующей', "recordTrace('nano-dynamic', 'dynamic opacity', control);"],
-    ['пустой', "recordTrace('nano-dynamic', 'dynamic opacity', control, '');"],
+    ['отсутствующей', "recordTrace('native-dynamic', 'dynamic opacity', control);"],
+    ['пустой', "recordTrace('native-dynamic', 'dynamic opacity', control, '');"],
   ])('не публикует runtime trace с %s причиной отказа', (_case, replacement) => {
     const source = readFileSync(script, 'utf8');
-    const original = "recordTrace('nano-dynamic', 'dynamic opacity', control, 'opacity is not build-known');";
+    const original = "recordTrace('native-dynamic', 'dynamic opacity', control, 'opacity is not build-known');";
     const changed = source.replace(original, replacement);
     expect(changed).not.toBe(source);
     writeFileSync(brokenScript, changed);
@@ -230,7 +230,7 @@ describe('compiler tooling trace', () => {
     expect(() => validateTrace(cloneTrace().slice(1))).toThrow();
 
     const owner = cloneTrace();
-    owner[0]!.owner = '@labpics/motion/nano';
+    owner[0]!.owner = '@labpics/motion/native';
     expect(() => validateTrace(owner)).toThrow();
 
     const path = cloneTrace();

@@ -119,7 +119,7 @@ export const FULL_CORE_CONSUMER_GATE_BYTES = 2330;
 
 // Публичный platform-trusted WAAPI entry. 1024 B — продуктовая граница,
 // утверждённая владельцем до реализации; она не выводится из текущего факта.
-export const NANO_GATE_BYTES = 1024;
+export const NATIVE_GATE_BYTES = 1024;
 
 // Нативный IntersectionObserver-адаптер: два независимых exact-ратчета от
 // первой завершённой реализации 2026-07-17. Shipped-порог ловит физическое
@@ -174,7 +174,7 @@ export const BESPOKE_SUBPATH_GATES = {
   './behaviors/reorder': 1518,
   './utils': 1400,
   // Build-tool entry (#208): Vite-адаптер lowering НАМЕРЕННО несёт канонический
-  // MotionProgram V1 parser + nano spring SSOT — это цена доверенного артефакта
+  // MotionProgram V1 parser + native spring SSOT — это цена доверенного артефакта
   // на стороне СБОРКИ, браузеру она не поставляется никогда (в bundle попадает
   // только ./compiler/runtime). Хронология: 2026-07-19 факт первой сборки
   // 5261 gz → порог 5470 (~4% люфт, «порог ОТ ФАКТА»); в тот же день
@@ -188,7 +188,7 @@ export const BESPOKE_SUBPATH_GATES = {
   // не изменилась (./compiler/runtime 341, ./surface 1016). Факт 9125 gz;
   // люфт ~0.3% — тот же рэтчет-класс.
   './compiler/vite': 9163,
-  // Единственный БРАУЗЕРНЫЙ compiler-артефакт: private executor compiled-nano
+  // Единственный БРАУЗЕРНЫЙ compiler-артефакт: private executor compiled-native
   // вызовов. Exact-ратчет от факта (канон ./in-view, люфт нулевой): новая
   // capability не прячется под общим потолком 4608 — рост только решением.
   // 2026-07-19: факт 341 gz.
@@ -267,7 +267,7 @@ export const BESPOKE_SUBPATH_GATES = {
   './animate': FULL_ANIMATE_GATE_BYTES,
   // To-only individual properties + spring->linear() + native Animation controls.
   // Отдельный hard gate не разрешает новому entry спрятаться под общим 4608 B.
-  './nano': NANO_GATE_BYTES,
+  './native': NATIVE_GATE_BYTES,
   // Приватный executor compiled surface-вызовов (build-tool деталь, цель
   // lowering'а layout:'project'). 1024 B — продуктовая граница спеки
   // («surface observer ≤1 KB») для КОДА без артефактных данных; люфт нулевой
@@ -295,14 +295,14 @@ export const IMPORT_COST_SCENARIOS = [
     gate: 1522, // Первый измеренный consumer: initial = total, без дополнительного chunk.
   },
   {
-    name: 'nano spring-to',
-    code: `import { animate } from '%DIST%/../nano/index.js'; console.log(animate('.hero', { translate: '240px', opacity: 1 }).length);`,
-    gate: NANO_GATE_BYTES,
+    name: 'native spring-to',
+    code: `import { animate } from '%DIST%/../native/index.js'; console.log(animate('.hero', { translate: '240px', opacity: 1 }).length);`,
+    gate: NATIVE_GATE_BYTES,
   },
   {
     // Единственный артефакт surface-lowering: executor обязан стоить ≤1 KB gz
     // и не тянуть ничего (фасад/солвер стираются на сборке, здесь страж
-    // consumer-цены самого субпутя — аналог nano spring-to).
+    // consumer-цены самого субпутя — аналог native spring-to).
     name: 'surface executor',
     code: `import { runSurface } from '%DIST%/../compiler/surface/index.js'; console.log(typeof runSurface);`,
     gate: 1024,
@@ -397,8 +397,8 @@ export const IMPORT_COST_SCENARIOS = [
     name: 'animate-one-liner (фасад)',
     code: `import { animate } from '%DIST%/../animate/index.js'; console.log(typeof animate('.hero', { x: 240, opacity: 1 }).pause);`,
     // Фасад статически тянет функциональный граф из-за диспетчеризации свойств;
-    // порог — страж полного пути. Линейка из двух входов: лёгкий case = ./nano
-    // (собственный hard gate выше), перестройка фасада (эпик nano-core) получит
+    // порог — страж полного пути. Линейка из двух входов: лёгкий case = ./native
+    // (собственный hard gate выше), перестройка фасада (эпик native-core) получит
     // сценарий «animate без допов» с порогом от факта первой реализации.
     gate: FULL_ANIMATE_GATE_BYTES,
   },

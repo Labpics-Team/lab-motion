@@ -191,7 +191,7 @@ Generated CSS host'а входит в consumer total size
    правку, включая схлопывание многострочных вызовов.
 4. **Executor ≤ 1 KB**: приватный runtime поверхности — жёсткий гейт кода
    1024 B gz (факт 1016), отдельный от total-решётки; browser-поставка
-   `./compiler/runtime` и nano не изменились.
+   `./compiler/runtime` и native не изменились.
 5. **Erasure**: solver/parser/full facade не попадают в граф скомпилированного
    потребителя — приёмка `scripts/compiler-acceptance.mjs` (surface fixture
    16 929 → 2 003 B gz, −88 %, в графе только `surface/index.js`).

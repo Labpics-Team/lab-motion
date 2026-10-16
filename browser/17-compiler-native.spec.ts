@@ -1,10 +1,10 @@
 /**
- * 17-compiler-nano.spec.ts — browser-differential приёмки компилятора (#208).
+ * 17-compiler-native.spec.ts — browser-differential приёмки компилятора (#208).
  *
  * Один fixture `animate(el, { opacity: 0.5 })` собран реальным Vite дважды
  * (globalSetup compile-artifacts.mjs): compiled — с плагином motionCompiler()
  * (precomputed-артефакт + приватный executor, БЕЗ spring-solver), uncompiled —
- * рантаймовый nano (springLinear в браузере). Оба бандла грузятся по http и
+ * рантаймовый native (springLinear в браузере). Оба бандла грузятся по http и
  * прогоняются в РЕАЛЬНОМ движке (chromium/firefox/webkit). Спека доказывает, что
  * lowering не меняет наблюдаемое: opacity-траектория, длительность и easing
  * идентичны на всей сетке времени. Семплирование детерминировано через
@@ -77,7 +77,7 @@ test('compiled и uncompiled дают идентичную opacity-траект�
   }, [COMPILED, UNCOMPILED] as const);
 
   // Длительность и easing precomputed-артефакта обязаны совпасть с рантаймовым
-  // nano бит-в-бит: это end-to-end проверка корректности precompute на движке.
+  // native бит-в-бит: это end-to-end проверка корректности precompute на движке.
   expect(Math.abs(result.durationCompiled - result.durationUncompiled)).toBeLessThanOrEqual(1e-6);
   expect(result.easingCompiled).toBe(result.easingUncompiled);
   expect(result.easingCompiled).toContain('linear(');

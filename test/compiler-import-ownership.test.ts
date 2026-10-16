@@ -1,22 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { parseAstAsync } from 'vite';
 import {
-  nanoArtifactLiteral,
-  planNanoOpacityLowering,
+  nativeArtifactLiteral,
+  planNativeOpacityLowering,
   planSurfaceLowering,
   type AstNode,
-  type NanoLoweringPlan,
+  type NativeLoweringPlan,
 } from '../src/compiler/core.js';
 
 const planners: readonly {
   readonly source: string;
   readonly call: string;
-  readonly plan: (ast: AstNode, code: string) => NanoLoweringPlan | undefined;
+  readonly plan: (ast: AstNode, code: string) => NativeLoweringPlan | undefined;
 }[] = [
   {
-    source: '@labpics/motion/nano',
+    source: '@labpics/motion/native',
     call: 'animate(el, { opacity: 0.5 });',
-    plan: (ast, code) => planNanoOpacityLowering(ast, code, nanoArtifactLiteral),
+    plan: (ast, code) => planNativeOpacityLowering(ast, code, nativeArtifactLiteral),
   },
   {
     source: '@labpics/motion/animate',
