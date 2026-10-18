@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -13,31 +13,16 @@ import {
 } from '../bench/compare/provenance.mjs';
 import { listChangedGitPaths } from './git-path-list.mjs';
 
-const write = process.argv.includes('--write');
+if (process.argv.length > 2) {
+  console.error('usage: node scripts/check-docs-facts.mjs');
+  process.exit(64);
+}
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const readmePath = path.join(ROOT, 'README.md');
 const benchmarkPath = path.join(ROOT, 'docs', 'benchmark.md');
 const benchmarkResultsDirectory = path.join(ROOT, 'bench', 'compare', 'results');
 const rootPackagePath = path.join(ROOT, 'package.json');
 const benchmarkPackagePath = path.join(ROOT, 'bench', 'compare', 'package.json');
-
-const staleInstall = `Пакет пока не опубликован в npm (публикация — отдельное решение). До этого —
-установка из тарбола (git-install не поддержан: \`dist/\` собирается, в гите его нет):
-
-\`\`\`bash
-cd lab-motion && pnpm build && pnpm pack   # → labpics-motion-<версия>.tgz
-cd ваш-проект && pnpm add /путь/к/labpics-motion-<версия>.tgz
-\`\`\``;
-
-const currentInstall = `Установите опубликованную версию из npm:
-
-\`\`\`bash
-pnpm add @labpics/motion
-\`\`\`
-
-Для разработки из исходников используйте тарбол: \`pnpm build && pnpm pack\`, затем
-\`pnpm add /путь/к/labpics-motion-<версия>.tgz\`. Git-установка не поддерживается:
-\`dist/\` собирается и не хранится в репозитории.`;
 
 function fail(message) {
   console.error(`docs-facts: ${message}`);
@@ -115,11 +100,7 @@ function pairedReportNames() {
   return stems;
 }
 
-let readme = readFileSync(readmePath, 'utf8');
-if (write && readme.includes(staleInstall)) {
-  readme = readme.replace(staleInstall, currentInstall);
-  writeFileSync(readmePath, readme);
-}
+const readme = readFileSync(readmePath, 'utf8');
 
 const benchmark = readFileSync(benchmarkPath, 'utf8');
 if (readme.includes('Пакет пока не опубликован')) fail('README утверждает, что опубликованный пакет не опубликован');
@@ -159,4 +140,4 @@ if (benchmark.includes('Достоверных сравнительных чис
 }
 if (benchmark.includes('BACKLOG.md')) fail('документ бенчмарка содержит мёртвую ссылку на backlog');
 
-if (process.exitCode === undefined) console.log(`docs-facts: ${write ? 'write + check' : 'check'} PASS`);
+if (process.exitCode === undefined) console.log('docs-facts: check PASS');

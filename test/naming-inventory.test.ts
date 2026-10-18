@@ -136,3 +136,24 @@ describe('Полнота проверки репозитория', () => {
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });
+
+
+describe('Границы синтаксического инвентаря', () => {
+  it('отклоняет повреждённый исходник вместо частичного AST', () => {
+    const { root } = workspace();
+    try {
+      writeFileSync(join(root, 'src/motion/index.ts'), 'const value = "unfinished');
+      expect(() => auditRepo(root)).toThrow(/source|index.ts|literal/i);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('не включает незакоммиченный отчёт измерения в документацию продукта', () => {
+    const { root } = workspace();
+    try {
+      writeFileSync(join(root, 'docs/local-measurement.md'), '**Status:** COMPLETE\n**Branch:** experiment\n');
+      expect(auditRepo(root).errors).toEqual([]);
+      execFileSync('git', ['add', '--', 'docs/local-measurement.md'], { cwd: root });
+      expect(auditRepo(root).errors).toContainEqual(expect.stringContaining('docs/local-measurement.md'));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+});
