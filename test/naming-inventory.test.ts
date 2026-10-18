@@ -157,3 +157,35 @@ describe('Границы синтаксического инвентаря', () 
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });
+
+
+describe('Текст документа и приведённые примеры', () => {
+  it.each(['```', '~~~~', '````'])('не путает fenced-пример %s с рабочим отчётом', (fence) => {
+    const { root } = workspace();
+    try {
+      const file = join(root, 'docs/example.md');
+      const example = ['# Формат результата', fence + 'markdown',
+        ...(fence.length === 4 && fence[0] === '`' ? ['```'] : []),
+        '**Status:** COMPLETE', '**Branch:** example', fence].join('\n');
+      writeFileSync(file, example);
+      execFileSync('git', ['add', '--', 'docs/example.md'], { cwd: root });
+      expect(auditRepo(root).errors).toEqual([]);
+      writeFileSync(file, example + '\n**Status:** COMPLETE\n**Branch:** real-work\n');
+      expect(auditRepo(root).errors).toContainEqual(expect.stringContaining('docs/example.md'));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('обнаруживает C1, сохраняя обычный многоязычный UTF-8', () => {
+    const { root } = workspace();
+    try {
+      const file = join(root, 'docs/unicode.txt');
+      writeFileSync(file, 'Цвет и движение — 色彩\n');
+      execFileSync('git', ['add', '--', 'docs/unicode.txt'], { cwd: root });
+      expect(auditRepo(root).errors).toEqual([]);
+      for (const point of [0x80, 0x85, 0x9b, 0x9f]) {
+        writeFileSync(file, 'Цвет' + String.fromCharCode(point));
+        expect(auditRepo(root).errors).toContainEqual(expect.stringContaining('управляющий символ'));
+      }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+});

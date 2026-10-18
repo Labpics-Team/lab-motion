@@ -84,6 +84,26 @@ export function fileLawErrors(section, nonKebab) {
 }
 
 
+/** Отдельно рассматриваем поля документа и содержимое fenced-примеров. */
+function proseOutsideFences(text) {
+  const lines = [];
+  let fence;
+  for (const line of text.split('\n')) {
+    if (fence) {
+      const closing = /^ {0,3}(`+|~+)[\t ]*$/.exec(line);
+      if (closing && closing[1][0] === fence[0] && closing[1].length >= fence.length) fence = undefined;
+      continue;
+    }
+    const opening = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (opening && !(opening[1][0] === '`' && opening[2].includes('`'))) {
+      fence = opening[1];
+    } else {
+      lines.push(line);
+    }
+  }
+  return lines.join('\n');
+}
+
 /** Признаки рабочих записей; предметные планы исполнения остаются допустимы. */
 export function workRecordReason(file, text) {
   const parts = file.split('/');
@@ -96,7 +116,7 @@ export function workRecordReason(file, text) {
     const keys = new Set([...frontmatter.matchAll(/^([a-z][a-z_-]*):/gm)].map((match) => match[1]));
     if (['track', 'revision', 'owns'].every((key) => keys.has(key))) return 'план работы агента';
   }
-  const fields = new Set([...normalized.matchAll(/^\*\*([^*\n]+):\*\*/gm)]
+  const fields = new Set([...proseOutsideFences(normalized).matchAll(/^\*\*([^*\n]+):\*\*/gm)]
     .map((match) => match[1].trim().toLowerCase()));
   if ((fields.has('status') && fields.has('branch'))
     || (fields.has('baseline sha') && fields.has('head at validation'))) return 'отчёт рабочей сессии';
@@ -116,7 +136,7 @@ export function documentErrors(root = ROOT) {
     const entry = lstatSync(filename);
     if (!entry.isFile() || entry.isSymbolicLink()) throw new Error('not a regular document: ' + name);
     const text = decoder.decode(readFileSync(filename));
-    if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/u.test(text)) errors.push(name + ': скрытый управляющий символ');
+    if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/u.test(text)) errors.push(name + ': скрытый управляющий символ');
     const reason = workRecordReason(name, text);
     if (reason) errors.push(name + ': ' + reason);
   }
