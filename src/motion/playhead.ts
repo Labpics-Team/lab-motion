@@ -15,7 +15,7 @@ export function playhead(playback: Playback): MotionPlayback {
   if (stoppedView && playback === stoppedView) return stoppedView;
   if (!(playback instanceof Run)) throw new MotionError('playhead: неподдерживаемый Playback');
   const run = playback;
-  if (run._capture) return run as MotionPlayback;
+  if (run._capture) return run as Run & MotionPlayback;
   if (!Object.isExtensible(run) || ['time', 'timeScale', 'reverse'].some(key => key in run))
     throw new MotionError('playhead: свойства контролов недоступны');
   let lastTime: number | undefined = run.duration === 0 ? 0 : undefined;
@@ -49,7 +49,7 @@ export function playhead(playback: Playback): MotionPlayback {
     reverse: { value(): void { run._apply(reverseRate); } },
   });
   run._capture = track => { lastTime = Math.min(run.duration, track._elapsed); lastRate = track._rate; };
-  return run as MotionPlayback;
+  return run as Run & MotionPlayback;
 }
 
 /** Подключается только представлением playhead, не является отдельным исполнителем. */
