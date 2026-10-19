@@ -1,12 +1,12 @@
-import { MotionError, STOPPED, record, snapshot, timing } from './model.js';
+import { stoppedMotion, stoppedLayout as stopped } from './stopped.js';
+import { attemptAll, rethrow } from './attempt-all.js';
+import { MotionError, record, snapshot, timing } from './model.js';
 import { animate, sequence, targets } from './runtime.js';
 import { layout, type LayoutOptions } from './layout.js';
 import { value, type MotionValue } from './value.js';
 import { listen } from './listener.js';
 import type { Disposable, MotionOptions, MotionProperties, MotionTarget, Playback, SequenceOptions, SequenceStep } from './types.js';
 
-const stopped: Playback = Object.freeze({ state: 'stopped', duration: 0, finished: Promise.resolve(STOPPED),
-  pause() {}, play() {}, seek() {}, stop() {}, finish() {} });
 
 export function snapshotOptions(input: MotionOptions | undefined): MotionOptions {
   const result = input === undefined ? {} : { ...record(input, 'options') };
@@ -62,30 +62,29 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
     return run;
   }
   function drain(): unknown[] {
-    const errors: unknown[] = [];
-    for (const run of playbacks) { try { run.stop(); } catch (error) { errors.push(error); } }
-    for (const resource of resources) { try { resource.dispose(); } catch (error) { errors.push(error); } }
-    for (const release of listeners) { try { release(); } catch (error) { errors.push(error); } }
+    const errors = attemptAll(playbacks, run => run.stop());
+    attemptAll(resources, resource => resource.dispose(), errors);
+    attemptAll(listeners, release => release(), errors);
     resources.clear(); listeners.clear();
     return errors;
   }
   return {
     get disposed(): boolean { return owner === undefined; },
     animate(target, properties, options): Playback {
-      if (!owner) return stopped;
+      if (!owner) return stoppedMotion;
       const combined = mergeOptions(settings, options);
       const selected = targets(target, owner);
-      if (!owner) return stopped;
+      if (!owner) return stoppedMotion;
       return adopt(animate(selected, properties, combined));
     },
     sequence(steps, options): Playback {
-      if (!owner) return stopped;
+      if (!owner) return stoppedMotion;
       const input = snapshot(steps, 'sequence').map(step => {
         const [target, properties, opt] = snapshot(step, 'sequence step', 2) as unknown as SequenceStep;
         const { at, ...motion } = opt ?? {};
         return [targets(target, owner), properties, { ...mergeOptions(settings, motion), ...(at === undefined ? {} : { at }) }] as SequenceStep;
       });
-      if (!owner) return stopped;
+      if (!owner) return stoppedMotion;
       return adopt(sequence(input, options));
     },
     layout(mutate, options): Playback {
@@ -118,7 +117,7 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
         const late = drain(); playbacks.clear();
         for (const error of late) globalThis.reportError?.(error);
       });
-      if (errors.length) throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'Не удалось освободить область движения');
+      rethrow(errors, 'Ошибки освобождения scope');
     },
   };
 }

@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 import { setImmediate } from 'node:timers/promises';
 
-const { scope, layout } = await import(pathToFileURL(process.argv[2]).href);
+const { scope, layout, playhead } = await import(pathToFileURL(process.argv[2]).href);
 assert.equal(typeof global.gc, 'function');
+const transport = process.argv[3] === 'playhead';
+const view = transport ? playhead : run => run;
 let frames = new Map(), frameId = 0, currentTime = 0, createdEffects = 0, removedEffects = 0;
 globalThis.requestAnimationFrame = fn => { frames.set(++frameId, fn); return frameId; };
 globalThis.cancelAnimationFrame = id => { frames.delete(id); };
@@ -40,9 +42,10 @@ function cycle(i, native, retained) {
   const element = target(owner, native), area = scope(root(element));
   const off = area.on(element, 'click', listener(owner));
   const scalar = area.value(0); scalar.subscribe(listener(owner));
-  const scalarRun = scalar.animate(100, { duration: 1000, ease: 'linear' });
-  const first = area.animate(element, { x: [0, 100], opacity: [0, 1] }, { duration: 1000, ease: 'linear' });
-  const second = area.animate(element, { x: 200 }, { duration: 1000, ease: 'linear' });
+  const scalarRun = view(scalar.animate(100, { duration: 1000, ease: 'linear' }));
+  const first = view(area.animate(element, { x: [0, 100], opacity: [0, 1] }, { duration: 1000, ease: 'linear' }));
+  if (transport) { first.seek(100); first.timeScale = .5; scalarRun.timeScale = 2; }
+  const second = view(area.animate(element, { x: 200 }, { duration: 1000, ease: 'linear' }));
   first.stop(); second.seek(100); area.dispose();
   assert.equal(owner.listeners.size, 0); assert.equal(area.disposed, true);
   pending.push(first.finished, second.finished, scalarRun.finished);
@@ -72,5 +75,5 @@ assert.equal(ownedResources.filter(ref => ref.deref() !== undefined).length, 0, 
 persistent.dispose();
 assert.equal(createdEffects, removedEffects, 'Остался native effect');
 assert.equal(frames.size, 0, 'Осталась заявка кадра');
-console.log(JSON.stringify({ cycles: 10_000, heldControllers: holds.length, retainedComponents: 0, nativeCreated: createdEffects,
+console.log(JSON.stringify({ cycles: 10_000, transport, heldControllers: holds.length, retainedComponents: 0, nativeCreated: createdEffects,
   nativeRemoved: removedEffects, frames: frames.size, positiveControl: true }));

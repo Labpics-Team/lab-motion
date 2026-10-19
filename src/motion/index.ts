@@ -5,5 +5,6 @@ export { value, type MotionValue } from './value.js';
 export { MotionError } from './model.js';
 export type {
   MotionScalar, MotionProperties, MotionTarget, MotionEase, MotionSpring, MotionOptions,
-  MotionResult, Playback, PlaybackState, Disposable, SequenceStep, SequenceOptions,
+  MotionResult, Playback, MotionPlayback, PlaybackState, Disposable, SequenceStep, SequenceOptions,
 } from './types.js';
+export { playhead } from './playhead.js';
