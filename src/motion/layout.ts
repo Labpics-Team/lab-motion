@@ -56,7 +56,7 @@ class LayoutRun implements Playback {
     const path = program('--lab-motion-progress', { _coordinates: [0], unit: '' }, [1], false, config, [0]);
     const win = root.ownerDocument.defaultView;
     const reduced = config.reduced || win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-    this.duration = reduced ? 0 : path.duration;
+    this.duration = reduced ? 0 : path._duration;
     this.finished = new Promise((yes, no) => { this._resolve = yes; this._reject = no; });
     void this.finished.catch(() => {});
     this._mutate = mutate;
