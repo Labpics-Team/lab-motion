@@ -1,6 +1,6 @@
 import { attemptAll, rethrow } from './attempt-all.js';
 import { MotionError, STOPPED, record, snapshot, timing } from './model.js';
-import { animate, sequence, targets } from './runtime.js';
+import { animate, sequence, targets, stoppedMotion } from './runtime.js';
 import { layout, type LayoutOptions } from './layout.js';
 import { value, type MotionValue } from './value.js';
 import { listen } from './listener.js';
@@ -72,20 +72,20 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
   return {
     get disposed(): boolean { return owner === undefined; },
     animate(target, properties, options): Playback {
-      if (!owner) return stopped;
+      if (!owner) return stoppedMotion;
       const combined = mergeOptions(settings, options);
       const selected = targets(target, owner);
-      if (!owner) return stopped;
+      if (!owner) return stoppedMotion;
       return adopt(animate(selected, properties, combined));
     },
     sequence(steps, options): Playback {
-      if (!owner) return stopped;
+      if (!owner) return stoppedMotion;
       const input = snapshot(steps, 'sequence').map(step => {
         const [target, properties, opt] = snapshot(step, 'sequence step', 2) as unknown as SequenceStep;
         const { at, ...motion } = opt ?? {};
         return [targets(target, owner), properties, { ...mergeOptions(settings, motion), ...(at === undefined ? {} : { at }) }] as SequenceStep;
       });
-      if (!owner) return stopped;
+      if (!owner) return stoppedMotion;
       return adopt(sequence(input, options));
     },
     layout(mutate, options): Playback {

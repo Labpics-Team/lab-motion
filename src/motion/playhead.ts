@@ -2,7 +2,7 @@ import { MotionError, number } from './model.js';
 import { Run, type ControlOperation, type CompletionContinuation } from './runtime.js';
 import type { MotionPlayback, Playback } from './types.js';
 
-const views = new WeakMap<Playback, MotionPlayback>();
+const views = /* @__PURE__ */ new WeakMap<Playback, MotionPlayback>();
 
 /** Дополнительные контролы того же владельца, без отдельного времени или планировщика. */
 export function playhead(playback: Playback): MotionPlayback {

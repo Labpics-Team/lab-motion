@@ -273,3 +273,20 @@ it('позднее наблюдение завершённого движени�
   expect(view.time).toBeUndefined(); expect(view.timeScale).toBeUndefined();
   view.reverse(); view.timeScale = 2; expect(view.state).toBe('stopped');
 });
+
+it('освобождённая scope сохраняет motion-контролы, но не превращает layout в обратимое движение', async () => {
+  const { scope } = await import('../src/motion/scope.js');
+  const area = scope({ querySelectorAll: () => [] } as unknown as HTMLElement);
+  area.dispose();
+  const motion = area.animate([] as Element[], {});
+  const sequence = area.sequence([]);
+  for (const result of [motion, sequence]) {
+    const view = playhead(result);
+    expect(view.state).toBe('stopped'); expect(view.time).toBe(0);
+    expect(await view.finished).toEqual({ status: 'stopped' });
+    view.timeScale = -2; view.reverse(); view.play();
+    expect(view.state).toBe('stopped');
+  }
+  const transition = area.layout(() => { throw Error('Не должно исполняться после dispose'); });
+  expect(() => playhead(transition)).toThrow(/playhead/);
+});

@@ -109,10 +109,11 @@ export class Run implements Playback {
   private _resolve!: (value: MotionResult) => void;
   private _reject!: (error: unknown) => void;
   readonly finished: Promise<MotionResult>;
-  constructor(public duration: number) {
+  constructor(public duration: number, terminal?: MotionResult) {
     this.finished = new Promise((resolve, reject) => { this._resolve = resolve; this._reject = reject; });
     // Ошибка доступна через original promise; отсутствие await не оставляет unhandled rejection.
     void this.finished.catch(() => {});
+    if (terminal) { this._status = terminal.status; this._resolve(terminal); }
   }
   get state(): PlaybackState {
     if (this._status === 'running') {
@@ -600,6 +601,8 @@ export class Runtime {
   }
 }
 
+/** Отозванная область возвращает завершённый motion-run без целей и часов. */
+export const stoppedMotion: Playback = /* @__PURE__ */ new Run(0, STOPPED);
 export const runtime: Runtime = new Runtime();
 export const animate: (target: MotionTarget, props: MotionProperties, options?: MotionOptions) => Playback = runtime.animate.bind(runtime);
 export const sequence: (steps: readonly SequenceStep[], options?: SequenceOptions) => Playback = runtime.sequence.bind(runtime);
