@@ -3,36 +3,29 @@ import { MotionError, number } from './model.js';
 import { Run, type ControlOperation } from './runtime.js';
 import type { MotionPlayback, Playback } from './types.js';
 
-const views = /* @__PURE__ */ new WeakMap<Playback, MotionPlayback>();
+let stoppedView: MotionPlayback | undefined;
 
-/** Дополнительные контролы того же владельца, без отдельного времени или планировщика. */
+/** Дополняет тот же Playback; новые часы, wrapper и registry не создаются. */
 export function playhead(playback: Playback): MotionPlayback {
-  const existing = views.get(playback);
-  if (existing) return existing;
-  if (playback === stoppedMotion) {
-    const view: MotionPlayback = {
-      ...stoppedMotion, time: 0,
-      get timeScale(): number | undefined { return undefined; }, set timeScale(_value: number) {},
-      reverse() {},
-    };
-    views.set(playback, view); views.set(view, view);
-    return view;
-  }
-  if (!(playback instanceof Run)) throw new MotionError('playhead ожидает animate, sequence или value.animate этого runtime');
-  const run = playback;
-  const history: { time: number | undefined; rate: number | undefined } = {
-    time: run.duration === 0 ? 0 : undefined, rate: run._tracks.size ? 1 : undefined,
+  if (playback === stoppedMotion) return stoppedView ??= {
+    ...stoppedMotion, time: 0,
+    get timeScale(): number | undefined { return undefined; }, set timeScale(_value: number) {},
+    reverse() {},
   };
-  run._capture = track => { history.time = Math.min(run.duration, track._elapsed); history.rate = track._rate; };
-  const view: MotionPlayback = {
-    duration: run.duration, finished: run.finished,
-    get state() { return run.state; },
-    get time(): number | undefined {
+  if (stoppedView && playback === stoppedView) return stoppedView;
+  if (!(playback instanceof Run)) throw new MotionError('playhead: неподдерживаемый Playback');
+  const run = playback;
+  if (run._capture) return run as MotionPlayback;
+  if (!Object.isExtensible(run) || ['time', 'timeScale', 'reverse'].some(key => key in run))
+    throw new MotionError('playhead: свойства контролов недоступны');
+  let lastTime: number | undefined = run.duration === 0 ? 0 : undefined;
+  let lastRate: number | undefined = run._tracks.size ? 1 : undefined;
+  Object.defineProperties(run, {
+    time: { get(): number | undefined {
       let now: number | undefined, position: number | undefined;
       for (const track of run._tracks) {
         now ??= number(track._group._engine._host.now(), 'clock');
-        const group = track._group, native = group._native;
-        const local = native?.currentTime;
+        const group = track._group, native = group._native, local = native?.currentTime;
         const delta = group._busy || track._paused ? 0 : native
           ? typeof local === 'number' && Number.isFinite(local) ? local - group._nativeTime : 0
           : Math.max(0, now - group._stamp) * track._rate;
@@ -40,25 +33,23 @@ export function playhead(playback: Playback): MotionPlayback {
         if (position !== undefined && position !== current) return undefined;
         position = current;
       }
-      return position ?? history.time;
+      return position ?? lastTime;
+    } },
+    timeScale: {
+      get(): number | undefined {
+        let rate: number | undefined;
+        for (const track of run._tracks) {
+          if (rate !== undefined && rate !== track._rate) return undefined;
+          rate = track._rate;
+        }
+        return rate ?? lastRate;
+      },
+      set(value: number) { if (run._tracks.size) run._apply(rateCommand(number(value, 'timeScale'))); },
     },
-    get timeScale(): number | undefined {
-      let rate: number | undefined;
-      for (const track of run._tracks) {
-        if (rate !== undefined && rate !== track._rate) return undefined;
-        rate = track._rate;
-      }
-      return rate ?? history.rate;
-    },
-    set timeScale(value: number) {
-      if (run._tracks.size) run._apply(rateCommand(number(value, 'timeScale')));
-    },
-    reverse(): void { run._apply(reverseRate); },
-    pause(): void { run.pause(); }, play(): void { run.play(); },
-    seek(time): void { run.seek(time); }, stop(): void { run.stop(); }, finish(): void { run.finish(); },
-  };
-  views.set(run, view); views.set(view, view);
-  return view;
+    reverse: { value(): void { run._apply(reverseRate); } },
+  });
+  run._capture = track => { lastTime = Math.min(run.duration, track._elapsed); lastRate = track._rate; };
+  return run as MotionPlayback;
 }
 
 /** Подключается только представлением playhead, не является отдельным исполнителем. */

@@ -254,7 +254,7 @@ it('повторный playhead возвращает те же контролы 
   const h = harness();
   const source = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
   const first = playhead(source);
-  expect(playhead(source)).toBe(first); expect(playhead(first)).toBe(first);
+  expect(first).toBe(source); expect(playhead(source)).toBe(first); expect(playhead(first)).toBe(first);
   expect(first.finished).toBe(source.finished);
   first.seek(300); first.reverse(); first.stop();
   expect(first.time).toBe(300); expect(first.timeScale).toBe(-1);

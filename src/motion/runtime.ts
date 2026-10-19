@@ -335,13 +335,15 @@ class Surface {
     };
     void finished.then(() => {
       if (this._token !== token || this._native !== effect) return;
+      const completed = [...this._tracks.values()].map(track => [track, track._owner] as const);
       try {
-        for (const track of this._tracks.values()) {
+        for (const [track] of completed) {
           track._elapsed = track._program.duration;
           this._sample(track);
         }
         this._detach();
-        for (const track of [...this._tracks.values()]) this._end(track, true);
+        // Host cleanup может синхронно передать даже прежний Track новому Run.
+        for (const [track, owner] of completed) if (track._owner === owner) this._end(track, true);
       } catch (error) { this._fail(error); }
     }, fail);
   }
