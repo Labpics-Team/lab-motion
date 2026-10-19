@@ -137,12 +137,12 @@ export function properties(input: MotionProperties): PropertyInput[] {
   let count = 0;
   for (const key of keys) {
     if (!key || key === '__proto__' || key === 'constructor' || key === 'prototype' || key === 'transform')
-      throw new MotionError(`Недопустимое свойство `);
+      throw new MotionError(`Недопустимое свойство ${key}`);
     const value = source[key], authored = Array.isArray(value);
     const values = authored ? snapshot(value, key, 2) : [value];
     for (const entry of values) {
       if (typeof entry !== 'number' && typeof entry !== 'string' || typeof entry === 'number' && !Number.isFinite(entry))
-        throw new MotionError(`: нужны конечные числа или CSS-строки`);
+        throw new MotionError(`${key}: нужны конечные числа или CSS-строки`);
     }
     const name = key.startsWith('--') ? key : key.replace(/[A-Z]/g, c => '-' + c.toLowerCase());
     const normalized = name === 'scale-x' ? 'scaleX' : name === 'scale-y' ? 'scaleY'
@@ -153,7 +153,7 @@ export function properties(input: MotionProperties): PropertyInput[] {
     if (key === 'scale' && (Object.hasOwn(source, 'scaleX') || Object.hasOwn(source, 'scaleY')))
       throw new MotionError('scale уже задаёт scaleX и scaleY');
     for (const channel of channels) {
-      if (declared.has(channel)) throw new MotionError(`Свойство  задано несколько раз`);
+      if (declared.has(channel)) throw new MotionError(`Свойство ${channel} задано несколько раз`);
       declared.add(channel);
       result.push({ key: channel, values: values as MotionScalar[], authored });
     }
