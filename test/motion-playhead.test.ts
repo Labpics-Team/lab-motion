@@ -179,3 +179,47 @@ it('случайные временные команды совпадают с �
     run.stop(); expect(h.updates.size + h.renders.size).toBe(0);
   }
 });
+
+for (const native of [false, true]) it('seek к концу обратного прогона не завершает его, native=' + native, async () => {
+  const h = harness(native);
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
+  run.pause(); run.reverse(); run.seek(5000);
+  expect(run.time).toBe(1000); expect(run.state).toBe('paused'); expect(h.x()).toBe(100);
+  run.play();
+  if (native) h.effects.at(-1)!.currentTime = 750; else h.step(250);
+  run.pause(); expect(h.x()).toBe(75); expect(run.time).toBe(750);
+  run.seek(0); expect(await run.finished).toEqual({ status: 'finished' }); expect(h.x()).toBe(0);
+});
+
+it('передача прежней пружины сохраняет длительность исполняемого артефакта', () => {
+  for (const fraction of [.1, .25, .6]) {
+    const h = harness();
+    const first = h.runtime.animate(h.element, { x: 100 });
+    const duration = first.duration;
+    first.seek(duration * fraction);
+    const next = playhead(h.runtime.animate(h.element, { x: 100 }));
+    expect(next.duration).toBe(duration); expect(next.time).toBeCloseTo(duration * fraction, 8);
+    next.finish(); expect(next.time).toBe(duration);
+  }
+});
+
+it('pending native rate не фиксирует старый finished и не масштабирует currentTime повторно', async () => {
+  const h = harness(true);
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
+  const effect = h.effects[0]! as typeof h.effects[number] & { pending: boolean; ready: Promise<void> };
+  const previousComplete = effect.complete;
+  let acknowledge!: () => void, complete!: () => void;
+  effect.ready = new Promise<void>(resolve => { acknowledge = resolve; });
+  effect.currentTime = 200;
+  effect.updatePlaybackRate = () => { effect.pending = true; };
+  run.timeScale = 0;
+  effect.currentTime = 250;
+  expect(run.time).toBe(250);
+  previousComplete(); await Promise.resolve(); expect(run.state).toBe('running');
+  effect.finished = new Promise<void>(resolve => { complete = resolve; });
+  effect.pending = false; effect.playbackRate = -1;
+  effect.updatePlaybackRate = rate => { effect.playbackRate = rate; };
+  acknowledge(); await Promise.resolve();
+  run.timeScale = -1; effect.currentTime = 0; complete();
+  expect(await run.finished).toEqual({ status: 'finished' }); expect(h.x()).toBe(0);
+});

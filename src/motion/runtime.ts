@@ -98,7 +98,7 @@ interface Track {
 }
 
 export class Run implements Playback {
-  readonly _tracks = new Set<Track>();
+  readonly _tracks: Set<Track> = new Set();
   private _status: PlaybackState = 'running';
   private _natural = true;
   declare _history?: { time: number | undefined; rate: number };
@@ -107,7 +107,7 @@ export class Run implements Playback {
   private _resolve!: (value: MotionResult) => void;
   private _reject!: (error: unknown) => void;
   readonly finished: Promise<MotionResult>;
-  constructor(readonly duration: number) {
+  constructor(public duration: number) {
     this.finished = new Promise((resolve, reject) => { this._resolve = resolve; this._reject = reject; });
     // Ошибка доступна через original promise; отсутствие await не оставляет unhandled rejection.
     void this.finished.catch(() => {});
@@ -138,7 +138,8 @@ export class Run implements Playback {
       this._resolve(this._natural ? FINISHED : STOPPED);
     }
   }
-  _own(track: Track): void {
+  _own(track: Track, reduced = false): void {
+    if (!reduced) this.duration = Math.max(this.duration, track._program.duration);
     // Новый вызов получает управление, сохраняя уже исполняемую траекторию.
     // Старый компонент не может остановить движение, принятое его преемником.
     track._owner?._settle(track, false);
@@ -557,7 +558,7 @@ export class Runtime {
     return result;
   }
   private _execute(drafts: readonly Draft[], total?: number): Playback {
-    const run = new Run(total ?? drafts.reduce((max, d) => Math.max(max, d.reduced ? 0 : d._program.duration), 0));
+    const run = new Run(total ?? 0);
     const touched = new Set<Surface>();
     try {
       for (const draft of drafts) {
@@ -571,7 +572,7 @@ export class Runtime {
         const track: Track = { _program: draft._program, _group: group, value: [...first], _velocity: first.map(() => 0),
           _owner: undefined, _elapsed: draft.reduced ? draft._program.duration : 0, _rate: 1, _paused: false, _done: false };
         group._sample(track);
-        run._own(track); group._attach(track);
+        run._own(track, draft.reduced); group._attach(track);
       }
       for (const group of touched) {
         group._render();
