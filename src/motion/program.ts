@@ -90,7 +90,7 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   if (!authored) resolved.unshift(from);
   const times = authored ? timing.times : undefined;
   if (times && times.length !== resolved.length) throw new MotionError('times: другая длина');
-  if (timing.spring && resolved.length > 2) throw new MotionError('keyframes: нужны duration/ease');
+  if (timing.spring && resolved.length > 2) throw new MotionError('keyframes: задайте duration/ease');
   const velocity = authored ? resolved[0]!._coordinates.map(() => 0) : [...initialVelocity];
   const _segments: Segment[] = [];
   const duration = timing.duration ?? 0;

@@ -53,31 +53,24 @@ export function playhead(playback: Playback): MotionPlayback {
 }
 
 /** Подключается только представлением playhead, не является отдельным исполнителем. */
-function configureNative(effect: Animation, rate: number): boolean {
-  if (typeof effect.updatePlaybackRate !== 'function') return false;
-  effect.updatePlaybackRate(rate);
-  return true;
-}
-const reverseRate: ControlOperation = (group, tracks) => applyRate(group, tracks);
+const reverseRate: ControlOperation = applyRate;
 function rateCommand(rate: number): ControlOperation {
   return (group, tracks) => applyRate(group, tracks, rate);
 }
 function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<ControlOperation>[1], rate?: number): void {
-  let native = false;
-  const requested = rate ?? -tracks[0]!._rate;
-  if (requested >= 0 && group._native && tracks.length === group._tracks.size) {
+  const requested = rate ?? -tracks[0]!._rate, effect = group._native;
+  if (requested >= 0 && effect && tracks.length === group._tracks.size &&
+      typeof effect.updatePlaybackRate === 'function') {
     group._lock(true);
     try {
-      native = configureNative(group._native, requested);
-      if (native) {
-        for (const track of tracks) {
-          track._rate = rate ?? -track._rate;
-          group._sample(track);
-        }
+      effect.updatePlaybackRate(requested);
+      for (const track of tracks) {
+        track._rate = rate ?? -track._rate;
+        group._sample(track);
       }
     } finally { group._lock(false); }
+    return;
   }
-  if (native) return;
   group._detach();
   for (const track of tracks) {
     track._rate = rate ?? -track._rate;

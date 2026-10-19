@@ -62,7 +62,7 @@ export function physics(input: MotionSpring | undefined): SpringParams {
   const { mass, stiffness, damping, response, bounce } = source;
   let result: SpringParams;
   if (mass !== undefined || stiffness !== undefined || damping !== undefined) {
-    if (response !== undefined || bounce !== undefined) throw new MotionError('spring: response/bounce либо mass/stiffness/damping');
+    if (response !== undefined || bounce !== undefined) throw new MotionError('spring: смешаны схемы параметров');
     result = { mass: number(mass, 'mass', Number.MIN_VALUE), stiffness: number(stiffness, 'stiffness', Number.MIN_VALUE), damping: number(damping, 'damping', Number.MIN_VALUE) };
   } else {
     const period = number(response ?? 320, 'response', Number.MIN_VALUE);
@@ -142,7 +142,7 @@ export function properties(input: MotionProperties): PropertyInput[] {
     const values = authored ? snapshot(value, key, 2) : [value];
     for (const entry of values) {
       if (typeof entry !== 'number' && typeof entry !== 'string' || typeof entry === 'number' && !Number.isFinite(entry))
-        throw new MotionError(`${key}: нужны конечные числа или CSS-строки`);
+        throw new MotionError(`${key}: нужно конечное число или CSS`);
     }
     const name = key.startsWith('--') ? key : key.replace(/[A-Z]/g, c => '-' + c.toLowerCase());
     const normalized = name === 'scale-x' ? 'scaleX' : name === 'scale-y' ? 'scaleY'

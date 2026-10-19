@@ -27,7 +27,7 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
   let result: Element[];
   if (selected && typeof selected === 'object' && 'style' in selected) result = [selected as Element];
   else {
-    if (!selected || typeof selected !== 'object') throw new MotionError('Нужен элемент или список');
+    if (!selected || typeof selected !== 'object') throw new MotionError('Нужен Element/список');
     if (Symbol.iterator in selected) {
       result = [];
       for (const item of selected as Iterable<Element>) {
@@ -104,6 +104,7 @@ export class Run implements Playback {
   declare _capture?: (track: Track) => void;
   private _notifications = 0;
   private _failure: { error: unknown } | undefined;
+  private _cleaning = false;
   private _resolve!: (value: MotionResult) => void;
   private _reject!: (error: unknown) => void;
   readonly finished: Promise<MotionResult>;
@@ -121,14 +122,20 @@ export class Run implements Playback {
   }
   _hold(): void { this._notifications++; }
   _release(): void { this._notifications--; this._complete(); }
-  _error(error: unknown): void {
+  _fault(error: unknown): void {
     if (this._failure) return;
     this._failure = { error }; this._status = 'failed';
-    for (const track of [...this._tracks]) {
-      try { track._group._control([track], 'stop', 0, this); }
-      catch { track._group._fail(error); }
-    }
-    this._complete();
+  }
+  _error(error: unknown): void {
+    this._fault(error);
+    if (this._cleaning) return;
+    this._cleaning = true;
+    try {
+      for (const track of [...this._tracks]) {
+        try { track._group._control([track], 'stop', 0, this); }
+        catch { track._group._fail(error); }
+      }
+    } finally { this._cleaning = false; this._complete(); }
   }
   private _complete(): void {
     if (this._tracks.size || this._notifications) return;
@@ -296,9 +303,14 @@ class Surface {
     owner._settle(track, natural, failure);
   }
   _fail(error: unknown): void {
+    // Снимок полномочий делается до host.cancel: callback может принять successor.
+    const owned = [...this._tracks.values()].map(track => [track, track._owner] as const);
+    for (const [, owner] of owned) owner?._fault(error);
     const native = this._native; this._native = undefined; this._token = undefined;
-    try { native?.cancel(); } catch { /* исходное исключение сохраняется */ }
-    for (const track of [...this._tracks.values()]) this._end(track, false, { error });
+    try { native?.cancel(); } catch { /* исходное исключение остаётся причиной */ }
+    for (const [track, owner] of owned) {
+      if (owner && track._owner === owner) this._end(track, false, { error });
+    }
   }
   _reconcile(): void {
     if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
@@ -492,12 +504,12 @@ export class Runtime {
     const seen = new Set<string>();
     for (let i = 0; i < 16; i++) {
       const variable = tryParseUnit(text);
-      if (variable?.kind !== 'var' || seen.has(variable.name)) throw new MotionError(`${key}: CSS-переменная не найдена`);
+      if (variable?.kind !== 'var' || seen.has(variable.name)) throw new MotionError(`${key}: CSS var не найдена`);
       seen.add(variable.name);
       text = this._host.styles(element).getPropertyValue(variable.name).trim() || variable.fallback || '';
       if (!/^var\(/i.test(text)) { if (!text) throw new MotionError(`${key}: пустая CSS-переменная`); return text; }
     }
-    throw new MotionError(`${key}: CSS-переменная: цикл/глубина`);
+    throw new MotionError(`${key}: CSS var: цикл или глубина`);
   }
   private _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
     origin?: (element: Element, key: string) => Point | undefined): Draft[] {
