@@ -59,12 +59,12 @@ export interface Program {
 
 function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration?: number): Segment {
   if (from.unit !== to.unit || from._coordinates.length !== to._coordinates.length)
-    throw new MotionError('Начальное и конечное значения должны иметь совместимые единицы');
+    throw new MotionError('Несовместимые единицы начального и конечного значений');
   let normalized: number | undefined;
   let aligned = true, extent = 1;
   for (let i = 0; i < from._coordinates.length; i++) {
     const distance = to._coordinates[i]! - from._coordinates[i]!;
-    if (!Number.isFinite(distance)) throw new MotionError('Диапазон движения превышает представимые значения');
+    if (!Number.isFinite(distance)) throw new MotionError('Непредставимый диапазон движения');
     const v = velocity[i] ?? 0;
     extent = Math.max(extent, Math.abs(distance));
     if (distance === 0) { if (v !== 0) aligned = false; }
@@ -78,7 +78,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
     length = artifact?.[2] ?? settleTimeUpperBound(timing.spring, energy) * 1000;
   }
-  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) throw new MotionError('Непредставимая длительность движения');
+  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) throw new MotionError('Непредставимая длительность');
   return { at, end: at + length, from: from._coordinates, to: to._coordinates, velocity, timing, artifact };
 }
 
@@ -88,8 +88,8 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   for (const input of values) { current = point(key, input, current); resolved.push(current); }
   if (!authored) resolved.unshift(from);
   const times = authored ? timing.times : undefined;
-  if (times && times.length !== resolved.length) throw new MotionError('Число times должно совпадать с числом значений');
-  if (timing.spring && resolved.length > 2) throw new MotionError('Многоточечная траектория использует duration/ease');
+  if (times && times.length !== resolved.length) throw new MotionError('Длина times не совпадает с числом значений');
+  if (timing.spring && resolved.length > 2) throw new MotionError('Для нескольких точек задайте duration/ease');
   const velocity = authored ? resolved[0]!._coordinates.map(() => 0) : [...initialVelocity];
   const _segments: Segment[] = [];
   const duration = timing.duration ?? 0;
@@ -136,7 +136,7 @@ export function sample(program: Program, time: number, value: number[], velocity
     dp = (ease(high) - ease(low)) * 1000 / ((high - low) * duration);
     p = ease(p);
   }
-  if (!Number.isFinite(p) || !Number.isFinite(dp)) throw new MotionError('Easing вернул нечисловой результат');
+  if (!Number.isFinite(p) || !Number.isFinite(dp)) throw new MotionError('Нечисловой результат easing');
   for (let i = 0; i < segment.from.length; i++) {
     const a = segment.from[i]!, distance = segment.to[i]! - a;
     if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment.at ? 0 : segment.velocity[i] ?? 0; }
@@ -145,6 +145,6 @@ export function sample(program: Program, time: number, value: number[], velocity
       velocity[i] = distance * basis._velocity + (segment.velocity[i] ?? 0) * basis._velocityV0;
     } else { value[i] = a + distance * p; velocity[i] = distance * dp; }
     if (rate !== 1) velocity[i] = rate === 0 ? 0 : velocity[i]! * rate;
-    if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) throw new MotionError('Движение вышло за представимый диапазон');
+    if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) throw new MotionError('Непредставимый результат движения');
   }
 }

@@ -27,7 +27,7 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
   let result: Element[];
   if (selected && typeof selected === 'object' && 'style' in selected) result = [selected as Element];
   else {
-    if (!selected || typeof selected !== 'object') throw new MotionError('Ожидается элемент или список элементов');
+    if (!selected || typeof selected !== 'object') throw new MotionError('Ожидается элемент или список');
     if (Symbol.iterator in selected) {
       result = [];
       for (const item of selected as Iterable<Element>) {
@@ -43,7 +43,7 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
   for (const element of result) {
     const style = (element as HTMLElement)?.style;
     if (!style || typeof style.getPropertyValue !== 'function' || typeof style.setProperty !== 'function')
-      throw new MotionError('Цель должна предоставлять CSS style');
+      throw new MotionError('У цели нет CSS style');
   }
   return [...new Set(result)];
 }
@@ -53,7 +53,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   if (!text || text === 'none') return values;
   if (typeof DOMMatrixReadOnly !== 'undefined') {
     const matrix = new DOMMatrixReadOnly(text);
-    if (!matrix.is2D) throw new MotionError('Независимые x/y требуют двумерного transform');
+    if (!matrix.is2D) throw new MotionError('Для x/y требуется 2D transform');
     const { a, b, c, d, e, f } = matrix;
     const sx = Math.hypot(a, b), determinant = a * d - b * c;
     if (sx > 0 && determinant === 0 && (c !== 0 || d !== 0)) throw new MotionError('Вырожденный transform нужно задать явно');
@@ -65,25 +65,21 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
     return values;
   }
   // Headless style-hosts поддерживают ту же каноническую форму, которую пишет Motion.
-  let rest = text;
-  const re = /(translate|translateX|translateY|rotate|skew|skewX|skewY|scale|scaleX|scaleY)\(([^)]+)\)/g;
-  for (const match of text.matchAll(re)) {
-    const args = match[2]!.split(/[,\s]+/).filter(Boolean).map(Number.parseFloat);
+  const rest = text.replace(/(translate[XY]?|rotate|(?:skew|scale)[XY]?)\(([^)]+)\)/g, (_match, name: string, arguments_: string) => {
+    const args = arguments_.trim().split(/[,\s]+/).map(Number.parseFloat);
     if (args.some(n => !Number.isFinite(n))) throw new MotionError('Нечисловой transform');
-    const name = match[1]!, a = args[0]!;
+    const a = args[0]!;
     if (name === 'translate') { values.x = a; values.y = args[1] ?? 0; }
-    else if (name === 'translateX') values.x = a;
-    else if (name === 'translateY') values.y = a;
-    else if (name === 'scale') { values.scaleX = a; values.scaleY = args[1] ?? a; }
-    else if (name === 'skew') { values.skewX = a; values.skewY = args[1] ?? 0; }
-    else values[name] = a;
-    rest = rest.replace(match[0], '');
-  }
-  if (rest.trim()) throw new MotionError('Transform не поддерживается этим style-host');
+    else if (name === 'scale' || name === 'skew') {
+      values[name + 'X'] = a;
+      values[name + 'Y'] = args[1] ?? (name === 'scale' ? a : 0);
+    } else values[name === 'translateX' ? 'x' : name === 'translateY' ? 'y' : name] = a;
+    return '';
+  });
+  if (rest.trim()) throw new MotionError('Неподдерживаемый transform');
   return values;
 }
 
-export type CompletionContinuation = (effect: Animation, settled: Promise<Animation>, resume: () => void, fail: (error: unknown) => void) => boolean;
 export type ControlOperation = (surface: Surface, selected: readonly Track[]) => void;
 type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | ControlOperation;
 
@@ -109,11 +105,10 @@ export class Run implements Playback {
   private _resolve!: (value: MotionResult) => void;
   private _reject!: (error: unknown) => void;
   readonly finished: Promise<MotionResult>;
-  constructor(public duration: number, terminal?: MotionResult) {
+  constructor(public duration: number) {
     this.finished = new Promise((resolve, reject) => { this._resolve = resolve; this._reject = reject; });
     // Ошибка доступна через original promise; отсутствие await не оставляет unhandled rejection.
     void this.finished.catch(() => {});
-    if (terminal) { this._status = terminal.status; this._resolve(terminal); }
   }
   get state(): PlaybackState {
     if (this._status === 'running') {
@@ -137,8 +132,8 @@ export class Run implements Playback {
     if (this._tracks.size || this._notifications) return;
     if (this._failure) this._reject(this._failure.error);
     else {
-      this._status = this._natural ? 'finished' : 'stopped';
-      this._resolve(this._natural ? FINISHED : STOPPED);
+      const result = this._natural ? FINISHED : STOPPED;
+      this._status = result.status; this._resolve(result);
     }
   }
   _own(track: Track, reduced = false): void {
@@ -170,7 +165,7 @@ export class Run implements Playback {
       ), failures);
     } finally { engine?._operation(false); }
     try { engine?._flush(); } catch (error) { failures.push(error); }
-    rethrow(failures, 'Не удалось управлять движением');
+    rethrow(failures, 'Ошибки управления');
   }
   pause(): void { this._apply('pause'); }
   play(): void { this._apply('play'); }
@@ -190,8 +185,7 @@ class Surface {
   _native: Animation | undefined;
   _nativeTime = 0;
   private _written: string | undefined;
-  private _token: object | undefined;
-  declare _continue?: CompletionContinuation;
+  private _token: Promise<Animation> | undefined;
   constructor(readonly _engine: Runtime, readonly element: Element, readonly key: string) {
     this._transforms = key === 'transform' ? initialTransforms(_engine._host.styles(element)) : {};
     this._stamp = number(_engine._host.now(), 'clock');
@@ -249,7 +243,9 @@ class Surface {
         const value = at ? track._program._segments[0]![at][0]! : track.value[0]!;
         state[key] = value;
       }
-      return !at && Object.keys(TRANSFORMS).every(key => state[key] === TRANSFORMS[key]) ? 'none' : transform(state);
+      let identity = !at;
+      for (const key in TRANSFORMS) identity &&= state[key] === TRANSFORMS[key];
+      return identity ? 'none' : transform(state);
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {
@@ -301,16 +297,14 @@ class Surface {
     const native = this._native; this._native = undefined; this._token = undefined;
     try { native?.cancel(); } catch { /* исходное исключение сохраняется */ }
     for (const track of [...this._tracks.values()]) this._end(track, false, { error });
-    this._engine._idle(this);
   }
   _reconcile(): void {
-    if (this._native) { this._engine._idle(this); return; }
-    if (this._tracks.size === 0) { this._engine._idle(this); return; }
+    if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
     const active = [...this._tracks.values()];
     if (active.every(track => track._paused || track._rate === 0)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
-    const canNative = (this.key === 'transform' || this.key === 'opacity') && _nativeEase !== undefined && typeof this.element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
+    const canNative = first._rate > 0 && (this.key === 'transform' || this.key === 'opacity') && _nativeEase !== undefined && typeof this.element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
       active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
         track._program.duration === first._program.duration && track._program._segments[0]!.at === seg.at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
@@ -329,31 +323,25 @@ class Surface {
     } catch (error) { this._lock(false); this._fail(error); throw error; }
   }
   _watch(): void {
-    const effect = this._native!, token = this._token ??= {};
-    const finished = effect.finished;
-    if (!finished || typeof finished.then !== 'function') throw new MotionError('Native effect не предоставляет finished');
+    const effect = this._native!, finished = effect.finished;
+    if (this._token === finished) return;
+    const token = this._token = finished;
+    if (!finished || typeof finished.then !== 'function') throw new MotionError('У Animation нет finished');
     const fail = (error: unknown): void => {
-      if (this._token !== token) return;
+      if (this._token !== token || this._native !== effect) return;
       if ((error as { name?: string })?.name !== 'AbortError') { this._fail(error); return; }
       this._native = undefined; this._token = undefined;
       for (const track of [...this._tracks.values()]) this._end(track, false);
-      this._engine._idle(this);
-    };
-    const observe = (): void => {
-      if (this._token !== token) return;
-      try { this._watch(); } catch (error) { this._fail(error); }
     };
     void finished.then(() => {
-      if (this._token !== token) return;
+      if (this._token !== token || this._native !== effect) return;
       try {
-        if (this._continue?.(effect, finished, observe, fail)) return;
         for (const track of this._tracks.values()) {
-          track._elapsed = track._rate < 0 ? 0 : track._program.duration;
+          track._elapsed = track._program.duration;
           this._sample(track);
         }
         this._detach();
         for (const track of [...this._tracks.values()]) this._end(track, true);
-        this._engine._idle(this);
       } catch (error) { this._fail(error); }
     }, fail);
   }
@@ -404,13 +392,13 @@ class Surface {
       for (const track of [...this._tracks.values()]) {
         if (!track._paused && track._rate !== 0 && this._ended(track)) this._end(track, true);
       }
-      if (this._tracks.size === 0 || [...this._tracks.values()].every(t => t._paused || t._rate === 0)) this._engine._idle(this);
+      if ([...this._tracks.values()].every(t => t._paused || t._rate === 0)) this._engine._idle(this);
     } catch (error) { this._fail(error); }
   }
 }
 
 export class Runtime {
-  private readonly _surfaces = new WeakMap<Element, Map<string, Surface>>();
+  private readonly _surfaces = new WeakMap<Element, Record<string, Surface>>();
   private readonly _active = new Set<Surface>();
   private _offUpdate: (() => void) | undefined;
   private _offRender: (() => void) | undefined;
@@ -423,7 +411,7 @@ export class Runtime {
   _busy(): boolean { return this._operations !== 0; }
   _operation(enter: boolean): void { this._operations += enter ? 1 : -1; }
   _notify(element: Element, key: string, action: () => void): void {
-    const owner = this._surfaces.get(element)?.get(key)?._tracks.get(key)?._owner;
+    const owner = this._surfaces.get(element)?.[key]?._tracks.get(key)?._owner;
     owner?._hold();
     this._after(() => {
       try { action(); }
@@ -432,18 +420,17 @@ export class Runtime {
     });
   }
   _after(action: () => void): void {
-    if (this._pending.length === 0) queueMicrotask(() => this._drain());
+    if (this._pending.length === 0) queueMicrotask(() => this._flush());
     this._pending.push(action);
   }
-  _flush(): void { this._drain(); }
-  private _drain(): void {
+  _flush(): void {
     if (this._pending.length === 0 || this._draining || this._operations) return;
     this._draining = true;
     const failures: unknown[] = [];
     try {
       attemptAll(this._pending, action => action(), failures);
     } finally { this._pending.length = 0; this._draining = false; }
-    rethrow(failures, 'Ошибка отложенного управления');
+    rethrow(failures, 'Ошибки отложенных команд');
   }
   _wake(surface: Surface): void {
     this._active.add(surface);
@@ -457,12 +444,12 @@ export class Runtime {
       this._offUpdate = this._host.frame.update(() => {
         this._prepared = [...this._active];
         for (const current of this._prepared) current._tick();
-        this._drain();
+        this._flush();
       }, { onTeardown: teardown });
       this._offRender = this._host.frame.render(() => {
         const current = this._prepared; this._prepared = [];
         for (const surface of current) surface._paint();
-        this._drain();
+        this._flush();
       }, { onTeardown: teardown });
       if (this._active.size === 0) { this._offUpdate(); this._offRender(); this._offUpdate = this._offRender = undefined; }
     } catch (error) {
@@ -474,8 +461,8 @@ export class Runtime {
   _idle(surface: Surface): void {
     this._active.delete(surface);
     const groups = this._surfaces.get(surface.element);
-    if (surface._tracks.size === 0 && surface.key !== 'transform' && groups?.get(surface.key) === surface)
-      groups.delete(surface.key);
+    if (surface._tracks.size === 0 && surface.key !== 'transform' && groups?.[surface.key] === surface)
+      delete groups[surface.key];
     if (this._active.size !== 0) return;
     const update = this._offUpdate, render = this._offRender;
     this._offUpdate = this._offRender = undefined; this._prepared = [];
@@ -483,13 +470,13 @@ export class Runtime {
   }
   private _surface(element: Element, key: string): Surface {
     let groups = this._surfaces.get(element);
-    if (!groups) { groups = new Map(); this._surfaces.set(element, groups); }
+    if (!groups) { groups = Object.create(null) as Record<string, Surface>; this._surfaces.set(element, groups); }
     const name = isTransform(key) ? 'transform' : key;
-    let group = groups.get(name);
+    let group = groups[name];
     if (!group) {
       const candidate = new Surface(this, element, name);
       // Чтение host-стиля может синхронно принять другой прогон.
-      group = groups.get(name) ?? candidate; groups.set(name, group);
+      group = groups[name] ?? candidate; groups[name] = group;
     }
     group._refresh();
     return group;
@@ -510,7 +497,7 @@ export class Runtime {
   private _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
     origin?: (element: Element, key: string) => Point | undefined): Draft[] {
     const elements = targets(input);
-    if (elements.length * props.reduce((sum, p) => sum + p.values.length, 0) > MAX_CHANNELS) throw new MotionError('Слишком много каналов движения');
+    if (elements.length * props.reduce((sum, p) => sum + p.values.length, 0) > MAX_CHANNELS) throw new MotionError('Слишком много каналов');
     const reduced = clock.reduced || this._host.reduced();
     const author = authoredTiming(clock);
     const result: Draft[] = [], synced = new Set<Surface>();
@@ -557,7 +544,7 @@ export class Runtime {
       }
       run._empty();
     } catch (error) { run._error(error); throw error; }
-    this._drain(); return run;
+    this._flush(); return run;
   }
   animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): Playback {
     const input = properties(props);
@@ -571,7 +558,7 @@ export class Runtime {
     let cursor = 0, previousStart = 0, end = 0, count = 0;
     for (const tuple of list) {
       const [target, props, option] = snapshot(tuple, 'sequence step', 2) as unknown as SequenceStep;
-      if (tuple.length > 3) throw new MotionError('Шаг последовательности: [target, properties, options]');
+      if (tuple.length > 3) throw new MotionError('Шаг: [target, properties, options]');
       const { at, ...rest } = option ?? {};
       const offset = at === '<' ? previousStart : at === undefined || at === '>' ? cursor : number(at, 'at', 0);
       const input = properties(props), clock = timing(rest);
@@ -581,14 +568,14 @@ export class Runtime {
       });
       for (const draft of drafts) {
         count += draft._program._segments.length;
-        if (count > MAX_CHANNELS) throw new MotionError('Последовательность слишком велика');
+        if (count > MAX_CHANNELS) throw new MotionError('Слишком много сегментов');
         let channels = merged.get(draft.element);
         if (!channels) { channels = new Map(); merged.set(draft.element, channels); }
         const before = channels.get(draft.key);
         let next = draft;
         if (before) {
           const at = draft._program._segments[0]!.at;
-          if (at < before._program.duration) throw new MotionError('Шаги одного свойства не должны пересекаться');
+          if (at < before._program.duration) throw new MotionError('Пересечение шагов одного свойства');
           next = { ...draft, _program: { ...draft._program, _segments: [...before._program._segments, ...draft._program._segments], _nativeEase: undefined, _identity: undefined } };
         }
         channels.set(draft.key, next);
@@ -601,8 +588,6 @@ export class Runtime {
   }
 }
 
-/** Отозванная область возвращает завершённый motion-run без целей и часов. */
-export const stoppedMotion: Playback = /* @__PURE__ */ new Run(0, STOPPED);
 export const runtime: Runtime = new Runtime();
 export const animate: (target: MotionTarget, props: MotionProperties, options?: MotionOptions) => Playback = runtime.animate.bind(runtime);
 export const sequence: (steps: readonly SequenceStep[], options?: SequenceOptions) => Playback = runtime.sequence.bind(runtime);

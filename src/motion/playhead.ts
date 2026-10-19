@@ -1,5 +1,6 @@
+import { stoppedMotion } from './stopped.js';
 import { MotionError, number } from './model.js';
-import { Run, type ControlOperation, type CompletionContinuation } from './runtime.js';
+import { Run, type ControlOperation } from './runtime.js';
 import type { MotionPlayback, Playback } from './types.js';
 
 const views = /* @__PURE__ */ new WeakMap<Playback, MotionPlayback>();
@@ -8,6 +9,8 @@ const views = /* @__PURE__ */ new WeakMap<Playback, MotionPlayback>();
 export function playhead(playback: Playback): MotionPlayback {
   const existing = views.get(playback);
   if (existing) return existing;
+  if (playback === stoppedPlayhead) return stoppedPlayhead;
+  if (playback === stoppedMotion) return stoppedPlayhead;
   if (!(playback instanceof Run)) throw new MotionError('playhead ожидает animate, sequence или value.animate этого runtime');
   const run = playback;
   const history: { time: number | undefined; rate: number | undefined } = {
@@ -62,12 +65,12 @@ function rateCommand(rate: number): ControlOperation {
   return (group, tracks) => applyRate(group, tracks, rate);
 }
 function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<ControlOperation>[1], rate?: number): void {
-  group._continue = continuePlayback;
   let native = false;
-  if (group._native && tracks.length === group._tracks.size) {
+  const requested = rate ?? -tracks[0]!._rate;
+  if (requested >= 0 && group._native && tracks.length === group._tracks.size) {
     group._lock(true);
     try {
-      native = configureNative(group._native, rate ?? -tracks[0]!._rate);
+      native = configureNative(group._native, requested);
       if (native) {
         for (const track of tracks) {
           track._rate = rate ?? -track._rate;
@@ -86,9 +89,8 @@ function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<Co
   for (const track of tracks) if (!track._paused && group._ended(track)) group._end(track, true);
 }
 
-/** Старая terminal-подписка передаётся новой фазе, только когда её promise завершён. */
-const continuePlayback: CompletionContinuation = (effect, finished, resume, fail) => {
-  if (effect.pending && effect.ready) { void effect.ready.then(resume, fail); return true; }
-  if (effect.finished !== finished) { resume(); return true; }
-  return false;
-};
+const stoppedPlayhead: MotionPlayback = /* @__PURE__ */ Object.freeze({
+  ...stoppedMotion, time: 0,
+  get timeScale(): number | undefined { return undefined; }, set timeScale(_value: number) {},
+  reverse() {},
+});

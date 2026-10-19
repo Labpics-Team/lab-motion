@@ -14,7 +14,7 @@ test('native speed сохраняет тот же Animation и не создаё
     effect.currentTime = control.currentTime = 400;
     try {
       const samples = [];
-      for (const rate of [2, .5, -1, 0, 3]) {
+      for (const rate of [2, .5, 1, 0, 3]) {
         run.timeScale = rate; control.updatePlaybackRate(rate); await Promise.all([effect.ready, control.ready]);
         samples.push({ time: run.time, requested: run.timeScale, native: effect.playbackRate,
           pose: x(el), reference: x(raw), same: el.getAnimations()[0] === effect });
@@ -64,8 +64,8 @@ test('новый reverse не принимает поздний finished пре�
     const el = document.createElement('div'); document.body.append(el);
     const run = playhead(animate(el, { x: [0, 100] }, { duration: 1000 })); const effect = el.getAnimations()[0]!;
     try {
-      effect.finish(); run.reverse(); await effect.ready; await Promise.resolve(); const live = run.state;
-      effect.pause(); await effect.ready; effect.currentTime = 500; run.pause();
+      effect.finish(); run.reverse(); await Promise.resolve(); const live = run.state;
+      run.pause(); run.seek(500);
       const position = new DOMMatrixReadOnly(getComputedStyle(el).transform).m41;
       run.stop(); const outcome = await run.finished;
       return { live, position, outcome, remaining: el.getAnimations().length };
@@ -75,17 +75,25 @@ test('новый reverse не принимает поздний finished пре�
   expect(result.outcome).toEqual({ status: 'stopped' }); expect(result.remaining).toBe(0);
 });
 
-test('нативный reverse естественно достигает начала и освобождает эффект', async ({ page }) => {
+test('native → JS reverse достигает начала без зависимости от browser finished', async ({ page }) => {
   const result = await page.evaluate(async () => {
     const { animate, playhead } = await import('/browser/.artifacts/motion-root.js');
-    const el = document.createElement('div'); document.body.append(el);
-    const run = playhead(animate(el, { x: [0, 100] }, { duration: 1000 }));
-    try {
-      run.seek(100); run.reverse(); const outcome = await run.finished;
-      return { outcome, time: run.time, x: new DOMMatrixReadOnly(getComputedStyle(el).transform).m41, effects: el.getAnimations().length };
-    } finally { run.stop(); el.remove(); }
+    for (const start of [100, 100.00000000000001, .001, 999.999]) {
+      for (let iteration = 0; iteration < 4; iteration++) {
+        const el = document.createElement('div'); document.body.append(el);
+        const run = playhead(animate(el, { x: [0, 100] }, { duration: 1000 }));
+        try {
+          run.seek(start); run.reverse();
+          if (el.getAnimations().length) throw Error('Обратный ход не передан JS');
+          const outcome = await run.finished;
+          if (outcome.status !== 'finished' || run.time !== 0 || new DOMMatrixReadOnly(getComputedStyle(el).transform).m41 !== 0)
+            throw Error('Нарушена конечная фаза');
+        } finally { run.stop(); el.remove(); }
+      }
+    }
+    return true;
   });
-  expect(result).toEqual({ outcome: { status: 'finished' }, time: 0, x: 0, effects: 0 });
+  expect(result).toBe(true);
 });
 
 test('reduced-motion завершён до поздних transport-команд', async ({ page }) => {

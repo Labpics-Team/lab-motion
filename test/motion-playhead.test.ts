@@ -51,14 +51,14 @@ it('нативный прогон меняет скорость на том же
   const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
   const effect = h.effects[0]!;
   effect.currentTime = 300;
-  for (const scale of [2, .5, -1, 0, 4]) {
+  for (const scale of [2, .5, 1, 0, 4]) {
     run.timeScale = scale;
     expect(run.time).toBe(300); expect(effect.playbackRate).toBe(scale);
     expect(h.effects).toHaveLength(1); expect(effect.cancelled).toBe(false);
     expect(h.updates.size + h.renders.size).toBe(0);
   }
-  run.reverse(); expect(effect.playbackRate).toBe(-4);
-  effect.currentTime = 0; effect.complete();
+  run.reverse(); expect(run.timeScale).toBe(-4); expect(effect.cancelled).toBe(true);
+  effect.complete(); h.step(75);
   expect(await run.finished).toEqual({ status: 'finished' }); expect(h.x()).toBe(0);
   expect(effect.cancelled).toBe(true);
 });
@@ -144,15 +144,17 @@ it('spring-handoff получает скорость движения после
   }
 });
 
-it('двойной reverse и чтение time не пишут CSS и не меняют фазу', () => {
+it('чтение time не пишет CSS, а двойной reverse сохраняет фазу и возвращает native', () => {
   const h = harness(true);
   const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
   const effect = h.effects[0]!; effect.currentTime = 250;
   const writes = h.writes.length;
   for (let i = 0; i < 1000; i++) expect(run.time).toBe(250);
+  expect(h.writes).toHaveLength(writes);
   run.reverse(); run.reverse();
   expect(run.timeScale).toBe(1); expect(run.time).toBe(250);
-  expect(h.writes).toHaveLength(writes); expect(h.effects).toHaveLength(1);
+  expect(h.effects).toHaveLength(2); expect(effect.cancelled).toBe(true);
+  expect(h.updates.size + h.renders.size).toBe(0);
   run.stop();
 });
 
@@ -189,7 +191,7 @@ for (const native of [false, true]) it('seek к концу обратного п
   run.pause(); run.reverse(); run.seek(5000);
   expect(run.time).toBe(1000); expect(run.state).toBe('paused'); expect(h.x()).toBe(100);
   run.play();
-  if (native) h.effects.at(-1)!.currentTime = 750; else h.step(250);
+  h.step(250);
   run.pause(); expect(h.x()).toBe(75); expect(run.time).toBe(750);
   run.seek(0); expect(await run.finished).toEqual({ status: 'finished' }); expect(h.x()).toBe(0);
 });
@@ -206,24 +208,17 @@ it('передача прежней пружины сохраняет длите
   }
 });
 
-it('pending native rate не фиксирует старый finished и не масштабирует currentTime повторно', async () => {
+it('pending native rate сохраняет авторитет currentTime, а late finished не забирает JS reverse', async () => {
   const h = harness(true);
   const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
-  const effect = h.effects[0]! as typeof h.effects[number] & { pending: boolean; ready: Promise<void> };
-  const previousComplete = effect.complete;
-  let acknowledge!: () => void, complete!: () => void;
-  effect.ready = new Promise<void>(resolve => { acknowledge = resolve; });
+  const effect = h.effects[0]!;
   effect.currentTime = 200;
-  effect.updatePlaybackRate = () => { effect.pending = true; };
+  effect.updatePlaybackRate = () => {};
   run.timeScale = 0;
-  effect.currentTime = 250;
-  expect(run.time).toBe(250);
-  previousComplete(); await Promise.resolve(); expect(run.state).toBe('running');
-  effect.finished = new Promise<void>(resolve => { complete = resolve; });
-  effect.pending = false; effect.playbackRate = -1;
-  effect.updatePlaybackRate = rate => { effect.playbackRate = rate; };
-  acknowledge(); await Promise.resolve();
-  run.timeScale = -1; effect.currentTime = 0; complete();
+  effect.currentTime = 250; expect(run.time).toBe(250);
+  run.timeScale = -1; effect.complete(); await Promise.resolve();
+  expect(run.state).toBe('running'); expect(effect.cancelled).toBe(true);
+  h.step(250);
   expect(await run.finished).toEqual({ status: 'finished' }); expect(h.x()).toBe(0);
 });
 

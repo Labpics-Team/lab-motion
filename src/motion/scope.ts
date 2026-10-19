@@ -1,13 +1,12 @@
+import { stoppedMotion, stoppedLayout as stopped } from './stopped.js';
 import { attemptAll, rethrow } from './attempt-all.js';
-import { MotionError, STOPPED, record, snapshot, timing } from './model.js';
-import { animate, sequence, targets, stoppedMotion } from './runtime.js';
+import { MotionError, record, snapshot, timing } from './model.js';
+import { animate, sequence, targets } from './runtime.js';
 import { layout, type LayoutOptions } from './layout.js';
 import { value, type MotionValue } from './value.js';
 import { listen } from './listener.js';
 import type { Disposable, MotionOptions, MotionProperties, MotionTarget, Playback, SequenceOptions, SequenceStep } from './types.js';
 
-const stopped: Playback = Object.freeze({ state: 'stopped', duration: 0, finished: Promise.resolve(STOPPED),
-  pause() {}, play() {}, seek() {}, stop() {}, finish() {} });
 
 export function snapshotOptions(input: MotionOptions | undefined): MotionOptions {
   const result = input === undefined ? {} : { ...record(input, 'options') };
@@ -118,7 +117,7 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
         const late = drain(); playbacks.clear();
         for (const error of late) globalThis.reportError?.(error);
       });
-      rethrow(errors, 'Не удалось освободить область движения');
+      rethrow(errors, 'Ошибки освобождения scope');
     },
   };
 }
