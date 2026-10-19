@@ -1,3 +1,4 @@
+import { playhead } from '../src/motion/playhead.js';
 import { expect, it } from 'vitest';
 import { harness } from './fixtures/motion-runtime.js';
 import type { Playback } from '../src/motion/types.js';
@@ -6,7 +7,7 @@ type TemporalPlayback = Playback & { readonly time: number | undefined; timeScal
 
 it('изменяет скорость и направление одного исполняемого animate без скачка', async () => {
   const h = harness();
-  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }) as TemporalPlayback;
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 })) as TemporalPlayback;
   h.step(200); expect(run.time).toBe(200);
   run.timeScale = 2;
   expect(h.x()).toBe(20);
@@ -19,10 +20,10 @@ it('изменяет скорость и направление одного и�
 
 it('sequence обращает всю действующую шкалу, включая промежутки', async () => {
   const h = harness();
-  const run = h.runtime.sequence([
+  const run = playhead(h.runtime.sequence([
     [h.element, { x: [0, 100] }, { duration: 100 }],
     [h.element, { x: [100, 200] }, { at: 200, duration: 100 }],
-  ]) as TemporalPlayback;
+  ])) as TemporalPlayback;
   run.seek(250); run.pause(); run.timeScale = -.5;
   expect(run.state).toBe('paused'); expect(run.time).toBe(250);
   run.play(); h.step(400); expect(h.x()).toBe(50);
@@ -32,7 +33,7 @@ it('sequence обращает всю действующую шкалу, вклю
 
 it('пауза, нулевая скорость и terminal controls не создают скрытую работу', async () => {
   const h = harness();
-  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
   h.step(200); run.timeScale = 0;
   expect(run.time).toBe(200); expect(h.updates.size + h.renders.size).toBe(0);
   h.step(800); run.reverse(); expect(h.x()).toBe(20);
@@ -47,7 +48,7 @@ it('пауза, нулевая скорость и terminal controls не соз
 
 it('нативный прогон меняет скорость на том же effect, без JS-кадров', async () => {
   const h = harness(true);
-  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
   const effect = h.effects[0]!;
   effect.currentTime = 300;
   for (const scale of [2, .5, -1, 0, 4]) {
@@ -64,9 +65,9 @@ it('нативный прогон меняет скорость на том же
 
 it('скорость одной оси не меняет вторую ось общей native-поверхности', async () => {
   const h = harness(true);
-  const old = h.runtime.animate(h.element, { x: 100, y: 200 }, { duration: 1000, ease: 'linear' });
+  const old = playhead(h.runtime.animate(h.element, { x: 100, y: 200 }, { duration: 1000, ease: 'linear' }));
   const effect = h.effects[0]!; effect.currentTime = 200;
-  const x = h.runtime.animate(h.element, { x: 100 }, { duration: 1000, ease: 'linear' });
+  const x = playhead(h.runtime.animate(h.element, { x: 100 }, { duration: 1000, ease: 'linear' }));
   x.timeScale = 2;
   expect(effect.cancelled).toBe(true); expect(h.effects).toHaveLength(1);
   h.step(100); expect(h.x()).toBe(40); expect(h.y()).toBe(60);
@@ -78,11 +79,11 @@ it('скорость одной оси не меняет вторую ось о�
 
 it('при повторном использовании разных фаз общий time не выдумывается', () => {
   const h = harness();
-  const x = h.runtime.animate(h.element, { x: 100 }, { duration: 1000, ease: 'linear' });
+  const x = playhead(h.runtime.animate(h.element, { x: 100 }, { duration: 1000, ease: 'linear' }));
   h.step(100);
-  const y = h.runtime.animate(h.element, { y: 200 }, { duration: 1000, ease: 'linear' });
+  const y = playhead(h.runtime.animate(h.element, { y: 200 }, { duration: 1000, ease: 'linear' }));
   y.timeScale = 2;
-  const both = h.runtime.animate(h.element, { x: 100, y: 200 }, { duration: 1000, ease: 'linear' });
+  const both = playhead(h.runtime.animate(h.element, { x: 100, y: 200 }, { duration: 1000, ease: 'linear' }));
   expect(both.time).toBeUndefined(); expect(both.timeScale).toBeUndefined();
   both.timeScale = .5; expect(both.timeScale).toBe(.5);
   both.seek(250); expect(both.time).toBe(250);
@@ -91,7 +92,7 @@ it('при повторном использовании разных фаз о�
 
 it('невалидная скорость отклоняется до изменения владельца, эффектов и позы', () => {
   const h = harness(true);
-  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
   const effect = h.effects[0]!, writes = h.writes.length;
   for (const invalid of [NaN, Infinity, -Infinity, '2', null]) {
     expect(() => { run.timeScale = invalid as number; }).toThrow(/timeScale/);
@@ -103,7 +104,7 @@ it('невалидная скорость отклоняется до измен
 
 it('ошибка native rate завершает sibling-каналы и не выдаёт успешный finished', async () => {
   const h = harness(true); const error = new Error('native rate failed');
-  const run = h.runtime.animate(h.element, { x: [0, 100], opacity: [0, 1] }, { duration: 1000 });
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100], opacity: [0, 1] }, { duration: 1000 }));
   h.effects[0]!.updatePlaybackRate = () => { throw error; };
   expect(() => { run.timeScale = 2; }).toThrow(error);
   await expect(run.finished).rejects.toBe(error);
@@ -119,7 +120,7 @@ it('отсутствующий updatePlaybackRate использует суще�
     Object.defineProperty(effect, 'updatePlaybackRate', { value: undefined });
     return effect;
   }) as HTMLElement['animate'];
-  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
   h.effects[0]!.currentTime = 200;
   run.timeScale = 2;
   expect(h.effects.every(effect => effect.cancelled)).toBe(true);
@@ -130,10 +131,10 @@ it('отсутствующий updatePlaybackRate использует суще�
 it('spring-handoff получает скорость движения после замедления и разворота', () => {
   for (const rate of [.5, -2]) {
     const h = harness();
-    const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+    const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
     run.seek(400); run.timeScale = rate;
     const from = h.x();
-    const successor = h.runtime.animate(h.element, { x: 200 });
+    const successor = playhead(h.runtime.animate(h.element, { x: 200 }));
     h.step(.001);
     expect((h.x() - from) / .000001).toBeCloseTo(100 * rate, 0);
     successor.finish();
@@ -142,7 +143,7 @@ it('spring-handoff получает скорость движения после
 
 it('двойной reverse и чтение time не пишут CSS и не меняют фазу', () => {
   const h = harness(true);
-  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
   const effect = h.effects[0]!; effect.currentTime = 250;
   const writes = h.writes.length;
   for (let i = 0; i < 1000; i++) expect(run.time).toBe(250);
@@ -157,7 +158,7 @@ it('случайные временные команды совпадают с �
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 2 ** 32; };
   for (let scenario = 0; scenario < 48; scenario++) {
     const h = harness();
-    const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+    const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
     let time = 500, wall = 0, scale = 1, paused = false;
     run.seek(time);
     for (let step = 0; step < 64; step++) {

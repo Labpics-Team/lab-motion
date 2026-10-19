@@ -7,3 +7,4 @@ export type {
   MotionScalar, MotionProperties, MotionTarget, MotionEase, MotionSpring, MotionOptions,
   MotionResult, Playback, MotionPlayback, PlaybackState, Disposable, SequenceStep, SequenceOptions,
 } from './types.js';
+export { playhead } from './playhead.js';

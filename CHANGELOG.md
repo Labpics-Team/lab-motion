@@ -9,8 +9,8 @@
 
 ### Добавлено
 
-- Контролы `animate`, `sequence`, `value.animate` и соответствующих методов `scope`
-  предоставляют `time`, `timeScale` и `reverse()`. Скорость меняется без скачка;
+- `playhead(playback)` добавляет к `animate`, `sequence` и `value.animate`
+  чтение `time`, настройку `timeScale` и `reverse()`. Скорость меняется без скачка;
   совместимые браузерные эффекты продолжаются без пересоздания.
 
 ### Исправлено

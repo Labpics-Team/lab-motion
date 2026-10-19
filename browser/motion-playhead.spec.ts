@@ -2,11 +2,11 @@ import { expect, test } from './fixtures/harness';
 
 test('native speed сохраняет тот же Animation и не создаёт собственных кадров', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { animate } = await import('/browser/.artifacts/motion-root.js');
+    const { animate, playhead } = await import('/browser/.artifacts/motion-root.js');
     const el = document.createElement('div'), raw = document.createElement('div'); document.body.append(el, raw);
     const request = window.requestAnimationFrame; let frames = 0;
     window.requestAnimationFrame = callback => { frames++; return request.call(window, callback); };
-    const run = animate(el, { x: [0, 100] }, { duration: 1000 });
+    const run = playhead(animate(el, { x: [0, 100] }, { duration: 1000 }));
     const effect = el.getAnimations()[0]!;
     const control = raw.animate([{ transform: 'translateX(0px)' }, { transform: 'translateX(100px)' }], { duration: 1000, fill: 'both', easing: 'linear' });
     const x = (target: Element) => new DOMMatrixReadOnly(getComputedStyle(target).transform).m41;
@@ -34,9 +34,9 @@ test('mixed native/main сохраняет позицию при speed, pause и
   await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
   await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'));
   await page.evaluate(async () => {
-    const { animate } = await import('/browser/.artifacts/motion-root.js');
+    const { animate, playhead } = await import('/browser/.artifacts/motion-root.js');
     const el = document.createElement('div'); el.style.width = '100px'; document.body.append(el);
-    const run = animate(el, { x: [0, 100], width: [100, 200] }, { duration: 1000 });
+    const run = playhead(animate(el, { x: [0, 100], width: [100, 200] }, { duration: 1000 }));
     run.seek(400); run.timeScale = 2;
     const effect = el.getAnimations()[0]!; effect.pause(); await effect.ready; effect.currentTime = 528;
     Object.assign(window, { transportTest: { el, run } });
@@ -60,9 +60,9 @@ test('mixed native/main сохраняет позицию при speed, pause и
 
 test('новый reverse не принимает поздний finished предыдущего направления', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { animate } = await import('/browser/.artifacts/motion-root.js');
+    const { animate, playhead } = await import('/browser/.artifacts/motion-root.js');
     const el = document.createElement('div'); document.body.append(el);
-    const run = animate(el, { x: [0, 100] }, { duration: 1000 }); const effect = el.getAnimations()[0]!;
+    const run = playhead(animate(el, { x: [0, 100] }, { duration: 1000 })); const effect = el.getAnimations()[0]!;
     try {
       effect.finish(); run.reverse(); await effect.ready; await Promise.resolve(); const live = run.state;
       effect.pause(); await effect.ready; effect.currentTime = 500; run.pause();
@@ -77,9 +77,9 @@ test('новый reverse не принимает поздний finished пре�
 
 test('нативный reverse естественно достигает начала и освобождает эффект', async ({ page }) => {
   const result = await page.evaluate(async () => {
-    const { animate } = await import('/browser/.artifacts/motion-root.js');
+    const { animate, playhead } = await import('/browser/.artifacts/motion-root.js');
     const el = document.createElement('div'); document.body.append(el);
-    const run = animate(el, { x: [0, 100] }, { duration: 1000 });
+    const run = playhead(animate(el, { x: [0, 100] }, { duration: 1000 }));
     try {
       run.seek(100); run.reverse(); const outcome = await run.finished;
       return { outcome, time: run.time, x: new DOMMatrixReadOnly(getComputedStyle(el).transform).m41, effects: el.getAnimations().length };
@@ -91,10 +91,10 @@ test('нативный reverse естественно достигает нач�
 test('reduced-motion завершён до поздних transport-команд', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const result = await page.evaluate(async () => {
-    const { scope } = await import('/browser/.artifacts/motion-root.js');
+    const { scope, playhead } = await import('/browser/.artifacts/motion-root.js');
     const root = document.createElement('div'); document.body.append(root); const area = scope(root);
     try {
-      const run = area.animate(root, { x: [0, 100] }, { duration: 1000 }); await run.finished;
+      const run = playhead(area.animate(root, { x: [0, 100] }, { duration: 1000 })); await run.finished;
       run.timeScale = -1; run.reverse(); run.seek(10); run.play();
       return { state: run.state, time: run.time, duration: run.duration,
         x: new DOMMatrixReadOnly(getComputedStyle(root).transform).m41, effects: root.getAnimations().length };

@@ -21,14 +21,14 @@ it('установленный пакет предоставляет один ro
       import assert from 'node:assert/strict';
       import {createRequire} from 'node:module';
       const require=createRequire(import.meta.url);
-      const keys=['MotionError','animate','layout','scope','sequence','value'];
+      const keys=['MotionError','animate','layout','playhead','scope','sequence','value'];
       for (const module of [await import('@labpics/motion'),require('@labpics/motion')]) {
         assert.deepEqual(Object.keys(module).sort(),keys);
         const c=module.animate([], {}, {duration:10});
         assert.deepEqual(await c.finished,{status:'finished'});
         c.stop(); c.seek(NaN); c.finish();
         const v=module.value(2); v.set(3); assert.equal(v.get(),3);
-        const motion=v.animate([3,5],{duration:1000}); motion.pause(); motion.seek(250);
+        const motion=module.playhead(v.animate([3,5],{duration:1000})); motion.pause(); motion.seek(250);
         assert.equal(motion.time,250); assert.equal(v.get(),3.5);
         motion.timeScale=.5; motion.reverse(); assert.equal(motion.timeScale,-.5);
         assert.equal(motion.state,'paused'); motion.finish(); assert.equal(v.get(),5);
@@ -42,10 +42,10 @@ it('установленный пакет предоставляет один ro
     `);
     const child = spawnSync(process.execPath, ['probe.mjs'], { cwd: work, encoding: 'utf8', timeout: 15_000 });
     expect(child.status, child.stdout + child.stderr).toBe(0);
-    const source = `import {animate, scope, sequence, layout, value, type Playback, type MotionPlayback, type MotionResult} from '@labpics/motion';
+    const source = `import {animate, scope, sequence, layout, value, playhead, type Playback, type MotionPlayback, type MotionResult} from '@labpics/motion';
 const element=document.createElement('div');
 const a:Playback=animate(element,{x:[0,100,0]},{duration:200,ease:'ease-out'});
-const b:MotionPlayback=animate(element,{x:200},{spring:{response:280,bounce:.1}});
+const b:MotionPlayback=playhead(animate(element,{x:200},{spring:{response:280,bounce:.1}}));
 const position:number|undefined=b.time;const speed:number|undefined=b.timeScale;
 b.timeScale=0.5;b.reverse();void position;void speed;
 // @ts-expect-error a requested speed must be a finite number at runtime, never undefined

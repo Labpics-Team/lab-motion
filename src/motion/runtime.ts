@@ -1,7 +1,8 @@
+import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, authoredTiming, snapshot, type PropertyInput, type Timing } from './model.js';
 import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
-import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, MotionPlayback, PlaybackState, SequenceOptions, SequenceStep } from './types.js';
+import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState, SequenceOptions, SequenceStep } from './types.js';
 
 export interface RuntimeHost {
   readonly frame: FrameLoop;
@@ -96,12 +97,11 @@ interface Track {
   _done: boolean;
 }
 
-class Run implements MotionPlayback {
-  private _tracks = new Set<Track>();
+export class Run implements Playback {
+  readonly _tracks = new Set<Track>();
   private _status: PlaybackState = 'running';
   private _natural = true;
-  private _lastTime = 0;
-  private _lastRate = 1;
+  declare _history?: { time: number | undefined; rate: number };
   private _notifications = 0;
   private _failure: { error: unknown } | undefined;
   private _resolve!: (value: MotionResult) => void;
@@ -119,28 +119,6 @@ class Run implements MotionPlayback {
     }
     return this._status;
   }
-  get time(): number | undefined {
-    let now: number | undefined, position: number | undefined;
-    for (const track of this._tracks) {
-      now ??= number(track._group._engine._host.now(), 'clock');
-      const current = track._group._position(track, now);
-      if (position !== undefined && position !== current) return undefined;
-      position = current;
-    }
-    return position ?? this._lastTime;
-  }
-  get timeScale(): number | undefined {
-    let rate: number | undefined;
-    for (const track of this._tracks) {
-      if (rate !== undefined && rate !== track._rate) return undefined;
-      rate = track._rate;
-    }
-    return rate ?? this._lastRate;
-  }
-  set timeScale(value: number) {
-    if (this._status === 'running') this._apply('rate', number(value, 'timeScale'));
-  }
-  reverse(): void { this._apply('reverse'); }
   _hold(): void { this._notifications++; }
   _release(): void { this._notifications--; this._complete(); }
   _error(error: unknown): void {
@@ -167,15 +145,17 @@ class Run implements MotionPlayback {
     this._tracks.add(track); track._owner = this;
   }
   _settle(track: Track, natural: boolean, failure?: { error: unknown }): void {
-    this._lastTime = Math.min(this.duration, track._elapsed);
-    this._lastRate = track._rate;
+    if (this._history) {
+      this._history.time = Math.min(this.duration, track._elapsed);
+      this._history.rate = track._rate;
+    }
     this._tracks.delete(track);
     this._natural &&= natural;
     if (failure) this._error(failure.error);
     this._complete();
   }
   _empty(): void { this._complete(); }
-  private _apply(action: ControlAction, time = 0): void {
+  _apply(action: ControlAction, time = 0): void {
     if (this._status !== 'running') return;
     const engine = this._tracks.values().next().value?._group._engine;
     if (engine?._busy()) { engine._after(() => this._apply(action, time)); return; }
@@ -183,11 +163,7 @@ class Run implements MotionPlayback {
     for (const track of this._tracks) {
       const list = groups.get(track._group) ?? []; list.push(track); groups.set(track._group, list);
     }
-    const failures: unknown[] = [];
-    for (const [group, selected] of groups) {
-      try { group._control(selected, action, time, this); } catch (error) { failures.push(error); }
-    }
-    if (failures.length) throw failures.length === 1 ? failures[0] : new AggregateError(failures, 'Не удалось управлять движением');
+    rethrow(attemptAll(groups, ([group, selected]) => group._control(selected, action, time, this)), 'Не удалось управлять движением');
   }
   pause(): void { this._apply('pause'); }
   play(): void { this._apply('play'); }
@@ -424,7 +400,7 @@ class Surface {
         if (!owns(track)) continue;
         if (action === 'pause') track._paused = true;
         else if (action === 'play') track._paused = false;
-        else if (action === 'seek') track._elapsed = time;
+        else if (action === 'seek') track._elapsed = Math.min(time, track._program.duration);
         else if (action === 'finish') track._elapsed = track._program.duration;
         else if (action === 'rate') track._rate = time;
         else if (action === 'reverse') track._rate = -track._rate;
@@ -434,7 +410,7 @@ class Surface {
       for (const track of selected) {
         if (!owns(track)) continue;
         if (action === 'stop') this._end(track, false);
-        else if (action === 'finish' || action === 'seek' && track._elapsed >= track._program.duration || changingRate && !track._paused && this._ended(track)) this._end(track, true);
+        else if (action === 'finish' || action === 'seek' && this._ended(track) || changingRate && !track._paused && this._ended(track)) this._end(track, true);
       }
       this._reconcile();
       this._engine._flush();
@@ -488,11 +464,9 @@ export class Runtime {
     this._draining = true;
     const failures: unknown[] = [];
     try {
-      for (const action of this._pending) {
-        try { action(); } catch (error) { failures.push(error); }
-      }
+      attemptAll(this._pending, action => action(), failures);
     } finally { this._pending.length = 0; this._draining = false; }
-    if (failures.length) throw failures.length === 1 ? failures[0] : new AggregateError(failures, 'Ошибка отложенного управления');
+    rethrow(failures, 'Ошибка отложенного управления');
   }
   _wake(surface: Surface): void {
     this._active.add(surface);
@@ -528,10 +502,7 @@ export class Runtime {
     if (this._active.size !== 0) return;
     const update = this._offUpdate, render = this._offRender;
     this._offUpdate = this._offRender = undefined; this._prepared = [];
-    const errors: unknown[] = [];
-    try { update?.(); } catch (error) { errors.push(error); }
-    try { render?.(); } catch (error) { errors.push(error); }
-    if (errors.length) throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'Frame cleanup failed');
+    rethrow(attemptAll([update, render], release => release?.()), 'Frame cleanup failed');
   }
   private _surface(element: Element, key: string): Surface {
     let groups = this._surfaces.get(element);
@@ -585,7 +556,7 @@ export class Runtime {
     }
     return result;
   }
-  private _execute(drafts: readonly Draft[], total?: number): MotionPlayback {
+  private _execute(drafts: readonly Draft[], total?: number): Playback {
     const run = new Run(total ?? drafts.reduce((max, d) => Math.max(max, d.reduced ? 0 : d._program.duration), 0));
     const touched = new Set<Surface>();
     try {
@@ -611,12 +582,12 @@ export class Runtime {
     } catch (error) { run._error(error); throw error; }
     this._drain(); return run;
   }
-  animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): MotionPlayback {
+  animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): Playback {
     const input = properties(props);
     const clock = timing(options);
     return this._execute(this._draft(target, input, clock));
   }
-  sequence(steps: readonly SequenceStep[], options?: SequenceOptions): MotionPlayback {
+  sequence(steps: readonly SequenceStep[], options?: SequenceOptions): Playback {
     const list = snapshot(steps, 'sequence');
     const sequenceClock = timing(options as MotionOptions | undefined);
     const merged = new Map<Element, Map<string, Draft>>();
@@ -654,5 +625,5 @@ export class Runtime {
 }
 
 export const runtime: Runtime = new Runtime();
-export const animate: (target: MotionTarget, props: MotionProperties, options?: MotionOptions) => MotionPlayback = runtime.animate.bind(runtime);
-export const sequence: (steps: readonly SequenceStep[], options?: SequenceOptions) => MotionPlayback = runtime.sequence.bind(runtime);
+export const animate: (target: MotionTarget, props: MotionProperties, options?: MotionOptions) => Playback = runtime.animate.bind(runtime);
+export const sequence: (steps: readonly SequenceStep[], options?: SequenceOptions) => Playback = runtime.sequence.bind(runtime);

@@ -1,12 +1,12 @@
 import { MotionError, number } from './model.js';
 import { runtime } from './runtime.js';
-import type { Disposable, MotionOptions, MotionPlayback } from './types.js';
+import type { Disposable, MotionOptions, Playback } from './types.js';
 
 export interface MotionValue extends Disposable {
   get(): number;
   /** Немедленно установить значение; прежнее движение завершается как stopped. */
   set(value: number): void;
-  animate(value: number | readonly number[], options?: MotionOptions): MotionPlayback;
+  animate(value: number | readonly number[], options?: MotionOptions): Playback;
   /** Уведомления идут после принятия значения. Первое значение читается через get(). */
   subscribe(listener: (value: number) => void): () => void;
 }
@@ -16,7 +16,7 @@ export function value(initial: number = 0): MotionValue {
   const listeners = new Map<(value: number) => void, object>();
   let live = true;
   let generation: object | undefined;
-  let animation: MotionPlayback | undefined;
+  let animation: Playback | undefined;
   const target = { style: {
     getPropertyValue() { return String(current); },
     setProperty(_property: string, text: string) {
@@ -35,7 +35,7 @@ export function value(initial: number = 0): MotionValue {
       });
     },
   } } as unknown as Element;
-  function start(next: number | readonly number[], options?: MotionOptions): MotionPlayback {
+  function start(next: number | readonly number[], options?: MotionOptions): Playback {
     const token = {}; generation = token;
     const started = runtime.animate(target, { '--lab-motion-value': next }, options);
     if (!live || generation !== token) { started.stop(); return started; }
@@ -49,7 +49,7 @@ export function value(initial: number = 0): MotionValue {
     set(next): void {
       if (live) start(number(next, 'value'), { duration: 0 });
     },
-    animate(next, options): MotionPlayback {
+    animate(next, options): Playback {
       if (!live) throw new MotionError('Значение уже освобождено');
       return start(next, options);
     },
