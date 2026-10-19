@@ -63,7 +63,6 @@ function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<Co
           track._rate = rate ?? -track._rate; track._configureNative = configureNative;
           group._sample(track);
         }
-        group._watch();
       }
     } finally { group._lock(false); }
   }

@@ -162,11 +162,11 @@ export class Run implements Playback {
     if (this._status !== 'running') return;
     const engine = this._tracks.values().next().value?._group._engine;
     if (engine?._busy()) { engine._after(() => this._apply(action, time)); return; }
-    const groups = new Map<Surface, Track[]>();
-    for (const track of this._tracks) {
-      const list = groups.get(track._group) ?? []; list.push(track); groups.set(track._group, list);
-    }
-    rethrow(attemptAll(groups, ([group, selected]) => group._control(selected, action, time, this)), 'Не удалось управлять движением');
+    const groups = new Set<Surface>();
+    for (const track of this._tracks) groups.add(track._group);
+    rethrow(attemptAll(groups, group => group._control(
+      [...group._tracks.values()].filter(track => track._owner === this), action, time, this,
+    )), 'Не удалось управлять движением');
   }
   pause(): void { this._apply('pause'); }
   play(): void { this._apply('play'); }
@@ -187,8 +187,6 @@ class Surface {
   _nativeTime = 0;
   private _written: string | undefined;
   private _token: object | undefined;
-  private _observedReady: Promise<Animation> | undefined;
-  private _observedFinished: Promise<Animation> | undefined;
   constructor(readonly _engine: Runtime, readonly element: Element, readonly key: string) {
     this._transforms = key === 'transform' ? initialTransforms(_engine._host.styles(element)) : {};
     this._stamp = number(_engine._host.now(), 'clock');
@@ -266,7 +264,7 @@ class Surface {
   }
   _detach(): void {
     const previous = this._native;
-    this._native = undefined; this._token = undefined; this._observedReady = this._observedFinished = undefined;
+    this._native = undefined; this._token = undefined;
     if (previous) {
       try { this._render(); }
       catch (error) {
@@ -295,7 +293,7 @@ class Surface {
     owner?._settle(track, natural, failure);
   }
   _fail(error: unknown): void {
-    const native = this._native; this._native = undefined; this._token = undefined; this._observedReady = this._observedFinished = undefined;
+    const native = this._native; this._native = undefined; this._token = undefined;
     try { native?.cancel(); } catch { /* исходное исключение сохраняется */ }
     for (const track of [...this._tracks.values()]) this._end(track, false, { error });
     this._engine._idle(this);
@@ -328,20 +326,26 @@ class Surface {
   }
   _watch(): void {
     const effect = this._native!, token = this._token ??= {};
-    const ready = effect.pending ? effect.ready : undefined;
-    const promise = ready ?? effect.finished;
-    if (!promise || typeof promise.then !== 'function') throw new MotionError('Native effect не предоставляет finished');
-    if (ready ? this._observedReady === promise : this._observedFinished === promise) return;
-    if (ready) this._observedReady = promise; else this._observedFinished = promise;
-    const current = (): boolean => this._token === token &&
-      (ready ? this._observedReady : this._observedFinished) === promise;
-    void promise.then(() => {
-      if (!current()) return;
+    const finished = effect.finished;
+    if (!finished || typeof finished.then !== 'function') throw new MotionError('Native effect не предоставляет finished');
+    const fail = (error: unknown): void => {
+      if (this._token !== token) return;
+      if ((error as { name?: string })?.name !== 'AbortError') { this._fail(error); return; }
+      this._native = undefined; this._token = undefined;
+      for (const track of [...this._tracks.values()]) this._end(track, false);
+      this._engine._idle(this);
+    };
+    const observe = (): void => {
+      if (this._token !== token) return;
+      try { this._watch(); } catch (error) { this._fail(error); }
+    };
+    void finished.then(() => {
+      if (this._token !== token) return;
       try {
-        if (ready) { this._observedReady = undefined; this._watch(); return; }
-        if (effect.pending || effect.finished !== promise) {
-          this._observedFinished = undefined; this._watch(); return;
-        }
+        // Скорость не добавляет подписчиков. Только завершившийся старый promise
+        // передаёт наблюдение следующему направлению после подтверждения платформы.
+        if (effect.pending && effect.ready) { void effect.ready.then(observe, fail); return; }
+        if (effect.finished !== finished) { observe(); return; }
         for (const track of this._tracks.values()) {
           track._elapsed = track._rate < 0 ? 0 : track._program.duration;
           this._sample(track);
@@ -350,14 +354,7 @@ class Surface {
         for (const track of [...this._tracks.values()]) this._end(track, true);
         this._engine._idle(this);
       } catch (error) { this._fail(error); }
-    }, error => {
-      if (!current()) return;
-      if ((error as { name?: string })?.name !== 'AbortError') { this._fail(error); return; }
-      this._native = undefined; this._token = undefined;
-      this._observedReady = this._observedFinished = undefined;
-      for (const track of [...this._tracks.values()]) this._end(track, false);
-      this._engine._idle(this);
-    });
+    }, fail);
   }
   _control(selected: readonly Track[], action: ControlAction, time: number, owner?: Run): void {
     const owns = (track: Track): boolean => !track._done && this._tracks.get(track._program.key) === track &&
