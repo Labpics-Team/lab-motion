@@ -133,31 +133,30 @@ export function properties(input: MotionProperties): PropertyInput[] {
   const source = record(input, 'properties');
   const keys = Object.keys(source);
   if (keys.length > MAX_CHANNELS) throw new MotionError('Слишком много свойств');
-  const result: PropertyInput[] = [];
+  const result: PropertyInput[] = [], declared = new Set<string>();
+  let count = 0;
   for (const key of keys) {
-    if (!key || key === '__proto__' || key === 'constructor' || key === 'prototype' || key === 'transform') throw new MotionError(`Недопустимое свойство ${key}`);
-    const value = source[key];
-    const authored = Array.isArray(value);
+    if (!key || key === '__proto__' || key === 'constructor' || key === 'prototype' || key === 'transform')
+      throw new MotionError(`Недопустимое свойство `);
+    const value = source[key], authored = Array.isArray(value);
     const values = authored ? snapshot(value, key, 2) : [value];
     for (const entry of values) {
       if (typeof entry !== 'number' && typeof entry !== 'string' || typeof entry === 'number' && !Number.isFinite(entry))
-        throw new MotionError(`${key}: нужны конечные числа или CSS-строки`);
+        throw new MotionError(`: нужны конечные числа или CSS-строки`);
     }
-    if (key === 'scale') {
-      if (Object.hasOwn(source, 'scaleX') || Object.hasOwn(source, 'scaleY')) throw new MotionError('scale уже задаёт scaleX и scaleY');
-      result.push({ key: 'scaleX', values: values as MotionScalar[], authored }, { key: 'scaleY', values: values as MotionScalar[], authored });
-    } else {
-      const name = key.startsWith('--') ? key : key.replace(/[A-Z]/g, c => '-' + c.toLowerCase());
-      const normalized = name === 'scale-x' ? 'scaleX' : name === 'scale-y' ? 'scaleY'
-        : name === 'skew-x' ? 'skewX' : name === 'skew-y' ? 'skewY' : name;
-      result.push({ key: normalized, values: values as MotionScalar[], authored });
+    const name = key.startsWith('--') ? key : key.replace(/[A-Z]/g, c => '-' + c.toLowerCase());
+    const normalized = name === 'scale-x' ? 'scaleX' : name === 'scale-y' ? 'scaleY'
+      : name === 'skew-x' ? 'skewX' : name === 'skew-y' ? 'skewY' : name;
+    const channels = key === 'scale' ? ['scaleX', 'scaleY'] : [normalized];
+    count += values.length * channels.length;
+    if (count > MAX_CHANNELS) throw new MotionError('Слишком много значений');
+    if (key === 'scale' && (Object.hasOwn(source, 'scaleX') || Object.hasOwn(source, 'scaleY')))
+      throw new MotionError('scale уже задаёт scaleX и scaleY');
+    for (const channel of channels) {
+      if (declared.has(channel)) throw new MotionError(`Свойство  задано несколько раз`);
+      declared.add(channel);
+      result.push({ key: channel, values: values as MotionScalar[], authored });
     }
-  }
-  if (result.reduce((sum, entry) => sum + entry.values.length, 0) > MAX_CHANNELS) throw new MotionError('Слишком много значений');
-  const declared = new Set<string>();
-  for (const entry of result) {
-    if (declared.has(entry.key)) throw new MotionError(`Свойство ${entry.key} задано несколько раз`);
-    declared.add(entry.key);
   }
   return result;
 }
