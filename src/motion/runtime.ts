@@ -95,6 +95,8 @@ interface Track {
   _paused: boolean;
 }
 
+function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
+
 export class Run implements Playback {
   readonly _tracks: Set<Track> = new Set();
   private _status: PlaybackState = 'running';
@@ -301,7 +303,7 @@ class Surface {
   _reconcile(): void {
     if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
     const active = [...this._tracks.values()];
-    if (active.every(track => track._paused || track._rate === 0)) { this._engine._idle(this); return; }
+    if (!active.some(moving)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
     const canNative = first._rate > 0 && (this.key === 'transform' || this.key === 'opacity') && _nativeEase !== undefined && typeof this.element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
@@ -392,9 +394,10 @@ class Surface {
     try {
       this._render();
       for (const track of [...this._tracks.values()]) {
-        if (!track._paused && track._rate !== 0 && this._ended(track)) this._end(track, true);
+        if (moving(track) && this._ended(track)) this._end(track, true);
       }
-      if ([...this._tracks.values()].every(t => t._paused || t._rate === 0)) this._engine._idle(this);
+      for (const track of this._tracks.values()) if (moving(track)) return;
+      this._engine._idle(this);
     } catch (error) { this._fail(error); }
   }
 }

@@ -103,9 +103,10 @@ export function timing(input: MotionOptions | undefined, authored = false): Timi
     }
   }
   const stops = times === undefined ? undefined : snapshot(times as readonly number[], 'times', 2);
-  if (stops) {
-    stops.forEach((v, i) => { number(v, `times[${i}]`, 0); if (v > 1 || i > 0 && v <= stops[i - 1]!) throw new MotionError('times: нужен строгий рост в [0,1]'); });
-    if (stops[0] !== 0 || stops.at(-1) !== 1) throw new MotionError('times: края должны быть 0 и 1');
+  if (stops) for (let i = 0; i < stops.length; i++) {
+    const stop = number(stops[i], `times[${i}]`, 0);
+    if (stop > 1 || (i === 0 ? stop !== 0 : stop <= stops[i - 1]!) || i === stops.length - 1 && stop !== 1)
+      throw new MotionError('times: нужен строгий рост от 0 до 1');
   }
   return {
     _defaultMotion: spring === undefined && duration === undefined && ease === undefined,

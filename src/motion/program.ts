@@ -24,10 +24,11 @@ export function point(key: string, input: MotionScalar, reference?: Point): Poin
   if (ast.kind === 'color') return { _coordinates: [ast.r * ast.r, ast.g * ast.g, ast.b * ast.b, ast.a], unit: 'color' };
   throw new MotionError(`${key}: неразрешённая CSS-переменная`);
 }
+function colorChannel(value: number): number { return Math.sqrt(Math.max(0, Math.min(65025, value))); }
+
 export function format(key: string, value: readonly number[], unit: string): string {
   if (unit === 'color') {
-    const channel = (i: number): number => Math.sqrt(Math.max(0, Math.min(65025, value[i]!)));
-    return `rgba(${channel(0)},${channel(1)},${channel(2)},${Math.max(0, Math.min(1, value[3]!))})`;
+    return `rgba(${colorChannel(value[0]!)},${colorChannel(value[1]!)},${colorChannel(value[2]!)},${Math.max(0, Math.min(1, value[3]!))})`;
   }
   const n = key === 'opacity' ? Math.max(0, Math.min(1, value[0]!)) : value[0]!;
   return `${n === 0 ? 0 : n}${unit}`;
