@@ -1,5 +1,5 @@
 import { playhead } from '../src/motion/playhead.js';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { harness } from './fixtures/motion-runtime.js';
 import type { Playback } from '../src/motion/types.js';
 
@@ -222,4 +222,15 @@ it('pending native rate не фиксирует старый finished и не м
   acknowledge(); await Promise.resolve();
   run.timeScale = -1; effect.currentTime = 0; complete();
   expect(await run.finished).toEqual({ status: 'finished' }); expect(h.x()).toBe(0);
+});
+
+it('10000 смен скорости не накапливают слушателей одного native finished', () => {
+  const h = harness(true);
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
+  const effect = h.effects[0]!; effect.currentTime = 500;
+  const observed = vi.spyOn(effect.finished, 'then');
+  for (let i = 0; i < 10000; i++) run.timeScale = i % 2 ? 2 : .5;
+  expect(observed).not.toHaveBeenCalled();
+  expect(h.effects).toHaveLength(1); expect(h.updates.size + h.renders.size).toBe(0);
+  run.stop(); expect(effect.cancelled).toBe(true);
 });

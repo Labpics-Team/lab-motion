@@ -110,7 +110,7 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
-export function sample(program: Program, time: number, value: number[], velocity: number[]): void {
+export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1): void {
   const _segments = program._segments;
   if (time >= program.duration) {
     for (let i = 0; i < program.final.length; i++) { value[i] = program.final[i]!; velocity[i] = 0; }
@@ -144,6 +144,7 @@ export function sample(program: Program, time: number, value: number[], velocity
       value[i] = a + distance * basis._value + (segment.velocity[i] ?? 0) * basis._valueV0;
       velocity[i] = distance * basis._velocity + (segment.velocity[i] ?? 0) * basis._velocityV0;
     } else { value[i] = a + distance * p; velocity[i] = distance * dp; }
+    if (rate !== 1) velocity[i] = rate === 0 ? 0 : velocity[i]! * rate;
     if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) throw new MotionError('Движение вышло за представимый диапазон');
   }
 }
