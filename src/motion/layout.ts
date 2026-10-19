@@ -36,112 +36,107 @@ function clearStyles(session: Session): void {
     const style = session._style; session._style = undefined; style?.remove();
   }
 }
-const owners = new WeakMap<Document, LayoutRun>();
+const owners = new WeakMap<Document, Playback>();
 let serial = 0;
 
-class LayoutRun implements Playback {
-  private _session: Session | undefined;
-  private _mutate: (() => void | Promise<void>) | undefined;
-  private _status: PlaybackState = 'running';
-  private _resolve!: (result: MotionResult) => void;
-  private _reject!: (error: unknown) => void;
-  private _terminal: MotionResult | undefined;
-  private _settled = false;
-  private _requestedTime: number | undefined;
-  readonly duration: number;
-  readonly finished: Promise<MotionResult>;
-  constructor(root: Element, mutate: () => void | Promise<void>, options?: LayoutOptions) {
-    const config = timing(options as MotionOptions | undefined);
-    if (typeof config.ease === 'function' && !config.cssEase) throw new MotionError('layout использует CSS easing');
-    const path = program('--lab-motion-progress', { _coordinates: [0], unit: '' }, [1], false, config, [0]);
-    const win = root.ownerDocument.defaultView;
-    const reduced = config.reduced || win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-    this.duration = reduced ? 0 : path._duration;
-    this.finished = new Promise((yes, no) => { this._resolve = yes; this._reject = no; });
-    void this.finished.catch(() => {});
-    this._mutate = mutate;
-    this._session = { _root: root, _document: root.ownerDocument, _effects: [], _name: `lab-motion-${++serial}`,
-      _previousName: '', _previousPriority: '',
-      _delay: config.delay, _easing: path._nativeEase };
+function createLayout(root: Element, mutate: () => void | Promise<void>, options?: LayoutOptions): Playback {
+  const config = timing(options as MotionOptions | undefined);
+  if (!config.cssEase) throw new MotionError('layout использует CSS easing');
+  const path = program('--lab-motion-progress', { _coordinates: [0], unit: '' }, [1], false, config, [0]);
+  const reduced = config.reduced || root.ownerDocument.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+  const duration = reduced ? 0 : path.duration;
+  let session: Session | undefined = { _root: root, _document: root.ownerDocument, _effects: [], _name: `lab-motion-${++serial}`,
+    _previousName: '', _previousPriority: '', _delay: config.delay, _easing: path._nativeEase };
+  let action: (() => void | Promise<void>) | undefined = mutate;
+  let status: PlaybackState = 'running', settled = false;
+  let terminal: MotionResult | undefined, requested: number | undefined;
+  let resolve!: (result: MotionResult) => void, reject!: (error: unknown) => void;
+  const finished = new Promise<MotionResult>((yes, no) => { resolve = yes; reject = no; });
+  void finished.catch(() => {});
+  const inactive = (): boolean => settled || terminal !== undefined;
+
+  function release(cancel: boolean): void {
+    const current = session; session = undefined;
+    if (!current) return;
+    if (owners.get(current._document) === run) owners.delete(current._document);
+    try { if (cancel) current._transition?.skipTransition(); }
+    finally { clearStyles(current); }
   }
-  get state(): PlaybackState { return this._status; }
-  private _inactive(): boolean { return this._settled || this._terminal !== undefined; }
-  private _release(cancel: boolean): void {
-    const session = this._session; this._session = undefined;
-    if (!session) return;
-    if (owners.get(session._document) === this) owners.delete(session._document);
-    try { if (cancel) session._transition?.skipTransition(); }
-    finally { clearStyles(session); }
+  function complete(failure?: { error: unknown }): void {
+    if (settled) return;
+    settled = true; action = undefined;
+    try { release(Boolean(failure)); } catch (error) { failure ??= { error }; }
+    if (failure) { status = 'failed'; reject(failure.error); }
+    else { const result = terminal ?? FINISHED; status = result.status; resolve(result); }
   }
-  private _complete(failure?: { error: unknown }): void {
-    if (this._settled) return;
-    this._settled = true; this._mutate = undefined;
-    try { this._release(Boolean(failure)); } catch (error) { failure ??= { error }; }
-    if (failure) { this._status = 'failed'; this._reject(failure.error); }
-    else { const result = this._terminal ?? FINISHED; this._status = result.status; this._resolve(result); }
+  function stopWith(result: MotionResult): void {
+    if (inactive()) return;
+    terminal = result; status = result.status;
+    try { release(true); } catch (error) { complete({ error }); }
   }
-  private _stopWith(result: MotionResult): void {
-    if (this._inactive()) return;
-    this._terminal = result; this._status = result.status;
-    try { this._release(true); } catch (error) { this._complete({ error }); }
-  }
-  private _apply(): void {
-    for (const effect of this._session?._effects ?? []) {
-      if (this._status === 'paused') effect.pause(); else effect.play();
-      if (this._requestedTime !== undefined) effect.currentTime = this._requestedTime;
+  function apply(): void {
+    for (const effect of session?._effects ?? []) {
+      if (status === 'paused') effect.pause(); else effect.play();
+      if (requested !== undefined) effect.currentTime = requested;
     }
-    this._requestedTime = undefined;
+    requested = undefined;
   }
-  pause(): void { if (!this._inactive()) { this._status = 'paused'; if (this._session?._effects.length) this._apply(); } }
-  play(): void { if (!this._inactive()) { this._status = 'running'; if (this._session?._effects.length) this._apply(); } }
-  seek(milliseconds: number): void {
-    if (this._inactive()) return;
-    this._requestedTime = number(milliseconds, 'seek', 0);
-    if (this._requestedTime >= this.duration) this._stopWith(FINISHED);
-    else if (this._session?._effects.length) this._apply();
+  function playing(next: PlaybackState): void {
+    if (inactive()) return;
+    status = next;
+    if (session?._effects.length) apply();
   }
-  stop(): void { this._stopWith(STOPPED); }
-  finish(): void { this._stopWith(FINISHED); }
-  private async _commit(): Promise<void> {
-    const action = this._mutate; this._mutate = undefined;
-    await action?.();
+  const run: Playback = {
+    duration, finished, get state(): PlaybackState { return status; },
+    pause(): void { playing('paused'); }, play(): void { playing('running'); },
+    seek(milliseconds): void {
+      if (inactive()) return;
+      requested = number(milliseconds, 'seek', 0);
+      if (requested >= duration) stopWith(FINISHED);
+      else if (session?._effects.length) apply();
+    },
+    stop(): void { stopWith(STOPPED); }, finish(): void { stopWith(FINISHED); },
+  };
+  async function commit(): Promise<void> {
+    const update = action; action = undefined;
+    await update?.();
   }
-  private _ready(): void {
-    const session = this._session;
-    if (!session || this._inactive()) return;
+  function ready(): void {
+    const current = session;
+    if (!current || inactive()) return;
     try {
-      session._effects = session._document.getAnimations().filter(effect => {
+      current._effects = current._document.getAnimations().filter(effect => {
         const pseudo = (effect.effect as (KeyframeEffect & { pseudoElement?: string }) | null)?.pseudoElement;
-        return typeof pseudo === 'string' && pseudo.includes(session._name);
+        return typeof pseudo === 'string' && pseudo.includes(current._name);
       });
-      if (this._status === 'paused' || this._requestedTime !== undefined) this._apply();
-    } catch (error) { this._complete({ error }); }
+      if (status === 'paused' || requested !== undefined) apply();
+    } catch (error) { complete({ error }); }
   }
-  start(): void {
-    const session = this._session!;
-    owners.get(session._document)?.stop(); owners.set(session._document, this);
-    const inline = (session._root as HTMLElement).style;
-    session._previousName = inline.getPropertyValue('view-transition-name');
-    session._previousPriority = inline.getPropertyPriority('view-transition-name');
-    const native = session._document.startViewTransition;
-    const css = session._document.defaultView?.CSS;
-    const supported = typeof native === 'function' && session._easing !== undefined && css?.supports('animation-timing-function', session._easing);
-    if (!this.duration || !supported) {
-      void this._commit().then(() => this._complete(), error => this._complete({ error }));
-      return;
-    }
+  // Только session удерживает DOM после запуска; release обрывает эту ссылку.
+  function start(): void {
+    const current = session!;
+    owners.get(current._document)?.stop(); owners.set(current._document, run);
+    const inline = (current._root as HTMLElement).style;
+    current._previousName = inline.getPropertyValue('view-transition-name');
+    current._previousPriority = inline.getPropertyPriority('view-transition-name');
+    const native = current._document.startViewTransition;
+    const css = current._document.defaultView?.CSS;
+    const supported = typeof native === 'function' && current._easing !== undefined && css?.supports('animation-timing-function', current._easing);
+    const failed = (error: unknown): void => complete({ error });
+    if (!duration || !supported) { void commit().then(() => complete(), failed); return; }
     try {
-      (session._root as HTMLElement).style.setProperty('view-transition-name', session._name);
-      const style = session._document.createElement('style'); session._style = style;
-      style.textContent = `::view-transition-group(${session._name}){animation-duration:${this.duration - session._delay}ms;animation-delay:${session._delay}ms;animation-timing-function:${session._easing}}::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}`;
-      (session._document.head ?? session._document.documentElement).append(style);
-      const transition = native.call(session._document, () => this._commit());
-      session._transition = transition;
-      void transition.ready.then(() => this._ready(), () => {});
-      void transition.updateCallbackDone.catch(error => this._complete({ error }));
-      void transition.finished.then(() => this._complete(), error => this._complete({ error }));
-    } catch (error) { this._complete({ error }); throw error; }
+      inline.setProperty('view-transition-name', current._name);
+      const style = current._document.createElement('style'); current._style = style;
+      style.textContent = `::view-transition-group(${current._name}){animation-duration:${duration - current._delay}ms;animation-delay:${current._delay}ms;animation-timing-function:${current._easing}}::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}`;
+      (current._document.head ?? current._document.documentElement).append(style);
+      const transition = native.call(current._document, commit); current._transition = transition;
+      void transition.ready.then(ready, () => {});
+      void transition.updateCallbackDone.catch(failed);
+      void transition.finished.then(() => complete(), failed);
+    } catch (error) { complete({ error }); throw error; }
   }
+  start();
+  return run;
 }
 
 /** Обновляет приложение один раз; временные снимки принадлежат браузеру. */
@@ -149,5 +144,5 @@ export function layout(root: Element, mutate: () => void | Promise<void>, option
   if (!root?.ownerDocument || typeof root.getBoundingClientRect !== 'function' || !(root as HTMLElement).style)
     throw new MotionError('layout ожидает DOM-элемент');
   if (typeof mutate !== 'function') throw new MotionError('layout ожидает функцию изменения DOM');
-  const run = new LayoutRun(root, mutate, options); run.start(); return run;
+  return createLayout(root, mutate, options);
 }

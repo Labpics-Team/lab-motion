@@ -38,20 +38,20 @@ export function transform(values: Readonly<Record<string, number>>): string {
 }
 
 export interface Segment {
-  readonly _at: number;
-  readonly _end: number;
-  readonly _from: readonly number[];
-  readonly _to: readonly number[];
-  readonly _velocity: readonly number[];
-  readonly _timing: Timing;
-  readonly _artifact: SpringExecutionArtifactTuple | undefined;
+  readonly at: number;
+  readonly end: number;
+  readonly from: readonly number[];
+  readonly to: readonly number[];
+  readonly velocity: readonly number[];
+  readonly timing: Timing;
+  readonly artifact: SpringExecutionArtifactTuple | undefined;
 }
 export interface Program {
-  readonly _key: string;
-  readonly _unit: string;
+  readonly key: string;
+  readonly unit: string;
   readonly _segments: readonly Segment[];
-  readonly _duration: number;
-  readonly _final: readonly number[];
+  readonly duration: number;
+  readonly final: readonly number[];
   /** Только точная форма, доступная нативному исполнителю. */
   readonly _nativeEase: string | undefined;
   readonly _identity: readonly unknown[] | undefined;
@@ -79,7 +79,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     length = artifact?.[2] ?? settleTimeUpperBound(timing.spring, energy) * 1000;
   }
   if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) throw new MotionError('Непредставимая длительность движения');
-  return { _at: at, _end: at + length, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
+  return { at, end: at + length, from: from._coordinates, to: to._coordinates, velocity, timing, artifact };
 }
 
 export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0): Program {
@@ -101,10 +101,10 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   }
   const last = _segments.at(-1)!;
   const first = _segments[0]!;
-  const _identity = authored ? undefined : [resolved[0]!.unit, ...last._to, timing.spring?.mass, timing.spring?.stiffness, timing.spring?.damping,
+  const _identity = authored ? undefined : [resolved[0]!.unit, ...last.to, timing.spring?.mass, timing.spring?.stiffness, timing.spring?.damping,
     timing.duration, timing.cssEase ?? timing.ease, timing.delay + offset];
-  return { _key: key, _unit: resolved[0]!.unit, _segments, _duration: last._end, _final: last._to,
-    _nativeEase: resolved[0]!.unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : _segments.length === 1 ? first._artifact?.[0] ?? (timing.spring ? undefined : timing.cssEase) : undefined,
+  return { key, unit: resolved[0]!.unit, _segments, duration: last.end, final: last.to,
+    _nativeEase: resolved[0]!.unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : _segments.length === 1 ? first.artifact?.[0] ?? (timing.spring ? undefined : timing.cssEase) : undefined,
     _identity };
 }
 
@@ -112,37 +112,37 @@ const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _veloc
 const springSample = { value: 0, velocity: 0 };
 export function sample(program: Program, time: number, value: number[], velocity: number[]): void {
   const _segments = program._segments;
-  if (time >= program._duration) {
-    for (let i = 0; i < program._final.length; i++) { value[i] = program._final[i]!; velocity[i] = 0; }
+  if (time >= program.duration) {
+    for (let i = 0; i < program.final.length; i++) { value[i] = program.final[i]!; velocity[i] = 0; }
     return;
   }
   let at = 0;
-  while (at + 1 < _segments.length && time >= _segments[at + 1]!._at) at++;
+  while (at + 1 < _segments.length && time >= _segments[at + 1]!.at) at++;
   const segment = _segments[at]!;
-  const _elapsed = Math.max(0, time - segment._at), duration = segment._end - segment._at;
-  if (time >= segment._end) {
-    for (let i = 0; i < segment._to.length; i++) { value[i] = segment._to[i]!; velocity[i] = 0; }
+  const _elapsed = Math.max(0, time - segment.at), duration = segment.end - segment.at;
+  if (time >= segment.end) {
+    for (let i = 0; i < segment.to.length; i++) { value[i] = segment.to[i]!; velocity[i] = 0; }
     return;
   }
   let p = duration === 0 ? 1 : Math.min(1, _elapsed / duration), dp = 0;
-  if (segment._artifact) {
-    sampleSerializedSpringIntoUnchecked(segment._artifact[1], duration, _elapsed, 0, springSample);
+  if (segment.artifact) {
+    sampleSerializedSpringIntoUnchecked(segment.artifact[1], duration, _elapsed, 0, springSample);
     p = springSample.value; dp = springSample.velocity;
-  } else if (segment._timing.spring) {
-    sampleSpringBasisUnchecked(segment._timing.spring, _elapsed / 1000, basis);
+  } else if (segment.timing.spring) {
+    sampleSpringBasisUnchecked(segment.timing.spring, _elapsed / 1000, basis);
   } else if (_elapsed > 0 && p < 1) {
     const low = Math.max(0, p - 0.001), high = Math.min(1, p + 0.001);
-    const ease = segment._timing.ease;
+    const ease = segment.timing.ease;
     dp = (ease(high) - ease(low)) * 1000 / ((high - low) * duration);
     p = ease(p);
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) throw new MotionError('Easing вернул нечисловой результат');
-  for (let i = 0; i < segment._from.length; i++) {
-    const a = segment._from[i]!, distance = segment._to[i]! - a;
-    if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
-    else if (segment._timing.spring && !segment._artifact) {
-      value[i] = a + distance * basis._value + (segment._velocity[i] ?? 0) * basis._valueV0;
-      velocity[i] = distance * basis._velocity + (segment._velocity[i] ?? 0) * basis._velocityV0;
+  for (let i = 0; i < segment.from.length; i++) {
+    const a = segment.from[i]!, distance = segment.to[i]! - a;
+    if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment.at ? 0 : segment.velocity[i] ?? 0; }
+    else if (segment.timing.spring && !segment.artifact) {
+      value[i] = a + distance * basis._value + (segment.velocity[i] ?? 0) * basis._valueV0;
+      velocity[i] = distance * basis._velocity + (segment.velocity[i] ?? 0) * basis._velocityV0;
     } else { value[i] = a + distance * p; velocity[i] = distance * dp; }
     if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) throw new MotionError('Движение вышло за представимый диапазон');
   }
