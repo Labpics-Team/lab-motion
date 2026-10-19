@@ -9,8 +9,15 @@ const views = /* @__PURE__ */ new WeakMap<Playback, MotionPlayback>();
 export function playhead(playback: Playback): MotionPlayback {
   const existing = views.get(playback);
   if (existing) return existing;
-  if (playback === stoppedPlayhead) return stoppedPlayhead;
-  if (playback === stoppedMotion) return stoppedPlayhead;
+  if (playback === stoppedMotion) {
+    const view: MotionPlayback = {
+      ...stoppedMotion, time: 0,
+      get timeScale(): number | undefined { return undefined; }, set timeScale(_value: number) {},
+      reverse() {},
+    };
+    views.set(playback, view); views.set(view, view);
+    return view;
+  }
   if (!(playback instanceof Run)) throw new MotionError('playhead ожидает animate, sequence или value.animate этого runtime');
   const run = playback;
   const history: { time: number | undefined; rate: number | undefined } = {
@@ -88,9 +95,3 @@ function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<Co
   group._render();
   for (const track of tracks) if (!track._paused && group._ended(track)) group._end(track, true);
 }
-
-const stoppedPlayhead: MotionPlayback = /* @__PURE__ */ Object.freeze({
-  ...stoppedMotion, time: 0,
-  get timeScale(): number | undefined { return undefined; }, set timeScale(_value: number) {},
-  reverse() {},
-});

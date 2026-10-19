@@ -17,12 +17,12 @@ for (const native of [false, true]) for (const paused of [false, true]) {
       return styles(element);
     };
     const registry = (h.runtime as unknown as {
-      _surfaces: WeakMap<Element, Map<string, { _tracks: Map<string, unknown> }>>;
+      _surfaces: WeakMap<Element, Record<string, { _tracks: Map<string, unknown> }>>;
     })._surfaces;
     try {
       expect(() => h.runtime.animate([h.element, other], { x: 100 }, options)).toThrow(failure);
       expect(await previous.finished).toEqual({ status: 'stopped' });
-      expect([...registry.get(h.element)!.get('transform')!._tracks.keys()]).toEqual(['y']);
+      expect([...registry.get(h.element)!.transform!._tracks.keys()]).toEqual(['y']);
       expect(sibling.state).toBe('running');
       sibling.seek(500); expect(h.y()).toBe(100); expect(h.x()).toBe(0);
       sibling.finish(); expect(await sibling.finished).toEqual({ status: 'finished' });
@@ -32,7 +32,7 @@ for (const native of [false, true]) for (const paused of [false, true]) {
       const recovered = h.runtime.animate(h.element, { x: 50 }, options);
       recovered.seek(500); expect(h.x()).toBe(25); recovered.finish();
       expect(await recovered.finished).toEqual({ status: 'finished' });
-      expect(registry.get(h.element)!.get('transform')!._tracks.size).toBe(0);
+      expect(registry.get(h.element)!.transform!._tracks.size).toBe(0);
     } finally { h.host.styles = styles; previous.stop(); sibling.stop(); }
   });
 }
