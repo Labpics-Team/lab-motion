@@ -99,3 +99,14 @@ it('отменённый layout освобождает root до заверше�
     { encoding: 'utf8', timeout: 15_000 });
   expect(result.status, result.stdout + result.stderr).toBe(0);
 }, 20_000);
+
+it('packed playhead сохраняет controls без удержания уничтоженных компонентов', () => {
+  const result = spawnSync(process.execPath, ['--expose-gc', 'test/fixtures/motion-production-retention.mjs', resolve('dist/motion/index.js'), 'playhead'],
+    { encoding: 'utf8', timeout: 90_000 });
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+  const proof = JSON.parse(result.stdout.trim().split('\n').at(-1)!);
+  expect(proof.transport).toBe(true); expect(proof.cycles).toBe(10_000);
+  expect(proof.retainedComponents).toBe(0); expect(proof.frames).toBe(0);
+  expect(proof.nativeCreated).toBeGreaterThan(0); expect(proof.nativeCreated).toBe(proof.nativeRemoved);
+  expect(proof.positiveControl).toBe(true);
+}, 100_000);
