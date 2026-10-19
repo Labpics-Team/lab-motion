@@ -14,7 +14,7 @@ it('цикл и слишком длинная CSS-переменная откл�
   const h = harness();
   h.values.set('--a', 'var(--b)'); h.values.set('--b', 'var(--a)');
   for (const value of ['var(--a)', 'var(--' + 'a'.repeat(4096) + ')']) {
-    expect(() => h.runtime.animate(h.element, { width: value })).toThrow(/CSS-переменная/);
+    expect(() => h.runtime.animate(h.element, { width: value })).toThrow(/width: CSS/);
     expect(h.writes).toHaveLength(0);
     expect(h.updates.size + h.renders.size).toBe(0);
   }
