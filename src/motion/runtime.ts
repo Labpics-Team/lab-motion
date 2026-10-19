@@ -1,7 +1,7 @@
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, authoredTiming, snapshot, type PropertyInput, type Timing } from './model.js';
 import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
-import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState, SequenceOptions, SequenceStep } from './types.js';
+import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, MotionPlayback, PlaybackState, SequenceOptions, SequenceStep } from './types.js';
 
 export interface RuntimeHost {
   readonly frame: FrameLoop;
@@ -81,6 +81,8 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   return values;
 }
 
+type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | 'rate' | 'reverse';
+
 interface Draft { readonly element: Element; readonly key: string; readonly _program: Program; readonly reduced: boolean }
 interface Track {
   readonly _program: Program;
@@ -89,14 +91,17 @@ interface Track {
   readonly _velocity: number[];
   _owner: Run | undefined;
   _elapsed: number;
+  _rate: number;
   _paused: boolean;
   _done: boolean;
 }
 
-class Run implements Playback {
+class Run implements MotionPlayback {
   private _tracks = new Set<Track>();
   private _status: PlaybackState = 'running';
   private _natural = true;
+  private _lastTime = 0;
+  private _lastRate = 1;
   private _notifications = 0;
   private _failure: { error: unknown } | undefined;
   private _resolve!: (value: MotionResult) => void;
@@ -114,6 +119,28 @@ class Run implements Playback {
     }
     return this._status;
   }
+  get time(): number | undefined {
+    let now: number | undefined, position: number | undefined;
+    for (const track of this._tracks) {
+      now ??= number(track._group._engine._host.now(), 'clock');
+      const current = track._group._position(track, now);
+      if (position !== undefined && position !== current) return undefined;
+      position = current;
+    }
+    return position ?? this._lastTime;
+  }
+  get timeScale(): number | undefined {
+    let rate: number | undefined;
+    for (const track of this._tracks) {
+      if (rate !== undefined && rate !== track._rate) return undefined;
+      rate = track._rate;
+    }
+    return rate ?? this._lastRate;
+  }
+  set timeScale(value: number) {
+    if (this._status === 'running') this._apply('rate', number(value, 'timeScale'));
+  }
+  reverse(): void { this._apply('reverse'); }
   _hold(): void { this._notifications++; }
   _release(): void { this._notifications--; this._complete(); }
   _error(error: unknown): void {
@@ -140,14 +167,18 @@ class Run implements Playback {
     this._tracks.add(track); track._owner = this;
   }
   _settle(track: Track, natural: boolean, failure?: { error: unknown }): void {
+    this._lastTime = Math.min(this.duration, track._elapsed);
+    this._lastRate = track._rate;
     this._tracks.delete(track);
     this._natural &&= natural;
     if (failure) this._error(failure.error);
     this._complete();
   }
   _empty(): void { this._complete(); }
-  private _apply(action: 'pause' | 'play' | 'seek' | 'stop' | 'finish', time = 0): void {
+  private _apply(action: ControlAction, time = 0): void {
     if (this._status !== 'running') return;
+    const engine = this._tracks.values().next().value?._group._engine;
+    if (engine?._busy()) { engine._after(() => this._apply(action, time)); return; }
     const groups = new Map<Surface, Track[]>();
     for (const track of this._tracks) {
       const list = groups.get(track._group) ?? []; list.push(track); groups.set(track._group, list);
@@ -214,14 +245,34 @@ class Surface {
       }
       this._stamp = Math.max(this._stamp, now);
       for (const track of this._tracks.values()) {
-        if (!track._paused) track._elapsed = Math.max(0, track._elapsed + delta);
-        sample(track._program, track._elapsed, track.value, track._velocity);
+        if (!track._paused && (this._native || track._rate !== 0))
+          track._elapsed = Math.min(track._program.duration, Math.max(0, track._elapsed + (this._native ? delta : delta * track._rate)));
+        this._sample(track);
       }
     } finally { this._lock(false); }
   }
+  _position(track: Track, now: number): number {
+    if (this._busy || track._paused || !this._native && track._rate === 0) return track._elapsed;
+    const local = this._native?.currentTime;
+    const delta = this._native
+      ? typeof local === 'number' && Number.isFinite(local) ? local - this._nativeTime : 0
+      : Math.max(0, now - this._stamp) * track._rate;
+    return Math.min(track._program.duration, Math.max(0, track._elapsed + delta));
+  }
+  _sample(track: Track): void {
+    sample(track._program, track._elapsed, track.value, track._velocity);
+    const rate = track._paused ? 0 : this._native?.playbackRate ?? track._rate;
+    if (rate !== 1) for (let i = 0; i < track._velocity.length; i++) {
+      track._velocity[i] = rate === 0 ? 0 : track._velocity[i]! * rate;
+      if (!Number.isFinite(track._velocity[i])) throw new MotionError('Скорость вышла за представимый диапазон');
+    }
+  }
+  private _ended(track: Track): boolean {
+    return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program.duration;
+  }
   private _text(at?: 'from' | 'to'): string {
     if (this.key === 'transform') {
-      const state = { ...this._transforms };
+      const state = this._transforms;
       for (const [key, track] of this._tracks) {
         const value = at ? track._program._segments[0]![at][0]! : track.value[0]!;
         state[key] = value;
@@ -283,14 +334,13 @@ class Surface {
   _reconcile(): void {
     if (this._tracks.size === 0) { this._engine._idle(this); return; }
     const active = [...this._tracks.values()];
-    if (active.every(track => track._paused)) { this._engine._idle(this); return; }
+    if (active.every(track => track._paused || track._rate === 0)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
     const canNative = (this.key === 'transform' || this.key === 'opacity') && _nativeEase !== undefined && typeof this.element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
+      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
         track._program.duration === first._program.duration && track._program._segments[0]!.at === seg.at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
-    const token = {}; this._token = token;
     try {
       this._lock(true);
       const effect = this.element.animate([{ [this.key]: this._text('from') }, { [this.key]: this._text('to') }], {
@@ -298,31 +348,51 @@ class Surface {
       });
       this._native = effect; this._nativeTime = first._elapsed;
       if (first._elapsed !== 0) effect.currentTime = first._elapsed;
-      const finished = effect.finished;
-      if (!finished || typeof finished.then !== 'function') throw new MotionError('Native effect не предоставляет finished');
+      if (first._rate !== 1 && !this._nativeRate(first._rate)) {
+        this._detach(); this._lock(false); this._engine._wake(this); return;
+      }
+      this._watch();
       this._lock(false);
-      void finished.then(() => {
-        if (this._token !== token) return;
-        try {
-          for (const track of this._tracks.values()) {
-            track._elapsed = track._program.duration; sample(track._program, track._elapsed, track.value, track._velocity);
-          }
-          this._detach();
-          for (const track of [...this._tracks.values()]) this._end(track, true);
-          this._engine._idle(this);
-        } catch (error) { this._fail(error); }
-      }, error => {
-        if (this._token !== token) return;
-        if ((error as { name?: string })?.name === 'AbortError') {
-          this._native = undefined; this._token = undefined;
-          for (const track of [...this._tracks.values()]) this._end(track, false);
-          this._engine._idle(this);
-        } else this._fail(error);
-      });
       this._engine._idle(this);
     } catch (error) { this._lock(false); this._fail(error); throw error; }
   }
-  _control(selected: readonly Track[], action: 'pause' | 'play' | 'seek' | 'stop' | 'finish', time: number, owner?: Run): void {
+  private _nativeRate(rate: number): boolean {
+    const effect = this._native;
+    if (!effect || typeof effect.updatePlaybackRate !== 'function') return false;
+    effect.updatePlaybackRate(rate);
+    return true;
+  }
+  private _watch(): void {
+    const effect = this._native!, token = {}; this._token = token;
+    const complete = (): void => {
+      if (this._token !== token) return;
+      try {
+        for (const track of this._tracks.values()) {
+          track._elapsed = track._rate < 0 ? 0 : track._program.duration;
+          this._sample(track);
+        }
+        this._detach();
+        for (const track of [...this._tracks.values()]) this._end(track, true);
+        this._engine._idle(this);
+      } catch (error) { this._fail(error); }
+    };
+    const fail = (error: unknown): void => {
+      if (this._token !== token) return;
+      if ((error as { name?: string })?.name !== 'AbortError') { this._fail(error); return; }
+      this._native = undefined; this._token = undefined;
+      for (const track of [...this._tracks.values()]) this._end(track, false);
+      this._engine._idle(this);
+    };
+    const watch = (): void => {
+      if (this._token !== token) return;
+      const finished = effect.finished;
+      if (!finished || typeof finished.then !== 'function') throw new MotionError('Native effect не предоставляет finished');
+      void finished.then(complete, fail);
+    };
+    if (effect.pending && effect.ready) void effect.ready.then(watch, fail).catch(fail);
+    else watch();
+  }
+  _control(selected: readonly Track[], action: ControlAction, time: number, owner?: Run): void {
     const owns = (track: Track): boolean => !track._done && this._tracks.get(track._program.key) === track &&
       (owner === undefined || track._owner === owner);
     // Пока команда ждала, траектория могла перейти к другому вызову.
@@ -335,6 +405,20 @@ class Surface {
     try {
       this._sync();
       if (!selected.some(owns)) return;
+      const changingRate = action === 'rate' || action === 'reverse';
+      if (changingRate && this._native && selected.length === this._tracks.size && selected.every(owns)) {
+        const rate = action === 'reverse' ? -selected[0]!._rate : time;
+        this._lock(true);
+        let updated: boolean;
+        try {
+          updated = this._nativeRate(rate);
+          if (updated) {
+            for (const track of selected) { track._rate = rate; this._sample(track); }
+            this._watch();
+          }
+        } finally { this._lock(false); }
+        if (updated) { this._engine._flush(); return; }
+      }
       this._detach();
       for (const track of selected) {
         if (!owns(track)) continue;
@@ -342,13 +426,15 @@ class Surface {
         else if (action === 'play') track._paused = false;
         else if (action === 'seek') track._elapsed = time;
         else if (action === 'finish') track._elapsed = track._program.duration;
-        sample(track._program, track._elapsed, track.value, track._velocity);
+        else if (action === 'rate') track._rate = time;
+        else if (action === 'reverse') track._rate = -track._rate;
+        this._sample(track);
       }
       this._render();
       for (const track of selected) {
         if (!owns(track)) continue;
         if (action === 'stop') this._end(track, false);
-        else if (action === 'finish' || action === 'seek' && track._elapsed >= track._program.duration) this._end(track, true);
+        else if (action === 'finish' || action === 'seek' && track._elapsed >= track._program.duration || changingRate && !track._paused && this._ended(track)) this._end(track, true);
       }
       this._reconcile();
       this._engine._flush();
@@ -363,9 +449,9 @@ class Surface {
     try {
       this._render();
       for (const track of [...this._tracks.values()]) {
-        if (!track._paused && track._elapsed >= track._program.duration) this._end(track, true);
+        if (!track._paused && track._rate !== 0 && this._ended(track)) this._end(track, true);
       }
-      if (this._tracks.size === 0 || [...this._tracks.values()].every(t => t._paused)) this._engine._idle(this);
+      if (this._tracks.size === 0 || [...this._tracks.values()].every(t => t._paused || t._rate === 0)) this._engine._idle(this);
     } catch (error) { this._fail(error); }
   }
 }
@@ -381,6 +467,7 @@ export class Runtime {
   private _operations = 0;
   private _subscribing = false;
   constructor(readonly _host: RuntimeHost = defaultHost) {}
+  _busy(): boolean { return this._operations !== 0; }
   _operation(enter: boolean): void { this._operations += enter ? 1 : -1; }
   _notify(element: Element, key: string, action: () => void): void {
     const owner = this._surfaces.get(element)?.get(key)?._tracks.get(key)?._owner;
@@ -498,7 +585,7 @@ export class Runtime {
     }
     return result;
   }
-  private _execute(drafts: readonly Draft[], total?: number): Playback {
+  private _execute(drafts: readonly Draft[], total?: number): MotionPlayback {
     const run = new Run(total ?? drafts.reduce((max, d) => Math.max(max, d.reduced ? 0 : d._program.duration), 0));
     const touched = new Set<Surface>();
     try {
@@ -511,8 +598,8 @@ export class Runtime {
         if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!.from;
         const track: Track = { _program: draft._program, _group: group, value: [...first], _velocity: first.map(() => 0),
-          _owner: undefined, _elapsed: draft.reduced ? draft._program.duration : 0, _paused: false, _done: false };
-        sample(track._program, track._elapsed, track.value, track._velocity);
+          _owner: undefined, _elapsed: draft.reduced ? draft._program.duration : 0, _rate: 1, _paused: false, _done: false };
+        group._sample(track);
         run._own(track); group._attach(track);
       }
       for (const group of touched) {
@@ -524,12 +611,12 @@ export class Runtime {
     } catch (error) { run._error(error); throw error; }
     this._drain(); return run;
   }
-  animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): Playback {
+  animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): MotionPlayback {
     const input = properties(props);
     const clock = timing(options);
     return this._execute(this._draft(target, input, clock));
   }
-  sequence(steps: readonly SequenceStep[], options?: SequenceOptions): Playback {
+  sequence(steps: readonly SequenceStep[], options?: SequenceOptions): MotionPlayback {
     const list = snapshot(steps, 'sequence');
     const sequenceClock = timing(options as MotionOptions | undefined);
     const merged = new Map<Element, Map<string, Draft>>();
@@ -567,5 +654,5 @@ export class Runtime {
 }
 
 export const runtime: Runtime = new Runtime();
-export const animate: (target: MotionTarget, props: MotionProperties, options?: MotionOptions) => Playback = runtime.animate.bind(runtime);
-export const sequence: (steps: readonly SequenceStep[], options?: SequenceOptions) => Playback = runtime.sequence.bind(runtime);
+export const animate: (target: MotionTarget, props: MotionProperties, options?: MotionOptions) => MotionPlayback = runtime.animate.bind(runtime);
+export const sequence: (steps: readonly SequenceStep[], options?: SequenceOptions) => MotionPlayback = runtime.sequence.bind(runtime);

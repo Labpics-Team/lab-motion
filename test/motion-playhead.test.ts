@@ -29,3 +29,152 @@ it('sequence обращает всю действующую шкалу, вклю
   h.step(500); expect(await run.finished).toEqual({ status: 'finished' });
   expect(h.x()).toBe(0);
 });
+
+it('пауза, нулевая скорость и terminal controls не создают скрытую работу', async () => {
+  const h = harness();
+  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  h.step(200); run.timeScale = 0;
+  expect(run.time).toBe(200); expect(h.updates.size + h.renders.size).toBe(0);
+  h.step(800); run.reverse(); expect(h.x()).toBe(20);
+  run.pause(); run.timeScale = -2; h.step(1000);
+  expect(run.state).toBe('paused'); expect(run.time).toBe(200);
+  run.play(); h.step(1100);
+  expect(await run.finished).toEqual({ status: 'finished' }); expect(run.time).toBe(0);
+  const writes = h.writes.length;
+  run.timeScale = NaN; run.reverse(); run.seek(NaN); run.play();
+  expect(h.writes).toHaveLength(writes); expect(h.updates.size + h.renders.size).toBe(0);
+});
+
+it('нативный прогон меняет скорость на том же effect, без JS-кадров', async () => {
+  const h = harness(true);
+  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  const effect = h.effects[0]!;
+  effect.currentTime = 300;
+  for (const scale of [2, .5, -1, 0, 4]) {
+    run.timeScale = scale;
+    expect(run.time).toBe(300); expect(effect.playbackRate).toBe(scale);
+    expect(h.effects).toHaveLength(1); expect(effect.cancelled).toBe(false);
+    expect(h.updates.size + h.renders.size).toBe(0);
+  }
+  run.reverse(); expect(effect.playbackRate).toBe(-4);
+  effect.currentTime = 0; effect.complete();
+  expect(await run.finished).toEqual({ status: 'finished' }); expect(h.x()).toBe(0);
+  expect(effect.cancelled).toBe(true);
+});
+
+it('скорость одной оси не меняет вторую ось общей native-поверхности', async () => {
+  const h = harness(true);
+  const old = h.runtime.animate(h.element, { x: 100, y: 200 }, { duration: 1000, ease: 'linear' });
+  const effect = h.effects[0]!; effect.currentTime = 200;
+  const x = h.runtime.animate(h.element, { x: 100 }, { duration: 1000, ease: 'linear' });
+  x.timeScale = 2;
+  expect(effect.cancelled).toBe(true); expect(h.effects).toHaveLength(1);
+  h.step(100); expect(h.x()).toBe(40); expect(h.y()).toBe(60);
+  old.reverse(); h.step(200); expect(h.x()).toBe(60); expect(h.y()).toBe(40);
+  old.stop(); x.finish();
+  expect(await old.finished).toEqual({ status: 'stopped' });
+  expect(await x.finished).toEqual({ status: 'finished' });
+});
+
+it('при повторном использовании разных фаз общий time не выдумывается', () => {
+  const h = harness();
+  const x = h.runtime.animate(h.element, { x: 100 }, { duration: 1000, ease: 'linear' });
+  h.step(100);
+  const y = h.runtime.animate(h.element, { y: 200 }, { duration: 1000, ease: 'linear' });
+  y.timeScale = 2;
+  const both = h.runtime.animate(h.element, { x: 100, y: 200 }, { duration: 1000, ease: 'linear' });
+  expect(both.time).toBeUndefined(); expect(both.timeScale).toBeUndefined();
+  both.timeScale = .5; expect(both.timeScale).toBe(.5);
+  both.seek(250); expect(both.time).toBe(250);
+  x.stop(); y.reverse(); both.finish(); expect(h.x()).toBe(100); expect(h.y()).toBe(200);
+});
+
+it('невалидная скорость отклоняется до изменения владельца, эффектов и позы', () => {
+  const h = harness(true);
+  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  const effect = h.effects[0]!, writes = h.writes.length;
+  for (const invalid of [NaN, Infinity, -Infinity, '2', null]) {
+    expect(() => { run.timeScale = invalid as number; }).toThrow(/timeScale/);
+    expect(h.effects).toHaveLength(1); expect(effect.cancelled).toBe(false);
+    expect(effect.playbackRate).toBe(1); expect(h.writes).toHaveLength(writes);
+  }
+  run.stop();
+});
+
+it('ошибка native rate завершает sibling-каналы и не выдаёт успешный finished', async () => {
+  const h = harness(true); const error = new Error('native rate failed');
+  const run = h.runtime.animate(h.element, { x: [0, 100], opacity: [0, 1] }, { duration: 1000 });
+  h.effects[0]!.updatePlaybackRate = () => { throw error; };
+  expect(() => { run.timeScale = 2; }).toThrow(error);
+  await expect(run.finished).rejects.toBe(error);
+  expect(run.state).toBe('failed'); expect(h.effects.every(effect => effect.cancelled)).toBe(true);
+  expect(h.updates.size + h.renders.size).toBe(0);
+});
+
+it('отсутствующий updatePlaybackRate использует существующий JS-путь', () => {
+  const h = harness(true);
+  const animate = h.element.animate.bind(h.element);
+  h.element.animate = ((...args: Parameters<HTMLElement['animate']>) => {
+    const effect = animate(...args);
+    Object.defineProperty(effect, 'updatePlaybackRate', { value: undefined });
+    return effect;
+  }) as HTMLElement['animate'];
+  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  h.effects[0]!.currentTime = 200;
+  run.timeScale = 2;
+  expect(h.effects.every(effect => effect.cancelled)).toBe(true);
+  h.step(100); expect(h.x()).toBe(40); expect(run.time).toBe(400);
+  run.stop(); expect(h.updates.size + h.renders.size).toBe(0);
+});
+
+it('spring-handoff получает скорость движения после замедления и разворота', () => {
+  for (const rate of [.5, -2]) {
+    const h = harness();
+    const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+    run.seek(400); run.timeScale = rate;
+    const from = h.x();
+    const successor = h.runtime.animate(h.element, { x: 200 });
+    h.step(.001);
+    expect((h.x() - from) / .000001).toBeCloseTo(100 * rate, 0);
+    successor.finish();
+  }
+});
+
+it('двойной reverse и чтение time не пишут CSS и не меняют фазу', () => {
+  const h = harness(true);
+  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  const effect = h.effects[0]!; effect.currentTime = 250;
+  const writes = h.writes.length;
+  for (let i = 0; i < 1000; i++) expect(run.time).toBe(250);
+  run.reverse(); run.reverse();
+  expect(run.timeScale).toBe(1); expect(run.time).toBe(250);
+  expect(h.writes).toHaveLength(writes); expect(h.effects).toHaveLength(1);
+  run.stop();
+});
+
+it('случайные временные команды совпадают с независимым линейным oracle', () => {
+  let seed = 0x51ca1e;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 2 ** 32; };
+  for (let scenario = 0; scenario < 48; scenario++) {
+    const h = harness();
+    const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+    let time = 500, wall = 0, scale = 1, paused = false;
+    run.seek(time);
+    for (let step = 0; step < 64; step++) {
+      const action = Math.floor(random() * 5);
+      if (action === 0) { scale = [0, .5, 2, -1, -3][Math.floor(random() * 5)]!; run.timeScale = scale; }
+      else if (action === 1) { scale = -scale; run.reverse(); }
+      else if (action === 2) { paused = !paused; if (paused) run.pause(); else run.play(); }
+      else if (action === 3) { time = 200 + Math.floor(random() * 600); run.seek(time); }
+      else {
+        const delta = 1 + Math.floor(random() * 9); wall += delta;
+        if (!paused) time = Math.max(0, Math.min(1000, time + delta * scale));
+        h.step(wall);
+      }
+      expect(run.time).toBeCloseTo(time, 8);
+      expect(h.x()).toBeCloseTo(time / 10, 8);
+      if (run.state === 'finished') break;
+    }
+    run.stop(); expect(h.updates.size + h.renders.size).toBe(0);
+  }
+});

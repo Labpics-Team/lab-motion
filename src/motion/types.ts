@@ -39,6 +39,16 @@ export interface Playback {
   /** Применить конечные значения и завершить. */
   finish(): void;
 }
+/** Контролы готовой траектории; мутация layout не является обратимой шкалой. */
+export interface MotionPlayback extends Playback {
+  /** Общая позиция действующих каналов, мс; undefined при разных сохранённых фазах. */
+  readonly time: number | undefined;
+  /** Общая скорость; undefined при разных сохранённых скоростях. Ноль удерживает позу. */
+  get timeScale(): number | undefined;
+  set timeScale(value: number);
+  /** Обратить направление без перемотки; пауза сохраняется. */
+  reverse(): void;
+}
 export interface Disposable { dispose(): void }
 export type SequenceStep = readonly [MotionTarget, MotionProperties, (MotionOptions & { readonly at?: number | '<' | '>' })?];
 export type SequenceOptions = Omit<MotionCommon, 'times' | 'stagger'>;

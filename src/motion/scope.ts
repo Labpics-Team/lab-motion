@@ -3,9 +3,10 @@ import { animate, sequence, targets } from './runtime.js';
 import { layout, type LayoutOptions } from './layout.js';
 import { value, type MotionValue } from './value.js';
 import { listen } from './listener.js';
-import type { Disposable, MotionOptions, MotionProperties, MotionTarget, Playback, SequenceOptions, SequenceStep } from './types.js';
+import type { Disposable, MotionOptions, MotionProperties, MotionTarget, Playback, MotionPlayback, SequenceOptions, SequenceStep } from './types.js';
 
-const stopped: Playback = Object.freeze({ state: 'stopped', duration: 0, finished: Promise.resolve(STOPPED),
+const stopped: MotionPlayback = Object.freeze({ state: 'stopped', duration: 0, time: 0,
+  get timeScale(): number { return 1; }, set timeScale(_value: number) {}, reverse() {}, finished: Promise.resolve(STOPPED),
   pause() {}, play() {}, seek() {}, stop() {}, finish() {} });
 
 export function snapshotOptions(input: MotionOptions | undefined): MotionOptions {
@@ -26,8 +27,8 @@ export function mergeOptions(defaults: MotionOptions, local: MotionOptions | und
 }
 
 export interface MotionScope extends Disposable {
-  animate(target: MotionTarget, properties: MotionProperties, options?: MotionOptions): Playback;
-  sequence(steps: readonly SequenceStep[], options?: SequenceOptions): Playback;
+  animate(target: MotionTarget, properties: MotionProperties, options?: MotionOptions): MotionPlayback;
+  sequence(steps: readonly SequenceStep[], options?: SequenceOptions): MotionPlayback;
   layout(mutate: () => void | Promise<void>, options?: LayoutOptions): Playback;
   value(initial?: number): MotionValue;
   scope(root: ParentNode, defaults?: MotionOptions): MotionScope;
@@ -54,7 +55,7 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
   let settings: MotionOptions = snapshotOptions(defaults);
   const playbacks = new Set<Playback>(), resources = new Set<Disposable>();
   const listeners = new Set<() => void>();
-  function adopt(run: Playback): Playback {
+  function adopt<T extends Playback>(run: T): T {
     playbacks.add(run);
     const release = (): void => { playbacks.delete(run); };
     void run.finished.then(release, release);
@@ -71,14 +72,14 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
   }
   return {
     get disposed(): boolean { return owner === undefined; },
-    animate(target, properties, options): Playback {
+    animate(target, properties, options): MotionPlayback {
       if (!owner) return stopped;
       const combined = mergeOptions(settings, options);
       const selected = targets(target, owner);
       if (!owner) return stopped;
       return adopt(animate(selected, properties, combined));
     },
-    sequence(steps, options): Playback {
+    sequence(steps, options): MotionPlayback {
       if (!owner) return stopped;
       const input = snapshot(steps, 'sequence').map(step => {
         const [target, properties, opt] = snapshot(step, 'sequence step', 2) as unknown as SequenceStep;
