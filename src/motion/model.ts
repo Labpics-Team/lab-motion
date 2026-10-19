@@ -19,15 +19,15 @@ const standardCss = `cubic-bezier(${STANDARD_EASING_COORDS.join(',')})`;
 
 export function number(value: unknown, name: string, minimum: number = -Infinity): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum)
-    throw new MotionError(`${name}: ожидается конечное число${minimum === -Infinity ? '' : ` не меньше ${minimum}`}`);
+    throw new MotionError(`${name}: нужно конечное число${minimum === -Infinity ? '' : ` не меньше ${minimum}`}`);
   return value;
 }
 export function record(value: unknown, name: string): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new MotionError(`${name}: ожидается объект`);
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new MotionError(`${name}: нужен объект`);
   return value as Record<string, unknown>;
 }
 export function snapshot<T>(input: readonly T[], name: string, minimum = 0): T[] {
-  if (!Array.isArray(input)) throw new MotionError(`${name}: ожидается массив`);
+  if (!Array.isArray(input)) throw new MotionError(`${name}: нужен массив`);
   const length = input.length;
   if (!Number.isSafeInteger(length) || length < minimum || length > MAX_CHANNELS)
     throw new MotionError(`${name}: недопустимая длина`);
@@ -94,18 +94,18 @@ export function timing(input: MotionOptions | undefined, authored = false): Timi
     else {
       const points = typeof ease === 'string' && Object.hasOwn(EASES, ease) ? EASES[ease] : ease;
       const values = snapshot(points as readonly number[], 'ease', 4);
-      if (values.length !== 4) throw new MotionError('ease: нужны четыре координаты cubic-bezier');
+      if (values.length !== 4) throw new MotionError('ease: нужна четвёрка cubic-bezier');
       values.forEach((v, i) => number(v, `ease[${i}]`));
       if (values[0]! < 0 || values[0]! > 1 || values[2]! < 0 || values[2]! > 1)
-        throw new MotionError('X-координаты ease должны находиться от 0 до 1');
+        throw new MotionError('ease: X-координаты вне [0,1]');
       easeFunction = cubicBezierUnchecked(values[0]!, values[1]!, values[2]!, values[3]!);
       cssEase = `cubic-bezier(${values.join(',')})`;
     }
   }
   const stops = times === undefined ? undefined : snapshot(times as readonly number[], 'times', 2);
   if (stops) {
-    stops.forEach((v, i) => { number(v, `times[${i}]`, 0); if (v > 1 || i > 0 && v <= stops[i - 1]!) throw new MotionError('times должны строго возрастать от 0 до 1'); });
-    if (stops[0] !== 0 || stops.at(-1) !== 1) throw new MotionError('times должны начинаться с 0 и заканчиваться 1');
+    stops.forEach((v, i) => { number(v, `times[${i}]`, 0); if (v > 1 || i > 0 && v <= stops[i - 1]!) throw new MotionError('times: нужен строгий рост в [0,1]'); });
+    if (stops[0] !== 0 || stops.at(-1) !== 1) throw new MotionError('times: края должны быть 0 и 1');
   }
   return {
     _defaultMotion: spring === undefined && duration === undefined && ease === undefined,

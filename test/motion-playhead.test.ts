@@ -285,3 +285,22 @@ it('освобождённая scope сохраняет motion-контролы,
   const transition = area.layout(() => { throw Error('Не должно исполняться после dispose'); });
   expect(() => playhead(transition)).toThrow(/playhead/);
 });
+
+it('занятые поля контролов отклоняются до частичной установки playhead', () => {
+  const h = harness();
+  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  Object.defineProperty(run, 'timeScale', { value: 'consumer-owned' });
+  expect(() => playhead(run)).toThrow(/свойства контролов/);
+  expect(Object.hasOwn(run, 'time')).toBe(false);
+  expect(Object.hasOwn(run, 'reverse')).toBe(false);
+  run.seek(250); expect(h.x()).toBe(25); run.finish(); expect(h.x()).toBe(100);
+});
+
+it('закрытый для расширения контроллер сохраняет прежний lifecycle при отказе playhead', () => {
+  const h = harness();
+  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  Object.preventExtensions(run);
+  expect(() => playhead(run)).toThrow(/свойства контролов/);
+  run.seek(250); expect(h.x()).toBe(25);
+  run.stop(); expect(h.updates.size + h.renders.size).toBe(0);
+});
