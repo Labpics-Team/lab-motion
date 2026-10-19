@@ -1,13 +1,20 @@
 import { MotionError, number } from './model.js';
-import { Run, type ControlOperation } from './runtime.js';
+import { Run, type ControlOperation, type CompletionContinuation } from './runtime.js';
 import type { MotionPlayback, Playback } from './types.js';
+
+const views = new WeakMap<Playback, MotionPlayback>();
 
 /** Дополнительные контролы того же владельца, без отдельного времени или планировщика. */
 export function playhead(playback: Playback): MotionPlayback {
+  const existing = views.get(playback);
+  if (existing) return existing;
   if (!(playback instanceof Run)) throw new MotionError('playhead ожидает animate, sequence или value.animate этого runtime');
   const run = playback;
-  const history = run._history ??= { time: run.state === 'finished' ? run.duration : undefined, rate: 1 };
-  return {
+  const history: { time: number | undefined; rate: number | undefined } = {
+    time: run.duration === 0 ? 0 : undefined, rate: run._tracks.size ? 1 : undefined,
+  };
+  run._capture = track => { history.time = Math.min(run.duration, track._elapsed); history.rate = track._rate; };
+  const view: MotionPlayback = {
     duration: run.duration, finished: run.finished,
     get state() { return run.state; },
     get time(): number | undefined {
@@ -40,6 +47,8 @@ export function playhead(playback: Playback): MotionPlayback {
     pause(): void { run.pause(); }, play(): void { run.play(); },
     seek(time): void { run.seek(time); }, stop(): void { run.stop(); }, finish(): void { run.finish(); },
   };
+  views.set(run, view); views.set(view, view);
+  return view;
 }
 
 /** Подключается только представлением playhead, не является отдельным исполнителем. */
@@ -53,6 +62,7 @@ function rateCommand(rate: number): ControlOperation {
   return (group, tracks) => applyRate(group, tracks, rate);
 }
 function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<ControlOperation>[1], rate?: number): void {
+  group._continue = continuePlayback;
   let native = false;
   if (group._native && tracks.length === group._tracks.size) {
     group._lock(true);
@@ -60,7 +70,7 @@ function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<Co
       native = configureNative(group._native, rate ?? -tracks[0]!._rate);
       if (native) {
         for (const track of tracks) {
-          track._rate = rate ?? -track._rate; track._configureNative = configureNative;
+          track._rate = rate ?? -track._rate;
           group._sample(track);
         }
       }
@@ -69,9 +79,16 @@ function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<Co
   if (native) return;
   group._detach();
   for (const track of tracks) {
-    track._rate = rate ?? -track._rate; track._configureNative = configureNative;
+    track._rate = rate ?? -track._rate;
     group._sample(track);
   }
   group._render();
   for (const track of tracks) if (!track._paused && group._ended(track)) group._end(track, true);
 }
+
+/** Старая terminal-подписка передаётся новой фазе, только когда её promise завершён. */
+const continuePlayback: CompletionContinuation = (effect, finished, resume, fail) => {
+  if (effect.pending && effect.ready) { void effect.ready.then(resume, fail); return true; }
+  if (effect.finished !== finished) { resume(); return true; }
+  return false;
+};

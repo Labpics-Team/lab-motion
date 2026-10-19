@@ -112,7 +112,7 @@ it('ошибка native rate завершает sibling-каналы и не в�
   expect(h.updates.size + h.renders.size).toBe(0);
 });
 
-it('отсутствующий updatePlaybackRate использует существующий JS-путь', () => {
+it('отсутствующий updatePlaybackRate пересоздаёт native effect с той же позой', () => {
   const h = harness(true);
   const animate = h.element.animate.bind(h.element);
   h.element.animate = ((...args: Parameters<HTMLElement['animate']>) => {
@@ -123,8 +123,11 @@ it('отсутствующий updatePlaybackRate использует суще�
   const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 }));
   h.effects[0]!.currentTime = 200;
   run.timeScale = 2;
-  expect(h.effects.every(effect => effect.cancelled)).toBe(true);
-  h.step(100); expect(h.x()).toBe(40); expect(run.time).toBe(400);
+  expect(h.effects).toHaveLength(2); expect(h.effects[0]!.cancelled).toBe(true);
+  const current = h.effects[1]!;
+  expect(current.playbackRate).toBe(2); expect(current.currentTime).toBe(200);
+  current.currentTime = 400;
+  run.pause(); expect(h.x()).toBe(40); expect(run.time).toBe(400);
   run.stop(); expect(h.updates.size + h.renders.size).toBe(0);
 });
 
@@ -233,4 +236,40 @@ it('10000 смен скорости не накапливают слушател
   expect(observed).not.toHaveBeenCalled();
   expect(h.effects).toHaveLength(1); expect(h.updates.size + h.renders.size).toBe(0);
   run.stop(); expect(effect.cancelled).toBe(true);
+});
+
+for (const nested of [false, true]) it('последняя reentrant-команда применяется ко всем поверхностям, nested=' + nested, () => {
+  const h = harness();
+  const run = playhead(h.runtime.animate(h.element, { width: [0, 100], height: [0, 100] }, { duration: 1000 }));
+  const setProperty = h.element.style.setProperty.bind(h.element.style);
+  let armed = nested;
+  h.element.style.setProperty = (key, value) => {
+    setProperty(key, value);
+    if (armed && key === 'width') { armed = false; run.timeScale = 3; }
+  };
+  run.timeScale = 2;
+  expect(run.timeScale).toBe(nested ? 3 : 2);
+  h.step(100);
+  expect(Number.parseFloat(h.values.get('width')!)).toBe(nested ? 30 : 20);
+  expect(Number.parseFloat(h.values.get('height')!)).toBe(nested ? 30 : 20);
+  run.stop(); expect(h.updates.size + h.renders.size).toBe(0);
+});
+
+it('повторный playhead возвращает те же контролы и не создаёт второго наблюдателя', () => {
+  const h = harness();
+  const source = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  const first = playhead(source);
+  expect(playhead(source)).toBe(first); expect(playhead(first)).toBe(first);
+  expect(first.finished).toBe(source.finished);
+  first.seek(300); first.reverse(); first.stop();
+  expect(first.time).toBe(300); expect(first.timeScale).toBe(-1);
+});
+
+it('позднее наблюдение завершённого движения не выдумывает его конечную фазу', () => {
+  const h = harness();
+  const run = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000 });
+  run.seek(300); run.stop();
+  const view = playhead(run);
+  expect(view.time).toBeUndefined(); expect(view.timeScale).toBeUndefined();
+  view.reverse(); view.timeScale = 2; expect(view.state).toBe('stopped');
 });
