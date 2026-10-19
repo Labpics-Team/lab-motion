@@ -23,7 +23,7 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
   const selected = typeof input === 'string'
     ? (root ?? (typeof document === 'undefined' ? undefined : document))?.querySelectorAll(input)
     : input;
-  if (selected === undefined) throw new MotionError('Селектор требует DOM-контейнер');
+  if (selected === undefined) throw new MotionError('Селектор без DOM-контейнера');
   let result: Element[];
   if (selected && typeof selected === 'object' && 'style' in selected) result = [selected as Element];
   else {
@@ -36,7 +36,7 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
       }
     } else {
       const list = selected as ArrayLike<Element>, length = list.length;
-      if (!Number.isSafeInteger(length) || length < 0 || length > MAX_CHANNELS) throw new MotionError('Недопустимый список элементов');
+      if (!Number.isSafeInteger(length) || length < 0 || length > MAX_CHANNELS) throw new MotionError('Недопустимый список');
       result = Array.from({ length }, (_, i) => list[i]!);
     }
   }
@@ -56,7 +56,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
     if (!matrix.is2D) throw new MotionError('Для x/y требуется 2D transform');
     const { a, b, c, d, e, f } = matrix;
     const sx = Math.hypot(a, b), determinant = a * d - b * c;
-    if (sx > 0 && determinant === 0 && (c !== 0 || d !== 0)) throw new MotionError('Вырожденный transform нужно задать явно');
+    if (sx > 0 && determinant === 0 && (c !== 0 || d !== 0)) throw new MotionError('Вырожденный transform');
     values.x = e; values.y = f;
     values.scaleX = sx;
     values.scaleY = sx ? determinant / sx : Math.hypot(c, d);
@@ -213,7 +213,7 @@ class Surface {
     return { point: initial, _velocity: initial._coordinates.map(() => 0) };
   }
   _sync(): void {
-    if (this._busy) throw new MotionError('Easing должен быть чистой функцией');
+    if (this._busy) throw new MotionError('Easing вызвал повторный вход');
     this._lock(true);
     try {
       const now = number(this._engine._host.now(), 'clock');
