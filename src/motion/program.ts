@@ -14,7 +14,7 @@ export interface Point { readonly _coordinates: readonly number[]; readonly unit
 export function point(key: string, input: MotionScalar, reference?: Point): Point {
   if (isTransform(key) || key === 'opacity') return { _coordinates: [number(input, key)], unit: '' };
   const ast = tryParseValue(input);
-  if (!ast) throw new MotionError(`${key}: неподдерживаемое CSS-значение ${String(input)}`);
+  if (!ast) throw new MotionError(`${key}: неподдерживаемый CSS ${String(input)}`);
   if (ast.kind === 'unit') return { _coordinates: [ast.value], unit: typeof input === 'number' && PIXELS.test(key) ? 'px' : ast.unit };
   if (ast.kind === 'relative') {
     if (!reference || reference._coordinates.length !== 1 || ast.unit && ast.unit !== reference.unit)
@@ -65,7 +65,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
   let aligned = true, extent = 1;
   for (let i = 0; i < from._coordinates.length; i++) {
     const distance = to._coordinates[i]! - from._coordinates[i]!;
-    if (!Number.isFinite(distance)) throw new MotionError('Переполнение диапазона');
+    if (!Number.isFinite(distance)) throw new MotionError('Диапазон вне Number');
     const v = velocity[i] ?? 0;
     extent = Math.max(extent, Math.abs(distance));
     if (distance === 0) { if (v !== 0) aligned = false; }
@@ -90,7 +90,7 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   if (!authored) resolved.unshift(from);
   const times = authored ? timing.times : undefined;
   if (times && times.length !== resolved.length) throw new MotionError('times: другая длина');
-  if (timing.spring && resolved.length > 2) throw new MotionError('N-keyframes: задайте duration/ease');
+  if (timing.spring && resolved.length > 2) throw new MotionError('keyframes: нужны duration/ease');
   const velocity = authored ? resolved[0]!._coordinates.map(() => 0) : [...initialVelocity];
   const _segments: Segment[] = [];
   const duration = timing.duration ?? 0;
@@ -137,7 +137,7 @@ export function sample(program: Program, time: number, value: number[], velocity
     dp = (ease(high) - ease(low)) * 1000 / ((high - low) * duration);
     p = ease(p);
   }
-  if (!Number.isFinite(p) || !Number.isFinite(dp)) throw new MotionError('Easing: нечисловой результат');
+  if (!Number.isFinite(p) || !Number.isFinite(dp)) throw new MotionError('easing: не число');
   for (let i = 0; i < segment.from.length; i++) {
     const a = segment.from[i]!, distance = segment.to[i]! - a;
     if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment.at ? 0 : segment.velocity[i] ?? 0; }
@@ -146,6 +146,6 @@ export function sample(program: Program, time: number, value: number[], velocity
       velocity[i] = distance * basis._velocity + (segment.velocity[i] ?? 0) * basis._velocityV0;
     } else { value[i] = a + distance * p; velocity[i] = distance * dp; }
     if (rate !== 1) velocity[i] = rate === 0 ? 0 : velocity[i]! * rate;
-    if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) throw new MotionError('Переполнение при семплировании');
+    if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) throw new MotionError('Переполнение при sample');
   }
 }

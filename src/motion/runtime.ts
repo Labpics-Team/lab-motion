@@ -23,20 +23,20 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
   const selected = typeof input === 'string'
     ? (root ?? (typeof document === 'undefined' ? undefined : document))?.querySelectorAll(input)
     : input;
-  if (selected === undefined) throw new MotionError('Селектор без DOM-контейнера');
+  if (selected === undefined) throw new MotionError('Селектор: нет DOM');
   let result: Element[];
   if (selected && typeof selected === 'object' && 'style' in selected) result = [selected as Element];
   else {
-    if (!selected || typeof selected !== 'object') throw new MotionError('Ожидается элемент или список');
+    if (!selected || typeof selected !== 'object') throw new MotionError('Нужен элемент или список');
     if (Symbol.iterator in selected) {
       result = [];
       for (const item of selected as Iterable<Element>) {
-        if (result.length === MAX_CHANNELS) throw new MotionError('Слишком много элементов');
+        if (result.length === MAX_CHANNELS) throw new MotionError('Лимит элементов');
         result.push(item);
       }
     } else {
       const list = selected as ArrayLike<Element>, length = list.length;
-      if (!Number.isSafeInteger(length) || length < 0 || length > MAX_CHANNELS) throw new MotionError('Недопустимый список');
+      if (!Number.isSafeInteger(length) || length < 0 || length > MAX_CHANNELS) throw new MotionError('Неверный список');
       result = Array.from({ length }, (_, i) => list[i]!);
     }
   }
@@ -53,10 +53,10 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   if (!text || text === 'none') return values;
   if (typeof DOMMatrixReadOnly !== 'undefined') {
     const matrix = new DOMMatrixReadOnly(text);
-    if (!matrix.is2D) throw new MotionError('Для x/y требуется 2D transform');
+    if (!matrix.is2D) throw new MotionError('x/y: нужен 2D transform');
     const { a, b, c, d, e, f } = matrix;
     const sx = Math.hypot(a, b), determinant = a * d - b * c;
-    if (sx > 0 && determinant === 0 && (c !== 0 || d !== 0)) throw new MotionError('Вырожденный transform');
+    if (sx > 0 && determinant === 0 && (c !== 0 || d !== 0)) throw new MotionError('transform вырожден');
     values.x = e; values.y = f;
     values.scaleX = sx;
     values.scaleY = sx ? determinant / sx : Math.hypot(c, d);
@@ -67,7 +67,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   // Headless style-hosts поддерживают ту же каноническую форму, которую пишет Motion.
   const rest = text.replace(/(translate[XY]?|rotate|(?:skew|scale)[XY]?)\(([^)]+)\)/g, (_match, name: string, arguments_: string) => {
     const args = arguments_.trim().split(/[,\s]+/).map(Number.parseFloat);
-    if (args.some(n => !Number.isFinite(n))) throw new MotionError('Нечисловой transform');
+    if (args.some(n => !Number.isFinite(n))) throw new MotionError('transform: не число');
     const a = args[0]!;
     if (name === 'translate') { values.x = a; values.y = args[1] ?? 0; }
     else if (name === 'scale' || name === 'skew') {
@@ -76,7 +76,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
     } else values[name === 'translateX' ? 'x' : name === 'translateY' ? 'y' : name] = a;
     return '';
   });
-  if (rest.trim()) throw new MotionError('Неподдерживаемый transform');
+  if (rest.trim()) throw new MotionError('transform не поддержан');
   return values;
 }
 
@@ -213,7 +213,7 @@ class Surface {
     return { point: initial, _velocity: initial._coordinates.map(() => 0) };
   }
   _sync(): void {
-    if (this._busy) throw new MotionError('Easing вызвал повторный вход');
+    if (this._busy) throw new MotionError('easing: повторный вход');
     this._lock(true);
     try {
       const now = number(this._engine._host.now(), 'clock');
@@ -256,7 +256,7 @@ class Surface {
     return format(track._program.key, at ? track._program._segments[0]![at] : track.value, track._program.unit);
   }
   _render(): void {
-    if (this._busy) throw new MotionError('Повторная запись свойства');
+    if (this._busy) throw new MotionError('style: повторная запись');
     this._lock(true);
     try {
       const text = this._text();
@@ -435,7 +435,7 @@ export class Runtime {
     try {
       attemptAll(this._pending, action => action(), failures);
     } finally { this._pending.length = 0; this._draining = false; }
-    rethrow(failures, 'Ошибки отложенных команд');
+    rethrow(failures, 'Ошибки команд');
   }
   _wake(surface: Surface): void {
     this._active.add(surface);
@@ -492,12 +492,12 @@ export class Runtime {
     const seen = new Set<string>();
     for (let i = 0; i < 16; i++) {
       const variable = tryParseUnit(text);
-      if (variable?.kind !== 'var' || seen.has(variable.name)) throw new MotionError(`${key}: неразрешимая CSS-переменная`);
+      if (variable?.kind !== 'var' || seen.has(variable.name)) throw new MotionError(`${key}: CSS-переменная не найдена`);
       seen.add(variable.name);
       text = this._host.styles(element).getPropertyValue(variable.name).trim() || variable.fallback || '';
       if (!/^var\(/i.test(text)) { if (!text) throw new MotionError(`${key}: пустая CSS-переменная`); return text; }
     }
-    throw new MotionError(`${key}: слишком глубокая CSS-переменная`);
+    throw new MotionError(`${key}: CSS-переменная: цикл/глубина`);
   }
   private _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
     origin?: (element: Element, key: string) => Point | undefined): Draft[] {
@@ -580,7 +580,7 @@ export class Runtime {
         let next = draft;
         if (before) {
           const at = draft._program._segments[0]!.at;
-          if (at < before._program.duration) throw new MotionError('Пересечение шагов одного свойства');
+          if (at < before._program.duration) throw new MotionError('Пересечение шагов');
           next = { ...draft, _program: { ...draft._program, _segments: [...before._program._segments, ...draft._program._segments], _nativeEase: undefined, _identity: undefined } };
         }
         channels.set(draft.key, next);
