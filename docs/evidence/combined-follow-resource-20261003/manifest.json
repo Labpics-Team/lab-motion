@@ -1,0 +1,1096 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-02T21:14:21.883987+00:00",
+  "plan_base": "18f1a5b40252f4ce38d359e81f4a62d98e8cca1c",
+  "product_baseline": "957ceaf26501525eff476cdc1d149d81fd5ebcd7",
+  "product_current": "78e7ab200f473667d8863ff028c17c2e0d7debbc",
+  "product_current_tree": "41bf2ed317ac4c3f98c08c12ea85f20c651f5238",
+  "archive": {
+    "path": "inputs.tar.gz",
+    "bytes": 2331622,
+    "sha256": "e675a253255010108b179edced4abb48d3e014dedec7ff4cd7bd927c58eb63f0"
+  },
+  "members": [
+    {
+      "path": "README.md",
+      "bytes": 2669,
+      "sha256": "50dd25b5511aca200f35c316c8be06e35a476b12d6d8066ce3b2028124b58a5f",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/motion-draft-delivery-78e7ab2.tar.gz"
+    },
+    {
+      "path": "MANIFEST.json",
+      "bytes": 57388,
+      "sha256": "28075485424a64aa4acd991ef77b747501be51cf51e73224cac74a445fc295cc",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/motion-draft-delivery-78e7ab2.manifest.json"
+    },
+    {
+      "path": "environment/stryker9.6.1-dry-run-executor.js",
+      "bytes": 8173,
+      "sha256": "3349a28ed44b2307754a12d5047983b3bcd933a3a9285f6f806db9cb041dc781",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/node_modules/.pnpm/@stryker-mutator+core@9.6.1_@types+node@26.6.3/node_modules/@stryker-mutator/core/dist/src/process/3-dry-run-executor.js"
+    },
+    {
+      "path": "evidence/DELTA.md",
+      "bytes": 36140,
+      "sha256": "e3bb877c3777ea4e9d5878bda11b2f12c130a5a512bfe090529db422f6cc71df",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/DELTA.md"
+    },
+    {
+      "path": "evidence/READSET.json",
+      "bytes": 29787,
+      "sha256": "53a5aaa9c06427523794240268ccbe3ddcfbd9847de2aed78855cbe4a5ad5855",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/READSET.json"
+    },
+    {
+      "path": "evidence/browser-candidate-resource.json",
+      "bytes": 485,
+      "sha256": "bf29b5360abc44d6cfc3da198f792326cea3cbd278a8c60a723ffeeed0a4cc7a",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/browser-candidate-resource.json"
+    },
+    {
+      "path": "evidence/browser-preflight-webkit.log",
+      "bytes": 3180,
+      "sha256": "a9df5efc87128b7412214018dfe4e6c5037c44b4ead1258521caf57c42e45998",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/browser-preflight-webkit.log"
+    },
+    {
+      "path": "evidence/browser-resource-cdp-profile.json",
+      "bytes": 969093,
+      "sha256": "955356e1202e640224871f1bccd0e6940b402a694f0d4b4723fda75d1f510411",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/browser-resource-cdp-profile.json"
+    },
+    {
+      "path": "evidence/browser-resource-cdp-receipt.json",
+      "bytes": 909,
+      "sha256": "9d637d63f0c03ba195d0070e6b78bb78c4fc9de2b7776d8cc64b7db969beb1fc",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/browser-resource-cdp-receipt.json"
+    },
+    {
+      "path": "evidence/browser-resource-cdp-summary.json",
+      "bytes": 6422,
+      "sha256": "98374a18c392bbb09b2eb756025129c24c8ecc7dd5e410892279e87b7dcdbf5e",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/browser-resource-cdp-summary.json"
+    },
+    {
+      "path": "evidence/double-cancel-new-oracle.stderr.log",
+      "bytes": 644,
+      "sha256": "88287fd91c438bfabf16f38af91dd40ed65d818eb1545ceaa2df4cb8d26b003c",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/double-cancel-new-oracle.stderr.log"
+    },
+    {
+      "path": "evidence/double-cancel-new-oracle.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/double-cancel-new-oracle.stdout.log"
+    },
+    {
+      "path": "evidence/double-cancel-new-receipt.json",
+      "bytes": 1203,
+      "sha256": "27c62641a0ef1fa4082e793d75cd19eccfaf7570c06a02fcfaef4ceca46b16c1",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/double-cancel-new-receipt.json"
+    },
+    {
+      "path": "evidence/double-cancel-old-receipt.json",
+      "bytes": 844,
+      "sha256": "6db486f25a388789b9b8cf0345c9b8d7856884bcba4cd6f2e2d503e107369d05",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/double-cancel-old-receipt.json"
+    },
+    {
+      "path": "evidence/double-cancel-old.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/double-cancel-old.stderr.log"
+    },
+    {
+      "path": "evidence/double-cancel-old.stdout.log",
+      "bytes": 3468,
+      "sha256": "ba07d21570ae338b55e9d1626e0cec9e477f63799a876ed80f9b3723ed0017c0",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/double-cancel-old.stdout.log"
+    },
+    {
+      "path": "evidence/draft-candidate.diff",
+      "bytes": 910124,
+      "sha256": "7a59d5b9c4cad22beb3be67c0edf911f098205715dfc17715d06a62b0cd93c82",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-candidate.diff"
+    },
+    {
+      "path": "evidence/draft-core-mutation-triage.json",
+      "bytes": 737,
+      "sha256": "fbd8d873194b35cc9ec7b3883bf55e7a8f0eb51706864015db2c0df9a097b56d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-core-mutation-triage.json"
+    },
+    {
+      "path": "evidence/draft-evidence-transfer-78e7ab2.json",
+      "bytes": 7185,
+      "sha256": "18396173779bea93222f2d668b7b5081e0e534ca5fe5f1174e0f20d0883c18d0",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-evidence-transfer-78e7ab2.json"
+    },
+    {
+      "path": "evidence/draft-integration-delta.diff",
+      "bytes": 33624,
+      "sha256": "3605ec1a7ca99f7e350b039f632f6464b0842ab797fa90cc45a2c4f9c5037e35",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-integration-delta.diff"
+    },
+    {
+      "path": "evidence/draft-local-core-mutation-78e7ab2-receipt.json",
+      "bytes": 1075,
+      "sha256": "6458c4951cbbee62f315e07fbc2f3386545789d38406e29b919052aa86381865",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-core-mutation-78e7ab2-receipt.json"
+    },
+    {
+      "path": "evidence/draft-local-core-mutation-78e7ab2.log",
+      "bytes": 2793,
+      "sha256": "5d54008908b0649f2e66c9486add2db1ee34f133f2e1d11d60a99518ab9019eb",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-core-mutation-78e7ab2.log"
+    },
+    {
+      "path": "evidence/draft-local-driver-mutation-78e7ab2.log",
+      "bytes": 69064,
+      "sha256": "2c0fcca335d821473e3c32e6c457165b966f808fc2cc0df1facd10f5b89b5a08",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-driver-mutation-78e7ab2.log"
+    },
+    {
+      "path": "evidence/draft-local-full-unit-78e7ab2-receipt.json",
+      "bytes": 1191,
+      "sha256": "3bef215932ef262d792d7d44efa2c59758bc83ebb0e7cdec6f6e57866835768d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-full-unit-78e7ab2-receipt.json"
+    },
+    {
+      "path": "evidence/draft-local-full-unit-78e7ab2-result.json",
+      "bytes": 2226551,
+      "sha256": "cb24aae1dc0bc3e0a7f0507296c1dec3e310391a503b5572c1cea4da2b459e05",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-full-unit-78e7ab2-result.json"
+    },
+    {
+      "path": "evidence/draft-local-full-unit-78e7ab2-summary.json",
+      "bytes": 27830,
+      "sha256": "a88646fbe430c05549f9419c009e75d6e80739e82500e8982d8e65ba1b40270a",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-full-unit-78e7ab2-summary.json"
+    },
+    {
+      "path": "evidence/draft-local-full-unit-78e7ab2.log",
+      "bytes": 117449,
+      "sha256": "a0218f6c4fe84540ef703587a1ab8129fadb7fcea4275fde096ccf26665d571b",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-full-unit-78e7ab2.log"
+    },
+    {
+      "path": "evidence/draft-local-gates-78e7ab2.json",
+      "bytes": 10560,
+      "sha256": "a62dc2577e8dee41133d7ed225399aa327b7c212573b44033510e81cdf96e7a5",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-gates-78e7ab2.json"
+    },
+    {
+      "path": "evidence/draft-local-native-typecheck-78e7ab2.log",
+      "bytes": 68,
+      "sha256": "e8dc8c4ba453beaeb4e95d604d0f8dceb27cebab8952f9a4bb811750aae38683",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-native-typecheck-78e7ab2.log"
+    },
+    {
+      "path": "evidence/draft-local-rest-78e7ab2-receipts.json",
+      "bytes": 2989,
+      "sha256": "90ac2bc6b345383720a57fa3a8df34b01d4f17791b9892aafaf621be5bf56db5",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-rest-78e7ab2-receipts.json"
+    },
+    {
+      "path": "evidence/draft-local-static-78e7ab2.log",
+      "bytes": 653,
+      "sha256": "9ee566c0a245cdd36ef22753353c1d62ff9737993409741e577a1af9b928714f",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-local-static-78e7ab2.log"
+    },
+    {
+      "path": "evidence/draft-owner-hook-mutant.diff",
+      "bytes": 411,
+      "sha256": "6d551dad6299f3cc8c04dc858bb777142deb263a613c99bf4580d5d630a95049",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-owner-hook-mutant.diff"
+    },
+    {
+      "path": "evidence/draft-package-timeout-triage.json",
+      "bytes": 1483,
+      "sha256": "935757950d656bf653f461b43d075099cc5e1cb77b3ac0ef9606f567de80e7de",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-package-timeout-triage.json"
+    },
+    {
+      "path": "evidence/draft-pr-body.md",
+      "bytes": 6466,
+      "sha256": "1405b4932af298c2261ab597d0b9b7d2998f5d0605c24836c08ed14d1fe1bbee",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-pr-body.md"
+    },
+    {
+      "path": "evidence/draft-pr-title.txt",
+      "bytes": 64,
+      "sha256": "f1f506bedf0bf86ae9ae0f8b3cca7ed751881fb3f9a91e861a54ed526bf90c09",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-pr-title.txt"
+    },
+    {
+      "path": "evidence/draft-resource-later-host-context.json",
+      "bytes": 22624,
+      "sha256": "86217a81323e80bd4df747b0039288423d2f5149b57dd7ab2b8d944f1b30629a",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-resource-later-host-context.json"
+    },
+    {
+      "path": "evidence/draft-resource-timeout-triage.json",
+      "bytes": 1840,
+      "sha256": "d07d0065369be3bbd9babd9356800fe184a9e2d883fbdedc745799540c3b196d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-resource-timeout-triage.json"
+    },
+    {
+      "path": "evidence/draft-transport-manifest.json",
+      "bytes": 1402,
+      "sha256": "067c799e4794e2f002c8366ce76e253a0482f1f7da65979193dfd962e2220e14",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/draft-transport-manifest.json"
+    },
+    {
+      "path": "evidence/gate-sabotage-bespoke-missing.log",
+      "bytes": 6203,
+      "sha256": "c90ccc05f39a0f12d158215229fcdb787555d58887475a7a5a0ec82f666f1338",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/gate-sabotage-bespoke-missing.log"
+    },
+    {
+      "path": "evidence/gate-sabotage-bespoke-missing.patch",
+      "bytes": 716,
+      "sha256": "cdfdde948efc67211cfac4dce43e539150b70d8dc0b805f19eb2f194c2a4d42d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/gate-sabotage-bespoke-missing.patch"
+    },
+    {
+      "path": "evidence/gate-sabotage-bespoke-value.log",
+      "bytes": 6239,
+      "sha256": "39372bc3acf3a520e3f3c8ca97e677a59913e64297e9337eafa51ae9d15da2b3",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/gate-sabotage-bespoke-value.log"
+    },
+    {
+      "path": "evidence/gate-sabotage-bespoke-value.patch",
+      "bytes": 741,
+      "sha256": "cadb1863e56a5a90961af790824856d963fddf9b398525547fcae1336992b16f",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/gate-sabotage-bespoke-value.patch"
+    },
+    {
+      "path": "evidence/gate-sabotage-manifest.json",
+      "bytes": 1623,
+      "sha256": "946dd6bbb79eb81ab8efe976f22e6c9e6e35203e893b6789a26c24df5157f53f",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/gate-sabotage-manifest.json"
+    },
+    {
+      "path": "evidence/gate-sabotage-receipts.json",
+      "bytes": 1791,
+      "sha256": "35075329c4e1909f304290442d507b4b1bf05938956e3d43abb9e31aab481ca3",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/gate-sabotage-receipts.json"
+    },
+    {
+      "path": "evidence/gate-sabotage-scenario-missing.log",
+      "bytes": 6251,
+      "sha256": "07f6d8fb3f6bc0fa7d4bce485fd82138d2073b18b22bbbca3eb3fff1b283ee8d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/gate-sabotage-scenario-missing.log"
+    },
+    {
+      "path": "evidence/gate-sabotage-scenario-missing.patch",
+      "bytes": 709,
+      "sha256": "faa02ddf0989b4d14917e1ac462bc340d54f9f53b7d899644f6580098fc32e9f",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/gate-sabotage-scenario-missing.patch"
+    },
+    {
+      "path": "evidence/gate-sabotage-scenario-value.log",
+      "bytes": 6302,
+      "sha256": "87332d93904bc700564458742e99a51b814c6d79fe4430d8ef3c490150454458",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/gate-sabotage-scenario-value.log"
+    },
+    {
+      "path": "evidence/gate-sabotage-scenario-value.patch",
+      "bytes": 629,
+      "sha256": "a805b8a3a1c2de66c96253a072292d57e3741ab3abe3743e890c64395b7a7b5b",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/gate-sabotage-scenario-value.patch"
+    },
+    {
+      "path": "evidence/group-owner-build.log",
+      "bytes": 12140,
+      "sha256": "7227f5f848fef690ef94fefde586293325bfe69b004f7a78b765d070db823b0a",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/group-owner-build.log"
+    },
+    {
+      "path": "evidence/group-owner-candidate-receipts.json",
+      "bytes": 1045,
+      "sha256": "11f5b23c51120df48d40e8688e3ab348e0657c5445a921da2a0ed99988c45561",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/group-owner-candidate-receipts.json"
+    },
+    {
+      "path": "evidence/group-owner-focused.log",
+      "bytes": 1478,
+      "sha256": "6cab82be943d8cf97cd894db13391796a87e6d3410a90c1a82118c9fd5e46193",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/group-owner-focused.log"
+    },
+    {
+      "path": "evidence/group-owner-size.log",
+      "bytes": 4779,
+      "sha256": "6d085b352f6ef8772c9827159dede8939aa83f4461efb3dc3761493a91a4f2e3",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/group-owner-size.log"
+    },
+    {
+      "path": "evidence/motion-78e7ab2-from-9e61ede.bundle",
+      "bytes": 33200,
+      "sha256": "a807c53fd0d1828ab55495c59bacfc1c1dc3a3a45c0742615f66acbf473c2131",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/motion-78e7ab2-from-9e61ede.bundle"
+    },
+    {
+      "path": "evidence/native-extra-effect-mutant-receipt.json",
+      "bytes": 784,
+      "sha256": "df4c540fe015d1423d850aaf8aef0bf59fbf125c3ff0812a034f18c4b28b370b",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-extra-effect-mutant-receipt.json"
+    },
+    {
+      "path": "evidence/native-extra-effect-mutant-result.json",
+      "bytes": 10476,
+      "sha256": "bfbd861947ac640e26ff4b29b83551ac33d7f421872d102fa2eeb6114109bfb4",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-extra-effect-mutant-result.json"
+    },
+    {
+      "path": "evidence/native-extra-effect-mutant.patch",
+      "bytes": 842,
+      "sha256": "8277bc2db228f7e115c9481f8ecc4b4143d08e176261a16ef9e961ab569581af",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-extra-effect-mutant.patch"
+    },
+    {
+      "path": "evidence/native-observation-control-receipts.json",
+      "bytes": 987,
+      "sha256": "419306bd74578dd52a719b3133f0aa2741d1bf633b134896e4a63e1e0095a23e",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-observation-control-receipts.json"
+    },
+    {
+      "path": "evidence/native-observation-control-result.json",
+      "bytes": 7564,
+      "sha256": "fd0cbff12ffbbf259093fa32d50dbe8b2e4668a8827ad80a761cd82036c669e6",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-observation-control-result.json"
+    },
+    {
+      "path": "evidence/native-observation-control.patch",
+      "bytes": 2181,
+      "sha256": "ecb5920aa3f0d83bfb52893b022b3412d6ef88d5e33098cb7ae939e6b3d9617b",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-observation-control.patch"
+    },
+    {
+      "path": "evidence/native-observation-installed-package-tuple.json",
+      "bytes": 1210,
+      "sha256": "c552ba0b8048bbd48f96885ade31ba10bf28ab0ea0a608abc2511d266a3710bf",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-observation-installed-package-tuple.json"
+    },
+    {
+      "path": "evidence/native-observation-package-equivalence.json",
+      "bytes": 269138,
+      "sha256": "f00057969b76f0f30c0e6fbc73982a1f005eefbbf4ecf000e34a77dcf6a38988",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-observation-package-equivalence.json"
+    },
+    {
+      "path": "evidence/native-observation-resource-native-ownership.json",
+      "bytes": 426,
+      "sha256": "8493c5f1a69ca96beb0dd445d85e3c62a60e5acf0b0cb29ef5e262977ac29f37",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-observation-resource-native-ownership.json"
+    },
+    {
+      "path": "evidence/native-observation-review-manifest.json",
+      "bytes": 1658,
+      "sha256": "9ee9e7eb7f77fa3c508d235ebe0dc199f4adad3865a24210c0ca9058b48cda4d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-observation-review-manifest.json"
+    },
+    {
+      "path": "evidence/owner-hook-mutant-identity.json",
+      "bytes": 1253,
+      "sha256": "e038a9cffa6cfce450941ff179a99e672895c6a28ad269ec456082a7ba81172b",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/owner-hook-mutant-identity.json"
+    },
+    {
+      "path": "evidence/owner-hook-mutant-receipts.json",
+      "bytes": 2313,
+      "sha256": "4af97002f1a320219e5997da87bee4ec7323939a0c2f7d9f58a30314b9ac38ec",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/owner-hook-mutant-receipts.json"
+    },
+    {
+      "path": "evidence/owner-mutant-witness.log",
+      "bytes": 928,
+      "sha256": "5fd13f9f78dd98d65d0590f7644382c41f786841663fc9582df702e15c8789da",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/owner-mutant-witness.log"
+    },
+    {
+      "path": "evidence/prepush-final-receipts.json",
+      "bytes": 2725,
+      "sha256": "3acb03ecb1fa8e3d85c25553559b2bc5f37b2e25ee1e6024a7f347b53d8e9c5d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/prepush-final-receipts.json"
+    },
+    {
+      "path": "evidence/profile-benchmark-scope-targeted.json",
+      "bytes": 491,
+      "sha256": "49dbd9b512959bb713b61fb99bb5c9bf48e30ce1aa95a307ab0adeb952e5fa51",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/profile-benchmark-scope-targeted.json"
+    },
+    {
+      "path": "evidence/profile-benchmark-scope-targeted.log",
+      "bytes": 1074,
+      "sha256": "2821e0698391ebdc143f4d97680a127495017ae5c54ab1f7dc97faf2e6711df6",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/profile-benchmark-scope-targeted.log"
+    },
+    {
+      "path": "evidence/qualified-actionlint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-actionlint.log"
+    },
+    {
+      "path": "evidence/qualified-browser-matrix-4f6bee1-compositor-follow-package.json",
+      "bytes": 885,
+      "sha256": "bf2cc9fdff7d33cdc719b02e544682ab408e4a1bb67f0ca3f258b70404e53da4",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-browser-matrix-4f6bee1-compositor-follow-package.json"
+    },
+    {
+      "path": "evidence/qualified-browser-matrix-4f6bee1-receipt.json",
+      "bytes": 530,
+      "sha256": "9e1dcf1e86ca79b0ae6e67ff1f2d7b67afdc7cbe79f4a7647ca482a7205ad21a",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-browser-matrix-4f6bee1-receipt.json"
+    },
+    {
+      "path": "evidence/qualified-browser-matrix-4f6bee1-result.json",
+      "bytes": 417023,
+      "sha256": "fcdcdbcf6f92652a2ab0a653aff4378ceff6af31392667780354668d2dcdd913",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-browser-matrix-4f6bee1-result.json"
+    },
+    {
+      "path": "evidence/qualified-browser-matrix-4f6bee1-scope-recipes.package.json",
+      "bytes": 1210,
+      "sha256": "b470584b4eca32599f13a9cbac0978a9343a97b47e873b65e1eaf7b7b794edd4",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-browser-matrix-4f6bee1-scope-recipes.package.json"
+    },
+    {
+      "path": "evidence/qualified-browser-matrix-4f6bee1.log",
+      "bytes": 55627,
+      "sha256": "1765ff06489f2f86f8fae45941b2d97811cdea0e3740bc7f734fa025cd14dcd8",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-browser-matrix-4f6bee1.log"
+    },
+    {
+      "path": "evidence/qualified-browser-receipts.json",
+      "bytes": 601,
+      "sha256": "15758d66bed2d269f1bfe20bba34a18872f044fd4dfd1617314c357534863fe7",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-browser-receipts.json"
+    },
+    {
+      "path": "evidence/qualified-chromium-full.log",
+      "bytes": 30918,
+      "sha256": "aa1879b63a92295fec428df130d73928d0e23114012181fa31c06f83d35b6d03",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-chromium-full.log"
+    },
+    {
+      "path": "evidence/qualified-compiler-acceptance.log",
+      "bytes": 881,
+      "sha256": "4ebae2354622427f83fd58d2332adcdf8f8e06a5354e6721a9dc2fc5dc8b7e13",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-compiler-acceptance.log"
+    },
+    {
+      "path": "evidence/qualified-docs-facts.log",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-docs-facts.log"
+    },
+    {
+      "path": "evidence/qualified-finiteness.log",
+      "bytes": 25762,
+      "sha256": "939adaa55a7c2a2f5f67d27ca875d897147a2a4cd483b716eac584e7919c44a5",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-finiteness.log"
+    },
+    {
+      "path": "evidence/qualified-full-tests.log",
+      "bytes": 120458,
+      "sha256": "a496576d8978dd0bb944008305960f5b7b4b0f2bbf26a6d29a9ff8f0dc361002",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-full-tests.log"
+    },
+    {
+      "path": "evidence/qualified-issue-forms.log",
+      "bytes": 30,
+      "sha256": "6e2e404998b19415e3546952c48d75835b76dab18f66217d266d3479200bb2dd",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-issue-forms.log"
+    },
+    {
+      "path": "evidence/qualified-native-clock.log",
+      "bytes": 45973,
+      "sha256": "5e61e231f68f080afafb83b5cf73c3897df2e0ff72f162d6ad6b92a5fd31fce5",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-native-clock.log"
+    },
+    {
+      "path": "evidence/qualified-pack-compat.log",
+      "bytes": 918,
+      "sha256": "b073da1dc44086e8d327fa3625ab44fb6c50e68efee6024ca37f434e4a131c02",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-pack-compat.log"
+    },
+    {
+      "path": "evidence/qualified-pack-smoke22.log",
+      "bytes": 901,
+      "sha256": "a678570d95ff7ef50089003b1e1932c7b5c24d6cb13dee52b33ca0a3298d735a",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-pack-smoke22.log"
+    },
+    {
+      "path": "evidence/qualified-pack-smoke24.log",
+      "bytes": 902,
+      "sha256": "05e7a9dbf8a640a814f0efbe6fdca2fd00cc88b9b45d00d281a53a9137fc2d70",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-pack-smoke24.log"
+    },
+    {
+      "path": "evidence/qualified-package-equivalence.json",
+      "bytes": 2000,
+      "sha256": "6e3e44b957fd77144051526e3dab710f37ba5cf16696cffefda59820f2915ded",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-package-equivalence.json"
+    },
+    {
+      "path": "evidence/qualified-prepush-receipts.json",
+      "bytes": 3595,
+      "sha256": "b7e22b1811d10555195682f26b9786edcb25202bc21bf043acbf9effed24d1df",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-prepush-receipts.json"
+    },
+    {
+      "path": "evidence/qualified-rebuild.log",
+      "bytes": 12140,
+      "sha256": "d4f0e04f53d3c460408c8fc94e1f0c177e0d67223463d38cbb4caa6576286b28",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-rebuild.log"
+    },
+    {
+      "path": "evidence/qualified-release-contract.log",
+      "bytes": 85,
+      "sha256": "b0fe270a55ab537299007386d115a5fb70ab60574f077560cd4a0b2f344c0c50",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-release-contract.log"
+    },
+    {
+      "path": "evidence/qualified-rest-local-receipts.json",
+      "bytes": 3742,
+      "sha256": "c5b563239048608bd8fb1c2d58bd48e4fa30d98e6e3e3bb91d0f93f013c01859",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-rest-local-receipts.json"
+    },
+    {
+      "path": "evidence/qualified-site-build.log",
+      "bytes": 12561,
+      "sha256": "f7c8477d7086bb6855a8eaf457747f82b7b9a8b282f97ed9adf4a56716edd34d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-site-build.log"
+    },
+    {
+      "path": "evidence/server-admission-cost-boundary.md",
+      "bytes": 6282,
+      "sha256": "b9815ba75422165d7603fd65b88610c3cf7e082d66055d392606fbf85ca0f779",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-admission-cost-boundary.md"
+    },
+    {
+      "path": "evidence/server-baseline-wall-cpu-receipt.json",
+      "bytes": 1486,
+      "sha256": "91fab6d0f44fa289d0c7cb1101f2525318ff19eb1de7c7c32bca76e4be25af74",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-baseline-wall-cpu-receipt.json"
+    },
+    {
+      "path": "evidence/server-baseline-wall-cpu-result.json",
+      "bytes": 87635,
+      "sha256": "3d9749040c90f8c4e1ecd0252e007f866c1db91a9ba33a9fda245e0bd19bc37b",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-baseline-wall-cpu-result.json"
+    },
+    {
+      "path": "evidence/server-construction-control-receipt.json",
+      "bytes": 1223,
+      "sha256": "34593d853a18773dbd94d9577c378122847742a03afdd371c62e3ee2b66e945c",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-construction-control-receipt.json"
+    },
+    {
+      "path": "evidence/server-construction-control-result.json",
+      "bytes": 87703,
+      "sha256": "c912a0525e322b67c922b005102ca7b898e2aa52e8917f94ae597609628293c8",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-construction-control-result.json"
+    },
+    {
+      "path": "evidence/server-consumer-traversal-map.md",
+      "bytes": 5878,
+      "sha256": "14173baa1fed5209beaf9541bfc5d079ee65cd11f4b4f5481f4a4206edf1f862",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-consumer-traversal-map.md"
+    },
+    {
+      "path": "evidence/server-expected-pairs-control-receipt.json",
+      "bytes": 637,
+      "sha256": "8e8f4d38366f1d249474c07b58888d04238a4d1f7491b2f61b892f31dbdd0cd8",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-expected-pairs-control-receipt.json"
+    },
+    {
+      "path": "evidence/server-expected-pairs-control-result.json",
+      "bytes": 87933,
+      "sha256": "6f34cce3f221b07e827ce5a7295521efb35bc6885024c925431bc7e372788e4b",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-expected-pairs-control-result.json"
+    },
+    {
+      "path": "evidence/server-native-phase-receipt.json",
+      "bytes": 446,
+      "sha256": "87a8bf7baab6cebbe2952353511ecb88c592307b58c2e9e8c9ea20575ab9f972",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-native-phase-receipt.json"
+    },
+    {
+      "path": "evidence/server-native-phase-result.json",
+      "bytes": 2919,
+      "sha256": "17750a8bec479b505ab4dbf16fab66ae07850d2edbb93d36332101242e0d834c",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-native-phase-result.json"
+    },
+    {
+      "path": "evidence/server-native-phase-source-transfer.json",
+      "bytes": 2307,
+      "sha256": "8e413089459ddf0d07472b08f58bab759c08d065098c6ca7b779c7951a93f46a",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-native-phase-source-transfer.json"
+    },
+    {
+      "path": "evidence/server-native-phase.mjs",
+      "bytes": 4868,
+      "sha256": "ee95b8143c4b57f3162045ff6ae3710226af0b852c8f9178d0cb4caf4250a5ee",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-native-phase.mjs"
+    },
+    {
+      "path": "evidence/server-node-provenance.json",
+      "bytes": 6791,
+      "sha256": "336d1163f05d48ed042b8a2199a37da9274220127c565871831b452d8f5a65eb",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-node-provenance.json"
+    },
+    {
+      "path": "evidence/server-stock-inspector-profile.json",
+      "bytes": 140515,
+      "sha256": "b510f9cb2bf6bd9a86063f79b10e0cec9514213e74c827652f47c5aab282cd7b",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-stock-inspector-profile.json"
+    },
+    {
+      "path": "evidence/server-stock-inspector-receipt.json",
+      "bytes": 570,
+      "sha256": "4e0d7820deb3887000f657a7888529d924870e66ec7c7d058628b1d7022e27de",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-stock-inspector-receipt.json"
+    },
+    {
+      "path": "evidence/server-stock-inspector-summary.json",
+      "bytes": 4627,
+      "sha256": "131fac5814e907ce4bad2f69daf05130f7d6a6e6367de1155d875263dd8157df",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-stock-inspector-summary.json"
+    },
+    {
+      "path": "evidence/server-timeout-parent-control.json",
+      "bytes": 384,
+      "sha256": "be7b91eb92a33d7a39992a5dece1458b55a2c960fe956dca56eb8e63d9b8c30a",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-timeout-parent-control.json"
+    },
+    {
+      "path": "evidence/server-timeout-parent-control.log",
+      "bytes": 25317,
+      "sha256": "74e0c6f9ab7a5890bb005a2bb3e5d7785308457f2b9d0b754bd532b780e17927",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/server-timeout-parent-control.log"
+    },
+    {
+      "path": "evidence/size-final.log",
+      "bytes": 5033,
+      "sha256": "ac094385fcd6dd5b33fb9b21758be2ee52aea567bb424cd54492612f68d04f63",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/size-final.log"
+    },
+    {
+      "path": "evidence/stock-guard-control.patch",
+      "bytes": 2980,
+      "sha256": "86c00e4922f4596f14faa562b9dc355e68bb020f3a969314234d13f215238d00",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-guard-control.patch"
+    },
+    {
+      "path": "evidence/stock-guard-install.log",
+      "bytes": 1013,
+      "sha256": "09c1e1ee40afccb606b4ae99788065a2890b9f8f779e4141bd89362b6734686c",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-guard-install.log"
+    },
+    {
+      "path": "evidence/stock-guard-mutant-receipts.json",
+      "bytes": 12637,
+      "sha256": "5016b8dbadeb292ba2c860220bded3c380e3031892c54d97439fc3762ae6e035",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-guard-mutant-receipts.json"
+    },
+    {
+      "path": "evidence/stock-guard-neighbor-receipts.json",
+      "bytes": 2634,
+      "sha256": "3d76a699b4b0773f5df32a73146d0031e8da5dabb0e51ed73d40fc8153b0a3e2",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-guard-neighbor-receipts.json"
+    },
+    {
+      "path": "evidence/stock-guard-positive-observed.json",
+      "bytes": 9347,
+      "sha256": "0c87e1b8652b5e2222dea71a1cf80718524eddc26307f5bea44d7535f6de7e4e",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-guard-positive-observed.json"
+    },
+    {
+      "path": "evidence/stock-guard-positive-receipt.json",
+      "bytes": 517,
+      "sha256": "bfb534fd17a4208e78904f3f5b5b6635f80de384184c14720877135bd0fd1a39",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-guard-positive-receipt.json"
+    },
+    {
+      "path": "evidence/stock-guard-positive-result.json",
+      "bytes": 83936,
+      "sha256": "a73ece2d117d0afa3b585b34c9dbcfb1fffd4b1d4f2379ad4b4d5fd108428f1e",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-guard-positive-result.json"
+    },
+    {
+      "path": "evidence/stock-guard-positive.log",
+      "bytes": 184,
+      "sha256": "23758021c80cef287a4b2cdfb5af303099e2ae459cf0b5b93ad152cc47d203c7",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-guard-positive.log"
+    },
+    {
+      "path": "evidence/stock-guard-review-manifest.json",
+      "bytes": 2753,
+      "sha256": "de7d726932e56869e0a539b261f6a9bef3c1fe65133387a7d6be97fbc31ffa65",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-guard-review-manifest.json"
+    },
+    {
+      "path": "evidence/stock-mutant-clamp-result.json",
+      "bytes": 85669,
+      "sha256": "bdd7196d2b30a1781896c787f04adb3239287e369e987de9cca5d3602e5fee32",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-clamp-result.json"
+    },
+    {
+      "path": "evidence/stock-mutant-clamp.log",
+      "bytes": 180,
+      "sha256": "0138336c64b62326d93166f43ce4b007d2aa4eccd4e3d385ccdf73948e5585e2",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-clamp.log"
+    },
+    {
+      "path": "evidence/stock-mutant-clamp.patch",
+      "bytes": 646,
+      "sha256": "b580726961aa8b3c3b63b1d706a2143ab5ba38c07ab483585f281d927123b92d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-clamp.patch"
+    },
+    {
+      "path": "evidence/stock-mutant-initial-zero-result.json",
+      "bytes": 85663,
+      "sha256": "e70173794e8bb1fa87c1dc58806e51da144a0d434f4f431b43bc91b179b29bfc",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-initial-zero-result.json"
+    },
+    {
+      "path": "evidence/stock-mutant-initial-zero.log",
+      "bytes": 189,
+      "sha256": "0081b1c600b05c277e0a89657e2af1beaf4e649784dda05d3fd3df4a482b6d5a",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-initial-zero.log"
+    },
+    {
+      "path": "evidence/stock-mutant-initial-zero.patch",
+      "bytes": 641,
+      "sha256": "92e9421ad1dd6d80f75fabf5c7eb1cb04706661803ab1ee73515d28a411f1dad",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-initial-zero.patch"
+    },
+    {
+      "path": "evidence/stock-mutant-spring-result.json",
+      "bytes": 85609,
+      "sha256": "defad8bfd1d1ef0a5f1503fca18d051ab46af4ff1495a747c40c91a9ae62bdd8",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-spring-result.json"
+    },
+    {
+      "path": "evidence/stock-mutant-spring.log",
+      "bytes": 181,
+      "sha256": "58679024d2f37cec1c2b6504ab34d1e6cd8b74405b45d23a94381ce6b8645a1d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-spring.log"
+    },
+    {
+      "path": "evidence/stock-mutant-spring.patch",
+      "bytes": 675,
+      "sha256": "43dcf28262b96b0d5579a69be3bbf9ae7ad69f9f0b062da60e01eed9a1149202",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-spring.patch"
+    },
+    {
+      "path": "evidence/stock-mutant-target-result.json",
+      "bytes": 85669,
+      "sha256": "4a98e603bfdd1649734cae40e53f9ab6134ef9037790c9d27cdef67a944bfb54",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-target-result.json"
+    },
+    {
+      "path": "evidence/stock-mutant-target.log",
+      "bytes": 183,
+      "sha256": "ce28447985dfe1702a8eb99eea76594037fb9ec3a6f54ea70c5f4df56c63e2fb",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-target.log"
+    },
+    {
+      "path": "evidence/stock-mutant-target.patch",
+      "bytes": 665,
+      "sha256": "06be833ed7a16df8ad9086bb6689c4f9c56a77559b30674b4fa4168eaaa4582d",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-mutant-target.patch"
+    },
+    {
+      "path": "evidence/stock-neighbor-extra-undefined-result.json",
+      "bytes": 83937,
+      "sha256": "07bb38aada2fd968733eec86ab49f171a43d97c96c64ac6c90589c91a7d99916",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-neighbor-extra-undefined-result.json"
+    },
+    {
+      "path": "evidence/stock-neighbor-extra-undefined.log",
+      "bytes": 194,
+      "sha256": "73588bf9f0c3fbfb43e3391f4511095ded35ed74c36b513e27b912493eff637a",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-neighbor-extra-undefined.log"
+    },
+    {
+      "path": "evidence/stock-neighbor-extra-undefined.patch",
+      "bytes": 678,
+      "sha256": "d9a429e85fecebc9fa1b3d17bddfb8fb26fd019135a6dd9467f06eb0ae872004",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-neighbor-extra-undefined.patch"
+    },
+    {
+      "path": "evidence/stock-neighbor-prototype-result.json",
+      "bytes": 83928,
+      "sha256": "f7d503fc1442f363a1367b2a8a3824f9f40abe2385c139b8860e6137bd4c21ef",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-neighbor-prototype-result.json"
+    },
+    {
+      "path": "evidence/stock-neighbor-prototype.log",
+      "bytes": 188,
+      "sha256": "a43bd9bba7bd9e3fff56beb3fc50fe0b3599ee972baad5d2f0a32c6e87087224",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-neighbor-prototype.log"
+    },
+    {
+      "path": "evidence/stock-neighbor-prototype.patch",
+      "bytes": 710,
+      "sha256": "7ff56e8a2a337d42e1b8c9c3dbce9a17db11a12f6675a46a1bf59b9a50a19784",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/stock-neighbor-prototype.patch"
+    },
+    {
+      "path": "packages/browser-scope-labpics-motion-0.3.0.tgz",
+      "bytes": 564707,
+      "sha256": "a30fa4f8d0e3a011caa181b82931f99653c9887a3646353aa700870cfa0beced",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/native-observation-package/labpics-motion-0.3.0.tgz"
+    },
+    {
+      "path": "packages/qualified-labpics-motion-0.3.0.tgz",
+      "bytes": 564700,
+      "sha256": "6e81f47096286fba47feb1d43f4a862bd28078a93f7aa3d4e5e18d8225d6438b",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/qualified-package/labpics-motion-0.3.0.tgz"
+    },
+    {
+      "path": "reports/driver-mutation.html",
+      "bytes": 696734,
+      "sha256": "bf98054b34de002efdf3a8d16a4604dc549eb7f9121839b5bc26c3ccdee30903",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/reports/mutation/driver/index.html"
+    },
+    {
+      "path": "resource/current-red/bytes.stdout.log",
+      "bytes": 3174,
+      "sha256": "b1c0d0ff981a189ab1cd7f86ecd2f0cd414c9a7fce19a3bdce2927f4b28a01ac",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-fB2ZBR/bytes.stdout.log"
+    },
+    {
+      "path": "resource/current-red/lifecycle.stdout.log",
+      "bytes": 1909,
+      "sha256": "cd62e415ba72ba8ec4f0deced396d45116c56fa7b9b895c54311726e7c91d0b5",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-fB2ZBR/lifecycle.stdout.log"
+    },
+    {
+      "path": "resource/current-red/package-tuple.json",
+      "bytes": 1707,
+      "sha256": "e524ac1aeb5deca0738fe9ca9a942f77635cb423397ed07a7509ac38321bd5cb",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-fB2ZBR/package-tuple.json"
+    },
+    {
+      "path": "resource/current-red/resource-package-probe.mjs",
+      "bytes": 40738,
+      "sha256": "1cbd6e0d2e89fd99a10b37292305c819b269bd24b700d9bde799d99e9467174f",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-fB2ZBR/resource-package-probe.mjs"
+    },
+    {
+      "path": "resource/current-red/retention.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-fB2ZBR/retention.stderr.log"
+    },
+    {
+      "path": "resource/current-red/retention.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-fB2ZBR/retention.stdout.log"
+    },
+    {
+      "path": "resource/current-red/witness.stdout.log",
+      "bytes": 3468,
+      "sha256": "ba07d21570ae338b55e9d1626e0cec9e477f63799a876ed80f9b3723ed0017c0",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-fB2ZBR/witness.stdout.log"
+    },
+    {
+      "path": "resource/previous-pass/bytes.stdout.log",
+      "bytes": 3174,
+      "sha256": "6e5d34cc0f89c2c8c545320353fbb566e4c2bddc29448217c1fc7912d59c91e7",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-i16sDX/bytes.stdout.log"
+    },
+    {
+      "path": "resource/previous-pass/lifecycle.stdout.log",
+      "bytes": 1909,
+      "sha256": "cd62e415ba72ba8ec4f0deced396d45116c56fa7b9b895c54311726e7c91d0b5",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-i16sDX/lifecycle.stdout.log"
+    },
+    {
+      "path": "resource/previous-pass/package-tuple.json",
+      "bytes": 1707,
+      "sha256": "6846a61cc9df825b8c73120d431db9b8fcfdc122a71fc864b4c19cbd6aafaa01",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-i16sDX/package-tuple.json"
+    },
+    {
+      "path": "resource/previous-pass/resource-package-probe.mjs",
+      "bytes": 40738,
+      "sha256": "1cbd6e0d2e89fd99a10b37292305c819b269bd24b700d9bde799d99e9467174f",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-i16sDX/resource-package-probe.mjs"
+    },
+    {
+      "path": "resource/previous-pass/retention.stdout.log",
+      "bytes": 3626,
+      "sha256": "1382215c552ad65ab1f6c219dfa891d315333b4364c71d92bbfc276fd7afcdc9",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-i16sDX/retention.stdout.log"
+    },
+    {
+      "path": "resource/previous-pass/witness.stdout.log",
+      "bytes": 3468,
+      "sha256": "ba07d21570ae338b55e9d1626e0cec9e477f63799a876ed80f9b3723ed0017c0",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/source/scratchpad/resource-evidence/run-i16sDX/witness.stdout.log"
+    },
+    {
+      "path": "reviews/evidence/RESOURCE-ORACLE-REVIEW.md",
+      "bytes": 9447,
+      "sha256": "e6a9f61980edf9f15a234ad303e9af2ac61765e962584d5327856e11c19838c6",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/RESOURCE-ORACLE-REVIEW.md"
+    },
+    {
+      "path": "reviews/evidence/SOURCE-CONSERVATION-REVIEW.md",
+      "bytes": 2787,
+      "sha256": "e61dd3bce9a453c1209d85a5a6eca7bc6a154536ea43bef10e7fbff8dea894bd",
+      "source": "/home/labpics-ops/work/motion-follow-resource-integration-20261002/evidence/SOURCE-CONSERVATION-REVIEW.md"
+    },
+    {
+      "path": "reviews/motion-contract-tests-review/readset-manifest.json",
+      "bytes": 9167,
+      "sha256": "79dfdad67f31c0f1281820801428184105e6ae57c07374589b4a951849891d18",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-contract-tests-review/readset-manifest.json"
+    },
+    {
+      "path": "reviews/motion-contract-tests-review/review.md",
+      "bytes": 7968,
+      "sha256": "fd44044e700d38d604d4ce6a48bdf42a498e0f59ae88ecb2c64b9b2ea16b3511",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-contract-tests-review/review.md"
+    },
+    {
+      "path": "reviews/motion-contract-tests-review/verdict.json",
+      "bytes": 875,
+      "sha256": "c3e1cd04ce01d2a3396ed37a40abcc7e6e9aa65fa06bc4380c4f161866aa6407",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-contract-tests-review/verdict.json"
+    },
+    {
+      "path": "reviews/motion-cost-boundary-independent-review/readset.json",
+      "bytes": 6034,
+      "sha256": "226319131a33f9f70d6692c640a2fb1bdb466e12ca1c93b9eed815b07f313eac",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-cost-boundary-independent-review/readset.json"
+    },
+    {
+      "path": "reviews/motion-cost-boundary-independent-review/report.md",
+      "bytes": 9813,
+      "sha256": "57e6e12f50beed9680b6be1c8d1cca51c9f30fc757ddb698ca6a9a3a61652a36",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-cost-boundary-independent-review/report.md"
+    },
+    {
+      "path": "reviews/motion-cost-boundary-independent-review/verdict.json",
+      "bytes": 853,
+      "sha256": "64128cec58b43da2962c6dbdae08e12405b3fc424c95ca67e38ba73345577113",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-cost-boundary-independent-review/verdict.json"
+    },
+    {
+      "path": "reviews/motion-final-owner-architecture-review/REVIEW.md",
+      "bytes": 11196,
+      "sha256": "e16162ba3f961daadc886b96df82876ce7f8d3250291cca67d8c4eed6d759046",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-final-owner-architecture-review/REVIEW.md"
+    },
+    {
+      "path": "reviews/motion-final-owner-architecture-review/readset.json",
+      "bytes": 9223,
+      "sha256": "fb6f9b34c18996ea8d951b4c641c67b930ccbf9ce89f9733cb2b0a7b0d090850",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-final-owner-architecture-review/readset.json"
+    },
+    {
+      "path": "reviews/motion-final-owner-semantics-review/manifest.json",
+      "bytes": 8222,
+      "sha256": "2dcd4f85bf7e3a9360e9216e980262b2bad8c03429e4dfe74c8a78e05cf8f721",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-final-owner-semantics-review/manifest.json"
+    },
+    {
+      "path": "reviews/motion-final-owner-semantics-review/plan-r11.md",
+      "bytes": 74166,
+      "sha256": "cbeef108b288502165437c375bb259f3f4d6dc8ae4ae9e926db133adeba40d4b",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-final-owner-semantics-review/plan-r11.md"
+    },
+    {
+      "path": "reviews/motion-final-owner-semantics-review/report.md",
+      "bytes": 10848,
+      "sha256": "691230f7d8260efb57c547bacc0c2dae818b1f927c7eb4f479d3fcd807e5abfa",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-final-owner-semantics-review/report.md"
+    },
+    {
+      "path": "reviews/motion-final-owner-semantics-review/runtime.diff",
+      "bytes": 7931,
+      "sha256": "6933354cbdcb367d25963789c2ca65300b5c1bb9c96a61d3823525189c19d23d",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-final-owner-semantics-review/runtime.diff"
+    },
+    {
+      "path": "reviews/motion-final-owner-semantics-review/verdict.json",
+      "bytes": 757,
+      "sha256": "e0b054d10109dd27b632758786bf6b5e3fd377c8635434f2ceacd93888ed2dae",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-final-owner-semantics-review/verdict.json"
+    },
+    {
+      "path": "reviews/motion-mutation-applicability-review/readset.json",
+      "bytes": 9676,
+      "sha256": "ebf04cfcb9473cdd254f459f0a1c3e2f9c5f226c4cb61ff223ef3d6c290c228e",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-mutation-applicability-review/readset.json"
+    },
+    {
+      "path": "reviews/motion-mutation-applicability-review/report.md",
+      "bytes": 11869,
+      "sha256": "ba83a012f2c32da71ce48e72bb37b8446abba3a5e09b4b26103c62b4f7c8a145",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-mutation-applicability-review/report.md"
+    },
+    {
+      "path": "reviews/motion-mutation-applicability-review/verdict.json",
+      "bytes": 964,
+      "sha256": "bbe3fa3a3e22953eb8d35fcfadbb759990eb623dc292143dd1d4461021507eb4",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-mutation-applicability-review/verdict.json"
+    },
+    {
+      "path": "reviews/motion-native-observation-review/resource-defect-preservation.json",
+      "bytes": 6968,
+      "sha256": "c9b0a1267f316f4553a6c5abbd1326f2446e58f9705193618a378bcfb1c6fc14",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-native-observation-review/resource-defect-preservation.json"
+    },
+    {
+      "path": "reviews/motion-stock-guard-independent-review/candidate.diff",
+      "bytes": 2980,
+      "sha256": "86c00e4922f4596f14faa562b9dc355e68bb020f3a969314234d13f215238d00",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-stock-guard-independent-review/candidate.diff"
+    },
+    {
+      "path": "reviews/motion-stock-guard-independent-review/differential-result.json",
+      "bytes": 893,
+      "sha256": "470290fff9acdfa04758f00e1cd11c059ec9e5620f0191ff9a85bae9fb802950",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-stock-guard-independent-review/differential-result.json"
+    },
+    {
+      "path": "reviews/motion-stock-guard-independent-review/differential.mjs",
+      "bytes": 1184,
+      "sha256": "2baaf4e68131b919b3ccd7c8286f254ed3293f90461319552a425c4a044e304b",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-stock-guard-independent-review/differential.mjs"
+    },
+    {
+      "path": "reviews/motion-stock-guard-independent-review/integrity-readback.json",
+      "bytes": 6124,
+      "sha256": "a314eb22453e949399657f6ad8f0dc9a51ed6e9a3779dcd079c6da7012910851",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-stock-guard-independent-review/integrity-readback.json"
+    },
+    {
+      "path": "reviews/motion-stock-guard-independent-review/producer-history-readback.json",
+      "bytes": 399,
+      "sha256": "e64907693db0efcab65898b6c50210ad3da591365b1bdf9204f43b4263051ffb",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-stock-guard-independent-review/producer-history-readback.json"
+    },
+    {
+      "path": "reviews/motion-stock-guard-independent-review/receipt-git-readback.json",
+      "bytes": 1407,
+      "sha256": "22cc8a1436f737f54dbc015702f13ea8836245e273856b09130ad804eb4a4f31",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-stock-guard-independent-review/receipt-git-readback.json"
+    },
+    {
+      "path": "reviews/motion-stock-guard-independent-review/review.md",
+      "bytes": 5680,
+      "sha256": "bd8830af181fe800d9736834c56c7126053b37a40766c73954d3962bdff590d0",
+      "source": "/home/labpics-ops/work/colors-motion-goal-20261002/motion-stock-guard-independent-review/review.md"
+    }
+  ],
+  "scope": "Сохранение frozen local evidence и исходных наблюдений, включая RED; не повтор проверок, не независимый verdict и не завершение приёмки продукта."
+}
