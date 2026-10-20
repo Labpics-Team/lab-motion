@@ -7,6 +7,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-10-20
+
 ### Добавлено
 
 - `playhead(playback)` добавляет к `animate`, `sequence` и `value.animate`
