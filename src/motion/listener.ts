@@ -1,3 +1,4 @@
+import { rethrow } from './attempt-all.js';
 import { MotionError } from './model.js';
 
 /** Регистрация имеет собственную идентичность и очищается также после once/abort. */
@@ -26,7 +27,7 @@ export function listen(elements: readonly EventTarget[], type: string, callback:
     for (const target of targets) {
       try { target.removeEventListener(type, invoke, capture); } catch (error) { errors.push(error); }
     }
-    if (errors.length) throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'Не удалось снять подписки');
+    rethrow(errors, 'Не удалось снять подписки');
   }
   function invoke(this: EventTarget, event: Event): void {
     if (released || !retained.has(this)) return;

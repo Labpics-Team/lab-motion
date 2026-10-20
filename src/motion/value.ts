@@ -1,3 +1,4 @@
+import { rethrow } from './attempt-all.js';
 import { MotionError, number } from './model.js';
 import { runtime } from './runtime.js';
 import type { Disposable, MotionOptions, Playback } from './types.js';
@@ -31,7 +32,7 @@ export function value(initial: number = 0): MotionValue {
           if (listeners.get(listener) !== registration) continue;
           try { listener(next); } catch (error) { errors.push(error); }
         }
-        if (errors.length) throw errors.length === 1 ? errors[0] : new AggregateError(errors, 'Ошибка подписки на движение');
+        rethrow(errors, 'Ошибка подписки на движение');
       });
     },
   } } as unknown as Element;

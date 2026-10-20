@@ -33,3 +33,21 @@ it('ошибка фиксации при паузе остаётся причи�
   expect(cancellations).toBe(1);
   expect(h.updates.size + h.renders.size).toBe(0);
 });
+
+it('завершение прежнего эффекта не завершает successor, созданный во время cancel', async () => {
+  const h = harness(true);
+  const old = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 100 });
+  const effect = h.effects[0]!, cancel = effect.cancel;
+  let successor: ReturnType<typeof h.runtime.animate> | undefined;
+  effect.cancel = () => {
+    cancel();
+    successor = h.runtime.animate(h.element, { x: [100, 200] }, { duration: 1000 });
+  };
+  effect.complete(); await old.finished;
+  expect(successor).toBeDefined(); expect(successor!.state).toBe('running');
+  expect(h.effects.at(-1)!.cancelled).toBe(false);
+  successor!.seek(500); expect(h.x()).toBe(150);
+  successor!.finish(); expect(await successor!.finished).toEqual({ status: 'finished' });
+  expect(h.effects.every(item => item.cancelled)).toBe(true);
+  expect(h.updates.size + h.renders.size).toBe(0);
+});

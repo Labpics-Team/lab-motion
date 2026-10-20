@@ -1,7 +1,8 @@
 /** Сверяет названия исходников, экспорты и CSS-имена с их владельцами. */
 
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { existsSync, lstatSync, readFileSync } from 'node:fs';
+import { extname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { BINDINGS, ROOT, collectInventory } from './naming-inventory.mjs';
 
@@ -83,8 +84,67 @@ export function fileLawErrors(section, nonKebab) {
 }
 
 
-export function auditRepo(root = ROOT) {
+/** Отдельно рассматриваем поля документа и содержимое fenced-примеров. */
+function proseOutsideFences(text) {
+  const lines = [];
+  let fence;
+  for (const line of text.split('\n')) {
+    if (fence) {
+      const closing = /^ {0,3}(`+|~+)[\t ]*$/.exec(line);
+      if (closing && closing[1][0] === fence[0] && closing[1].length >= fence.length) fence = undefined;
+      continue;
+    }
+    const opening = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (opening && !(opening[1][0] === '`' && opening[2].includes('`'))) {
+      fence = opening[1];
+    } else {
+      lines.push(line);
+    }
+  }
+  return lines.join('\n');
+}
+
+/** Признаки рабочих записей; предметные планы исполнения остаются допустимы. */
+export function workRecordReason(file, text) {
+  const parts = file.split('/');
+  if (parts.length > 1 && ['plans', 'handoffs', 'worklogs'].includes(parts[0].toLowerCase())) {
+    return 'рабочий каталог';
+  }
+  const normalized = text.replace(/^\uFEFF/, '').replaceAll('\r\n', '\n');
+  if (normalized.startsWith('---\n')) {
+    const frontmatter = normalized.slice(4).split('\n---', 1)[0];
+    const keys = new Set([...frontmatter.matchAll(/^([a-z][a-z_-]*):/gm)].map((match) => match[1]));
+    if (['track', 'revision', 'owns'].every((key) => keys.has(key))) return 'план работы агента';
+  }
+  const fields = new Set([...proseOutsideFences(normalized).matchAll(/^\*\*([^*\n]+):\*\*/gm)]
+    .map((match) => match[1].trim().toLowerCase()));
+  if ((fields.has('status') && fields.has('branch'))
+    || (fields.has('baseline sha') && fields.has('head at validation'))) return 'отчёт рабочей сессии';
+  return undefined;
+}
+
+/** Проверка tracked-текстов не включает локальные результаты сборки и измерений. */
+export function documentErrors(root = ROOT) {
+  const gitRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], { cwd: root, encoding: 'utf8' }).trim();
+  if (resolve(gitRoot) !== resolve(root)) throw new Error('inventory root differs from repository root');
+  const names = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean);
   const errors = [];
+  const decoder = new TextDecoder('utf-8', { fatal: true });
+  for (const name of names) {
+    if (!['.md', '.mdx', '.rst', '.txt'].includes(extname(name).toLowerCase())) continue;
+    const filename = join(root, name);
+    const entry = lstatSync(filename);
+    if (!entry.isFile() || entry.isSymbolicLink()) throw new Error('not a regular document: ' + name);
+    const text = decoder.decode(readFileSync(filename));
+    if (/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/u.test(text)) errors.push(name + ': скрытый управляющий символ');
+    const reason = workRecordReason(name, text);
+    if (reason) errors.push(name + ': ' + reason);
+  }
+  return errors;
+}
+
+export function auditRepo(root = ROOT) {
+  const errors = documentErrors(root);
   const namingPath = join(root, 'docs', 'NAMING.md');
   const inv = collectInventory(root);
   if (!existsSync(namingPath)) {
