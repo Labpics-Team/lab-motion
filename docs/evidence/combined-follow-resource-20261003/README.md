@@ -7,7 +7,7 @@ mutation в нём — **RED**; эти результаты не описыва�
 
 Источник переноса — [agents-config #1465](https://github.com/Labpics-Team/agents-config/pull/1465)
 на [`6ac1306bb7ff9824f4ef8992f0a8967690267709`](https://github.com/Labpics-Team/agents-config/tree/6ac1306bb7ff9824f4ef8992f0a8967690267709/plans/lab-motion-production/evidence/combined-follow-resource-20261003).
-Исправленные 7 октября команды ниже останавливают подготовку на первой ошибке и
+Команды ниже останавливают подготовку на первой ошибке и
 сохраняют ненулевой итог при отказе любой проверки. Raw receipts остаются исходными.
 
 ## Исходный снимок и история
@@ -31,9 +31,7 @@ Source PR — [Motion #462](https://github.com/Labpics-Team/lab-motion/pull/462)
 Предыдущий [carrier #1301](https://github.com/Labpics-Team/agents-config/pull/1301)
 и исходный Vue/RESOURCE [#1270](https://github.com/Labpics-Team/agents-config/pull/1270)
 сохранены в истории; этот combined-пакет содержит последующие RED-наблюдения и не
-зависит от merge #1270. Ветка `fix/sqlite-attempt-oracle-20261003` была целевой base
-прежнего carrier PR. Это историческое размещение, не prerequisite чтения в Motion
-и не требование прежних центральных механизмов допуска.
+зависит от merge #1270.
 
 ## Проверить и прочитать локально
 
