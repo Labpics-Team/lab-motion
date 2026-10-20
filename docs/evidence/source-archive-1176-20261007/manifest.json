@@ -1,0 +1,2250 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-07",
+  "source_pr": 1176,
+  "source_repository": "Labpics-Team/agents-config",
+  "source_head": "d3224cd485701d7fa8448c19b0529f3931b03acb",
+  "source_base": "aa868277c462ac033c255ea7c264a649ed3d0345",
+  "source_tree": "962568ff2893fcba7e37fcc9beaf772311bb2788",
+  "previous_carrier_head": "8a3d3ef0077757f59c5b969ec2c770ae6508adab",
+  "track": "lab-motion-production",
+  "archive": {
+    "path": "inputs.tar.gz",
+    "bytes": 472052,
+    "sha256": "6058aa36d3e291bdbf834f72300dad5f1afd7c3d1f5309019930a919e8e3c03b"
+  },
+  "members": [
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/README.md",
+      "bytes": 3051,
+      "sha256": "cf47c415f9905f1c198b76d77d42a25dbe32bb18e4c371edac94ed7d594f690a",
+      "git_blob": "907f0d1d9b910d769c81c482e7adf74982462684",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/README.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-declarations.json",
+      "bytes": 500,
+      "sha256": "867186a63690af9a727569ec6f62ec6afb44248024af33a0812fe07a676bb35d",
+      "git_blob": "cabfcba2c51151c68b76222f53dcbbf3f7f41f3b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-declarations.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-declarations.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-declarations.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-declarations.stdout.log",
+      "bytes": 61,
+      "sha256": "1d2e470d1312ade9731bd719ab958752ef6ee7c9701d68fe3e1a9f590517b9ca",
+      "git_blob": "8638ec1b57c649469e6022b33068605fb123e66a",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-declarations.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-js.json",
+      "bytes": 498,
+      "sha256": "4d1eca9c880a58263e8866508a1e68da9eafe0331924f038e74fcafc9e1108d6",
+      "git_blob": "252f3a146876469058b566452a9b16c03b7b3cfb",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-js.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-js.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-js.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-js.stdout.log",
+      "bytes": 12019,
+      "sha256": "cb90606752a0e654c7682a81c90bef513edb8762a5554965418959d60ae33c7f",
+      "git_blob": "8a8b32f0119c81b701fc14261999022f8b160d0c",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/build-js.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/candidate-inputs.json",
+      "bytes": 312,
+      "sha256": "4ce2029034415d435681eda517ad3a234bc909f326c4228439ef1bc23144a0e1",
+      "git_blob": "51072ec45fd5395807abbceb08f4c127f4171612",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/candidate-inputs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/candidate-source.ts",
+      "bytes": 26909,
+      "sha256": "2c179e54fffe6fe36bb347c188f5197318565f4516af504523fec9c5e8e618d5",
+      "git_blob": "96c69dd5b020a638003824f650459f2b02c32462",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/candidate-source.ts"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/candidate-test.ts",
+      "bytes": 1145,
+      "sha256": "752856286d1e8280c5ac419c58a168c27638ab696e5368ffb50d38ab5149f1cd",
+      "git_blob": "fac2a49eba9ebeadb43b897582121d0c4ce36e7e",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/candidate-test.ts"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/candidate.patch",
+      "bytes": 11730,
+      "sha256": "b644ef9b0fe179f0b7f66827f8b85f879fc7a7c652375cad7c03cacf5502b0e4",
+      "git_blob": "a991737426da1fb327791c7ce172234968a917c3",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/candidate.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/commit-combined-readback.json",
+      "bytes": 1027,
+      "sha256": "0079c4e45e36ba6299c14ba00d8c6f60d07b796d11f5bacd27dce1563456c522",
+      "git_blob": "092c6698c1c1b446ffaac5469418511fdfb65629",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/commit-combined-readback.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/inputs.json",
+      "bytes": 414,
+      "sha256": "16d8918dd522eee07773ed2a581a9e465b69d4644abbc4d8aca7b627e1a33be8",
+      "git_blob": "0fdabc3b10988c29483b75da757be554cc3aa089",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/inputs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/manifest.json",
+      "bytes": 7672,
+      "sha256": "8415a7fdb4946ddd153bea56e2ab96bdb62b85a6b21850d933309043c41aa64b",
+      "git_blob": "0fb2c4c1107b6811458150dcbc16845f35d51fe6",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/manifest.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/qualification.json",
+      "bytes": 711,
+      "sha256": "2ea440bb27abc0c3411d50f644f355b8566956650b281f3d49ad226bd9f4d4fd",
+      "git_blob": "d73822a52cfdd363ff904df35f775fbbad8bec68",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/qualification.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-cjs.json",
+      "bytes": 606,
+      "sha256": "a2ccf56bc27d15d809fb5578d1573fbfb3c5215e287a31e8cbe14f4812401560",
+      "git_blob": "71b792ea7bfde4376189abc6f30884a8d21d9047",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-cjs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-cjs.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-cjs.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-cjs.stdout.log",
+      "bytes": 495,
+      "sha256": "f0d5cb54cfb58b18e295bb864e64c9379f894372749aeb05e0cf13b8be73ecea",
+      "git_blob": "1a9f2923a072078f59a448ac0f5c05895505935b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-cjs.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-esm.json",
+      "bytes": 606,
+      "sha256": "ff548528a3913f4dc6986fb5e6a78284f425fddcfd700c92d69153a13d876ac3",
+      "git_blob": "eb388e0973badf2c0f80225e105ac105ce379668",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-esm.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-esm.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-esm.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-esm.stdout.log",
+      "bytes": 494,
+      "sha256": "9e7ce60879a346f78b37deb83f45b08219dea113031b2832061711dc1c394db7",
+      "git_blob": "56e5fd1aa11ef580b3ac09c7d6a590687a944ac4",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-esm.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-package-liveness.mjs",
+      "bytes": 4624,
+      "sha256": "e30e1cf221228d430c56e9735f7fa271624b9a4ffa6933b3e800de3005244f54",
+      "git_blob": "d25f13aaba2b0da95b238d834806169d7a2d238d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/raw-package-liveness.mjs"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/red-delivery.json",
+      "bytes": 770,
+      "sha256": "a683d81521f753accaba64eacdb932cf73500282f42f32b53db31e71def7ccb0",
+      "git_blob": "d001979d0cae47e207aed4f80e8a31e964721cc9",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/red-delivery.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/red-delivery.stderr.log",
+      "bytes": 1478,
+      "sha256": "da34f276725018c1da8ff12420ad3c29cf8a154aac240b2f5d71629cb23b772c",
+      "git_blob": "49b55e16d842378ae38c1d01b9753bcf8aac2ec2",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/red-delivery.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/red-delivery.stdout.log",
+      "bytes": 753,
+      "sha256": "a42c160681934aa3eaba11e9c33ca13242c62b3b763f8c59545434c7d794477f",
+      "git_blob": "77d6f5b63ae38bab22c4ea00941accc2a7ded27d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/red-delivery.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/review-contract.md",
+      "bytes": 3549,
+      "sha256": "f645f9fe8b678d754ab18731f64b96e18ba6346c11449269a420a8fba9fb188c",
+      "git_blob": "2a496f88722076b418edde2c29f214bb041e3f14",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/review-contract.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/size.json",
+      "bytes": 478,
+      "sha256": "6ed53d2f2025a32343aaa210c14a1184154dcc44968e5875e412f13082ce04ed",
+      "git_blob": "4bd64993fa0d9bb0ed41274367f5394e18af893e",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/size.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/size.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/size.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/size.stdout.log",
+      "bytes": 4698,
+      "sha256": "d1c253863330d28d31263c8f18d4c856ada83197a4ec2313dc71f6e109acbdec",
+      "git_blob": "9cccc1a9c9c58147e11dbf8640c5b9d7a0b21120",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/size.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/typecheck.json",
+      "bytes": 509,
+      "sha256": "cbe86b1607e5328586c7e25816b60dab4b5fed782597179f8381466a316234d8",
+      "git_blob": "6b5273f4ddae6cd1f7ff724c82dd6ce0bb1b2aa2",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/typecheck.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/typecheck.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/typecheck.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/typecheck.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/typecheck.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/unit.json",
+      "bytes": 1105,
+      "sha256": "83d9360b04707a98005a48efc27aa24a319d92e4c25ee3b9a11cd28244ae1d23",
+      "git_blob": "24ab783107f49a9ab87ee0dca9f0521906da15f6",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/unit.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/unit.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/unit.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/unit.stdout.log",
+      "bytes": 1605,
+      "sha256": "e8c755f3484bb74775865dcc8ed3bf7911b9bc08f8c83d22810431ef0b7d863d",
+      "git_blob": "85394c005d961f900ba8fa1fab6ce24361e15aa0",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/evidence/unit.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/qualify.py",
+      "bytes": 573,
+      "sha256": "fa13a39cebefd58815d10f3ae668a7754a24e256e8c291280c7787382cd78630",
+      "git_blob": "a510c488ed99296de834580e8a30d626c8248a02",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/qualify.py"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/run.py",
+      "bytes": 1212,
+      "sha256": "6aaf8832d4cfa7c1ad4e3566d60065db010bc4d9b8db182f890ce9f9c3bf973b",
+      "git_blob": "82a54d6d373132cc5242d764bf391c7bb006c65f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/run.py"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/vitest.config.mjs",
+      "bytes": 212,
+      "sha256": "5f28f23a9c3d710df652e4a2d53fa36974a0f75ff3649917e1ba0896dd4cc786",
+      "git_blob": "6adb4d0df4bad1c13bbcd90bc1d545b80cc19cee",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/frame-consumption/vitest.config.mjs"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/reviews/frame-axis1.md",
+      "bytes": 3754,
+      "sha256": "9da1fdecae7965bb24cea6630adeef23d71bb44c8c629c1f138fb10a5865b658",
+      "git_blob": "cec83e0a1dd5910c63c6c7834613850a54fa7c5c",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/reviews/frame-axis1.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/reviews/frame-axis2.md",
+      "bytes": 4381,
+      "sha256": "cd6f01573394a41817b34147f603d52aa1334faf99fa2866c800e2471a2b76ab",
+      "git_blob": "a4d0f27ed5c2af5a180858a6e122cdd1ea75fd2b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/reviews/frame-axis2.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/reviews/webkit-initial.md",
+      "bytes": 5254,
+      "sha256": "dfdb3f70ae70df0d4527687400278ccbcd0a59341567e7222320b5247c12e6c0",
+      "git_blob": "8127f9f4cf41ef482bfdcfa1afe56ce8cbfd63d8",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/reviews/webkit-initial.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/reviews/webkit-pickup.md",
+      "bytes": 2916,
+      "sha256": "7704acadb4ab10128a428ba02355b8432601d33dfe21339db92f7dfb7dd9f11b",
+      "git_blob": "93d83b6d9486d9020a46cd06668edeb3ab008f2d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/reviews/webkit-pickup.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/RESULT.md",
+      "bytes": 3447,
+      "sha256": "1bcbcf900126bdb09709c2981d90ecf873e276de52479faf0c30059a8d760e2c",
+      "git_blob": "c588c262de5938759f78923dd9910baa1179da31",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/RESULT.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/candidate-final.patch",
+      "bytes": 1827,
+      "sha256": "725fd87952199e59f1316c481cb2ae7af43b5a312714e9dcc9d4dab8dea5dba6",
+      "git_blob": "a74d3f8ea6200006b06e428d676c9bf12a53642d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/candidate-final.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/candidate.patch",
+      "bytes": 2938,
+      "sha256": "bf6dae1c0c7059a8564e125600abf4eda9ceef76b785bf15d3f189c410221baf",
+      "git_blob": "fe26000ec992040af6ab6421915a59b7ec676df9",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/candidate.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-artifact.zip",
+      "bytes": 95092,
+      "sha256": "e8e0772928b1792edb6f43885a039580f2708f054c6f82bdb50797479eba08d7",
+      "git_blob": "e8fc705c9b57971c65450f282bb7847a3307ad75",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-artifact.zip"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-artifacts.json",
+      "bytes": 777,
+      "sha256": "68fa009128e8e92880a83ffbdb9a003b1203dea86325c449d86ff04d57e2fdaf",
+      "git_blob": "077a2e339fed2b6cea56e5e597102f2e39aad363",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-artifacts.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-failure-trace.zip",
+      "bytes": 59174,
+      "sha256": "e5db016e35a11f3187f01b837a2115775b12f94aea470d8f753b666392e5889a",
+      "git_blob": "84e4d43d9d8c1d37241bac522c16f35af6af623b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-failure-trace.zip"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-failure.log",
+      "bytes": 286427,
+      "sha256": "bbc44bca371ad64a525f42d3c9caf5ab23d4368ce672912f79552f02685060d3",
+      "git_blob": "2d39c9b003f892950f36681b670e39c2fea805c9",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-failure.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-jobs.json",
+      "bytes": 35087,
+      "sha256": "eecbcacdebf52f1314a34fd8402e6c31b7748aedeca3fd471a76bf09b4f95c07",
+      "git_blob": "5ed381add7bb43558b42598dd28ae18281a9fe09",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-jobs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-package-receipt.json",
+      "bytes": 885,
+      "sha256": "cb48cad1695d4ee8f18449d083abca0e0158f31ff34a08fd556d2a839f51357f",
+      "git_blob": "065dc4ae3ddcf5841054ed4c39c7605dc27a9bae",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-package-receipt.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-recipe-bundle.js",
+      "bytes": 18237,
+      "sha256": "956f8a825b93bc456b5286af28363d8860c37b78d21b82da3650096d9b5b4a0d",
+      "git_blob": "6d950083fa485d2f8a69d7dca730d95df8b05301",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-recipe-bundle.js"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-trace-actions.json",
+      "bytes": 6934,
+      "sha256": "7c9938847f6d60b109a17381a174d4bf5e10b2865ce5e0fb3a66927b359cb75f",
+      "git_blob": "6a5944a7947c3441d97c1684158b13e5478cdd7b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/ci-trace-actions.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/manifest.json",
+      "bytes": 3283,
+      "sha256": "fd26fbb754ad88fe3a105a867949200a0ee9f5a3d1498706ddbced9d19d8e25b",
+      "git_blob": "7f749d7804c785da1ea2760a7084f293c591134b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/manifest.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/review-contract.md",
+      "bytes": 2563,
+      "sha256": "efb896cea7e094fffde76107816b4550f6c8f1bd72dd830802d25dcc75e5d88e",
+      "git_blob": "9ecef4296628935bf35b2ac80e6f6b14a91d7318",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/review-contract.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/runtime-witness-corrected-receipt.json",
+      "bytes": 406,
+      "sha256": "0530e59d0295c1db8078b10e096b31ab4983d02b75e24d719c3f53ce8a13a3ab",
+      "git_blob": "a37e19a51200a7b200a0cbbb6c127a7a8b4ef9a4",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/runtime-witness-corrected-receipt.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/runtime-witness-corrected-result.json",
+      "bytes": 541,
+      "sha256": "17dc6ab96e51cd6303168fe8754168551f2f2bd0d45eb071a9424538892304fa",
+      "git_blob": "a55cab8bc9a6bc769ca7d8dfaa557bf42ad507c8",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/runtime-witness-corrected-result.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/runtime-witness-corrected.mjs",
+      "bytes": 3793,
+      "sha256": "ed34d04c71e31cfaabd49cc06838d52698a864457de6f015caf762e86018249e",
+      "git_blob": "9e533037cdc89f13f2b037eaf3cac97f583c7690",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/runtime-witness-corrected.mjs"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/runtime-witness-corrected.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/runtime-witness-corrected.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/runtime-witness-corrected.stdout.log",
+      "bytes": 381,
+      "sha256": "bf6b867ee9050b5e8dd349e636316105c893be038ef1cf7e8f41aa7f927f703a",
+      "git_blob": "7c6b5048a8a483bbf88bf171df567f2230f9743c",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/runtime-witness-corrected.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/typecheck-browser.json",
+      "bytes": 482,
+      "sha256": "4daadaa613cdf0d868dfa484475892d0387b1d65cb67fa71b5a1e7b90561d4be",
+      "git_blob": "04fa709798af34bfd78428505e963477f9fb624d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/typecheck-browser.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/typecheck-browser.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/typecheck-browser.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/typecheck-browser.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/typecheck-browser.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit-final.json",
+      "bytes": 766,
+      "sha256": "cd6b137fcf69b642a1f811b20b4063b5abb33e4234ff2b12d3c51169588534cc",
+      "git_blob": "4e963de99992767646b84d2f4b4443ec6fe4f8ac",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit-final.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit-final.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit-final.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit-final.stdout.log",
+      "bytes": 556,
+      "sha256": "e8a5c6f17a4084921f7d7c21a764063dd00b50124d1fd8083fbb6f96b18719a0",
+      "git_blob": "2f8562fc1eb03ebd43ca1f643be574e1250cb650",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit-final.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit.json",
+      "bytes": 676,
+      "sha256": "5561d7e7d3bea63a1c5ba65adb5b494382be62df722feff7b7c795f57cea92ab",
+      "git_blob": "9c1a5c1229fd503cf82b7fe1afaa8c299ace713f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit.stderr.log",
+      "bytes": 1213,
+      "sha256": "df1b03c6507aef805a17cc306c841d1d0048c8d02c09059caec641e56735fdbe",
+      "git_blob": "9b8206eab69692a1096c68ef3f68cb098f66a9f0",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit.stdout.log",
+      "bytes": 4615,
+      "sha256": "c1fd86c853a1097da26c857c246de2b657c1489ea9c057fe27b63103ac88d20d",
+      "git_blob": "74ad252d2793fea5f18c8a3edbe7894d07deadc6",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-initial/evidence/unit.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/candidate.patch",
+      "bytes": 1915,
+      "sha256": "b9cf15dd633bbe7c202f06fce64a4700480e89588ee1b55870816c40e3287a7f",
+      "git_blob": "e411245fa624e70db447a90d4ac7b699266c12b5",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/candidate.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/ci-package-receipt.json",
+      "bytes": 885,
+      "sha256": "cb48cad1695d4ee8f18449d083abca0e0158f31ff34a08fd556d2a839f51357f",
+      "git_blob": "065dc4ae3ddcf5841054ed4c39c7605dc27a9bae",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/ci-package-receipt.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/ci-recipe-bundle.js",
+      "bytes": 18237,
+      "sha256": "956f8a825b93bc456b5286af28363d8860c37b78d21b82da3650096d9b5b4a0d",
+      "git_blob": "6d950083fa485d2f8a69d7dca730d95df8b05301",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/ci-recipe-bundle.js"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/ci-trace-actions.json",
+      "bytes": 6934,
+      "sha256": "7c9938847f6d60b109a17381a174d4bf5e10b2865ce5e0fb3a66927b359cb75f",
+      "git_blob": "6a5944a7947c3441d97c1684158b13e5478cdd7b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/ci-trace-actions.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/commit-readback.json",
+      "bytes": 300,
+      "sha256": "6b0e1acf4a8a6b0c1d9040683865de92f6baa2ee218cff4fb281d613ec162065",
+      "git_blob": "2615430367104b1f23ef178d5d715c5de9bed915",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/commit-readback.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/final-inputs.json",
+      "bytes": 502,
+      "sha256": "dff716a60c29fe2f4ace595a8204e550d7d8020e14ac53ca235b07770c0bb61a",
+      "git_blob": "79ad93b598c16dae5717e71eb724150bb342af8b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/final-inputs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/manifest.json",
+      "bytes": 3267,
+      "sha256": "35b271a9476310c98bb4bb2f549867e170a134083862e29432a3e0e25ec4dbf0",
+      "git_blob": "7b0ad79b2a01743929d2b365eaf61e990e90666a",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/manifest.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/review-contract.md",
+      "bytes": 1657,
+      "sha256": "2d7e8253545232a290edd2327f8041f1d303dba7ff0f048d358adcd1532597cd",
+      "git_blob": "1c1126978f1fb7e779acf7adb625655bdf9e92c2",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/review-contract.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/runtime-end-pickup-result.json",
+      "bytes": 454,
+      "sha256": "5ef88cf881f8ee97bd74160f73fcbb34eec4f07595c5a0a1ae0dc266fe7efa81",
+      "git_blob": "282d3700ecf1e0da3517fedfd8684736f5b8605d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/runtime-end-pickup-result.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/runtime-end-pickup.json",
+      "bytes": 583,
+      "sha256": "0fc173dfe833abe87ad280d969b331044b8f301d1a603f36efc7788a8e8987fe",
+      "git_blob": "816f86ed615c2d15b993e2328fc6625ee3218dc6",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/runtime-end-pickup.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/runtime-end-pickup.mjs",
+      "bytes": 4134,
+      "sha256": "6da89aff50fb0efa43a693b10b48e2fb6cfa68fc85b24d5569fbc0729055b7ad",
+      "git_blob": "2a5b336b0458afc589693b2e0b4b4a5e7900fc36",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/runtime-end-pickup.mjs"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/runtime-end-pickup.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/runtime-end-pickup.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/runtime-end-pickup.stdout.log",
+      "bytes": 326,
+      "sha256": "a9503cfeca54761bd693e4137f00a800b8ee66df439449dbcf6052db87247f9a",
+      "git_blob": "54093a0a6911c6d649fccba2b19d31bf07fd95cd",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/runtime-end-pickup.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/triage.md",
+      "bytes": 1602,
+      "sha256": "73f800ffb7f335e67ed258a9baf57de936f1c9f1301c6c5b8fe03d07d4813cd3",
+      "git_blob": "16c30ab34cb10e2ff0ecb422c464735463a5003a",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/triage.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/typecheck-browser.json",
+      "bytes": 536,
+      "sha256": "8382d820a6af9608f772facf4835dac19fcba36e85f68a53bcdbfdde13fa4b31",
+      "git_blob": "701f4168e01650efad943b463193400d75ecd223",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/typecheck-browser.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/typecheck-browser.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/typecheck-browser.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/typecheck-browser.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/frame-delivery-20261002/webkit-pickup/evidence/typecheck-browser.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/MANIFEST.sha256",
+      "bytes": 19490,
+      "sha256": "adea67948062de45149be0e66b96af873aa8cbdddc2ce601625952fd20a8b5c4",
+      "git_blob": "2f08f8381b6898f3b7d8bf48dad98beb79774a61",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/MANIFEST.sha256"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/README.md",
+      "bytes": 9364,
+      "sha256": "b4717259c8dcd068bdb9593bebfcad81b020af5274676b574d43998f167bafe5",
+      "git_blob": "8241409d90ca032f5b60acea923bc2d84aca0301",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/README.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/SOURCE-MAP.json",
+      "bytes": 87914,
+      "sha256": "1e3e3302dbf07a1a26752219f3332a7356b00b8c7f9723e1763c4651e9c8aa2c",
+      "git_blob": "ea6d567c4272317584a91b32be6ae1a33c8f0a11",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/SOURCE-MAP.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/candidate.patch",
+      "bytes": 55018,
+      "sha256": "3e1cbfe3a56e17ba0fd5216b908d22d0ab71428d0aae5e5a47f22e3f3a95e08c",
+      "git_blob": "465f5e632a08caa3fc2f862e7ca60281016b72b2",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/candidate.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/ci-failures-excerpt.json",
+      "bytes": 8144,
+      "sha256": "5a256584b6de9d96621d14e3fd9c5f3873c4d4ee7cf478fbc4032174e5de0336",
+      "git_blob": "dfd130c26c97d0dbce5050d052962f738ed06e97",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/ci-failures-excerpt.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/ci-jobs.json",
+      "bytes": 35087,
+      "sha256": "eecbcacdebf52f1314a34fd8402e6c31b7748aedeca3fd471a76bf09b4f95c07",
+      "git_blob": "5ed381add7bb43558b42598dd28ae18281a9fe09",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/ci-jobs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/commit-receipt.json",
+      "bytes": 11248,
+      "sha256": "ec9dd0f5cb9744de4537245186b6d26e3a416357f4e26a52ea7c268df8b113c7",
+      "git_blob": "a5c04ca3f1babdbb3de2f1eb1953d4d2c0cb0244",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/commit-receipt.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/composition.json",
+      "bytes": 1724,
+      "sha256": "3c9473b46e808aa8d5d7f41ef5e9653e0a2f922f0ee04aca114f180289679a5f",
+      "git_blob": "18d5392a27002aa52868f2140610033fa768cb23",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/composition.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/main-testdelta.patch",
+      "bytes": 2949,
+      "sha256": "871ec4acf6d9080963810ca9b2166e1e75be1c2faeced822df791fe68371d817",
+      "git_blob": "050bf4c829fbe2c3d62024e73e0686210d830cb1",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/main-testdelta.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/actionlint-dispatch.json",
+      "bytes": 220,
+      "sha256": "f9c30b75af5d1718e129a90e7556f5ecf90cc1d8a9a42ea78e097b669fdc7c6b",
+      "git_blob": "618fbbda36a9c3989240cfa1811efcf8a35f01a9",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/actionlint-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/actionlint.json",
+      "bytes": 461,
+      "sha256": "9535d476b758f239b4813936074b3fbfa9c09347ce2a325323412182c52e6d01",
+      "git_blob": "5dd86ce0446e0ec2181ee5530963a79ee7ea5582",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/actionlint.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/actionlint.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/actionlint.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/actionlint.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/actionlint.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/audit-dispatch.json",
+      "bytes": 392,
+      "sha256": "280bb31bebbe6c26d07dcd95682aaab5668a825197a7a7c4d5ab6ec0ea5f3e8b",
+      "git_blob": "738c88885fb4ba79cf59db438b647144f8505fd0",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/audit-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/audit.json",
+      "bytes": 627,
+      "sha256": "c8058b6eadabc4dc6ec023a3762b560940fa6563e225012d50d8c94a826c8372",
+      "git_blob": "78cf019eb2d9aef941f5036ff2862f6b8cda7c87",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/audit.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/audit.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/audit.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/audit.stdout.log",
+      "bytes": 280,
+      "sha256": "ce873cc057b3fcce79c7c0e701fc5e62545ddbbfb4640a535c208c87d10cc0a6",
+      "git_blob": "708ed876ba972664ae16de907fcc65ce004a6be1",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/audit.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-declarations-dispatch.json",
+      "bytes": 261,
+      "sha256": "697d572b9c5f4cb1a5e63a210dd3fceddeec38e076c363c623c6006272fef709",
+      "git_blob": "78c7349f9f6aaac11a2d23d640ed0854e99ac526",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-declarations-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-declarations.json",
+      "bytes": 508,
+      "sha256": "c6e136c5487c245ef50eef346de7e159f91e65e002dc6ed7fcaf16f7e9d4c64c",
+      "git_blob": "0cc258ffc6d94a122f0252623acc3d529ddae7f9",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-declarations.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-declarations.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-declarations.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-declarations.stdout.log",
+      "bytes": 61,
+      "sha256": "1d2e470d1312ade9731bd719ab958752ef6ee7c9701d68fe3e1a9f590517b9ca",
+      "git_blob": "8638ec1b57c649469e6022b33068605fb123e66a",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-declarations.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-js-dispatch.json",
+      "bytes": 269,
+      "sha256": "f476de70597c7862a509605579cde3eda9a320d9f21b8f748361d4e541aa883d",
+      "git_blob": "76f56a82110777bf343e3e32f6ccaec522c2e1cc",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-js-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-js.json",
+      "bytes": 505,
+      "sha256": "d2a1b340871953ed57db813edd2ccb55c351562a4e56f6dad1a3a5163b2fe840",
+      "git_blob": "d4085c10bf1d6bce2f865c2720811330ed11aafc",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-js.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-js.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-js.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-js.stdout.log",
+      "bytes": 12012,
+      "sha256": "5fa69f167513e8d15a09145844f50102e059081ecacf91c52644250a6d85a653",
+      "git_blob": "7625d1fe8497fc4489027a925237c2a17a7c8f8f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/build-js.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/cycles-dispatch.json",
+      "bytes": 263,
+      "sha256": "eb391e2025aeccff0c97889a3f83970096b978ffa31d09f0fe22434d759c0253",
+      "git_blob": "833f88c5c4b1050214b934f46b1d24a40436ac56",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/cycles-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/cycles.json",
+      "bytes": 499,
+      "sha256": "8f8122516778db1e86b0f679dd0d0e3dd68db31a1bd303eede72183484d1fba2",
+      "git_blob": "3209d79e4903b28b55bf2b20a55235506d6463e8",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/cycles.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/cycles.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/cycles.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/cycles.stdout.log",
+      "bytes": 126,
+      "sha256": "f3c074507f4afe5e0aa96c36b49f526f35281b4459052a890dca064e7a2a4bf6",
+      "git_blob": "e2e818283fed89385f612aebf9228cc1aa9d8948",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/cycles.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-drift-dispatch.json",
+      "bytes": 260,
+      "sha256": "8f8924c57ae4900052ee836df15591543a46552f565961d2684b79d9a75c481a",
+      "git_blob": "5d5f624123844919870729ce312e92f29b2e4e7e",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-drift-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-drift.json",
+      "bytes": 501,
+      "sha256": "f28e237dd50bf514c1128c9dc46d632e249ff8e51cc01e4d6dd9c8c9aae9e2d7",
+      "git_blob": "d642940bd21e4b744c7437065af94a21182d1aa6",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-drift.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-drift.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-drift.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-drift.stdout.log",
+      "bytes": 218,
+      "sha256": "792972146336cd1959200f202e6efe288c0281eeba2f092727ecfa4a2eaf8b80",
+      "git_blob": "99c1d24c2659aa08f428db16fb7e4be8cb6cef53",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-drift.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-facts-dispatch.json",
+      "bytes": 260,
+      "sha256": "abf6f45e8c27c81da145ab3afb8298d53a361a660747d59065c4382f509cc7fe",
+      "git_blob": "59e1c533f325454c3c9b37390240b3866948fff5",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-facts-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-facts.json",
+      "bytes": 501,
+      "sha256": "68d9bad39037451d64a84ebe2e800c8c64dbc0e79b9f0ee026e6c55d78d255f6",
+      "git_blob": "a417dc298c03c6789cc46d2fedf52ae8034b23ac",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-facts.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-facts.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-facts.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-facts.stdout.log",
+      "bytes": 23,
+      "sha256": "d3b534c5348e15bf96aadf4f5a210761809cc2829415d4fd9015117c41a69d0f",
+      "git_blob": "478f511c809fee70005da64da55f12f16fb23a68",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/docs-facts.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/error-catalog-dispatch.json",
+      "bytes": 263,
+      "sha256": "a95eed073deafd6dad06d470b3e9445f8fa443beb472a7725be16bd46268c91c",
+      "git_blob": "196876f30a36375a03a21d014a878f23eafcf6cc",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/error-catalog-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/error-catalog.json",
+      "bytes": 506,
+      "sha256": "d11b994b5f09d58df31e812e039091733767dae2ab122d4270c0c73a5c8e2377",
+      "git_blob": "9928e9ddd21f0327a604ad3f0114365e4cf1c73e",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/error-catalog.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/error-catalog.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/error-catalog.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/error-catalog.stdout.log",
+      "bytes": 18,
+      "sha256": "43814532f167f6af777bdce03eb03d34ebac324b1c1409e496495a3e80ed05a5",
+      "git_blob": "f9706c678d516bc8b8c2d6f29c3a681f3083f467",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/error-catalog.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/issue-forms-dispatch.json",
+      "bytes": 261,
+      "sha256": "09d717713b0649d9a707d671a87954c5de9b7bcc529850ac779515f6a1baf242",
+      "git_blob": "8ce837a62941b70bc830d739e8698be63e2b61cc",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/issue-forms-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/issue-forms.json",
+      "bytes": 502,
+      "sha256": "681821721efba72efa0761efef34eeedc2a6200d9857dbeb6894e0a5f396ac90",
+      "git_blob": "e5f15f695d23644d1dff19877821b0015972a0aa",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/issue-forms.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/issue-forms.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/issue-forms.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/issue-forms.stdout.log",
+      "bytes": 30,
+      "sha256": "6e2e404998b19415e3546952c48d75835b76dab18f66217d266d3479200bb2dd",
+      "git_blob": "3ef33f87a7b0700202c786c91b8cc4bd39cf79e1",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/issue-forms.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/native-gate-dispatch.json",
+      "bytes": 261,
+      "sha256": "6dc300b94547c0f4f04bf7fc84d4b9bab04825d4d46d121a9fe9f9c2a7f2eb43",
+      "git_blob": "10e91e17d504db68f6de499f150f62cd5d5deca7",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/native-gate-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/native-gate.json",
+      "bytes": 503,
+      "sha256": "6704c4563278722d99ebe7abca584decfd6440718eddcc8a3952b070883ebd64",
+      "git_blob": "8b964e7e3bbd6265907509699fad91053ab641eb",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/native-gate.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/native-gate.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/native-gate.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/native-gate.stdout.log",
+      "bytes": 32,
+      "sha256": "f2d2339b4313d7612703956d956f7f63005d23eaad9e7809c1ba641e147097cc",
+      "git_blob": "10b5fe03107f4e56f463a6a284f4edbb628246d7",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/native-gate.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/release-contract-dispatch.json",
+      "bytes": 301,
+      "sha256": "3c27016758be611ee7bd20a639fb7318140489b92c663bbbc0bbd51bd86e35f6",
+      "git_blob": "58c1cf90a2bfd6e66a0a93785673679b81705c43",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/release-contract-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/release-contract.json",
+      "bytes": 548,
+      "sha256": "55f3f4791ced3850d90295284e363d5ea9f044f594163efe19a5cb4068319087",
+      "git_blob": "97ed2f1a23f495277cbe61c310b7317f9d984610",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/release-contract.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/release-contract.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/release-contract.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/release-contract.stdout.log",
+      "bytes": 85,
+      "sha256": "b0fe270a55ab537299007386d115a5fb70ab60574f077560cd4a0b2f344c0c50",
+      "git_blob": "8be71a89cf553cbecde634e9e89468965690c16a",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/release-contract.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/results.json",
+      "bytes": 10141,
+      "sha256": "c25ae28aa23b16a991d94f011b8c14cdfb6e9462c08f5a12c216f7e51e4f0517",
+      "git_blob": "f94647fb28c5585ed43b335b16342f45d4d4317d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/results.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/size-dispatch.json",
+      "bytes": 253,
+      "sha256": "98ce51933be30b59d30c9219e3e40ec96a1ff5303eafb2dc3e8b37f0b9fae8ec",
+      "git_blob": "f2c38f4e8cd7cd1ddb16a906b611886aba776964",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/size-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/size.json",
+      "bytes": 486,
+      "sha256": "1b53b2e0d710981ff7d4139e219989c923222947a644f0e4740ef8008af709b7",
+      "git_blob": "e4c9c81f8d9aba9082bc567cdfce72df4b74d519",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/size.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/size.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/size.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/size.stdout.log",
+      "bytes": 5046,
+      "sha256": "f5ad6b80b291f2d1ebd92cb59c90bb706e9082dae7621eca8b877697489cc6cf",
+      "git_blob": "307c358fcc573a0e4939f3c573ae0bbddb911d02",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/size.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/touched-unit-dispatch.json",
+      "bytes": 912,
+      "sha256": "e98e6b856609848a4bf69cb669fa99c8c9263ee59e19b609fbe205de772830eb",
+      "git_blob": "49a8a05648139d103a032baa5777fb2e6ce1a2f7",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/touched-unit-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/touched-unit.json",
+      "bytes": 1154,
+      "sha256": "642338802344d97dc5a428f9835faa87a27c7c97b9d5efe92dbe05bcc246d5db",
+      "git_blob": "31a7a5929d995004c222749bdf9fdcd90da91fed",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/touched-unit.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/touched-unit.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/touched-unit.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/touched-unit.stdout.log",
+      "bytes": 1863,
+      "sha256": "49bb285870561e287bb475dc81ea30b8b9321c2bc210b71eaae34b180adca161",
+      "git_blob": "cc812180af1fd8dfc649522f036e88d18ad1438f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/touched-unit.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-browser-dispatch.json",
+      "bytes": 318,
+      "sha256": "b037867e4dbd85957eae9d9c7807d81a7b340430a9d9b578f443e29597512e55",
+      "git_blob": "1e0b07eccea27500725c117b1e866bdc9a57e6a4",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-browser-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-browser.json",
+      "bytes": 564,
+      "sha256": "f197e4051bbca4b0a6b4f8a405ae2868719ea8d15709f1ef259c1eb5a4febc84",
+      "git_blob": "a9377b2ec01e1583e1123590687474ef9678c283",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-browser.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-browser.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-browser.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-browser.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-browser.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-dispatch.json",
+      "bytes": 279,
+      "sha256": "492c653a82244c3e7042abc2a88a46f180f9c29017ea73c976fea3b647bd8d6b",
+      "git_blob": "21b9a0e171ebe5ae35aeba1d4e155a3bc1e21edd",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-motion-program-dispatch.json",
+      "bytes": 309,
+      "sha256": "03987d7d95b50b7b786fe04b2e36d517e04b9bbbffc3711c67254f825c54af65",
+      "git_blob": "92c29bb177a393595c16e296d60065a094f45b3c",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-motion-program-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-motion-program.json",
+      "bytes": 563,
+      "sha256": "c08b369ba9fee03932fd4339ec9b06aa86f224892eab0d663dddb9699bb82146",
+      "git_blob": "cf4b30bcb5f613e02940a564c09ce336001a92d0",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-motion-program.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-motion-program.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-motion-program.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-motion-program.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-motion-program.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-native-dispatch.json",
+      "bytes": 296,
+      "sha256": "bd47b4df03bed7b033919e8ab950b0cc7c4e52e0aa80c2fb9587b3a0bfe05587",
+      "git_blob": "dd5f581b10d85bfca218d89ad1f08fb8b35f2696",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-native-dispatch.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-native.json",
+      "bytes": 541,
+      "sha256": "31518e49856816d3cd90cc601f4d7ee14919c2491d936f8c6c9fd36a8576971e",
+      "git_blob": "65ee33067ae2f7a2af13503f1522f8aad3b956fe",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-native.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-native.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-native.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-native.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck-native.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck.json",
+      "bytes": 518,
+      "sha256": "08cb9985049b1be0eed8c7722a49ccc61f68acf8b0528f0f397dec3186368188",
+      "git_blob": "c2da1a312855f0bcea8713a9de8cb665aa765c38",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck.stderr.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/prepush/typecheck.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/push-readback.json",
+      "bytes": 222,
+      "sha256": "11ff3d635e3cb3de74bcf4ac9d49af5f7baa7f3cba35359f6391534c7795188f",
+      "git_blob": "a8965cec725c74495e70957923e43dd75162df0f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/push-readback.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/push.log",
+      "bytes": 116,
+      "sha256": "facf530080b736abf46328f3d28228badd5095ea0abe9953ddf43d7aba3f325a",
+      "git_blob": "f16649370a0d1e4e503fad4b0e9ace6bc289613f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/push.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/qualify-checkpoint.py",
+      "bytes": 3758,
+      "sha256": "2d08c117234c3f0973e65c3adbdf4f739dbe5be4df9cd044bc8d0e29f031e88e",
+      "git_blob": "a78bc98d6691bc51665fc6e10f9d23e0d9a53d26",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/qualify-checkpoint.py"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/remote-durable-readback.json",
+      "bytes": 1621,
+      "sha256": "2974bb9ad42bc5a0d6656172be262b42b0268ee3f9e09a8a31d83e82d223e16b",
+      "git_blob": "7de56a7c3b9bfc305ccae038002ca1d5c725478e",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/remote-durable-readback.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/vitest.config.mjs",
+      "bytes": 205,
+      "sha256": "5a5598eefc69ce84809204c0c2908ccc48b24a1ab235cee958f6d6beece7e278",
+      "git_blob": "a3732b30a8d0981bea46a77c013488c4dc48ec40",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/checkpoint/vitest.config.mjs"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/RESULT.md",
+      "bytes": 3176,
+      "sha256": "bd20b057b0e726d0f0f10b066bac867974c9f31716d8f0969e43baf3883d69d9",
+      "git_blob": "5d2b1f544e84f821cee62062cda317ca96ee05bf",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/RESULT.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/artifact-files.json",
+      "bytes": 74739,
+      "sha256": "cb98805773fa62b3e1c4fa93383ac939283ac76d55949d6853cbb7d260f2f28e",
+      "git_blob": "e8fd1c874cdb2b4a1f1015527461a91481ad5564",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/artifact-files.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/build.json",
+      "bytes": 1306,
+      "sha256": "3207c7a89953d2083ce6434cd87dc6133ace3d542d28d17d1abb0e74ad9bbb90",
+      "git_blob": "2c5c288cd0e60f649dd807a5252152b86540c29f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/build.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/completion-readback.json",
+      "bytes": 2105,
+      "sha256": "0e146e12ed86813f6ba19822a80293ad370490291566ba947d5d50c1f171f887",
+      "git_blob": "a56ec431eeca5374b1888f8a76872c5dff2cf71a",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/completion-readback.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/delta-from-best12.patch",
+      "bytes": 17599,
+      "sha256": "5bfbb0190696f48622aeab3632459bac3011ff7728e518b9ba6b96b5e6ee7ace",
+      "git_blob": "a3dd19df53ff3300942d2bd942e9b27eebdc7e5b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/delta-from-best12.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/guard-reset-and-tests.patch",
+      "bytes": 7476,
+      "sha256": "d1d8297c04a69250e986396f364174775dc342b6db393151bc41ce4a4ee06091",
+      "git_blob": "e2d60c9cd0020e02350b11dca3ffc1178329c790",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/guard-reset-and-tests.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/guard-reset.patch",
+      "bytes": 906,
+      "sha256": "fa9fa84e69fd9cb361a78bf6f1aa9832fe42fe7914abbb2ddf57b37d122bf589",
+      "git_blob": "90d5f27f02e79ba1ba5144db07a6248222c970ff",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/guard-reset.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/inputs-attempt1.json",
+      "bytes": 874,
+      "sha256": "00efc4eda059c5046f68dbfa97bbed33ae784a2fed46bdbf52987f36949052ff",
+      "git_blob": "84dbae3a0b120f213163f0fb96cb171156f5b6a1",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/inputs-attempt1.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/inputs.json",
+      "bytes": 932,
+      "sha256": "e1ae28c11fcb176a0feb9205935d0d2ae83df35fd0ca524b9df0f55ca2dac1b8",
+      "git_blob": "15b9bf8f99d0326f5e9cd1750989891102e41ee0",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/inputs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/manifest.json",
+      "bytes": 4372,
+      "sha256": "57937fead0ffea7af3bd29245458d24694ff102f8c08bd01de1500753133965f",
+      "git_blob": "67d054dbc45a02867146cb69ede46a9cdf94307d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/manifest.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/qualify.py",
+      "bytes": 2613,
+      "sha256": "0dbbf99b18d18885860a5556f20c0179def3fe1037e9b476636d42b2ff0e62ed",
+      "git_blob": "c6a6d89b3f8c248295a4f424b256ea6142bec9b2",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/qualify.py"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/regression-attempt1.test.ts",
+      "bytes": 6276,
+      "sha256": "534a75ac07d822d90db1a6f4ca63a7e0d853e98ed2560839930274b6b85a83e7",
+      "git_blob": "21be0e06313d40459416565dfe2118f31ca01638",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/regression-attempt1.test.ts"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/review-contract.md",
+      "bytes": 1851,
+      "sha256": "fa94970b23783e8318bd6aa9d23c62b50e394ba7b7eae411630a4557319b806c",
+      "git_blob": "c826c73eb6716d338cf0c5f9acecc4d3dc88bf5b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/review-contract.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-inputs.json",
+      "bytes": 367,
+      "sha256": "40c88eccdef3f88b43b8c1fbaf084f54a9a92626daf5f07fa9a1c6d748d7c358",
+      "git_blob": "e2476052ac49cf1746355799f0501ccbd8e25864",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-inputs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-probe-derivation.md",
+      "bytes": 970,
+      "sha256": "13ac427abdd941c40943baf2ce3469e988573bb4fbf832a1136ee55372ee3b02",
+      "git_blob": "468bd1b8ffc2ea9607a478f6ef5c5108dcf558c2",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-probe-derivation.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-probe.json",
+      "bytes": 1410,
+      "sha256": "1085c6798eb2e05525b997f982dc808bee84dca91b91f93d853ed03f598defeb",
+      "git_blob": "4e78224e1644ace90aa8faa6e269e41d09f3d7de",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-probe.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-probe.mjs",
+      "bytes": 6946,
+      "sha256": "e972f796f5513e809af76f38fd7bb4bed08e57c63545bc0af29969ed4c383875",
+      "git_blob": "36b9b38bb6b9d4abde92371bacd3d83f1f7efa24",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-probe.mjs"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-probe.stdout.log",
+      "bytes": 2584,
+      "sha256": "a747b7f9a4059002c9382af9bc547f68617599cff81895677c259ba0170900ed",
+      "git_blob": "ea084c729213b5fc4537c60e4bcaece1dcb5195a",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-probe.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-summary.json",
+      "bytes": 3135,
+      "sha256": "4a2a2c706291dc31a8a327cdb728fc88f99e755fed593dcd5b1ff75d650c83f7",
+      "git_blob": "6c3970f82f489e71a2407ab9c81937480fa6e177",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/runtime-summary.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/test-finding-triage.md",
+      "bytes": 1277,
+      "sha256": "75fed2d886abb6424115fea436e4f58ed68baf64bceb79a65ed4172fbf8a2357",
+      "git_blob": "ef45e922de6b838f4cd88fc4b011fd3fbc36b7a1",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/test-finding-triage.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/triage-manifest.json",
+      "bytes": 179,
+      "sha256": "fcb22118177f201f2155b6835ff8b09262a70c9d89ad0ab897aac48c2f542f09",
+      "git_blob": "3b517b5f71c0a272c6fb6324d4f03a1e75f9969b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/triage-manifest.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/triage-receipt.json",
+      "bytes": 5383,
+      "sha256": "d48caa9eb47642219de5b4b5477685320bfd114def6f2dda322287a2c8c2d5eb",
+      "git_blob": "0c512b2211c9c1ef8c88434ce794813d5b41fb6c",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/triage-receipt.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/triage.md",
+      "bytes": 3467,
+      "sha256": "25f10dd79c54585f7613ff2f6566336a409a4f9a9b6c520a2d932e768228aff0",
+      "git_blob": "0fa23ee9af8007335f16aea9d31753b87dc57e40",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/triage.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/typecheck.json",
+      "bytes": 1316,
+      "sha256": "986f3c17142523227eb6ea91e95b3d6a35c0760d596c2ad05bb8d6ee2c7e9d0a",
+      "git_blob": "183b7413ff9201d8af7cfc23dedd2e2ec5da4f2b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/typecheck.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/unit-attempt1.json",
+      "bytes": 1751,
+      "sha256": "956d1684437f2455d0a4443a6f7adb69b7f3e599f13d243bfbc2bcf7a701955c",
+      "git_blob": "ffbc8bc15184d960f80e9f133daebecd7bdfbd0e",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/unit-attempt1.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/unit-attempt1.stderr.log",
+      "bytes": 1650,
+      "sha256": "cb3fb77a7c4b8607be1840271478743b9accf2c622a76178f2efff31a53db2e2",
+      "git_blob": "9595a3bd3fa2bd1e46824f620979ad2053444613",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/unit-attempt1.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/unit-attempt1.stdout.log",
+      "bytes": 2417,
+      "sha256": "f02f0bf9391461c2642ee89bef5dbaea48aada46739fbfb1748abb5252a35865",
+      "git_blob": "a01982bfc07355fc9c16210f8988cda3f2039802",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/unit-attempt1.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/unit.json",
+      "bytes": 1809,
+      "sha256": "779edd22fb124b21b7437768770ba991db2e82dd0c4fb29ec0af4d46c742d1eb",
+      "git_blob": "1b862fc65cf600c48221dfad04e1b049c549ed03",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/unit.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/unit.stdout.log",
+      "bytes": 1404,
+      "sha256": "85af8e8c5f0f965c1274b7128931a8495b7d405d4eb155ce95f103976cdba30f",
+      "git_blob": "5c780a809676271d48a64b85a81b2d4cb3b730d5",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/guard-reset/unit.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/REPORT.md",
+      "bytes": 3563,
+      "sha256": "a8a84cd051564134670bf45a4a7e49a529616b751359efd8c320ef5445f50932",
+      "git_blob": "d456eb1dbfd94552971ac9298b9668e1bf2f98bf",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/REPORT.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/candidate-motion-value.ts",
+      "bytes": 28192,
+      "sha256": "55a57c907b0d505d1d0053c0fe572949ac6122c91e2e0777c89bc8bb7db69632",
+      "git_blob": "ed09d7d7aacfa58b5f4fd5c2694924ed0c43ca53",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/candidate-motion-value.ts"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/completion-readback.json",
+      "bytes": 6141,
+      "sha256": "27b80b02ba48b432242214c702ccf07050cf5131cccdd2d67dd71eaf275cd0be",
+      "git_blob": "75a847d84873254d89e9a82ce192576baad02a5a",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/completion-readback.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/full-size-vector.json",
+      "bytes": 10953,
+      "sha256": "5927c4c0375a98c99f506f682452f5620ff16f1d788498c82b4c1e2756938101",
+      "git_blob": "0b51060d41393c9d9404e2845200707871aaf895",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/full-size-vector.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/inputs.json",
+      "bytes": 471,
+      "sha256": "ca2d01f3b520110dc9369593968216b5a107514f2bbcbaa5a175ecb72e6784d7",
+      "git_blob": "66bbf6a27fceb5f8b1248889c8a7a27677484970",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/inputs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/manifest.json",
+      "bytes": 2625,
+      "sha256": "4562b7b5d7e62ac5e5f7b38b0bf0588db676da931009c0593ae5f82fa55fb238",
+      "git_blob": "70dcc73138039512daaf46159d8a2684e01de72d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/manifest.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/size.stdout.log",
+      "bytes": 5544,
+      "sha256": "0e0cbe4394bf36f7e9ac44848136666a9621e272b0c22c21c08cb779265ca142",
+      "git_blob": "869f7a0d6b5c5a9793b1c710405ed19fc3c1eae9",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-best12/size.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/RESULT.md",
+      "bytes": 3276,
+      "sha256": "5cb4a2ea5e763435215299d260f432fa42e51b6c6332edf3fcf0424e5cfd3159",
+      "git_blob": "f19c53d43f91169b87901af0a7fe9c0df324269d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/RESULT.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/analysis-inputs.json",
+      "bytes": 1393,
+      "sha256": "453498480cef36a3bd298a8edf542fa16867b2f4be7d1e30026fa4ef009cae02",
+      "git_blob": "f60abafc359cbfc858ed620fd3264784c31d519d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/analysis-inputs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/completion-readback.json",
+      "bytes": 1886,
+      "sha256": "3ed888b2feac0d90e3a67c60bc6d5c9d02986fa493b316664c514aa4dc75c930",
+      "git_blob": "265127e32b7c1f07dc90457d4ea9af64bc9c6063",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/completion-readback.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/full-size-vector.json",
+      "bytes": 11954,
+      "sha256": "51f36e68b5de1a924a8b93437564c7ff766d4ee7467544f791815d45ef8ce258",
+      "git_blob": "3147bcea11a857f49e6d0a248f64f474b4ff0040",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/full-size-vector.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/inputs.json",
+      "bytes": 910,
+      "sha256": "16bcba056c8b03cf20a356ff60976e7edcdfc7e67adf59ca88614e20219479f4",
+      "git_blob": "41b4c0ad6af7d1032f7d0350b2ec6b433cf24059",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/inputs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/manifest.json",
+      "bytes": 2820,
+      "sha256": "60cfe60a95e58a70b30681affa3ba43fbbc70a6fc80807f6dbbf820a521e1603",
+      "git_blob": "5ac78bdb96b02c17510826845e17605906682d38",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/manifest.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/review-contract.md",
+      "bytes": 1998,
+      "sha256": "f55b113a9b0f0e93cd032a40efb0f3c401d1647fb39c9b3c4b418cfe6ba401e4",
+      "git_blob": "58522cf11d57c3c4beba6ed21beb6ae649f238b3",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/review-contract.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/run-identity.patch",
+      "bytes": 10796,
+      "sha256": "a6e982c38c5d18a6ba7e92023b99ee5f77b86ac4d59e38cf898fc5b43458f7c8",
+      "git_blob": "cc5a23d188d91936d921e742229e03b4359d6bdc",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/run-identity.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/size.json",
+      "bytes": 1268,
+      "sha256": "1d722008f5c873d3320feee73e0f1babd7bd5554a75ae3254dd27466e2540fc3",
+      "git_blob": "453a9df87bf43586fde13c6483f0f0178a7282f8",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/size.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/size.stdout.log",
+      "bytes": 5046,
+      "sha256": "be95718c510c00a5c68fe0a7184af5c419ae6bb7acc502fdd31935dddcc6f6eb",
+      "git_blob": "907884583eb128957eaeec77496a72c5bcdbb5ab",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/size.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/transition-table.md",
+      "bytes": 13195,
+      "sha256": "c202216cfd050f98d32ddf46ef6edf1cf6b98968c11333807b6e1b1654e27a75",
+      "git_blob": "dec3c4e0e6e805281fdd39c5f0b08931b036506e",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/transition-table.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/unit.json",
+      "bytes": 1735,
+      "sha256": "93bba8d0d44d4fa08cd2339192b431f7b9b92284e6a27d7689c476d373074a82",
+      "git_blob": "6b0d7928c8b1ec44793745e2f1f0edc95b65833a",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/unit.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/unit.stdout.log",
+      "bytes": 1281,
+      "sha256": "c35d3bbee43c96e8f905d0a5b0533d43b248c3d9edaf4d8b8d7c3b3b8362ef9f",
+      "git_blob": "914311fb5df0b42eccba84006c191dd6964e2e99",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-object-run/unit.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-current-base/INPUTS.json",
+      "bytes": 8132,
+      "sha256": "11c9adc0bca51834771734b0741c37c5049179afbe15d590cccb2df15f495dd6",
+      "git_blob": "d23bb1f56b74b7031f301309cd932f069a1e8f2d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-current-base/INPUTS.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-current-base/MANIFEST.sha256",
+      "bytes": 154,
+      "sha256": "e817198af3328a17b00c3321e1a30a096adb008ebf4f59e2fcbb2fa86ff3c3a4",
+      "git_blob": "58e5a4879037d6b24ef0dd0ae7e6b8c234f2d5b7",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-current-base/MANIFEST.sha256"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-current-base/REPORT.md",
+      "bytes": 7392,
+      "sha256": "723a205b3d0292b6cbc9f67e3987814d35bd462697280cb4dd083969319c139a",
+      "git_blob": "af959de39f851b55a1585fa9e95de521fee1003f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-current-base/REPORT.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-fix6/MANIFEST.json",
+      "bytes": 2706,
+      "sha256": "a654a3850be91718b07de0f8f8231d27506b2b139dbdc2eb765bcebbe135f156",
+      "git_blob": "ed8528cf66fb54ba7e2d51a22fff213bdb56d924",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-fix6/MANIFEST.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-fix6/REPORT.md",
+      "bytes": 5916,
+      "sha256": "7c63e169126669aeb93f9c4e5711b4af5cd05685003ce1ea9a168daf1e461373",
+      "git_blob": "8c869d72c47d4a2431fc16b57e878ae7808cab31",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-fix6/REPORT.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-retention/MANIFEST.sha256",
+      "bytes": 154,
+      "sha256": "a3f4a6ce710ddfb1cd6c9daf79a118a46e2505a339c5fb5bec217f8cb70151cc",
+      "git_blob": "a3327f51ac12a8976d02fe20641642d9f72cd69e",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-retention/MANIFEST.sha256"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-retention/REPORT.md",
+      "bytes": 13270,
+      "sha256": "723c5144afa52b6c9b9f2429f04f938cdfa677106dc37c216144cd596a673aee",
+      "git_blob": "68e02276e7de1ec10b7e9eb3581ff1cf4a57c125",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/historical-review-retention/REPORT.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-guard-reset/MANIFEST.sha256",
+      "bytes": 76,
+      "sha256": "df8f493f8e118da5caaa274f9046e72e9c82e2b46e25778c81845bb7a29b8728",
+      "git_blob": "7b529c550ee73c60933d1140a54b2ac035b42b06",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-guard-reset/MANIFEST.sha256"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-guard-reset/review.md",
+      "bytes": 10823,
+      "sha256": "021e88fe08d3f55fd58ac63fdfedce10c906032dcaf40207adb9e11ffd0130a1",
+      "git_blob": "9469d601171342eaa31a0f2f030240f1f89d4e7e",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-guard-reset/review.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/INPUT-BINDINGS.json",
+      "bytes": 9001,
+      "sha256": "99ac5190bccddfd4515302fe539bb27fd5e3a731a88f83417c8f7a5bcf29016a",
+      "git_blob": "c7b389fc46975f5fd6fef8d84b58799a593e9c57",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/INPUT-BINDINGS.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/MANIFEST.sha256",
+      "bytes": 2500,
+      "sha256": "eedd0a76c4948f473ff6b1b18c4c72458e76b65a28babc1520d14cbac13eefec",
+      "git_blob": "2355d421fd61989f0e99a8a3e5bac92ccaa7d358",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/MANIFEST.sha256"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/REVIEW.md",
+      "bytes": 14491,
+      "sha256": "6f27df357d62c03930d00234fc505651a65383908c3ae49542a54f19d967c96e",
+      "git_blob": "8672edc6fb9e455d519b826664920bd061341619",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/REVIEW.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/SIZE-AND-TEST-BINDINGS.json",
+      "bytes": 7252,
+      "sha256": "a5e91304f381e6b54fdaf2b38f5fd32fc6c1e156500c2946108129eb70b80fe7",
+      "git_blob": "1193c26975c43479de204d2a6b676819878ec72b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/SIZE-AND-TEST-BINDINGS.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/VERDICT.json",
+      "bytes": 959,
+      "sha256": "1f1a88b356f5cd124f6edb2361f5b2d5e52c59f068d1361ba1d7f4c13ad52316",
+      "git_blob": "42c65b1b20b1f0e400768e2bd57993da9b5fbf4a",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/VERDICT.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/VERIFICATION.json",
+      "bytes": 561,
+      "sha256": "2a116b85ce2fd80dc8f503a8f7b8b3f401fd474471972e4c69f0885f0375e440",
+      "git_blob": "994dd9d66e5def9c117633ded21886b042396f3b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-cost/VERIFICATION.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-identity-red/probe-result-summary.json",
+      "bytes": 9338,
+      "sha256": "3c7a43136351a600ba321ac9e2fa9f971d125a879de7f884ff36da505d268045",
+      "git_blob": "08b82ff8b7389c8701ff9e6f0e62d349c5872dd9",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-identity-red/probe-result-summary.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-identity-red/probe.mjs",
+      "bytes": 6953,
+      "sha256": "09d08dd8b596c557c82387c163668d9058c4ca9e5ca7bdec80b216d70d8222ce",
+      "git_blob": "383ebe9e06624c0a7e3ab19798ea73a666b3f6d9",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-identity-red/probe.mjs"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-identity-red/review.md",
+      "bytes": 8524,
+      "sha256": "e167cf2d089726f6626fc9e2af626b454b27683cdfbcdd20e4823b316b28bf94",
+      "git_blob": "90dae2177981c1ff9295e954a8cd79880cb8ab4f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-run-identity-red/review.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-contract/INPUT-BINDINGS.json",
+      "bytes": 6376,
+      "sha256": "843d26d3227666f766c7b3aa3e4a1ee1ad2464706ac884455e139158a455be5c",
+      "git_blob": "7cc1f43aa19d79ba773954c4d87d8e9775b6166b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-contract/INPUT-BINDINGS.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-contract/MANIFEST.sha256",
+      "bytes": 1754,
+      "sha256": "901c19b2d0907dc9ad75d74b0b52cae4092c9d1bdc5b4e9b5f9b8dc47eca486e",
+      "git_blob": "1c50879eec2b4b937f2d3af021609a3d51348f5d",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-contract/MANIFEST.sha256"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-contract/REVIEW.md",
+      "bytes": 11093,
+      "sha256": "c466aa4a1078f79f4357a7dfd9d2d94b1ccef0c84e4ab938edaae5de04aa266e",
+      "git_blob": "977a2394fdeedf659e2406816c91d6b9ff499106",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-contract/REVIEW.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-contract/VERDICT.json",
+      "bytes": 1721,
+      "sha256": "6207232506c8691fa406446fa31f67817c9bbe0a1bd22cb374ba7286ddcb24dc",
+      "git_blob": "9c399877896f0705617d07653d6be59835bcb984",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-contract/VERDICT.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-contract/VERIFICATION.json",
+      "bytes": 557,
+      "sha256": "c3d6b2cc5274c887f42c7628b1ee8c23c36544a755d8dfba3aa1da9a4b75afba",
+      "git_blob": "8c65a96d6c3eecc42143bd78887c29f08058d4a8",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-contract/VERIFICATION.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-doc2/MANIFEST.sha256",
+      "bytes": 429,
+      "sha256": "f25a448cd0ef10795588d409a09750996c381f14c7efbd72af6e1380cda6ccf9",
+      "git_blob": "baefeec43dcc0244f37ce7c40f160028c6f588a1",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-doc2/MANIFEST.sha256"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-doc2/REVIEW.md",
+      "bytes": 883,
+      "sha256": "e1bfb4dd1acc38770135f385bb2ff9fd504152fe03dc14e992449e2e11d6abf6",
+      "git_blob": "1578ae7e64438e788004bcd763ce5ceb8cb78845",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-doc2/REVIEW.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-doc2/VERDICT.json",
+      "bytes": 938,
+      "sha256": "9a97d99487522aba0734f52d2ea9b3a9382a70a06cb9923c0e27c0f2ee7ce427",
+      "git_blob": "8fccf67abf1c038d9f04c3dbc3802761d904ef67",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-doc2/VERDICT.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-red/probe-result.json",
+      "bytes": 3629,
+      "sha256": "8b481c5c28867b735caf2de88e576dff69108927945a8c519e86637445299888",
+      "git_blob": "3a8e009f40210bf615a7ba1c897c957f8d270578",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-red/probe-result.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-red/probe.mjs",
+      "bytes": 4915,
+      "sha256": "34142eb9ad849d2f94b9af6a53f0fbff070e88e21c5ea47cb6ee73807138dc25",
+      "git_blob": "86eeaacd45e7e9f316ccc388d9538cb1c19c1f25",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-red/probe.mjs"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-red/review.md",
+      "bytes": 7032,
+      "sha256": "88a55e70ed926c1d8938363fbd498240f8c47867f3e5ff644a74580d23bba5a7",
+      "git_blob": "bce82ef97c14edcb37350e402ad172c5e922b584",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/review-svelte-red/review.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/RESULT.md",
+      "bytes": 1304,
+      "sha256": "01634fc3ae1539989a04542157aac09f27a5bb34042b34414098c14a12d8f3cf",
+      "git_blob": "95a844ded2e2840f86abcf6c66db7a0d1ee2c3da",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/RESULT.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/candidate-svelte.ts",
+      "bytes": 5975,
+      "sha256": "b756eb7acb3a51f991fc2ae499abac7c387557c39763c5e33489662cd2b5777e",
+      "git_blob": "3d55b291ba16a834cbad6ca4fedb4a4ee7a2c10f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/candidate-svelte.ts"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/doc-correction.patch",
+      "bytes": 725,
+      "sha256": "c454d7667ff618bcb6091e1af0ba962c3d58bf95ffee559c930415419226deaa",
+      "git_blob": "e60952b41743fc3c5ba87a8e5696fb9e578a66a7",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/doc-correction.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/manifest.json",
+      "bytes": 551,
+      "sha256": "9194e94879f1580630259de4161c6c7be48d3b81a7e8cdb4409593dd9bba1071",
+      "git_blob": "086ebbc4e028472f0da9feb8980cc89f4fc38206",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/manifest.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/readback.json",
+      "bytes": 1056,
+      "sha256": "729c447284cf3a5b6c69416e5dd8ad9d42e6242cea3d4bac79512d0cc46e9a8f",
+      "git_blob": "e13f8a233cc4c798d46b365aa54e26d534ba46ad",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/readback.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/supersedes-doc1.patch",
+      "bytes": 761,
+      "sha256": "e8af6187a1133c0f5a09fc6438247911ecc81d66294a71588d15db7af2c93301",
+      "git_blob": "ecd13f9e20e74eb038808140984727184ffe4a69",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/supersedes-doc1.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/svelte-corrected.patch",
+      "bytes": 2451,
+      "sha256": "a18e8325d6b4c0efc878d50dbb60066428ab4cccef1484877a524148f9111626",
+      "git_blob": "03c5091cdcd730bffd645b9a23b952047d2e51cb",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte-doc2/svelte-corrected.patch"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/README.md",
+      "bytes": 2754,
+      "sha256": "84e6a42bfd02cef50b143b2e8db4c6d3b8aa404cb4ee75a41a4958d6750511a8",
+      "git_blob": "e544690b6c0e1dc31c809626b1b608d54c0f721f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/README.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/RESULT.md",
+      "bytes": 1362,
+      "sha256": "0e1cfaed315daa98af7d63133ac6d970336e9c5f0c084e227b1d88f38d26af3d",
+      "git_blob": "869456fda5589edfa7b71291c7d0aea17d03b5fe",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/RESULT.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/candidate-inputs.json",
+      "bytes": 699,
+      "sha256": "39f690f3878e99b96e8f95b966c6be9b7129a19e14f3c3a6336a3de537ce7f8d",
+      "git_blob": "1b330cb2b00d49cb58b82958ff0d660c2b0174ec",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/candidate-inputs.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/candidate-runtime-binding.json",
+      "bytes": 9868,
+      "sha256": "0ee91cc874bda2dec097673d1d89ab547aa67b8207f90001a7f870899ab69793",
+      "git_blob": "c667b9b69da6fd7e12be885b327d8a37acf76f74",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/candidate-runtime-binding.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/completion-readback.json",
+      "bytes": 8975,
+      "sha256": "88d9371103819997d1805aca1f71b5f016f76962158b09d1e666c36ce3b0e7fc",
+      "git_blob": "26876b497b6b982c61826f64e9f889618c0c87c4",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/completion-readback.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-build.json",
+      "bytes": 881,
+      "sha256": "a45fae77ab4f7343398fa8d4db8d84c24bd0fa6ab172b40ab26c69f3168dae69",
+      "git_blob": "eb28d94d53fa4c889bcef760bf2f46cce8265f82",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-build.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-runtime.json",
+      "bytes": 1273,
+      "sha256": "6acabe3b4e8e10604d4943f3137b5679fa0a64010d250f9a0f5dafeeecb84f00",
+      "git_blob": "6206b7c6f96407a93eefdf4ceb4316b3d2cdeaf4",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-runtime.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-runtime.stdout.log",
+      "bytes": 2312,
+      "sha256": "51ff6ec6a719a23e9a430d0c8837163ea25c7bc992fcf2ca206ee5a9464c3270",
+      "git_blob": "5c0de03c863bfadbcd7a3f8c85cec4596e8874aa",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-runtime.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-targeted.json",
+      "bytes": 1220,
+      "sha256": "74a087f415ee0b35af3e4c19befb59d6bf11c47f41e2ba864fd8addae3674d86",
+      "git_blob": "5d941d02397946bb5d40d1a2c0e285980482c4ec",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-targeted.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-targeted.stdout.log",
+      "bytes": 773,
+      "sha256": "5ba69ac6845caf09acaf81c4850714ed01f4470daee84b9be3770181dce7f7fd",
+      "git_blob": "799e60feeecd3a62c861cb044b57db318c8345d6",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-targeted.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-typecheck.json",
+      "bytes": 892,
+      "sha256": "12dc747d8bdcfb5a0b9aee24c84e8ff181ce6275bb27b62351fd592d7f0e923d",
+      "git_blob": "bb2e49d67e0e415a52cf56e0a00a9d59353e5c38",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/green-typecheck.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/manifest.json",
+      "bytes": 4072,
+      "sha256": "7cc09f452e078fbb5f6c5bee2b16a48177b029ee8a85da70a3d8ecbd80f66655",
+      "git_blob": "2afb0eeff175f604d6b8c0263addd8ff3e39af08",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/manifest.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/preparation-readback.json",
+      "bytes": 1213,
+      "sha256": "dd278e033973d2ebfc9fb859abe4d841b9d3dcc94b74b92d4061ec81b49df7b3",
+      "git_blob": "c6c4be29b471aee5d4a0bc3af10cb75fa44b3f09",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/preparation-readback.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/prepared.json",
+      "bytes": 508,
+      "sha256": "e2c011b58e83138814e70b2c198e37a4e1bbf4df3fd4a4abcfd5fb38bc167b22",
+      "git_blob": "554761440b8668641e459cf42ff94fb0654f11b7",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/prepared.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/raw-artifact-binding.json",
+      "bytes": 10371,
+      "sha256": "738f9c60c7579e2f2c1162229fb77e663f49034d9a45a683374f3373bfb1c6b3",
+      "git_blob": "11528cf5112060c723d95d5510a498af576b48f6",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/raw-artifact-binding.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/red-focused.json",
+      "bytes": 1151,
+      "sha256": "f5bf933d039fa64814f36b5d95a956352fc8d0b7bec62b827fa08c0b6ca06fa1",
+      "git_blob": "09007da7059ada902031e5ba6811bc8c1cf64029",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/red-focused.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/red-focused.stderr.log",
+      "bytes": 2572,
+      "sha256": "9aa185683c26db9df4d7b8897cdcc7d3fb8dfa25f7d0b2e2100b54c92830edd8",
+      "git_blob": "b32b47949468902765bf5b42690b6355edb799cd",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/red-focused.stderr.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/red-focused.stdout.log",
+      "bytes": 1303,
+      "sha256": "344d40db907da96924f904ad0a11a5d3909cc92efb35172b00c5a30da323cd28",
+      "git_blob": "ecdb4b0945d9de6d9f469a09d6894d4c66935644",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/red-focused.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/red-runtime.json",
+      "bytes": 1163,
+      "sha256": "9c228b05ce4c5f5d51e7b3a7b09540d8fb69973fba3d80e5e2311f7578a499c2",
+      "git_blob": "ea0fd01c69d355cc0949d301e1268d5358cf18a9",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/red-runtime.json"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/red-runtime.stdout.log",
+      "bytes": 3810,
+      "sha256": "19a27ef393ee6c2e3c55f6ed8fb8c1b64ab96078d96ef47ad92474299d9916c6",
+      "git_blob": "88dfabef09feb8ea4c18e49c0376d0c3030e10b9",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/red-runtime.stdout.log"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/review-contract.md",
+      "bytes": 3098,
+      "sha256": "f18c6672ae33f8dd408fde2ca5f104980fb2842fd86cf36aaf8f7ca6d89f8b58",
+      "git_blob": "65c76e97a21c113dbe0a4b506795b98987b25b5f",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/review-contract.md"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/run-stage.py",
+      "bytes": 3088,
+      "sha256": "e500d856d678b36b75a80a3d33a941dd8c71b8569b65805ab24ecbebb1af892f",
+      "git_blob": "46308f644f61d902521a6e9936ab773a0718757c",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/run-stage.py"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/runtime-probe.mjs",
+      "bytes": 7229,
+      "sha256": "1c5442ffa96aa0c6045ebf5684d91ef9b1702fa75ab59d9d989269ea0ddffa19",
+      "git_blob": "ffac7edc8de924dac31be1ccea6bb6bbb9b5ee1b",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/runtime-probe.mjs"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/svelte-only.diff",
+      "bytes": 2465,
+      "sha256": "e0657fc3958b1ffb0730819c8483222a42ba5cade20c0f2f0c0a9515a66759e5",
+      "git_blob": "b9a0674ad448b6616f995769c9297e515aaf5f11",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/svelte-only.diff"
+    },
+    {
+      "path": "plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/svelte.patch",
+      "bytes": 5542,
+      "sha256": "99d00597192d182a0508c46caf5109a61620433fe1d4c675db0b23a8cd6ce64b",
+      "git_blob": "6eae58ad16cc1fb377e93e61c5edee41b4db0f6e",
+      "git_mode": "100644",
+      "source": "https://github.com/Labpics-Team/agents-config/blob/d3224cd485701d7fa8448c19b0529f3931b03acb/plans/lab-motion-production/evidence/resource-checkpoint-20261002/svelte/svelte.patch"
+    }
+  ]
+}
