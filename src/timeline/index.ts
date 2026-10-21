@@ -15,6 +15,7 @@
  */
 
 import { MotionParamError } from '../errors.js';
+import { clampFinite } from '../internal/finite.js';
 
 // ─── Внутренние константы ────────────────────────────────────────────────────
 
@@ -26,20 +27,6 @@ const FIXED_DT_S = 1 / 60;
  * практической анимации, но всё ещё конечен как fail-safe от зависания.
  */
 const MAX_FRAMES = 100_000;
-
-// ─── Вспомогательные функции ─────────────────────────────────────────────────
-
-/**
- * Зажать значение к конечному диапазону.
- * NaN → 0 (spring-at-rest позиция; безопасный CSS-дефолт)
- * +Infinity → Number.MAX_VALUE
- * -Infinity → -Number.MAX_VALUE
- */
-function clampFinite(x: number): number {
-  if (Number.isFinite(x)) return x;
-  if (Number.isNaN(x)) return 0;
-  return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
-}
 
 /**
  * Структурный подвид MediaQueryList — только то, что нужно timeline.

@@ -108,6 +108,7 @@ function addSpec(groups: Map<GroupKey, ChannelSpec[]>, spec: ChannelSpec): void 
 
 export function parseProps(props: Record<string, unknown>): Map<GroupKey, ChannelSpec[]> {
   const groups = new Map<GroupKey, ChannelSpec[]>();
+  // Набор и приоритет осей фиксируются до чтения getter-ов значений.
   const keys = Object.keys(props);
   for (const key of keys) {
     const raw = props[key];
@@ -122,10 +123,6 @@ export function parseProps(props: Record<string, unknown>): Map<GroupKey, Channe
       const group: GroupKey = key === 'opacity' ? 'opacity' : 'transform';
       const explicitFrom = pair ? requireFinite(pair[0]) : undefined;
       const to = requireFinite(pair ? pair[1] : raw);
-      // Full-движок хранит scale как две независимые физические оси. Равные
-      // значения всё равно сериализуются в компактный scale(N), зато переход
-      // uniform↔axial не меняет представление: обе позиции и pickup-скорость
-      // перехватываемого канала остаются явными.
       if (key === 'scale') {
         if (!keys.includes('scaleX')) {
           addSpec(groups, { _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });

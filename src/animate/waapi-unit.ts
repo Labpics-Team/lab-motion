@@ -167,7 +167,10 @@ export class WaapiUnit implements GroupOwner {
   _numericKeys(): readonly string[] {
     if (this._done) return [];
     if (this._delegate) return this._delegate._numericKeys();
-    return [...this._o!._numeric.map((c) => c._key), ...this._o!._residuals.keys()];
+    const o = this._o!;
+    const keys = o._numeric.map((channel) => channel._key);
+    for (const key of o._residuals.keys()) keys.push(key);
+    return keys;
   }
 
   _supersede(replacement?: () => void): void {
