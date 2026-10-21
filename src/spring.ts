@@ -18,6 +18,7 @@
 
 import { MotionParamError } from './errors.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from './internal/constants.js';
+import { clampFinite } from './internal/finite.js';
 import { solveSpring } from './internal/solver.js';
 import { type SpringParams } from './internal/types.js';
 
@@ -220,12 +221,6 @@ export const validateSpringParams: (p: SpringParams) => void =
  *     (NaN > 0 === false) was a semantic violation: a solver targeting x=1
  *     returning -1.8e308 is physically absurd.
  */
-function clampFinite(x: number): number {
-  if (Number.isFinite(x)) return x;
-  if (Number.isNaN(x)) return 0;
-  return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
-}
-
 /**
  * Internal solver — same as spring() but skips validation.
  * Used by drive() which validates spring params once at its boundary (before any

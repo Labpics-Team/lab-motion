@@ -67,6 +67,7 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
    * rendered-снапшот фиксируется только после успешного возврата setter-а.
    */
   private _writing = false;
+  private _numericKeysCache: readonly string[] | undefined;
 
   constructor(options: MainUnitOptions) {
     this._o = options;
@@ -121,8 +122,13 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
 
   _numericKeys(): readonly string[] {
     if (this._done) return [];
+    if (this._numericKeysCache !== undefined) return this._numericKeysCache;
     const bound = this._o!._bound;
-    return [...bound._numeric.map((channel) => channel._key), ...bound._residuals.keys()];
+    const keys: string[] = [];
+    for (const channel of bound._numeric) keys.push(channel._key);
+    for (const key of bound._residuals.keys()) keys.push(key);
+    this._numericKeysCache = keys;
+    return keys;
   }
 
   _supersede(replacement?: () => void): void {

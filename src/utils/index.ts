@@ -35,22 +35,7 @@
  */
 
 import { MotionParamError } from '../errors.js';
-
-// ---------------------------------------------------------------------------
-// Private helpers — not exported (any leak trips the api-surface `extra` pin).
-// ---------------------------------------------------------------------------
-
-/**
- * Clamp a value to finite range. Mirrors spring.ts `clampFinite` exactly:
- *   Finite → pass through ; NaN → 0 ; +Infinity → MAX_VALUE ; −Infinity → −MAX_VALUE.
- * Branch order (isFinite, then isNaN, then sign) is load-bearing: collapsing the
- * NaN/sign branches would map NaN → −MAX_VALUE (NaN > 0 === false).
- */
-function clampFinite(x: number): number {
-  if (Number.isFinite(x)) return x;
-  if (Number.isNaN(x)) return 0;
-  return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
-}
+import { clampFinite } from '../internal/finite.js';
 
 /**
  * Linear interpolation with an overflow guard — the default numeric Mixer and

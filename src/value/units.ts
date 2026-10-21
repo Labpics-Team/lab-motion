@@ -15,12 +15,9 @@
  */
 
 // ── Внутренний страж конечности (зеркало spring.ts / easing/index.ts) ──────
-/** @internal */
-export function clampFinite(x: number): number {
-  if (Number.isFinite(x)) return x;
-  if (Number.isNaN(x)) return 0;
-  return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
-}
+import { clampFinite as _clampFinite } from '../internal/finite.js';
+const clampFinite: (x: number) => number = _clampFinite;
+export { clampFinite };
 
 // ── AST-типы ─────────────────────────────────────────────────────────────────
 

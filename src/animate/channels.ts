@@ -108,8 +108,8 @@ function addSpec(groups: Map<GroupKey, ChannelSpec[]>, spec: ChannelSpec): void 
 
 export function parseProps(props: Record<string, unknown>): Map<GroupKey, ChannelSpec[]> {
   const groups = new Map<GroupKey, ChannelSpec[]>();
-  const keys = Object.keys(props);
-  for (const key of keys) {
+  for (const key in props) {
+    if (!Object.hasOwn(props, key)) continue;
     const raw = props[key];
     if (key === 'transform') {
       throw new MotionParamError('LM140');
@@ -122,15 +122,11 @@ export function parseProps(props: Record<string, unknown>): Map<GroupKey, Channe
       const group: GroupKey = key === 'opacity' ? 'opacity' : 'transform';
       const explicitFrom = pair ? requireFinite(pair[0]) : undefined;
       const to = requireFinite(pair ? pair[1] : raw);
-      // Full-движок хранит scale как две независимые физические оси. Равные
-      // значения всё равно сериализуются в компактный scale(N), зато переход
-      // uniform↔axial не меняет представление: обе позиции и pickup-скорость
-      // перехватываемого канала остаются явными.
       if (key === 'scale') {
-        if (!keys.includes('scaleX')) {
+        if (!('scaleX' in props)) {
           addSpec(groups, { _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });
         }
-        if (!keys.includes('scaleY')) {
+        if (!('scaleY' in props)) {
           addSpec(groups, { _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to });
         }
       } else {

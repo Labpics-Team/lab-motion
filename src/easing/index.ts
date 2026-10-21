@@ -29,27 +29,7 @@
 
 import { MotionParamError } from '../errors.js';
 import { cubicBezierUnchecked } from '../internal/cubic-bezier.js';
-
-// ---------------------------------------------------------------------------
-// Internal guard — mirrors spring.ts clampFinite exactly
-// ---------------------------------------------------------------------------
-
-/**
- * Clamp a value to finite range.
- *
- * Mirrors spring.ts `clampFinite` exactly:
- *   - Finite → pass through unchanged
- *   - NaN → 0 (spring-at-rest position; safe CSS-default)
- *   - +Infinity → Number.MAX_VALUE
- *   - -Infinity → -Number.MAX_VALUE
- *
- * Private — not exported. Called inside normalizeEasing and all curve bodies.
- */
-function clampFinite(x: number): number {
-  if (Number.isFinite(x)) return x;
-  if (Number.isNaN(x)) return 0;
-  return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
-}
+import { clampFinite } from '../internal/finite.js';
 
 // ---------------------------------------------------------------------------
 // Public: normalizeEasing — NE1 harness for custom easings

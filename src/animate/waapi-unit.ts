@@ -108,6 +108,7 @@ export class WaapiUnit implements GroupOwner {
   private _paused = false;
   /** Блокирует реентрантные controls, пока terminal pose/семантика фиксируются. */
   private _locked = false;
+  private _numericKeysCache: readonly string[] | undefined;
   private _anim: WaapiAnimation | undefined;
   /**
    * Редкий exact-handoff: нормализованная WAAPI-кривая не кодирует абсолютный
@@ -167,7 +168,13 @@ export class WaapiUnit implements GroupOwner {
   _numericKeys(): readonly string[] {
     if (this._done) return [];
     if (this._delegate) return this._delegate._numericKeys();
-    return [...this._o!._numeric.map((c) => c._key), ...this._o!._residuals.keys()];
+    if (this._numericKeysCache !== undefined) return this._numericKeysCache;
+    const o = this._o!;
+    const keys: string[] = [];
+    for (const c of o._numeric) keys.push(c._key);
+    for (const key of o._residuals.keys()) keys.push(key);
+    this._numericKeysCache = keys;
+    return keys;
   }
 
   _supersede(replacement?: () => void): void {
