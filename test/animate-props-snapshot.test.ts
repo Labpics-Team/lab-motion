@@ -29,7 +29,7 @@ for (const implementation of ['source', 'dist'] as const) {
   const runAnimate: typeof animate = (...args) =>
     (implementation === 'source' ? animate : builtAnimate)(...args);
   for (const mode of ['main', 'reduced'] as const) {
-    describe(`animate ${mode}: снимок собственных перечисляемых свойств`, () => {
+    describe(`animate ${implementation}/${mode}: снимок собственных перечисляемых свойств`, () => {
       for (const axis of ['scaleX', 'scaleY'] as const) {
         it(`${axis} из прототипа не подавляет scale и не читается`, async () => {
           const prototype = Object.defineProperty({}, axis, {
