@@ -1,37 +1,19 @@
 /**
- * utils/index.ts — L1 Domain: pure numeric value-mapping & math primitives.
+ * Чистые числовые преобразования подпути @labpics/motion/utils.
  *
- * Subpath export: import { clamp, mix, wrap, snap, mapRange, interpolate, pipe }
- *                 from '@labpics/motion/utils'
+ * U1. Числовой результат конечен при любом IEEE-754 входе. Общий страж
+ *     internal/finite сохраняет конечные числа, NaN → 0, ±∞ → ±MAX_VALUE.
+ * U2. Некорректная конфигурация (границы, шаг, точки) отклоняется сразу через
+ *     MotionParamError; переданное затем значение обрабатывается без исключения.
+ * U3. Нет внешних runtime-зависимостей, DOM, случайности или часов.
+ * U4. Концы mix/mapRange/interpolate возвращают точные исходные значения,
+ *     включая −0 и диапазон, разность которого переполняет число.
+ * U5. Импорт одного преобразования не подтягивает остальные. Общий числовой
+ *     страж внутренний: зависимости от публичных подпутей нет. mapRange не
+ *     использует движок сегментов interpolate; его миксер — локальный lerp.
  *
- * The primitives Framer Motion and GSAP ship at their core — a scalar remap
- * (`mapRange` / Framer `transform`), an N-stop piecewise mapper (`interpolate`),
- * range constraint (`clamp`), cyclic wrap (`wrap`), grid/target snapping (`snap`),
- * a total lerp (`mix`), and left-to-right composition (`pipe`). Pure math: no
- * DOM, no clock, no window, no global state.
- *
- * Invariants (same discipline as ./easing, ./value, ./stagger):
- *   U1. CSS-safe finiteness: every NUMERIC output is always finite (never NaN,
- *       never ±Infinity) for ALL IEEE-754 value inputs — <range, >range, NaN,
- *       ±Infinity, -0, subnormals. Guard is the module-private `clampFinite`,
- *       mirroring spring.ts exactly (NaN→0, +∞→MAX_VALUE, −∞→−MAX_VALUE).
- *   U2. Eager config validation: invalid CONFIG (bounds, increment, stops)
- *       throws MotionParamError synchronously at the boundary (mirrors easing
- *       power/steps/cubicBezier). The trailing VALUE argument NEVER throws — it
- *       is hardened by `clampFinite` instead.
- *   U3. Deterministic & pure: identical inputs → bit-identical outputs; zero
- *       runtime dependencies (only MotionParamError is imported), no Math.random,
- *       no Date.now, no clock, no DOM.
- *   U4. Bit-exact endpoints: mix/mapRange/interpolate resolve exact endpoints
- *       without float drift (short-circuits, not a+(b−a)·1).
- *   U5. Tree-shake isolation: private helpers are inlined (no cross-subpath
- *       import); mapRange does NOT route through the interpolate segment engine;
- *       interpolate's default mixer is the private `lerp`, not the public `mix` —
- *       so a single-symbol import stays a handful of bytes.
- *
- * The sole exception to U1 is `pipe`: a structural combinator that applies no
- * clampFinite (each composed stage owns its own finiteness). A pipeline built
- * from these primitives is finite by transitivity.
+ * pipe не меняет числовую семантику: конечность результата принадлежит
+ * каждой переданной функции, а не структурной композиции.
  */
 
 import { MotionParamError } from '../errors.js';

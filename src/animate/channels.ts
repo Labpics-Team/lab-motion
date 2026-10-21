@@ -108,8 +108,9 @@ function addSpec(groups: Map<GroupKey, ChannelSpec[]>, spec: ChannelSpec): void 
 
 export function parseProps(props: Record<string, unknown>): Map<GroupKey, ChannelSpec[]> {
   const groups = new Map<GroupKey, ChannelSpec[]>();
-  for (const key in props) {
-    if (!Object.hasOwn(props, key)) continue;
+  // Набор и приоритет осей фиксируются до чтения getter-ов значений.
+  const keys = Object.keys(props);
+  for (const key of keys) {
     const raw = props[key];
     if (key === 'transform') {
       throw new MotionParamError('LM140');
@@ -123,10 +124,10 @@ export function parseProps(props: Record<string, unknown>): Map<GroupKey, Channe
       const explicitFrom = pair ? requireFinite(pair[0]) : undefined;
       const to = requireFinite(pair ? pair[1] : raw);
       if (key === 'scale') {
-        if (!('scaleX' in props)) {
+        if (!keys.includes('scaleX')) {
           addSpec(groups, { _kind: 'num', _key: 'scaleX', _group: group, _explicitFrom: explicitFrom, _to: to });
         }
-        if (!('scaleY' in props)) {
+        if (!keys.includes('scaleY')) {
           addSpec(groups, { _kind: 'num', _key: 'scaleY', _group: group, _explicitFrom: explicitFrom, _to: to });
         }
       } else {

@@ -8,6 +8,7 @@ export function finiteOr(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
+/** Конечные числа, включая −0, сохраняются; NaN → 0, ±∞ → ±MAX_VALUE. */
 export function clampFinite(x: number): number {
   if (Number.isFinite(x)) return x;
   if (Number.isNaN(x)) return 0;

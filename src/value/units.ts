@@ -14,7 +14,7 @@
  *   V4. TypeScript strict — нет `any` в публичном API.
  */
 
-// ── Внутренний страж конечности (зеркало spring.ts / easing/index.ts) ──────
+// Общий страж; локальная сигнатура сохраняет изолированный эмит деклараций.
 import { clampFinite as _clampFinite } from '../internal/finite.js';
 const clampFinite: (x: number) => number = _clampFinite;
 export { clampFinite };
