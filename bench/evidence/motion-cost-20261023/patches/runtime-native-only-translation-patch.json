@@ -1,0 +1,23 @@
+{
+  "base": "c9f2ccb1681bc56a9e3da163ff7c4f324fc7ea3a",
+  "operations": [
+    {
+      "path": "src/motion/runtime.ts",
+      "replace": [
+        [
+          "      let identity = !at, translationOnly = true;",
+          "      let identity = !at, translationOnly = !!at;"
+        ]
+      ]
+    },
+    {
+      "path": "browser/motion-transform-serialization.spec.ts",
+      "replace": [
+        [
+          "import { expect, test } from './fixtures/harness';\n",
+          "import { expect, test } from './fixtures/harness';\n\ntest('JS seek(1 мс) сохраняет точную матрицу полной CSS-записи', async ({ page }) => {\n  const result = await page.evaluate(async () => {\n    const { animate } = await import('/browser/.artifacts/motion-root.js');\n    const make = () => {\n      const el = document.createElement('div');\n      el.style.cssText = 'position:absolute;width:2px;height:2px;transform:none;transform-origin:0 0';\n      document.body.append(el); return el;\n    };\n    const elements = Array.from({ length: 100 }, make), reference = make();\n    const read = (el: Element) => {\n      const matrix = new DOMMatrixReadOnly(getComputedStyle(el).transform);\n      return [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f];\n    };\n    // Аналитическое положение; reference не вызывает serializer или sampler пакета.\n    const p = 1 / 400, x = 300 * (p * p * (3 - 2 * p));\n    reference.style.transform = `translate(${x}px,0px) rotate(0deg) skew(0deg,0deg) scale(1,1)`;\n    const run = animate(elements, { x: 300 }, { duration: 400, ease: p => p * p * (3 - 2 * p) });\n    try {\n      run.pause(); run.seek(1);\n      return { poses: elements.map(read), expected: read(reference), duration: run.duration,\n        state: run.state, effects: elements.reduce((sum, el) => sum + el.getAnimations().length, 0) };\n    } finally { run.stop(); for (const el of [...elements, reference]) el.remove(); }\n  });\n  expect(result.duration).toBe(400); expect(result.state).toBe('paused'); expect(result.effects).toBe(0);\n  expect(result.poses).toHaveLength(100); expect(result.expected[4]).toBeGreaterThan(0);\n  for (const pose of result.poses) expect(pose).toEqual(result.expected);\n});\n"
+        ]
+      ]
+    }
+  ]
+}

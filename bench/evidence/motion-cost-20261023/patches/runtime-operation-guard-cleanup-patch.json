@@ -1,0 +1,22 @@
+{
+  "base": "b18c728b7660021bce3c8e044500a357d447d1e8",
+  "operations": [
+    {
+      "path": "src/motion/runtime.ts",
+      "replace": [
+        [
+          "    if (engine?._busy()) { engine._after(() => this._apply(action, time)); return; }",
+          "    if (engine?._operations) { engine._after(() => this._apply(action, time)); return; }"
+        ],
+        [
+          "  private _operations = 0;",
+          "  _operations = 0;"
+        ],
+        [
+          "  _busy(): boolean { return this._operations !== 0; }\n",
+          ""
+        ]
+      ]
+    }
+  ]
+}
