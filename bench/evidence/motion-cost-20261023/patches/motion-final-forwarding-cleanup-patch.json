@@ -1,0 +1,48 @@
+{
+  "base": "7d6d8073323b915fa50dcf513d8bc55a7e472cb8",
+  "operations": [
+    {
+      "path": "src/motion/runtime.ts",
+      "replace": [
+        [
+          "  private _complete(): void {",
+          "  _complete(): void {"
+        ],
+        [
+          "  _empty(): void { this._complete(); }\n",
+          ""
+        ],
+        [
+          "      run._empty();",
+          "      run._complete();"
+        ]
+      ]
+    },
+    {
+      "path": "src/motion/layout.ts",
+      "replace": [
+        [
+          "this._release(Boolean(failure));",
+          "this._release(!!failure);"
+        ]
+      ]
+    },
+    {
+      "path": "src/motion/program.ts",
+      "replace": [
+        [
+          "const _identity = authored ? undefined : [resolved[0]!._unit,",
+          "const _identity = authored ? undefined : [from._unit,"
+        ],
+        [
+          "return { _key: key, _unit: resolved[0]!._unit,",
+          "return { _key: key, _unit: from._unit,"
+        ],
+        [
+          "_nativeEase: resolved[0]!._unit === 'color'",
+          "_nativeEase: from._unit === 'color'"
+        ]
+      ]
+    }
+  ]
+}

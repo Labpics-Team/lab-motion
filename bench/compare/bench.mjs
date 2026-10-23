@@ -240,6 +240,35 @@ async function smokeCheck(page, libId) {
   if (!(moved > 10)) fail(`смоук ${libId}: элемент не сдвинулся (x=${moved}) — адаптер неисправен, числа были бы враньём`);
 }
 
+/** Node-side failure evidence is diagnostic only; the original semantic gate still throws. */
+export function assertStartSemanticEvidenceWithDiagnostic(label, evidence, metadata, resultsDirectory = path.join(__dirname, 'results')) {
+  try {
+    assertStartSemanticEvidence(label, evidence);
+  } catch (error) {
+    try {
+      // A visible, unique directory survives artifact upload and cannot overwrite a prior attempt.
+      const directory = mkdtempSync(path.join(resultsDirectory, 'semantic-failure-'));
+      const file = path.join(directory, 'evidence.json');
+      const diagnostic = {
+        ...metadata,
+        diagnostic: 'start-semantic-failure',
+        label,
+        error: { name: error?.name, message: String(error?.message ?? error), stack: error?.stack },
+        semanticEvidence: evidence,
+      };
+      // JSON normally erases NaN/Infinity as null, losing the actual invalid observation.
+      const json = JSON.stringify(diagnostic, (_key, value) => (
+        typeof value === 'number' && !Number.isFinite(value) ? { $number: String(value) } : value
+      ), 2) + '\n';
+      writeFileSync(file, json, { flag: 'wx' });
+      console.error(`Semantic diagnostic: ${file}`);
+    } catch (diagnosticError) {
+      console.error(`${label}: semantic diagnostic could not be saved: ${String(diagnosticError)}`);
+    }
+    throw error;
+  }
+}
+
 async function measurePageTimerProbe(page, phase) {
   const raw = await page.evaluate(() => {
     const deltas = [];
@@ -444,7 +473,11 @@ export async function runSemanticStartCheck(page, scenario, calls) {
     const A = window.__adapterModule;
     const groups = [], callStartedAtMs = [], controls = [], checkpoints = [], terminal = [], failures = [];
     const onset = config.requireFreshStart ? { before: [], after: [] } : undefined;
-    let phase = 'setup', epoch;
+    const completion = config.completionTimeoutMs === undefined ? undefined
+      : { timeoutMs: config.completionTimeoutMs, calls: [] };
+    const pendingCompletions = [];
+    const rendered = () => new Promise((resolve) => requestAnimationFrame(resolve));
+    let phase = 'setup', epoch, watchdog;
     const failed = (error, location) => failures.push({ phase: location, name: error?.name ?? typeof error, message: String(error?.message ?? error) });
     const delaySpan = config.staggerGapMs * (config.targetsPerCall - 1);
     const checkpointTimes = config.staggerGapMs > 0
@@ -458,6 +491,9 @@ export async function runSemanticStartCheck(page, scenario, calls) {
           element.className = 'box'; document.body.appendChild(element);
         }
       }
+      // Подготовка DOM не входит в untimed trajectory oracle. Два rendering
+      // шага дают браузеру опубликовать созданные цели до начала анимации.
+      if (completion) { await rendered(); await rendered(); }
       epoch = performance.now();
       if (onset) {
         phase = 'onset-before';
@@ -481,6 +517,19 @@ export async function runSemanticStartCheck(page, scenario, calls) {
         controls.push(config.staggerGapMs > 0
           ? A.startStagger(elements, config.toPx, config.durationMs, config.staggerGapMs)
           : A.start(elements, config.toPx, config.durationMs));
+        if (completion) {
+          const outcome = { state: 'pending' }; completion.calls.push(outcome);
+          const finished = controls.at(-1).finished();
+          if (typeof finished?.then !== 'function') throw new Error('Adapter completion is not awaitable');
+          // Подписываемся сразу; rejection до checkpoints остаётся acquired evidence.
+          pendingCompletions.push(Promise.resolve(finished).then(
+            () => { outcome.state = 'fulfilled'; outcome.observedAtMs = performance.now() - epoch; },
+            (error) => {
+              outcome.state = 'rejected'; outcome.observedAtMs = performance.now() - epoch;
+              failed(error, 'completion');
+            },
+          ));
+        }
         if (onset) {
           phase = 'onset-after';
           const group = { readStartedMs: performance.now() - epoch, positions: [] }; onset.after.push(group);
@@ -532,14 +581,45 @@ export async function runSemanticStartCheck(page, scenario, calls) {
           group.readEndedMs = performance.now() - epoch;
         }
       }
-      phase = 'terminal';
-      const remaining = config.durationMs + delaySpan + 100 - (performance.now() - epoch);
-      if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+      if (completion) {
+        phase = 'completion';
+        completion.waitStartedMs = performance.now() - epoch;
+        try {
+          await Promise.race([
+            Promise.all(pendingCompletions),
+            new Promise((_, reject) => {
+              watchdog = setTimeout(() => reject(new Error('Completion watchdog expired')),
+                Math.max(0, completion.timeoutMs - completion.waitStartedMs));
+            }),
+          ]);
+        } finally { clearTimeout(watchdog); }
+        completion.observedAtMs = performance.now() - epoch;
+        if (completion.calls.some((call) => call.state !== 'fulfilled')) {
+          throw new Error('Adapter completion rejected');
+        }
+        phase = 'terminal';
+        await rendered();
+        await new Promise((resolve) => requestAnimationFrame((timestamp) => {
+          completion.terminalFrameTimestampMs = timestamp - epoch;
+          // Timestamp кадра может отставать от wall clock его callback.
+          completion.terminalFrameObservedAtMs = performance.now() - epoch;
+          resolve();
+        }));
+        completion.terminalReadStartedMs = performance.now() - epoch;
+      } else {
+        // Locked server profile сохраняет прежний terminal contract;
+        // его adapters не обязаны предоставлять completion API.
+        phase = 'terminal';
+        const remaining = config.durationMs + delaySpan + 100 - (performance.now() - epoch);
+        if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+      }
       for (const elements of groups) {
         const positions = []; terminal.push(positions);
         for (const element of elements) positions.push(new DOMMatrixReadOnly(getComputedStyle(element).transform).e);
       }
+      if (completion) completion.terminalReadEndedMs = performance.now() - epoch;
     } catch (error) { failed(error, phase); } finally {
+      clearTimeout(watchdog);
       for (const control of controls) { try { control.cancel(); } catch (error) { failed(error, 'cancel-cleanup'); } }
       for (const elements of groups) for (const element of elements) { try { element.remove(); } catch (error) { failed(error, 'target-cleanup'); } }
     }
@@ -554,6 +634,7 @@ export async function runSemanticStartCheck(page, scenario, calls) {
       callStartedAtMs,
       checkpoints,
       terminal,
+      ...(completion ? { completion } : {}),
       ...(onset ? { onset } : {}),
       ...(failures.length ? { failures, acquiredOwners: controls.length, createdTargets: groups.map((elements) => elements.length) } : {}),
     };
@@ -1001,6 +1082,24 @@ async function main() {
   const scenarioManifest = warmCalibration.scenarioManifest;
   const startOrders = makeRoundRobinOrders(startIds, RUNS, ORDER_SEED);
   assertBalancedRunBlocks('BENCH_RUNS', startOrders, startIds);
+  const assertSemantic = (label, evidence, { id, scenario, run, metric }) => (
+    assertStartSemanticEvidenceWithDiagnostic(label, evidence, {
+      generatedAt,
+      participant: { id, version: results[id].version, adapterSha256: adapters[id].sha256 },
+      run: run + 1,
+      metric,
+      scenario,
+      scenarioConfig: scenarioManifest[scenario],
+      startOrder: startOrders[run],
+      provenance,
+      browser: {
+        name: 'chromium',
+        version: browserVersion,
+        revision: chromiumInstall.revision,
+        executableSha256: browserExecutableSha256,
+      },
+    })
+  );
   for (let run = 0; run < RUNS; run++) {
     for (const id of startOrders[run]) {
       const adapterPath = adapters[id].path;
@@ -1018,7 +1117,9 @@ async function main() {
           measurement.measurementTimeOriginMs,
         );
         const semanticEvidence = await runSemanticStartCheck(page, config, config.warmCalls);
-        assertStartSemanticEvidence(`${id}.${scenario} run ${run + 1}`, semanticEvidence);
+        assertSemantic(`${id}.${scenario} run ${run + 1}`, semanticEvidence, {
+          id, scenario, run, metric: `warm.${scenario}`,
+        });
         const semantic = semanticEvidence.valid;
         results[id].raw.warm[scenario].push({
           run,
@@ -1037,7 +1138,9 @@ async function main() {
         const measurement = await runColdStartCost(page, config);
         assertPositiveFiniteSamples(`${id}.cold.${scenario} run ${run + 1}`, [measurement.sample]);
         const semanticEvidence = await runSemanticStartCheck(page, config, 1);
-        assertStartSemanticEvidence(`${id}.cold.${scenario} run ${run + 1}`, semanticEvidence);
+        assertSemantic(`${id}.cold.${scenario} run ${run + 1}`, semanticEvidence, {
+          id, scenario, run, metric: `cold.${scenario}`,
+        });
         const semantic = semanticEvidence.valid;
         results[id].raw.cold[scenario].push({
           run,
@@ -1059,7 +1162,9 @@ async function main() {
         assertPositiveFiniteSamples(`${id}.cold.firstPresented run ${run + 1}`, [presented.sample]);
         const { context, page } = await newPage(browser, adapterPath, benchmarkOrigin.url);
         const semanticEvidence = await runSemanticStartCheck(page, scenarioManifest.s1, 1);
-        assertStartSemanticEvidence(`cold.firstPresented ${id} run ${run + 1}`, semanticEvidence);
+        assertSemantic(`cold.firstPresented ${id} run ${run + 1}`, semanticEvidence, {
+          id, scenario: 's1', run, metric: 'cold.firstPresented',
+        });
         const semantic = semanticEvidence.valid;
         results[id].raw.cold.firstPresented.push({
           run,

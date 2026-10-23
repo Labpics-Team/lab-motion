@@ -1,0 +1,58 @@
+{
+  "base": "87ce1f1c5572fa6bd45d715c2196fbd5965f748c",
+  "operations": [
+    {
+      "path": "test/motion-program-reuse.test.ts",
+      "replace": [
+        [
+          "import type { Program } from '../src/motion/program.js';\n",
+          ""
+        ],
+        [
+          "type Track = { _program: Program; _value: number[]; _velocity: number[] };",
+          "type Track = { _value: number[]; _velocity: number[] };"
+        ],
+        [
+          "общая программа группы не связывает состояние и полномочия отдельных целей",
+          "группа не связывает состояние и полномочия отдельных целей"
+        ],
+        [
+          "разные начальные координаты сохраняют разные программы и траектории",
+          "разные начальные координаты сохраняют независимые траектории"
+        ],
+        [
+          "пользовательский easing исполняется для каждой цели даже при общей программе",
+          "пользовательский easing исполняется для каждой цели группы"
+        ],
+        [
+          "      expect(first._program).toBe(second._program);\n",
+          ""
+        ],
+        [
+          "    expect(track(a, a.element, '--distance')._program).not.toBe(track(a, b.element, '--distance')._program);\n",
+          ""
+        ],
+        [
+          "    expect(track(a, a.element, 'width')._program).not.toBe(track(a, b.element, 'width')._program);\n",
+          ""
+        ],
+        [
+          "    expect(track(a, a.element, 'x')._program).toBe(track(a, b.element, 'x')._program);\n",
+          ""
+        ],
+        [
+          "    expect(track(a, a.element, 'x')._program).not.toBe(track(a, b.element, 'x')._program);\n    run.seek(500); expect(a.x()).toBe(55); expect(b.x()).toBe(60);",
+          "    run.seek(500); expect(a.x()).toBe(55); expect(b.x()).toBe(60);"
+        ],
+        [
+          "    expect(track(a, a.element, 'x')._program).not.toBe(track(a, b.element, 'x')._program);\n    next.seek(100); expect(a.x()).toBeGreaterThan(b.x());",
+          "    next.seek(100); expect(a.x()).toBeGreaterThan(b.x());"
+        ],
+        [
+          "    expect(track(a, a.element, 'x')._program).not.toBe(track(a, b.element, 'x')._program);\n    run.seek(500); expect(a.x()).toBe(50); expect(b.x()).toBe(40);",
+          "    run.seek(500); expect(a.x()).toBe(50); expect(b.x()).toBe(40);"
+        ]
+      ]
+    }
+  ]
+}

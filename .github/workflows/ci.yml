@@ -11,6 +11,10 @@ on:
         description: 'Снять зарегистрированный размерный baseline PROFILE-01'
         type: boolean
         default: false
+      performance_baseline:
+        description: 'Commit для парного сравнения полной стоимости движения'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -26,6 +30,12 @@ env:
   COREPACK_DEFAULT_TO_LATEST: "0"
 
 jobs:
+  performance:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' }}
+    uses: ./.github/workflows/performance.yml
+    with:
+      baseline: ${{ inputs.performance_baseline }}
+
   # Только явный baseline-запрос: обычный кандидат может менять runtime и
   # не обязан совпадать с зарегистрированным старым источником PROFILE-01.
   profile-baseline:

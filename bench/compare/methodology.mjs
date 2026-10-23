@@ -80,7 +80,11 @@ export const WARM_TIMER_CALIBRATION_POLICY = Object.freeze({
   maximumTargetsPerPilotProvenance: 'harness-resource-safety-policy',
 });
 
-const scenario = (value) => Object.freeze(value);
+const scenario = (value) => Object.freeze({
+  requireDocumentFrame: true,
+  completionTimeoutMs: 10_000,
+  ...value,
+});
 
 /** Каноническая топология: runner, raw schema и claim thresholds читают один объект. */
 export const START_SCENARIO_MANIFEST = Object.freeze({
@@ -696,13 +700,37 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
   ));
   if (!terminalValid) return false;
 
+  const clockErrorMs = expected.semanticClockErrorMs ?? 0;
+  if (!Number.isFinite(clockErrorMs) || clockErrorMs < 0 ||
+      !Number.isFinite(expected.durationMs) || expected.durationMs <= 0) return false;
+
+  if (expected.completionTimeoutMs !== undefined) {
+    const completion = evidence.completion;
+    const times = [completion?.waitStartedMs, completion?.observedAtMs,
+      completion?.terminalFrameObservedAtMs, completion?.terminalReadStartedMs, completion?.terminalReadEndedMs];
+    if (!Number.isFinite(expected.completionTimeoutMs) || expected.completionTimeoutMs <= 0 ||
+        completion?.timeoutMs !== expected.completionTimeoutMs ||
+        times.some((value) => !Number.isFinite(value) || value < 0) ||
+        // Порядок finished → callback → чтение доказан одним perf clock.
+        times.some((value, index) => index > 0 && value < times[index - 1]) ||
+        completion.observedAtMs > completion.timeoutMs ||
+        !Number.isFinite(completion.terminalFrameTimestampMs) || completion.terminalFrameTimestampMs < 0 ||
+        // Document timestamp не обязан быть новее finished wall time,
+        // но не может находиться в будущем своего acquired callback.
+        completion.terminalFrameTimestampMs > nextUp(completion.terminalFrameObservedAtMs + clockErrorMs) ||
+        !Array.isArray(completion.calls) || completion.calls.length !== calls ||
+        completion.calls.some((call, index) => call?.state !== 'fulfilled' ||
+          !Number.isFinite(call.observedAtMs) || call.observedAtMs < evidence.callStartedAtMs[index] ||
+          call.observedAtMs > completion.observedAtMs) ||
+        evidence.checkpoints.some((checkpoint) => !Number.isFinite(checkpoint?.frameTimestampMs) ||
+          completion.terminalFrameTimestampMs < checkpoint.frameTimestampMs ||
+          checkpoint.groups?.some((group) => group.readEndedMs > completion.waitStartedMs))) return false;
+  }
+
   let provedPartialStagger = expected.staggerGapMs === 0;
   const observations = Array.from({ length: calls }, () => []);
   const phases = Array.from({ length: calls }, () => ({ low: -Infinity, high: Infinity }));
   const resolved = Array.from({ length: calls }, () => Array(expected.targetsPerCall).fill(false));
-  const clockErrorMs = expected.semanticClockErrorMs ?? 0;
-  if (!Number.isFinite(clockErrorMs) || clockErrorMs < 0 ||
-      !Number.isFinite(expected.durationMs) || expected.durationMs <= 0) return false;
   const slope = expected.toPx / expected.durationMs;
   const coordinateError = 2 * expected.movementThresholdPx;
   const interior = (value) => value >= expected.movementThresholdPx && value < expected.toPx - expected.finalTolerancePx;
@@ -838,6 +866,13 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
       }
       if (lastMoved >= 0 && lastMoved < expected.targetsPerCall - 1) provedPartialStagger = true;
     }
+  }
+  if (expected.completionTimeoutMs !== undefined) {
+    // Фаза уже ограничена независимыми CSS observations. Поздние terminal
+    // кадры не могут оправдать finished до полного конца последней цели.
+    const delay = nextDown(expected.staggerGapMs * (expected.targetsPerCall - 1));
+    if (evidence.completion.calls.some((call, index) => call.observedAtMs <
+      nextDown(nextDown(nextDown(phases[index].low + expected.durationMs) + delay) - clockErrorMs))) return false;
   }
   return provedPartialStagger && resolved.every((targets) => expected.staggerGapMs === 0
     ? targets.every(Boolean) : targets[0]);

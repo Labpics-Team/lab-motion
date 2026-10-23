@@ -1,0 +1,894 @@
+{
+  "schemaVersion": 1,
+  "measuredAt": "2026-10-23T09:42:03.969Z",
+  "measurement": "production consumer import-cost",
+  "compilerProfile": {
+    "bundle": true,
+    "minify": true,
+    "treeShaking": true,
+    "format": "esm",
+    "platform": "browser",
+    "target": "es2022",
+    "tsconfigRaw": {},
+    "splitting": true,
+    "metafile": true,
+    "write": false,
+    "logLevel": "silent"
+  },
+  "compression": "canonical gzip; Node Brotli quality 11; каждый output сжимается отдельно",
+  "baseline": {
+    "name": "@labpics/motion",
+    "version": "0.6.0",
+    "rootExport": "./dist/motion/index.js",
+    "packageJsonSha256": "dec5adfb2e21d5eabe078a284c39d7049f1a480682914e093f3d7c191094744d",
+    "dist": {
+      "sha256": "ce88164996c355867d306bfbbbc68e724e1afab022cb0e72b26a0d4e0002ae78",
+      "files": 338
+    }
+  },
+  "candidate": {
+    "name": "@labpics/motion",
+    "version": "0.6.0",
+    "rootExport": "./dist/motion/index.js",
+    "packageJsonSha256": "dec5adfb2e21d5eabe078a284c39d7049f1a480682914e093f3d7c191094744d",
+    "dist": {
+      "sha256": "19ff28b2e6ceeb5ce8637d7eaddcf94ae6cdf9a0c64b7acc78c851c47200d66b",
+      "files": 340
+    }
+  },
+  "toolchain": {
+    "node": "v24.19.0",
+    "platform": "linux",
+    "arch": "x64",
+    "nodeExecutableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+    "esbuild": {
+      "version": "0.28.2",
+      "sha256": "89887859ca74227a1fb14497c29ab7be6a1b719a52205515ad3846536d1c7fdf",
+      "files": 7
+    },
+    "nativePackages": {
+      "@esbuild/linux-x64": {
+        "version": "0.28.2",
+        "sha256": "c33ff18b9c77a710399a1b819708a7ccd8c5e2d17ecd7226b7ff549eaa7f5f39",
+        "files": 3
+      }
+    },
+    "gzip": {
+      "package": "pako",
+      "version": "3.0.2",
+      "sha256": "d25b61fb8b74f8fc46fb16312d80fdafeabb83bbef355e92c880ace60339d763",
+      "files": 20
+    },
+    "brotli": {
+      "implementation": "node:zlib",
+      "quality": 11,
+      "version": "1.2.0"
+    },
+    "oracle": {
+      "scripts/size-gate.mjs": "03db42e864f770827e97198d8d980b4fbdf10834ed46df420d2767f0a3510766",
+      "scripts/compression-oracle.mjs": "736f72336d54bca93dca1cfe426ff79476eb6b2fbd266296b00802eef565a6bb",
+      "scripts/compression-policy.mjs": "78535921e66d3f1e9bb2936722cce03f0464ec835cd88ab4ac9a1cbd97cc38a4",
+      "bench/compare/provenance.mjs": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623"
+    },
+    "scriptSha256": "090476805efe3f172c0e89df12147f98f8ec36b25627be51a293e89d53faa73d"
+  },
+  "verification": {
+    "artifactsUnchanged": true,
+    "toolchainUnchanged": true,
+    "samePublicExports": true
+  },
+  "results": [
+    {
+      "name": "root animate",
+      "baseline": {
+        "rawBytes": 33426,
+        "gzBytes": 12969,
+        "brBytes": 11848,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 33426,
+        "totalGzBytes": 12969,
+        "totalBrBytes": 11848,
+        "totalFiles": 1,
+        "exports": [
+          "animate"
+        ],
+        "outputSha256": "26dc330fbc7b7d52c222707f0d217e38f95a07cf61d0fba17eb45a51b139f30d",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "9f5d5e59f70f8c30e00398e644aed9ddd2684e932e6c5f24f9da12ac8cd566d9",
+            "bytes": 33426
+          }
+        ]
+      },
+      "candidate": {
+        "rawBytes": 31609,
+        "gzBytes": 12696,
+        "brBytes": 11567,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 31609,
+        "totalGzBytes": 12696,
+        "totalBrBytes": 11567,
+        "totalFiles": 1,
+        "exports": [
+          "animate"
+        ],
+        "outputSha256": "d909ab678dd968a07e7b684bb6e3485e564c6eea45258c095acb595da43d7514",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "981925242df2e3c9a31bcb30b3a559b75bb6619f28e531ca48133e405e8ba5ae",
+            "bytes": 31609
+          }
+        ]
+      },
+      "change": {
+        "rawBytes": {
+          "deltaBytes": -1817,
+          "candidateOverBaseline": 0.945641117692814,
+          "reductionPercent": 5.4358882307186
+        },
+        "gzBytes": {
+          "deltaBytes": -273,
+          "candidateOverBaseline": 0.9789498033772843,
+          "reductionPercent": 2.105019662271568
+        },
+        "brBytes": {
+          "deltaBytes": -281,
+          "candidateOverBaseline": 0.9762829169480081,
+          "reductionPercent": 2.371708305199194
+        },
+        "lazyRawBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyGzBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyBrBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "totalRawBytes": {
+          "deltaBytes": -1817,
+          "candidateOverBaseline": 0.945641117692814,
+          "reductionPercent": 5.4358882307186
+        },
+        "totalGzBytes": {
+          "deltaBytes": -273,
+          "candidateOverBaseline": 0.9789498033772843,
+          "reductionPercent": 2.105019662271568
+        },
+        "totalBrBytes": {
+          "deltaBytes": -281,
+          "candidateOverBaseline": 0.9762829169480081,
+          "reductionPercent": 2.371708305199194
+        }
+      }
+    },
+    {
+      "name": "root sequence",
+      "baseline": {
+        "rawBytes": 33427,
+        "gzBytes": 12967,
+        "brBytes": 11802,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 33427,
+        "totalGzBytes": 12967,
+        "totalBrBytes": 11802,
+        "totalFiles": 1,
+        "exports": [
+          "sequence"
+        ],
+        "outputSha256": "173247acf08186f80cbacee0a092c0990a27ab9aaa0a2d6317e79d2dc42894fa",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "e1afe95cc56f01a1b5e01b84be62f9a6a0c6f057149da45a4caf230181886799",
+            "bytes": 33427
+          }
+        ]
+      },
+      "candidate": {
+        "rawBytes": 32594,
+        "gzBytes": 13092,
+        "brBytes": 11858,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 32594,
+        "totalGzBytes": 13092,
+        "totalBrBytes": 11858,
+        "totalFiles": 1,
+        "exports": [
+          "sequence"
+        ],
+        "outputSha256": "dfb26e229c61f50cea08e69e7bec41c47c7054fa39f1071eeeea94695552cad6",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "b3d8929a6caa0bb5484e6f1ea6e8428bcf33cd93203a7255d803155da15f24a9",
+            "bytes": 32594
+          }
+        ]
+      },
+      "change": {
+        "rawBytes": {
+          "deltaBytes": -833,
+          "candidateOverBaseline": 0.9750800251293864,
+          "reductionPercent": 2.4919974870613593
+        },
+        "gzBytes": {
+          "deltaBytes": 125,
+          "candidateOverBaseline": 1.0096398550165806,
+          "reductionPercent": -0.9639855016580601
+        },
+        "brBytes": {
+          "deltaBytes": 56,
+          "candidateOverBaseline": 1.0047449584816133,
+          "reductionPercent": -0.47449584816132706
+        },
+        "lazyRawBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyGzBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyBrBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "totalRawBytes": {
+          "deltaBytes": -833,
+          "candidateOverBaseline": 0.9750800251293864,
+          "reductionPercent": 2.4919974870613593
+        },
+        "totalGzBytes": {
+          "deltaBytes": 125,
+          "candidateOverBaseline": 1.0096398550165806,
+          "reductionPercent": -0.9639855016580601
+        },
+        "totalBrBytes": {
+          "deltaBytes": 56,
+          "candidateOverBaseline": 1.0047449584816133,
+          "reductionPercent": -0.47449584816132706
+        }
+      }
+    },
+    {
+      "name": "root scope",
+      "baseline": {
+        "rawBytes": 41550,
+        "gzBytes": 15528,
+        "brBytes": 14150,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 41550,
+        "totalGzBytes": 15528,
+        "totalBrBytes": 14150,
+        "totalFiles": 1,
+        "exports": [
+          "scope"
+        ],
+        "outputSha256": "31cf1c914512bc8c5fd4620b4cd9a5b36cbd9fe62baa7bae3e0413c792f90f8a",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "c59b7c69ab9fe61b020613535a0265ec80a7c44c240d425079c353f606746632",
+            "bytes": 41550
+          }
+        ]
+      },
+      "candidate": {
+        "rawBytes": 40606,
+        "gzBytes": 15698,
+        "brBytes": 14259,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 40606,
+        "totalGzBytes": 15698,
+        "totalBrBytes": 14259,
+        "totalFiles": 1,
+        "exports": [
+          "scope"
+        ],
+        "outputSha256": "1f8cad783c678861c44a0d42e39f03d5e51b12e4d614989dbb596c9e7b7756a1",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "d3cb93484d2c4c19b334adc6df82d10894112197fe24a901ce21b91bc98d697d",
+            "bytes": 40606
+          }
+        ]
+      },
+      "change": {
+        "rawBytes": {
+          "deltaBytes": -944,
+          "candidateOverBaseline": 0.977280385078219,
+          "reductionPercent": 2.2719614921780984
+        },
+        "gzBytes": {
+          "deltaBytes": 170,
+          "candidateOverBaseline": 1.010947964966512,
+          "reductionPercent": -1.094796496651207
+        },
+        "brBytes": {
+          "deltaBytes": 109,
+          "candidateOverBaseline": 1.0077031802120142,
+          "reductionPercent": -0.7703180212014216
+        },
+        "lazyRawBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyGzBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyBrBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "totalRawBytes": {
+          "deltaBytes": -944,
+          "candidateOverBaseline": 0.977280385078219,
+          "reductionPercent": 2.2719614921780984
+        },
+        "totalGzBytes": {
+          "deltaBytes": 170,
+          "candidateOverBaseline": 1.010947964966512,
+          "reductionPercent": -1.094796496651207
+        },
+        "totalBrBytes": {
+          "deltaBytes": 109,
+          "candidateOverBaseline": 1.0077031802120142,
+          "reductionPercent": -0.7703180212014216
+        }
+      }
+    },
+    {
+      "name": "root layout",
+      "baseline": {
+        "rawBytes": 36844,
+        "gzBytes": 14067,
+        "brBytes": 12880,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 36844,
+        "totalGzBytes": 14067,
+        "totalBrBytes": 12880,
+        "totalFiles": 1,
+        "exports": [
+          "layout"
+        ],
+        "outputSha256": "547e82f370ca09a58801962725a4e268b9729867ad944323e4b78662287e6cf5",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "ad5c395f322455c62f6ebafdc66fcce4121393081f098c52b5e85a6cb4831adc",
+            "bytes": 36844
+          }
+        ]
+      },
+      "candidate": {
+        "rawBytes": 17238,
+        "gzBytes": 7280,
+        "brBytes": 6601,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 17238,
+        "totalGzBytes": 7280,
+        "totalBrBytes": 6601,
+        "totalFiles": 1,
+        "exports": [
+          "layout"
+        ],
+        "outputSha256": "368e1fe8fbf55f29527f23ef09d5012fe3e918a36a62d58870cd7a223076921b",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "d07618dcf1814c8fa05793ae07fc6acc9ad9ae8aab10e43dc2c47042fb06da8f",
+            "bytes": 17238
+          }
+        ]
+      },
+      "change": {
+        "rawBytes": {
+          "deltaBytes": -19606,
+          "candidateOverBaseline": 0.467864509825209,
+          "reductionPercent": 53.2135490174791
+        },
+        "gzBytes": {
+          "deltaBytes": -6787,
+          "candidateOverBaseline": 0.5175232814388284,
+          "reductionPercent": 48.24767185611716
+        },
+        "brBytes": {
+          "deltaBytes": -6279,
+          "candidateOverBaseline": 0.5125,
+          "reductionPercent": 48.75000000000001
+        },
+        "lazyRawBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyGzBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyBrBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "totalRawBytes": {
+          "deltaBytes": -19606,
+          "candidateOverBaseline": 0.467864509825209,
+          "reductionPercent": 53.2135490174791
+        },
+        "totalGzBytes": {
+          "deltaBytes": -6787,
+          "candidateOverBaseline": 0.5175232814388284,
+          "reductionPercent": 48.24767185611716
+        },
+        "totalBrBytes": {
+          "deltaBytes": -6279,
+          "candidateOverBaseline": 0.5125,
+          "reductionPercent": 48.75000000000001
+        }
+      }
+    },
+    {
+      "name": "root value",
+      "baseline": {
+        "rawBytes": 34624,
+        "gzBytes": 13387,
+        "brBytes": 12281,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 34624,
+        "totalGzBytes": 13387,
+        "totalBrBytes": 12281,
+        "totalFiles": 1,
+        "exports": [
+          "value"
+        ],
+        "outputSha256": "f5d21beeee4dca203b5bf4ab92518db70818221a3efd87c174573a569fc842da",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "ac154f80bac7e55a30146a0331fa747e24f5c248a99c4fe0b566e84acdf33ff9",
+            "bytes": 34624
+          }
+        ]
+      },
+      "candidate": {
+        "rawBytes": 32738,
+        "gzBytes": 13108,
+        "brBytes": 11946,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 32738,
+        "totalGzBytes": 13108,
+        "totalBrBytes": 11946,
+        "totalFiles": 1,
+        "exports": [
+          "value"
+        ],
+        "outputSha256": "fd8c86d2417122e923dc058e162b7f7ea810f022c8fafd8afe0b95a3ae01d6a1",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "193f97fa85cbcafb621f6480fb50adf3ad63649796279872c77399f94729639c",
+            "bytes": 32738
+          }
+        ]
+      },
+      "change": {
+        "rawBytes": {
+          "deltaBytes": -1886,
+          "candidateOverBaseline": 0.945529112754159,
+          "reductionPercent": 5.447088724584104
+        },
+        "gzBytes": {
+          "deltaBytes": -279,
+          "candidateOverBaseline": 0.9791588854859192,
+          "reductionPercent": 2.084111451408077
+        },
+        "brBytes": {
+          "deltaBytes": -335,
+          "candidateOverBaseline": 0.972722091034932,
+          "reductionPercent": 2.7277908965067987
+        },
+        "lazyRawBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyGzBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyBrBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "totalRawBytes": {
+          "deltaBytes": -1886,
+          "candidateOverBaseline": 0.945529112754159,
+          "reductionPercent": 5.447088724584104
+        },
+        "totalGzBytes": {
+          "deltaBytes": -279,
+          "candidateOverBaseline": 0.9791588854859192,
+          "reductionPercent": 2.084111451408077
+        },
+        "totalBrBytes": {
+          "deltaBytes": -335,
+          "candidateOverBaseline": 0.972722091034932,
+          "reductionPercent": 2.7277908965067987
+        }
+      }
+    },
+    {
+      "name": "root playhead",
+      "baseline": {
+        "rawBytes": 34910,
+        "gzBytes": 13470,
+        "brBytes": 12286,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 34910,
+        "totalGzBytes": 13470,
+        "totalBrBytes": 12286,
+        "totalFiles": 1,
+        "exports": [
+          "playhead"
+        ],
+        "outputSha256": "c0137f133aae46da03aa0e5c30a630c879d4d77c69ba0086c390d0c51076b908",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "3783d9a74bb62bd39218c6d93170112f9c8267ba7043f4c547e83a5a8881397e",
+            "bytes": 34910
+          }
+        ]
+      },
+      "candidate": {
+        "rawBytes": 4977,
+        "gzBytes": 2302,
+        "brBytes": 2143,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 4977,
+        "totalGzBytes": 2302,
+        "totalBrBytes": 2143,
+        "totalFiles": 1,
+        "exports": [
+          "playhead"
+        ],
+        "outputSha256": "33e8b80a16059d333bb977b7dcf4cc1a37c24c54877d3a8e1be75102892bfd49",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "b6d43fca688986fd8ec8b6dbdab77e09ff323bb06d3034d2aaaf811ddb5b33bb",
+            "bytes": 4977
+          }
+        ]
+      },
+      "change": {
+        "rawBytes": {
+          "deltaBytes": -29933,
+          "candidateOverBaseline": 0.14256659982812947,
+          "reductionPercent": 85.74334001718705
+        },
+        "gzBytes": {
+          "deltaBytes": -11168,
+          "candidateOverBaseline": 0.17089829250185598,
+          "reductionPercent": 82.9101707498144
+        },
+        "brBytes": {
+          "deltaBytes": -10143,
+          "candidateOverBaseline": 0.1744261761354387,
+          "reductionPercent": 82.55738238645614
+        },
+        "lazyRawBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyGzBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyBrBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "totalRawBytes": {
+          "deltaBytes": -29933,
+          "candidateOverBaseline": 0.14256659982812947,
+          "reductionPercent": 85.74334001718705
+        },
+        "totalGzBytes": {
+          "deltaBytes": -11168,
+          "candidateOverBaseline": 0.17089829250185598,
+          "reductionPercent": 82.9101707498144
+        },
+        "totalBrBytes": {
+          "deltaBytes": -10143,
+          "candidateOverBaseline": 0.1744261761354387,
+          "reductionPercent": 82.55738238645614
+        }
+      }
+    },
+    {
+      "name": "root MotionError",
+      "baseline": {
+        "rawBytes": 33429,
+        "gzBytes": 12969,
+        "brBytes": 11873,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 33429,
+        "totalGzBytes": 12969,
+        "totalBrBytes": 11873,
+        "totalFiles": 1,
+        "exports": [
+          "MotionError"
+        ],
+        "outputSha256": "0c97d096895712302c21c4d9ec386d475a8b73e5f58251a86a4b92e0499366b9",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "55895f27c403441200af5af0f9f62a3e36d106e8315d34afa4b6d3b9cd8490b1",
+            "bytes": 33429
+          }
+        ]
+      },
+      "candidate": {
+        "rawBytes": 1624,
+        "gzBytes": 883,
+        "brBytes": 811,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 1624,
+        "totalGzBytes": 883,
+        "totalBrBytes": 811,
+        "totalFiles": 1,
+        "exports": [
+          "MotionError"
+        ],
+        "outputSha256": "9059bd671508e49afa2bbbeccecbbf9b3623c4e9ca95d23896fcb8d65a39841a",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "22f92ad58ddbd2953f74a21c2e8a6daf8f4774935e67e95b456ba9f37ad4e453",
+            "bytes": 1624
+          }
+        ]
+      },
+      "change": {
+        "rawBytes": {
+          "deltaBytes": -31805,
+          "candidateOverBaseline": 0.04858057375332795,
+          "reductionPercent": 95.14194262466721
+        },
+        "gzBytes": {
+          "deltaBytes": -12086,
+          "candidateOverBaseline": 0.06808543449764824,
+          "reductionPercent": 93.19145655023517
+        },
+        "brBytes": {
+          "deltaBytes": -11062,
+          "candidateOverBaseline": 0.0683062410511244,
+          "reductionPercent": 93.16937589488757
+        },
+        "lazyRawBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyGzBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyBrBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "totalRawBytes": {
+          "deltaBytes": -31805,
+          "candidateOverBaseline": 0.04858057375332795,
+          "reductionPercent": 95.14194262466721
+        },
+        "totalGzBytes": {
+          "deltaBytes": -12086,
+          "candidateOverBaseline": 0.06808543449764824,
+          "reductionPercent": 93.19145655023517
+        },
+        "totalBrBytes": {
+          "deltaBytes": -11062,
+          "candidateOverBaseline": 0.0683062410511244,
+          "reductionPercent": 93.16937589488757
+        }
+      }
+    },
+    {
+      "name": "full root",
+      "baseline": {
+        "rawBytes": 43116,
+        "gzBytes": 16072,
+        "brBytes": 14651,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 43116,
+        "totalGzBytes": 16072,
+        "totalBrBytes": 14651,
+        "totalFiles": 1,
+        "exports": [
+          "MotionError",
+          "animate",
+          "layout",
+          "playhead",
+          "scope",
+          "sequence",
+          "value"
+        ],
+        "outputSha256": "0ec7deb37010dccf4e4692ffa7f40870a49218da5e05f7440346a6c5cf1c9cdb",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "6063b9e6abe14b0876b8fac782e4a68483ce7a966ecaad55f439ed7010b4b25a",
+            "bytes": 43116
+          }
+        ]
+      },
+      "candidate": {
+        "rawBytes": 42158,
+        "gzBytes": 16231,
+        "brBytes": 14762,
+        "initialFiles": 1,
+        "lazyRawBytes": 0,
+        "lazyGzBytes": 0,
+        "lazyBrBytes": 0,
+        "lazyFiles": 0,
+        "totalRawBytes": 42158,
+        "totalGzBytes": 16231,
+        "totalBrBytes": 14762,
+        "totalFiles": 1,
+        "exports": [
+          "MotionError",
+          "animate",
+          "layout",
+          "playhead",
+          "scope",
+          "sequence",
+          "value"
+        ],
+        "outputSha256": "83f3ca503c5decc53a46d3c30691b13ad41b587d5fbde6213b411ed38bdfabc1",
+        "files": [
+          {
+            "path": "stdin.js",
+            "sha256": "6224dec4d39108e038b92077ee4302684805232ce6422114d3c1b549d153631c",
+            "bytes": 42158
+          }
+        ]
+      },
+      "change": {
+        "rawBytes": {
+          "deltaBytes": -958,
+          "candidateOverBaseline": 0.9777808702105947,
+          "reductionPercent": 2.2219129789405323
+        },
+        "gzBytes": {
+          "deltaBytes": 159,
+          "candidateOverBaseline": 1.009892981582877,
+          "reductionPercent": -0.9892981582876992
+        },
+        "brBytes": {
+          "deltaBytes": 111,
+          "candidateOverBaseline": 1.00757627465702,
+          "reductionPercent": -0.7576274657020043
+        },
+        "lazyRawBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyGzBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "lazyBrBytes": {
+          "deltaBytes": 0,
+          "candidateOverBaseline": null,
+          "reductionPercent": null
+        },
+        "totalRawBytes": {
+          "deltaBytes": -958,
+          "candidateOverBaseline": 0.9777808702105947,
+          "reductionPercent": 2.2219129789405323
+        },
+        "totalGzBytes": {
+          "deltaBytes": 159,
+          "candidateOverBaseline": 1.009892981582877,
+          "reductionPercent": -0.9892981582876992
+        },
+        "totalBrBytes": {
+          "deltaBytes": 111,
+          "candidateOverBaseline": 1.00757627465702,
+          "reductionPercent": -0.7576274657020043
+        }
+      }
+    }
+  ]
+}

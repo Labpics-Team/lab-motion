@@ -1,4 +1,4 @@
-// Лучший native-путь Motion: mini + явный transform без CSS-variable шортхенда x.
+// Узкий native API Motion: mini + явный transform; hybrid x также аппаратный с 14.2.
 import { animate } from 'motion/mini';
 
 export const name = 'motion/mini transform';

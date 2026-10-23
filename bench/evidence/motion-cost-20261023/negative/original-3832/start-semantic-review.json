@@ -1,0 +1,251 @@
+{
+  "review": "original-3832-start-semantic-and-terminal-clock",
+  "reviewedAtUtc": "2026-10-23T10:51:08.469738+00:00",
+  "revision": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+  "scopeVerdict": "PASS",
+  "wholeRunVerdict": "FAIL",
+  "wholeRunReason": "Strict S5 lab-spring.blocked=inconclusive; S5 is reviewed separately.",
+  "inputs": {
+    "raw": {
+      "path": "evidence-overlay-original3832/bench/evidence/motion-cost-20261023/negative/original-3832/canonical-report.json.gz",
+      "bytes": 12817371,
+      "sha256": "13e2f68fadc3410bb254776775f7ed3a5aedec9e4f9bbd99d8497d1b30dce952",
+      "storedBytes": 704342,
+      "containerSha256": "c8ec85d0a3188d455c104aefb6c4787bd7718e5eee175603bc37484881caef7a",
+      "compression": "gzip"
+    },
+    "markdown": {
+      "path": "evidence-overlay-original3832/bench/evidence/motion-cost-20261023/negative/original-3832/canonical-report.md.txt",
+      "sha256": "3cb87f50626b87e4a001e50984fa696bfc91c23ee0e69952e65a267232764053",
+      "originalBasename": "2026-10-23-3832dbd37f21-80d2ea493552.md",
+      "storedBasename": "canonical-report.md.txt"
+    }
+  },
+  "sourceHashes": [
+    {
+      "input": "bench/bench.mjs",
+      "actualSha256": "f8e7e71983a2b6afb3fb8ecfe8aa021a9dc57e6ea1794c96499120054963d3bb",
+      "matchesRecorded": true
+    },
+    {
+      "input": "bench/methodology.mjs",
+      "actualSha256": "8ec57637a9e926ca9d8386b8a1fd046de0ffb47b1e2eca83a3f6a0726a10f3b7",
+      "matchesRecorded": true
+    },
+    {
+      "input": "bench/report-contract.mjs",
+      "actualSha256": "1f4b24106011a25cb8bfe54fdcdbffc71ff82fc30ce39609eca720095769da6a",
+      "matchesRecorded": true
+    }
+  ],
+  "recordedRuntime": {
+    "system": {
+      "cpu": "AMD EPYC 7763 64-Core Processor",
+      "logicalCpus": 4,
+      "memoryGiB": 16,
+      "osType": "Linux",
+      "osRelease": "6.17.0-1022-azure"
+    },
+    "browser": {
+      "name": "chromium",
+      "version": "149.0.7827.55",
+      "revision": "1228",
+      "files": 305,
+      "treeSha256": "c449d46b244ba7b25c13142d45e15e20f0775719d1fc436ee2e74dc93a459f12",
+      "executableSha256": "2d18db9d8608b052b6a552ee00ec1e830f93692e928b65ecc67d693bd33fe801"
+    },
+    "node": "v24.19.0",
+    "distRuntime": {
+      "sha256": "80d2ea493552a702a799132bc765977df12ffc950b4bced9d92c3104b2100306",
+      "files": 92
+    }
+  },
+  "counts": {
+    "semanticRecords": 640,
+    "fulfilledCalls": 4240,
+    "checkpoints": 1920,
+    "checkpointGroups": 12720,
+    "checkpointPositions": 825840,
+    "terminalGroups": 4240,
+    "terminalPositions": 275280,
+    "staggerRecords": 160,
+    "staggerCalls": 320,
+    "timedSamples": 2560,
+    "lab.semanticRecords": 160,
+    "firstPresentedFrameSeries": 80,
+    "firstPresentedDetectedFrames": 3482,
+    "motion.semanticRecords": 160,
+    "gsap.semanticRecords": 160,
+    "anime.semanticRecords": 160
+  },
+  "scenarioManifest": {
+    "s1": {
+      "requireDocumentFrame": true,
+      "completionTimeoutMs": 10000,
+      "targetsPerCall": 1,
+      "warmCalls": 40,
+      "warmSamples": 7,
+      "staggerGapMs": 0,
+      "durationMs": 1200,
+      "toPx": 300,
+      "movementThresholdPx": 0.5,
+      "finalTolerancePx": 2,
+      "coldMetric": "firstPresented"
+    },
+    "s2": {
+      "requireDocumentFrame": true,
+      "completionTimeoutMs": 10000,
+      "targetsPerCall": 100,
+      "warmCalls": 5,
+      "warmSamples": 7,
+      "staggerGapMs": 0,
+      "durationMs": 1200,
+      "toPx": 300,
+      "movementThresholdPx": 0.5,
+      "finalTolerancePx": 2,
+      "coldMetric": "apiReturn"
+    },
+    "s3": {
+      "requireDocumentFrame": true,
+      "completionTimeoutMs": 10000,
+      "targetsPerCall": 200,
+      "warmCalls": 3,
+      "warmSamples": 7,
+      "staggerGapMs": 5,
+      "durationMs": 1200,
+      "toPx": 300,
+      "movementThresholdPx": 0.5,
+      "finalTolerancePx": 2,
+      "coldMetric": "apiReturn"
+    },
+    "s4": {
+      "requireDocumentFrame": true,
+      "completionTimeoutMs": 10000,
+      "targetsPerCall": 1000,
+      "warmCalls": 1,
+      "warmSamples": 7,
+      "staggerGapMs": 0,
+      "durationMs": 1200,
+      "toPx": 300,
+      "movementThresholdPx": 0.5,
+      "finalTolerancePx": 2,
+      "coldMetric": "apiReturn"
+    }
+  },
+  "order": {
+    "runs": 20,
+    "seed": 5370206,
+    "deterministicOrdersMatch": true,
+    "positionCounts": {
+      "lab": [
+        5,
+        5,
+        5,
+        5
+      ],
+      "motion": [
+        5,
+        5,
+        5,
+        5
+      ],
+      "gsap": [
+        5,
+        5,
+        5,
+        5
+      ],
+      "anime": [
+        5,
+        5,
+        5,
+        5
+      ]
+    }
+  },
+  "terminalClock": {
+    "strictPerfChainPassed": 640,
+    "callbacksWithDocumentTimestampBeforeFinishedWall": 7,
+    "largestDocumentLag": {
+      "label": "motion.cold.s4.run8",
+      "documentBehindFinishedMs": 4.314999999934798,
+      "completion": {
+        "waitStartedMs": 759.9749999998603,
+        "observedAtMs": 1237.214999999851,
+        "terminalFrameTimestampMs": 1232.8999999999162,
+        "terminalFrameObservedAtMs": 1255.1950000000652,
+        "terminalReadStartedMs": 1255.2050000000745,
+        "terminalReadEndedMs": 1258.714999999851
+      }
+    },
+    "smallestCompletionLowerBoundMargin": {
+      "label": "gsap.cold.firstPresented.run12",
+      "call": 0,
+      "marginMs": 1.8549999999079319,
+      "observedAtMs": 1200.0349999999162,
+      "lowerBoundMs": 1198.1800000000082
+    },
+    "maximumAggregateCompletionMs": 2633.4249999998137,
+    "maximumTerminalPositionErrorPx": 0.0
+  },
+  "recordedAdapters": [
+    {
+      "participant": "lab",
+      "version": "@labpics/motion@0.6.0 (локальный dist)",
+      "runtimeAdapterSha256": "fcc1f0ebdc44f86e3a6de1ab923ac6a8b03c9dab7fd49e4b9817fbf7fb967f18",
+      "sizeAdapterSha256": "0aeee9a6f20a7ed6a5af0ecd3bd0753e6ad6ea8b9529aa412669411b299d0638"
+    },
+    {
+      "participant": "motion",
+      "version": "motion@14.5.0",
+      "runtimeAdapterSha256": "563a4391d249382bd4f9b3c058ba562cc953101d98522d56d5b11f5ca6be99a7",
+      "sizeAdapterSha256": "823b381360ec53644f26f4aa3f4bffff749f06bbed13c0c2a265e1cc50d5696a"
+    },
+    {
+      "participant": "gsap",
+      "version": "gsap@3.15.0",
+      "runtimeAdapterSha256": "0edf67b70ff3020b13e807ee472911e6bf9ec5941f98525830dcc5c513157e74",
+      "sizeAdapterSha256": "f0765be9d823cd772a019df821e39cf7747edbea8e4780253d545f884598b48b"
+    },
+    {
+      "participant": "anime",
+      "version": "animejs@4.5.0",
+      "runtimeAdapterSha256": "771e40298a68d57f11c47b19fa89afef0bc407d06cecabdfb2afe20981c489ad",
+      "sizeAdapterSha256": "d3a760e7166f2bb42332af9108021a1a6a570fa9f439ef1cd70f44dec54378c9"
+    },
+    {
+      "participant": "waapi-ctl",
+      "version": "платформа Chromium (без библиотеки)",
+      "runtimeAdapterSha256": "d98bebdef4a7e509c622a494932a6d318429c8fdb4e87370d128eb58638cb4f4",
+      "sizeAdapterSha256": "f57d387c68cebb5c5842506c4a26c04b952e8da8973b2e4b1dc587eede5a197c"
+    },
+    {
+      "participant": "lab-spring",
+      "version": "@labpics/motion@0.6.0 (локальный dist)",
+      "runtimeAdapterSha256": "7d2262b9ce976fc3024e11d9800d83ecbc150fad823cc8bec40da28dd7ce9496",
+      "sizeAdapterSha256": "53eb5f9bba840aae5d8d481da5a56786750e9e2af1ba47fae66b21d819e90621"
+    },
+    {
+      "participant": "motion-mini",
+      "version": "motion@14.5.0",
+      "runtimeAdapterSha256": "e4f618e514bd2d18d4b9908b30b76161e7e451e56ab5a58fbfda500b365c2ae1",
+      "sizeAdapterSha256": "ee8cb1cfb429e898155fe7f9c90a1ebe0ddf3adf4543e280a61360dde02396f7"
+    },
+    {
+      "participant": "anime-waapi",
+      "version": "animejs@4.5.0",
+      "runtimeAdapterSha256": "2ec291f7710da293e14d1064a907c7405cd67e30e199aa3615339b32c3430e76",
+      "sizeAdapterSha256": "a5869dbdb86d86df48fb50ddba0fe025ca613d73ca1b1289f5c486169151fa43"
+    }
+  ],
+  "limitations": [
+    "This is a saved-data START semantic/terminal-clock audit, not full report publication admission. The original run remains FAIL due to strict S5 lab-spring.blocked=inconclusive.",
+    "No project JavaScript, tests, browser, or benchmark was executed. Python stdlib reconstructs the inspected START inequalities with binary64 outward rounding via math.nextafter.",
+    "The actual START configs do not requireFreshStart. Their existing phase/slope/stagger contract was preserved; this review does not add a new zero-onset/start-latency claim.",
+    "Timing samples and first-presented raw pixel series were checked for counts, finite values, order, and direct derivation. Full warm timer calibration, first-presented CDP uncertainty bounds, bootstrap/Holm claims, and S5 conformance are outside this independent slice.",
+    "Runtime and size adapter digests are checked at recorded-metadata/Markdown level only. Adapter/package/browser bytes are absent from the original report bundle and were not independently rehashed.",
+    "The three supplied exact benchmark source byte snapshots match their recorded provenance digests. These checks do not re-establish the entire source/dist supply chain.",
+    "This artifact concerns revision3832, not the final revision259."
+  ],
+  "issues": []
+}

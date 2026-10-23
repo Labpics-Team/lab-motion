@@ -54,13 +54,9 @@ export interface ParsedVar {
 
 // ── Регулярки ─────────────────────────────────────────────────────────────────
 
-// Числа: целые, дробные, научная нотация, со знаком
-const NUM = '[+-]?(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?';
-// Поддерживаемые CSS-юниты
-const UNIT = '(?:px|%|deg|rem|vh|vw|em|rad|turn|ms|s|fr|)';
-
-const UNIT_RE = new RegExp(`^(${NUM})(${UNIT})$`, 'i');
-const RELATIVE_RE = new RegExp(`^([+-])=(${NUM})(${UNIT})$`, 'i');
+// Статические грамматики: те же capture groups без import-time RegExp-конструкторов.
+const UNIT_RE = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)((?:px|%|deg|rem|vh|vw|em|rad|turn|ms|s|fr|))$/i;
+const RELATIVE_RE = /^([+-])=([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)((?:px|%|deg|rem|vh|vw|em|rad|turn|ms|s|fr|))$/i;
 // ЛИНЕЙНЫЙ (не catastrophic-backtracking) var()-регекс: ровно ОДИН
 // неограниченный квантификатор на fallback-хвост (`[\s\S]*`), захваченный
 // "сырым" (пробелы вокруг триммятся в коде через .trim(), не в самой

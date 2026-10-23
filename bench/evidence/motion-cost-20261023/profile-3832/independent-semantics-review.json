@@ -1,0 +1,455 @@
+{
+  "scope": "Independent saved-data audit of JS/spring paired semantics, complete raw matrices, counters and easing evidence; no project execution",
+  "revision": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+  "baseline": "15137fba618e962ef0319bba21d49cc123ae1e2f",
+  "profiles": {
+    "js": {
+      "durationMs": 400,
+      "timesMs": [
+        0,
+        1,
+        16,
+        63,
+        127,
+        255,
+        399,
+        500,
+        999
+      ],
+      "targetsPerTime": 100,
+      "exactRecordedCoordinatePairs": 900,
+      "recordedFiniteCoordinates": 1800,
+      "at1ms": 0.00561563,
+      "sameCoordinateForAllTargetsAtEveryTime": true,
+      "identicalSavedSemanticsTo126425": true,
+      "rawMatrix": {
+        "rows": 120,
+        "counts": [
+          1,
+          100,
+          1000
+        ],
+        "rounds": 20,
+        "ids": [
+          "baseline",
+          "lab"
+        ],
+        "completeOrderedUnique": true,
+        "firstPositions": {
+          "baseline": 10,
+          "lab": 10
+        }
+      },
+      "allRawEndpointsExact300": true,
+      "allPostCleanupEffectsZero": true,
+      "finiteNonnegativeRawCounterValuesChecked": 17280,
+      "counterDerivedMetricsRecomputedExactly": 600,
+      "cumulativeCounterChronologyChecked": true,
+      "sourceIdentity": {
+        "candidate": {
+          "revision": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+          "dist": {
+            "sha256": "7464855a2699e36b8445c8b82718cbd32b577afca34250c22a7772669c632185",
+            "files": 340
+          }
+        },
+        "baseline": {
+          "revision": "15137fba618e962ef0319bba21d49cc123ae1e2f",
+          "dist": {
+            "sha256": "ce88164996c355867d306bfbbbc68e724e1afab022cb0e72b26a0d4e0002ae78",
+            "files": 338
+          }
+        }
+      },
+      "profileSha256": "c9fc979757e3d36f4496afcd372f38b0105a911045a15e0c77856fa937780956",
+      "profileSourceHashMatchesLocalCopy": true,
+      "environment": {
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cpuMax": null,
+        "memoryMax": null
+      },
+      "versions": {
+        "lab": "0.6.0",
+        "animejs": "4.5.0",
+        "esbuild": "0.28.1",
+        "gsap": "3.15.0",
+        "motion": "14.5.0",
+        "playwright": "1.61.1",
+        "pngjs": "7.0.0",
+        "chromium": "149.0.7827.55",
+        "node": "v24.19.0"
+      },
+      "originalStartSemanticCheck": "not-applicable: adapter-has-no-stagger",
+      "recordedAdapterHashes": {
+        "baseline": "87c81154e15b068356f1ba9a7029b05a19eda903c896b80675ec3083604967b0",
+        "lab": "dca50830cf19da2105099ff4376351cf255c572314d97f412c605fbefd9c363e"
+      }
+    },
+    "spring": {
+      "durationMs": 1277.5309159615554,
+      "timesMs": [
+        0,
+        1,
+        16,
+        63,
+        127,
+        255,
+        399,
+        500,
+        999
+      ],
+      "targetsPerTime": 100,
+      "exactRecordedCoordinatePairs": 900,
+      "recordedFiniteCoordinates": 1800,
+      "at1ms": 0.0434881,
+      "sameCoordinateForAllTargetsAtEveryTime": true,
+      "identicalSavedSemanticsTo126425": true,
+      "rawMatrix": {
+        "rows": 120,
+        "counts": [
+          1,
+          100,
+          1000
+        ],
+        "rounds": 20,
+        "ids": [
+          "baseline",
+          "lab"
+        ],
+        "completeOrderedUnique": true,
+        "firstPositions": {
+          "baseline": 10,
+          "lab": 10
+        }
+      },
+      "allRawEndpointsExact300": true,
+      "allPostCleanupEffectsZero": true,
+      "finiteNonnegativeRawCounterValuesChecked": 17280,
+      "counterDerivedMetricsRecomputedExactly": 600,
+      "cumulativeCounterChronologyChecked": true,
+      "sourceIdentity": {
+        "candidate": {
+          "revision": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+          "dist": {
+            "sha256": "7464855a2699e36b8445c8b82718cbd32b577afca34250c22a7772669c632185",
+            "files": 340
+          }
+        },
+        "baseline": {
+          "revision": "15137fba618e962ef0319bba21d49cc123ae1e2f",
+          "dist": {
+            "sha256": "ce88164996c355867d306bfbbbc68e724e1afab022cb0e72b26a0d4e0002ae78",
+            "files": 338
+          }
+        }
+      },
+      "profileSha256": "c9fc979757e3d36f4496afcd372f38b0105a911045a15e0c77856fa937780956",
+      "profileSourceHashMatchesLocalCopy": true,
+      "environment": {
+        "cpu": "AMD EPYC 7763 64-Core Processor",
+        "cpuMax": null,
+        "memoryMax": null
+      },
+      "versions": {
+        "lab": "0.6.0",
+        "animejs": "4.5.0",
+        "esbuild": "0.28.1",
+        "gsap": "3.15.0",
+        "motion": "14.5.0",
+        "playwright": "1.61.1",
+        "pngjs": "7.0.0",
+        "chromium": "149.0.7827.55",
+        "node": "v24.19.0"
+      },
+      "originalStartSemanticCheck": "not-applicable: adapter-has-no-stagger",
+      "recordedAdapterHashes": {
+        "baseline": "1d6874034647fdc3807f17834cf362cbee0e9a1461933447d5d606fa8a11e8ed",
+        "lab": "4d807cba72ec3197a18476f56f6e25fbba889f56f30a9b4c791fbd8ca7927143"
+      }
+    }
+  },
+  "limitations": [
+    "This audit applies only to intermediate candidate3832, not later shipping heads or the complete original S1-S5 suite. The requester reported that S1-S5 was still running when assigning the audit; this report independently grants no publication admission.",
+    "Paired browser semantics cover DOMMatrix.e for100 paused/seeking x-only targets at9times, not all6matrix components, uninterrupted autoplay, rotations or arbitrary API histories.",
+    "Equality is exact for finite numbers saved in JSON. JSON does not preserve negative zero; this is not an Object.is proof for unrecorded runtime values.",
+    "Spring seek samples end at999ms before its1277.5309159615554ms duration. Timed endpoints are independently recorded with maxError0 and no post-cleanup effects.",
+    "Adapter and dist bytes are absent locally. Their recorded identities are consistent, and the profile source hash matches a local copy; the artifact byte hashes cannot be rehashed here. The parent remote analyzer reportedly checked them.",
+    "The easing artifact records a successful4110x9 Object.is corpus assertion but omits its raw outputs. This audit independently checks timed pair checksums and summary arithmetic, not the unrecorded corpus outputs.",
+    "Easing timings measure warmed Node/V8 evaluation on4096 interior inputs; they exclude factory construction and DOM lifecycle. Observed paired percentiles are not confidence intervals.",
+    "This run records AMD EPYC7763, unlike the prior126425 run on AMD EPYC9V74. Absolute timings across those runs are not a controlled intervention.",
+    "The JS and spring pair adapters mark the original stagger semantic check not-applicable. Clean profile analysis with publicationAdmission not evaluated does not constitute full S1-S5 or publication PASS."
+  ],
+  "easing": {
+    "identities": [
+      {
+        "revision": "15137fba618e962ef0319bba21d49cc123ae1e2f",
+        "entrySha256": "061e46b69aa2e61e248efccbd2821f6aa44f286f44992b0ea619cc49a69c8639"
+      },
+      {
+        "revision": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+        "entrySha256": "579582f72f1c497ed79bf9d79ec152b7b4a40529af704e17ffe5c8beefda2356"
+      }
+    ],
+    "entryHashesUnchangedSince126425": true,
+    "runtime": {
+      "node": "v24.19.0",
+      "v8": "13.6.233.17-node.51",
+      "cpu": "AMD EPYC 7763 64-Core Processor"
+    },
+    "profile": {
+      "inputs": 4096,
+      "repeats": 32,
+      "warmups": 4,
+      "pairs": 32,
+      "curves": [
+        [
+          0.2,
+          0,
+          0,
+          1
+        ],
+        [
+          0.25,
+          0.1,
+          0.25,
+          1
+        ],
+        [
+          0.42,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0.58,
+          1
+        ],
+        [
+          0.42,
+          0,
+          0.58,
+          1
+        ],
+        [
+          0.1,
+          -1,
+          0.8,
+          2
+        ],
+        [
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          0,
+          1,
+          1
+        ],
+        [
+          1,
+          0,
+          0,
+          1
+        ]
+      ]
+    },
+    "reportedExactPairs": 36990,
+    "reportedExactInputsPerCurve": {
+      "interiorMidpointGrid": 4096,
+      "boundaryAndNonfinite": 14
+    },
+    "rawTimedPairs": 288,
+    "timedCallsPerSidePerPair": 131072,
+    "balancedOrderEachCurve": [
+      16,
+      16
+    ],
+    "allPairAndWithinCurveChecksumsExact": true,
+    "deterministicOrderVerified": true,
+    "allSummariesRecomputedExactly": true,
+    "observedAccumulatorRecomputedExactly": true,
+    "observed": 46749450.132190466,
+    "results": [
+      {
+        "coordinates": [
+          0.2,
+          0,
+          0,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 127.8524017333982,
+        "candidateNsP50": 89.46176147460895,
+        "pairedSpeedup": {
+          "p05": 1.4028036803421144,
+          "p50": 1.4282902961143786,
+          "p95": 1.5125832661421794
+        }
+      },
+      {
+        "coordinates": [
+          0.25,
+          0.1,
+          0.25,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 132.97285461425813,
+        "candidateNsP50": 100.33068847656139,
+        "pairedSpeedup": {
+          "p05": 1.2595812937520745,
+          "p50": 1.3236267686153282,
+          "p95": 1.578802494327818
+        }
+      },
+      {
+        "coordinates": [
+          0.42,
+          0,
+          1,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 129.02059173583794,
+        "candidateNsP50": 106.87570953369155,
+        "pairedSpeedup": {
+          "p05": 1.1993301103475236,
+          "p50": 1.2074644752146577,
+          "p95": 1.2142347657372823
+        }
+      },
+      {
+        "coordinates": [
+          0,
+          0,
+          0.58,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 133.95690917968744,
+        "candidateNsP50": 96.83750152587878,
+        "pairedSpeedup": {
+          "p05": 1.3594908324348969,
+          "p50": 1.3825975787541214,
+          "p95": 1.3970784344428362
+        }
+      },
+      {
+        "coordinates": [
+          0.42,
+          0,
+          0.58,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 131.32639312744138,
+        "candidateNsP50": 102.63397216796893,
+        "pairedSpeedup": {
+          "p05": 1.2701682258083489,
+          "p50": 1.2799832945262946,
+          "p95": 1.2866514922200012
+        }
+      },
+      {
+        "coordinates": [
+          0.1,
+          -1,
+          0.8,
+          2
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 131.96833801269736,
+        "candidateNsP50": 100.28697967529033,
+        "pairedSpeedup": {
+          "p05": 1.2606331866668485,
+          "p50": 1.316520702312196,
+          "p95": 1.340794752538977
+        }
+      },
+      {
+        "coordinates": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 137.00884246826277,
+        "candidateNsP50": 86.36743927002006,
+        "pairedSpeedup": {
+          "p05": 1.5770156504092576,
+          "p50": 1.5863107151489633,
+          "p95": 1.593600095295662
+        }
+      },
+      {
+        "coordinates": [
+          1,
+          0,
+          1,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 124.82213592528157,
+        "candidateNsP50": 111.2623062133819,
+        "pairedSpeedup": {
+          "p05": 1.1126059578911198,
+          "p50": 1.122233165990048,
+          "p95": 1.1287023207782299
+        }
+      },
+      {
+        "coordinates": [
+          1,
+          0,
+          0,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 130.75810241700015,
+        "candidateNsP50": 107.87491607666678,
+        "pairedSpeedup": {
+          "p05": 1.1999187663801107,
+          "p50": 1.2127287423530337,
+          "p95": 1.21994048899703
+        }
+      }
+    ]
+  },
+  "remoteAnalyzerRecorded": {
+    "passed": true,
+    "errors": [],
+    "warnings": [],
+    "publicationAdmission": "not evaluated"
+  },
+  "inputs": {
+    "js/metadata.json": "88e0ac5b866091d2ede8344929682011b3f29b07c4372578849f22f4464146ac",
+    "js/paired-semantics.json": "3254368af8ef97a65d42f74dbc2b154c691f82c18f1f7fee48134469c231ed69",
+    "js/samples.jsonl": "6afba5fd8e78402cb756f93b0939a48dce9e7dc04b38f5fcf115a14cde404661",
+    "js/baseline-original-semantic.json": "ea23f7f8e0e511bc3a51d87ec66ac9ef43443c99ef4677c7590b622939941095",
+    "js/lab-original-semantic.json": "ea23f7f8e0e511bc3a51d87ec66ac9ef43443c99ef4677c7590b622939941095",
+    "spring/metadata.json": "0a542f5377576a146fd9d222fb059ef78005f970f173cce61e379af551aed5da",
+    "spring/paired-semantics.json": "1ada59efe4bbb670c5029f27e1ffa10a014d9edc45bea4a6d1dbaf47f5b5cd37",
+    "spring/samples.jsonl": "ee5b7acb671e5e95dcbe16300f22bf2b6884874f7dcb2e18d623871dc5236bb5",
+    "spring/baseline-original-semantic.json": "ea23f7f8e0e511bc3a51d87ec66ac9ef43443c99ef4677c7590b622939941095",
+    "spring/lab-original-semantic.json": "ea23f7f8e0e511bc3a51d87ec66ac9ef43443c99ef4677c7590b622939941095",
+    "easing.json": "037c9ab80f961c9fd1e4d7a9e7213b575baf1935bb607156721d493a38a421d1",
+    "analysis.json": "cad73ffee521bc8dea80f8adc86b0a59ac70ed1d4a54ed786e6d939a742c3988"
+  },
+  "issues": [],
+  "savedDataChecksPassed": true
+}

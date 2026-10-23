@@ -9,10 +9,10 @@ describe('однопроходная нормализация authored-кана�
     expect(() => properties({ scale: [1, 2], 'scale-x': 4 })).toThrow('scaleX');
   });
   it('создаёт ровно одну числовую проекцию для каждого разрешённого канала', () => {
-    expect(properties({ scale: [1, 2], skewY: 5 }).map(channel => channel.key))
+    expect(properties({ scale: [1, 2], skewY: 5 }).map(channel => channel._key))
       .toEqual(['scaleX', 'scaleY', 'skewY']);
     expect(properties({ '--opacity-level': [0, 1] })[0]).toMatchObject({
-      key: '--opacity-level', authored: true, values: [0, 1],
+      _key: '--opacity-level', _authored: true, _values: [0, 1],
     });
   });
 });

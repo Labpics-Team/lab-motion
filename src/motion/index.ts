@@ -1,4 +1,5 @@
-export { animate, sequence } from './runtime.js';
+export { animate } from './runtime.js';
+export { sequence } from './sequence.js';
 export { scope, type MotionScope } from './scope.js';
 export { layout, type LayoutOptions } from './layout.js';
 export { value, type MotionValue } from './value.js';

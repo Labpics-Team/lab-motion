@@ -15,10 +15,9 @@ export type ValueAST = ParsedUnit | ParsedRelative | ParsedVar | ParsedColor;
 /** Внутренняя граница: invalid возвращает undefined и не строит RangeError. */
 export function tryParseValue(value: string | number): ValueAST | undefined {
   if (typeof value === 'number') return tryParseUnit(value);
-  const source = value.trim();
-  return source.startsWith('#') || /^rgba?/i.test(source) || /^hsla?/i.test(source)
-    ? parseColor(source) ?? undefined
-    : tryParseUnit(source);
+  return /^\s*(?:#|rgb|hsl)/i.test(value)
+    ? parseColor(value) ?? undefined
+    : tryParseUnit(value);
 }
 
 /** Публичный parser сохраняет прежние типы ошибок и сообщения дословно. */

@@ -314,14 +314,27 @@ function assertNativeGraph(files: Map<string, string>) {
     workflow_dispatch: { inputs: { profile_baseline: {
       description: 'Снять зарегистрированный размерный baseline PROFILE-01',
       type: 'boolean', default: false,
+    }, performance_baseline: {
+      description: 'Commit для парного сравнения полной стоимости движения',
+      type: 'string', default: '',
     } } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'profile-baseline', 'tests', 'verify']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'performance', 'profile-baseline', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}",
     uses: './.github/workflows/profile-01.yml',
   });
+  expect(ci.jobs.performance).toEqual({
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' }}",
+    uses: './.github/workflows/performance.yml',
+    with: { baseline: '${{ inputs.performance_baseline }}' },
+  });
+  const performance = workflows.get('performance.yml')!;
+  expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true } } } });
+  expect(performance.permissions).toEqual({ contents: 'read' });
+  expect(performance.jobs.compare!['runs-on']).toBe('ubuntu-latest');
+  expect(performance.jobs.compare!['continue-on-error']).toBeUndefined();
   expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);
   for (const document of [ci, browser]) {

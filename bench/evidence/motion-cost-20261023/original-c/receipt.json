@@ -1,0 +1,36 @@
+{
+  "candidate": "e52a4b37c79cf495adc10ac70dbceb5ac5b5fd85",
+  "notFinalCandidate": true,
+  "runId": 39936237625,
+  "artifactId": 12495423280,
+  "originalZipSha256ReportedByIntegrationOwner": "ff2025b212c55bc807b6ac59117be49e37690d333e290be5b9c087c0b1583f73",
+  "strictComparativeStep": "SUCCESS",
+  "wholePerformanceJob": "FAILED at size validation",
+  "workflowStatusSource": {
+    "job": "120356353075",
+    "strictComparativeStep": "success",
+    "strictStepStart": "2026-10-23T10:13:06Z",
+    "strictStepEnd": "2026-10-23T10:44:20Z",
+    "jobConclusion": "failure",
+    "failureScope": "size gate; exact candidate and baseline annotations are preserved below"
+  },
+  "raw": {
+    "originalFilename": "2026-10-23-e52a4b37c79c-99cf4feb4053.json",
+    "bytes": 12745636,
+    "sha256": "9c5b0f27422583cfbe1d21af77afcb017505d250224d19ba56eb467badcf7201",
+    "storedPath": "2026-10-23-e52a4b37c79c-99cf4feb4053.json.gz",
+    "storedBytes": 674876,
+    "storedSha256": "d1df03c83c79f6f117d3328dac994d8ee0955a5ed55a02dce8ee17d4c3dfcdb9"
+  },
+  "companion": {
+    "originalFilename": "2026-10-23-e52a4b37c79c-99cf4feb4053.md",
+    "storedPath": "2026-10-23-e52a4b37c79c-99cf4feb4053.md.txt",
+    "bytes": 22382,
+    "sha256": "a2fcdfa8350b9698156103ac78c34f732908190835636b8484777d3fd3deca47"
+  },
+  "sourceSnapshots": {
+    "motionConformance": "../negative/original-3832/motion-conformance.mjs.txt",
+    "reportContract": "../negative/original-3832/source/report-contract.mjs.txt"
+  },
+  "scope": "Complete raw retained; Python S5 replay is separate from project validator execution; no transfer to final259"
+}

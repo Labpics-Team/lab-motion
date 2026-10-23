@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  completionEvidence,
   startClock,
   TIMER_ORIGIN_MS,
   timerEvidence,
@@ -379,9 +380,11 @@ describe('benchmark methodology fail-closed contracts', () => {
         ? [0.2, 0.5, 0.8].map((fraction) => config.staggerGapMs * (config.targetsPerCall - 1) * fraction)
         : [config.durationMs * 0.25, config.durationMs * 0.5, config.durationMs * 0.625];
       const checkpoints = checkpointTimes.map((elapsedMs) => ({
+        frameTimestampMs: elapsedMs,
         groups: Array.from({ length: calls }, () => ({
           readStartedMs: elapsedMs,
           readEndedMs: elapsedMs,
+          documentFrame: { beforeMs: elapsedMs, afterMs: elapsedMs },
           positions: Array.from({ length: config.targetsPerCall }, (_, target) => {
             const progress = config.staggerGapMs === 0
               ? elapsedMs / config.durationMs
@@ -403,6 +406,7 @@ describe('benchmark methodology fail-closed contracts', () => {
         terminal: Array.from({ length: calls }, () => (
           Array.from({ length: config.targetsPerCall }, () => config.toPx)
         )),
+        completion: completionEvidence(config, calls, checkpointTimes.at(-1)!),
       };
       return { ...raw, valid: evaluateStartSemanticEvidence(raw, config, calls) };
     };
@@ -479,7 +483,9 @@ describe('benchmark methodology fail-closed contracts', () => {
     { name: '256мс и разрешающие узкие окна', times: [88, 136, 184], positions: [103.125, 159.375, 215.625], width: 0.1, duration: 256, expected: true },
     { name: 'только завершённые позиции', times: [140, 156, 172], positions: [300, 300, 300], width: 0.1, duration: 128, expected: false },
   ])('temporal oracle: $name', ({ times, positions, width, duration, expected: accepted }) => {
-    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: duration };
+    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: duration,
+      requireDocumentFrame: false, completionTimeoutMs: undefined };
+    // Generic oracle без document clock сохраняет прежние границы неопределённости.
     // Векторы заданы независимо; ширина окна меняется при том же законе движения.
     const evidence = { topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: duration, toPx: 300 },
       callStartedAtMs: [0], checkpoints: times.map((time, index) => ({ frameTimestampMs: time,
@@ -494,7 +500,8 @@ describe('benchmark methodology fail-closed contracts', () => {
   });
 
   it.each([0, 75])('fresh0→300 связывает фазу с API start, offset=%s', (offset) => {
-    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128, fromPx: 0, requireFreshStart: true };
+    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128, fromPx: 0,
+      requireFreshStart: true, requireDocumentFrame: false, completionTimeoutMs: undefined };
     const evidence = { topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: 128, toPx: 300 },
       callStartedAtMs: [0], onset: { before: [{ readStartedMs: 0, readEndedMs: 0, positions: [0, 0, 0] }],
         after: [{ readStartedMs: 0.025, readEndedMs: 0.05, positions: [offset, offset, offset] }] },
@@ -502,6 +509,160 @@ describe('benchmark methodology fail-closed contracts', () => {
         groups: [{ readStartedMs: time, readEndedMs: time + 0.1, positions: Array(3).fill(Math.min(300, offset + 300 * time / 128)) }] })),
       terminal: [[300, 300, 300]] };
     expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(offset === 0);
+  });
+
+
+  it('публикация CSS использует document clock при долгом чтении всех целей', () => {
+    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128 };
+    const evidence: any = {
+      topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: 128, toPx: 300 },
+      callStartedAtMs: [0],
+      checkpoints: [32, 64, 80].map((time, index) => ({
+        frameTimestampMs: time,
+        groups: [{ readStartedMs: time, readEndedMs: time + 20,
+          documentFrame: { beforeMs: time, afterMs: time },
+          positions: Array(3).fill([75, 150, 187.5][index]) }],
+      })),
+      terminal: [[300, 300, 300]],
+      completion: completionEvidence(config, 1, 100),
+    };
+    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(true);
+    // Без document clock то же wall-окно не разрешает прежнюю точность.
+    expect(evaluateStartSemanticEvidence(evidence, { ...config, requireDocumentFrame: false }, 1)).toBe(false);
+    for (const mutate of [
+      (raw: any) => { delete raw.checkpoints[1].groups[0].documentFrame; },
+      (raw: any) => { raw.checkpoints[1].groups[0].documentFrame.beforeMs = null; },
+      (raw: any) => { raw.checkpoints[1].groups[0].documentFrame.afterMs += 0.01; },
+      (raw: any) => { raw.checkpoints[1].groups[0].documentFrame = { beforeMs: 63, afterMs: 63 }; },
+      (raw: any) => { raw.checkpoints[1].groups[0].positions[2] = 140; },
+    ]) {
+      const wrong = structuredClone(evidence);
+      mutate(wrong);
+      expect(evaluateStartSemanticEvidence(wrong, config, 1)).toBe(false);
+    }
+    for (const mutate of [
+      (raw: any) => { delete raw.completion; },
+      (raw: any) => { raw.completion.calls[0].state = 'pending'; },
+      (raw: any) => { raw.completion.calls[0].observedAtMs = -1; },
+      (raw: any) => { raw.completion.calls[0].observedAtMs = 1; },
+      (raw: any) => { raw.completion.calls[0].observedAtMs = 112; },
+      (raw: any) => { raw.completion.observedAtMs = config.completionTimeoutMs + 1; },
+      (raw: any) => { raw.completion.terminalReadStartedMs = 1; },
+    ]) {
+      const wrong = structuredClone(evidence);
+      mutate(wrong);
+      expect(evaluateStartSemanticEvidence(wrong, config, 1)).toBe(false);
+    }
+  });
+
+  it('completion принимает поздний rAF callback при документированном timestamp на 3.63 мс раньше finished', () => {
+    const config = START_SCENARIO_MANIFEST.s4;
+    const count = config.targetsPerCall;
+    const checkpoints = [
+      { frame: 315.56, started: 316.72, ended: 322.865, x: 78.8487 },
+      { frame: 598.88, started: 601.605, ended: 608.685, x: 149.679 },
+      { frame: 748.875, started: 752.33, ended: 759.57, x: 187.178 },
+    ];
+    const evidence: any = {
+      topology: { calls: 1, targetsPerCall: count, staggerGapMs: 0, durationMs: 1200, toPx: 300 },
+      callStartedAtMs: [0.005],
+      checkpoints: checkpoints.map(({ frame, started, ended, x }) => ({
+        frameTimestampMs: frame,
+        groups: [{ readStartedMs: started, readEndedMs: ended,
+          documentFrame: { beforeMs: frame, afterMs: frame }, positions: Array(count).fill(x) }],
+      })),
+      terminal: [Array(count).fill(300)],
+      completion: {
+        timeoutMs: config.completionTimeoutMs,
+        calls: [{ state: 'fulfilled', observedAtMs: 1235.795 }],
+        waitStartedMs: 759.575,
+        observedAtMs: 1235.815,
+        terminalFrameTimestampMs: 1232.185,
+        // Синтетическое положительное свидетельство callback; старый raw
+        // без этого поля остаётся failed evidence и не достраивается.
+        terminalFrameObservedAtMs: 1254.36,
+        terminalReadStartedMs: 1254.365,
+        terminalReadEndedMs: 1257.83,
+      },
+    };
+    expect(evidence.completion.terminalFrameTimestampMs).toBeLessThan(evidence.completion.observedAtMs - 3.6);
+    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(true);
+    for (const mutate of [
+      (raw: any) => { delete raw.completion.terminalFrameObservedAtMs; },
+      (raw: any) => { raw.completion.terminalFrameObservedAtMs = Number.NaN; },
+      (raw: any) => { raw.completion.terminalFrameTimestampMs = Number.NaN; },
+      (raw: any) => { raw.completion.terminalFrameObservedAtMs = raw.completion.observedAtMs - 0.001; },
+      (raw: any) => { raw.completion.terminalReadStartedMs = raw.completion.terminalFrameObservedAtMs - 0.001; },
+      (raw: any) => { raw.completion.terminalReadEndedMs = raw.completion.terminalReadStartedMs - 0.001; },
+      (raw: any) => { raw.completion.terminalFrameTimestampMs = 748.874; },
+      (raw: any) => { raw.completion.terminalFrameTimestampMs = raw.completion.terminalFrameObservedAtMs + 0.001; },
+      (raw: any) => { raw.completion.calls[0].state = 'rejected'; },
+      (raw: any) => { raw.completion.calls[0].observedAtMs = 1198; },
+      (raw: any) => { raw.completion.calls[0].observedAtMs = 1; },
+      (raw: any) => { raw.checkpoints[1].groups[0].positions[0] = 140; },
+    ]) {
+      const wrong = structuredClone(evidence);
+      mutate(wrong);
+      expect(evaluateStartSemanticEvidence(wrong, config, 1)).toBe(false);
+    }
+  });
+
+  it('completion сохраняет clock uncertainty только на связи document timestamp с wall clock callback', () => {
+    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128, semanticClockErrorMs: 0.018 };
+    const evidence: any = {
+      topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: 128, toPx: 300 },
+      callStartedAtMs: [0],
+      checkpoints: [32, 64, 80].map((time, index) => ({ frameTimestampMs: time, groups: [{
+        readStartedMs: time, readEndedMs: time, documentFrame: { beforeMs: time, afterMs: time },
+        positions: Array(3).fill([75, 150, 187.5][index]),
+      }] })),
+      terminal: [[300, 300, 300]],
+      completion: completionEvidence(config, 1, 80),
+    };
+    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(true);
+    const within = structuredClone(evidence);
+    within.completion.terminalFrameTimestampMs = within.completion.terminalFrameObservedAtMs + 0.001;
+    expect(evaluateStartSemanticEvidence(within, config, 1)).toBe(true);
+    expect(evaluateStartSemanticEvidence(within, { ...config, semanticClockErrorMs: 0 }, 1)).toBe(false);
+    const outside = structuredClone(evidence);
+    outside.completion.terminalFrameTimestampMs = outside.completion.terminalFrameObservedAtMs + 0.02;
+    expect(evaluateStartSemanticEvidence(outside, config, 1)).toBe(false);
+    for (const [before, after] of [['waitStartedMs', 'observedAtMs'],
+      ['observedAtMs', 'terminalFrameObservedAtMs'], ['terminalFrameObservedAtMs', 'terminalReadStartedMs'],
+      ['terminalReadStartedMs', 'terminalReadEndedMs']]) {
+      const reversed = structuredClone(evidence);
+      reversed.completion[before!] = reversed.completion[after!] + 0.001;
+      expect(evaluateStartSemanticEvidence(reversed, config, 1)).toBe(false);
+    }
+    // Позднее исполнение кадра не разрешает обратный порядок perf readings.
+    const acrossFrame = structuredClone(evidence);
+    acrossFrame.completion.terminalFrameTimestampMs = acrossFrame.completion.observedAtMs - 0.01;
+    acrossFrame.completion.terminalFrameObservedAtMs = acrossFrame.completion.observedAtMs;
+    acrossFrame.completion.terminalReadStartedMs = acrossFrame.completion.observedAtMs - 0.02;
+    expect(evaluateStartSemanticEvidence(acrossFrame, config, 1)).toBe(false);
+  });
+
+  it.each([0, 5])('finished связан с фазой и последней stagger целью, gap=%s', (staggerGapMs) => {
+    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128, staggerGapMs };
+    const times = staggerGapMs ? [4, 32, 64, 80] : [32, 64, 80];
+    const endMs = 128 + 2 * staggerGapMs;
+    const evidence: any = {
+      topology: { calls: 1, targetsPerCall: 3, staggerGapMs, durationMs: 128, toPx: 300 },
+      callStartedAtMs: [0],
+      checkpoints: times.map((time) => ({ frameTimestampMs: time, groups: [{
+        readStartedMs: time, readEndedMs: time, documentFrame: { beforeMs: time, afterMs: time },
+        positions: Array.from({ length: 3 }, (_, target) => 300 * Math.max(0, (time - target * staggerGapMs) / 128)),
+      }] })),
+      terminal: [[300, 300, 300]],
+      completion: completionEvidence(config, 1, 80),
+    };
+    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(true);
+    // 0.5px при 300/128px/ms оставляет ~0.213ms неопределённости фазы.
+    // Её не сужаем до ложной точности и не расширяем до целого кадра.
+    evidence.completion.calls[0].observedAtMs = endMs - 0.1;
+    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(true);
+    evidence.completion.calls[0].observedAtMs = endMs - 1;
+    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(false);
   });
 
   it('bootstraps paired independent run clusters reproducibly without flattening rounds', () => {
@@ -676,7 +837,41 @@ describe('benchmark methodology fail-closed contracts', () => {
     expect(source).toContain('page.evaluate(() => globalThis.crossOriginIsolated)');
     expect(source).not.toContain('timerEvidence: { crossOriginIsolated: true');
     expect(source).not.toContain('semantic: true');
-    expect(source.match(/assertStartSemanticEvidence\(/g)).toHaveLength(3);
+    // Every measured path must reach the real gate through the diagnostic wrapper
+    // before its raw cluster is accepted. The wrapper's failure behavior is exercised
+    // with invalid evidence in benchmark-report-contract.test.ts.
+    const diagnosticGuard = source.slice(
+      source.indexOf('export function assertStartSemanticEvidenceWithDiagnostic('),
+      source.indexOf('async function measurePageTimerProbe('),
+    );
+    expect(source.match(/assertStartSemanticEvidence\(/g)).toHaveLength(1);
+    expect(diagnosticGuard).toContain('assertStartSemanticEvidence(label, evidence);');
+    const main = source.slice(source.indexOf('async function main()'));
+    expect(main).toContain('assertStartSemanticEvidenceWithDiagnostic(label, evidence, {');
+    expect(main.match(/assertSemantic\(/g)).toHaveLength(3);
+    for (const route of [
+      {
+        call: 'assertSemantic(`${id}.${scenario} run ${run + 1}`, semanticEvidence, {',
+        metric: 'metric: `warm.${scenario}`',
+        append: 'results[id].raw.warm[scenario].push(',
+      },
+      {
+        call: 'assertSemantic(`${id}.cold.${scenario} run ${run + 1}`, semanticEvidence, {',
+        metric: 'metric: `cold.${scenario}`',
+        append: 'results[id].raw.cold[scenario].push(',
+      },
+      {
+        call: 'assertSemantic(`cold.firstPresented ${id} run ${run + 1}`, semanticEvidence, {',
+        metric: "scenario: 's1', run, metric: 'cold.firstPresented'",
+        append: 'results[id].raw.cold.firstPresented.push(',
+      },
+    ]) {
+      const gate = main.indexOf(route.call);
+      const append = main.indexOf(route.append);
+      expect(gate).toBeGreaterThanOrEqual(0);
+      expect(append).toBeGreaterThan(gate);
+      expect(main.slice(gate, append)).toContain(route.metric);
+    }
     expect(source).toContain("const rawJson = JSON.stringify(rawPayload) + '\\n';");
     expect(source).not.toContain('JSON.stringify(rawPayload, null, 2)');
   });

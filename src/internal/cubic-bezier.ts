@@ -1,5 +1,7 @@
 /** Невалидирующее ядро CSS cubic-bezier для публичного easing и defaults. */
 
+import { clampFinite as finite } from './finite.js';
+
 const NEWTON_ITERS = 8;
 const EPSILON = 1e-7;
 const DERIV_THRESHOLD = 1e-6;
@@ -12,21 +14,9 @@ function endpoint(t: number): number | undefined {
   return undefined;
 }
 
-function finite(value: number): number {
-  if (Number.isFinite(value)) return value;
-  if (Number.isNaN(value)) return 0;
-  return value > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
-}
-
 function xAt(t: number, x1: number, x2: number): number {
   return (1 - t) * 3 * (1 - t) * t * x1
     + 3 * (1 - t) * t * t * x2
-    + t * t * t;
-}
-
-function yAt(t: number, y1: number, y2: number): number {
-  return (1 - t) * 3 * (1 - t) * t * y1
-    + 3 * (1 - t) * t * t * y2
     + t * t * t;
 }
 
@@ -59,11 +49,15 @@ export function cubicBezierUnchecked(
     sample--;
     const distance = (input - table[sample]!) / (table[sample + 1]! - table[sample]!);
     let guess = intervalStart + distance / last;
-    if (dxAt(guess, x1, x2) >= DERIV_THRESHOLD) {
+    let slope = dxAt(guess, x1, x2);
+    if (slope >= DERIV_THRESHOLD) {
       for (let i = 0; i < NEWTON_ITERS; i++) {
-        const slope = dxAt(guess, x1, x2);
         if (slope === 0) break;
-        guess -= (xAt(guess, x1, x2) - input) / slope;
+        const next = guess - (xAt(guess, x1, x2) - input) / slope;
+        // В неподвижной точке оставшиеся шаги дают те же binary64-биты.
+        if (next === guess) break;
+        guess = next;
+        slope = dxAt(guess, x1, x2);
       }
     } else {
       let lo = intervalStart;
@@ -80,6 +74,6 @@ export function cubicBezierUnchecked(
         guess = (lo + hi) / 2;
       }
     }
-    return finite(yAt(guess, y1, y2));
+    return finite(xAt(guess, y1, y2));
   };
 }
