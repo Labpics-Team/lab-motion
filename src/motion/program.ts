@@ -31,7 +31,7 @@ export function format(key: string, value: readonly number[], unit: string): str
     return `rgba(${colorChannel(value[0]!)},${colorChannel(value[1]!)},${colorChannel(value[2]!)},${Math.max(0, Math.min(1, value[3]!))})`;
   }
   const n = key === 'opacity' ? Math.max(0, Math.min(1, value[0]!)) : value[0]!;
-  return `${n === 0 ? 0 : n}${unit}`;
+  return `${n}${unit}`;
 }
 export function transform(values: Readonly<Record<string, number>>, translationOnly = false): string {
   const translation = `translate(${values.x ?? 0}px,${values.y ?? 0}px)`;
