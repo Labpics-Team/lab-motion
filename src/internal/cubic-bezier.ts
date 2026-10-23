@@ -24,12 +24,6 @@ function xAt(t: number, x1: number, x2: number): number {
     + t * t * t;
 }
 
-function yAt(t: number, y1: number, y2: number): number {
-  return (1 - t) * 3 * (1 - t) * t * y1
-    + 3 * (1 - t) * t * t * y2
-    + t * t * t;
-}
-
 function dxAt(t: number, x1: number, x2: number): number {
   return 3 * (1 - t) * (1 - t) * x1
     + 6 * (1 - t) * t * (x2 - x1)
@@ -63,7 +57,10 @@ export function cubicBezierUnchecked(
       for (let i = 0; i < NEWTON_ITERS; i++) {
         const slope = dxAt(guess, x1, x2);
         if (slope === 0) break;
-        guess -= (xAt(guess, x1, x2) - input) / slope;
+        const next = guess - (xAt(guess, x1, x2) - input) / slope;
+        // В неподвижной точке оставшиеся шаги дают те же binary64-биты.
+        if (next === guess) break;
+        guess = next;
       }
     } else {
       let lo = intervalStart;
@@ -80,6 +77,6 @@ export function cubicBezierUnchecked(
         guess = (lo + hi) / 2;
       }
     }
-    return finite(yAt(guess, y1, y2));
+    return finite(xAt(guess, y1, y2));
   };
 }

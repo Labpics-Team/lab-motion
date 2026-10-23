@@ -333,7 +333,7 @@ function assertNativeGraph(files: Map<string, string>) {
   const performance = workflows.get('performance.yml')!;
   expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true } } } });
   expect(performance.permissions).toEqual({ contents: 'read' });
-  expect(performance.jobs.compare!['runs-on']).toEqual(['self-hosted', 'Linux', 'X64']);
+  expect(performance.jobs.compare!['runs-on']).toBe('ubuntu-latest');
   expect(performance.jobs.compare!['continue-on-error']).toBeUndefined();
   expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);

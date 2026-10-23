@@ -16,7 +16,7 @@ env:
 
 jobs:
   compare:
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Проверить identity baseline
@@ -68,6 +68,9 @@ jobs:
           node baseline/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/baseline-size.txt"
           node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt"
 
+      - name: Сравнить численное ядро easing
+        run: node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"
+
       - name: Установить Chromium
         run: pnpm --dir candidate/bench/compare exec playwright install --with-deps chromium
 
@@ -75,7 +78,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          xvfb-run -a node candidate/bench/compare/transition-profile.mjs             candidate "$RUNNER_TEMP/motion-performance/transition" full baseline
+          xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline
 
       - name: Проверить сравнительные утверждения
         working-directory: candidate/bench/compare
