@@ -97,7 +97,7 @@ export interface Draft { readonly element: Element; readonly key: string; readon
 interface Track {
   readonly _program: Program;
   readonly _group: Surface;
-  readonly value: number[];
+  readonly _value: number[];
   readonly _velocity: number[];
   _owner: Run | undefined;
   _elapsed: number;
@@ -213,8 +213,8 @@ class Surface {
   _nativeTime = 0;
   private _written: string | undefined;
   private _token: Promise<Animation> | undefined;
-  constructor(readonly _engine: Runtime, readonly element: Element, readonly key: string) {
-    this._transforms = key === 'transform' ? initialTransforms(_engine._host.styles(element)) : {};
+  constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string) {
+    this._transforms = _key === 'transform' ? initialTransforms(_engine._host.styles(_element)) : {};
     this._stamp = number(_engine._host.now(), 'clock');
   }
   _lock(busy: boolean): void {
@@ -223,17 +223,17 @@ class Surface {
     this._engine._operation(busy);
   }
   _refresh(): void {
-    if (this._tracks.size || this._written === (this.element as HTMLElement).style.getPropertyValue(this.key)) return;
-    if (this.key === 'transform') Object.assign(this._transforms, initialTransforms(this._engine._host.styles(this.element)));
+    if (this._tracks.size || this._written === (this._element as HTMLElement).style.getPropertyValue(this._key)) return;
+    if (this._key === 'transform') Object.assign(this._transforms, initialTransforms(this._engine._host.styles(this._element)));
     this._rest = undefined;
   }
   _read(key: string): { point: Point; _velocity: readonly number[] } {
     const track = this._tracks.get(key);
-    if (track) return { point: { _coordinates: [...track.value], _unit: track._program._unit }, _velocity: [...track._velocity] };
+    if (track) return { point: { _coordinates: [...track._value], _unit: track._program._unit }, _velocity: [...track._velocity] };
     if (isTransform(key)) return { point: { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], _unit: '' }, _velocity: [0] };
     const saved = this._rest;
     if (saved) return { point: saved, _velocity: saved._coordinates.map(() => 0) };
-    const text = this._engine._host.styles(this.element).getPropertyValue(key);
+    const text = this._engine._host.styles(this._element).getPropertyValue(key);
     const initial = point(key, key === 'opacity' ? text === '' ? 1 : number(Number(text), 'opacity') : text || 0);
     return { point: initial, _velocity: initial._coordinates.map(() => 0) };
   }
@@ -257,17 +257,17 @@ class Surface {
     } finally { this._lock(false); }
   }
   _sample(track: Track): void {
-    sample(track._program, track._elapsed, track.value, track._velocity,
+    sample(track._program, track._elapsed, track._value, track._velocity,
       track._paused ? 0 : this._native?.playbackRate ?? track._rate);
   }
   _ended(track: Track): boolean {
     return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
   }
   private _text(at?: 'from' | 'to'): string {
-    if (this.key === 'transform') {
+    if (this._key === 'transform') {
       const state = this._transforms;
       for (const [key, track] of this._tracks) {
-        const value = at ? track._program._segments[0]![at][0]! : track.value[0]!;
+        const value = at ? track._program._segments[0]![at][0]! : track._value[0]!;
         state[key] = value;
       }
       let identity = !at;
@@ -276,16 +276,16 @@ class Surface {
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {
-      const held = this._rest!; return format(this.key, held._coordinates, held._unit);
+      const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
-    return format(track._program._key, at ? track._program._segments[0]![at] : track.value, track._program._unit);
+    return format(track._program._key, at ? track._program._segments[0]![at] : track._value, track._program._unit);
   }
   _render(): void {
     if (this._busy) throw new MotionError('style: повторная запись');
     this._lock(true);
     try {
       const text = this._text();
-      (this.element as HTMLElement).style.setProperty(this.key, text);
+      (this._element as HTMLElement).style.setProperty(this._key, text);
       this._written = text;
     }
     finally { this._lock(false); }
@@ -313,8 +313,8 @@ class Surface {
     if (!owner) return;
     track._owner = undefined;
     if (this._tracks.get(track._program._key) === track) this._tracks.delete(track._program._key);
-    if (this.key !== 'transform') this._rest = { _coordinates: [...track.value], _unit: track._program._unit };
-    if (isTransform(track._program._key)) this._transforms[track._program._key] = track.value[0]!;
+    if (this._key !== 'transform') this._rest = { _coordinates: [...track._value], _unit: track._program._unit };
+    if (isTransform(track._program._key)) this._transforms[track._program._key] = track._value[0]!;
     if (this._tracks.size === 0) {
       try { this._engine._idle(this); } catch (error) { failure ??= { error }; }
     }
@@ -336,13 +336,13 @@ class Surface {
     if (!active.some(moving)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
-    const canNative = first._rate > 0 && (this.key === 'transform' || this.key === 'opacity') && _nativeEase !== undefined && typeof this.element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
+    const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
       active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
         track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
     try {
       this._lock(true);
-      const effect = this.element.animate([{ [this.key]: this._text('from') }, { [this.key]: this._text('to') }], {
+      const effect = this._element.animate([{ [this._key]: this._text('from') }, { [this._key]: this._text('to') }], {
         duration: seg._end - seg._at, delay: seg._at, easing: _nativeEase, fill: 'both',
       });
       this._native = effect; this._nativeTime = first._elapsed;
@@ -495,9 +495,9 @@ export class Runtime {
   }
   _idle(surface: Surface): void {
     this._active.delete(surface);
-    const groups = this._surfaces.get(surface.element);
-    if (surface._tracks.size === 0 && surface.key !== 'transform' && groups?.[surface.key] === surface)
-      delete groups[surface.key];
+    const groups = this._surfaces.get(surface._element);
+    if (surface._tracks.size === 0 && surface._key !== 'transform' && groups?.[surface._key] === surface)
+      delete groups[surface._key];
     if (this._active.size !== 0) return;
     const update = this._offUpdate, render = this._offRender;
     this._offUpdate = this._offRender = undefined; this._prepared = [];
@@ -574,7 +574,7 @@ export class Runtime {
         if (equal) { run._own(existing!); continue; }
         if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!.from;
-        const track: Track = { _program: draft._program, _group: group, value: [...first], _velocity: first.map(() => 0),
+        const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: first.map(() => 0),
           _owner: undefined, _elapsed: draft.reduced ? draft._program._duration : 0, _rate: 1, _paused: false };
         group._sample(track);
         run._own(track, draft.reduced); group._attach(track);

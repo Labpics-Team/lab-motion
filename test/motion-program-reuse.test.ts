@@ -4,7 +4,7 @@ import type { Program } from '../src/motion/program.js';
 import type { Playback } from '../src/motion/types.js';
 
 const linear = { duration: 1000, ease: 'linear' } as const;
-type Track = { _program: Program; value: number[]; _velocity: number[] };
+type Track = { _program: Program; _value: number[]; _velocity: number[] };
 function track(h: ReturnType<typeof harness>, element: Element, key: string): Track {
   const registry = (h.runtime as unknown as {
     _surfaces: WeakMap<Element, Record<string, { _tracks: Map<string, Track> }>>;
@@ -20,7 +20,7 @@ it('общая программа группы не связывает сост�
     for (const key of ['x', 'opacity']) {
       const first = track(a, a.element, key), second = track(a, b.element, key);
       expect(first._program).toBe(second._program);
-      expect(first.value).not.toBe(second.value);
+      expect(first._value).not.toBe(second._value);
       expect(first._velocity).not.toBe(second._velocity);
     }
     a.step(250); expect(a.x()).toBe(25); expect(b.x()).toBe(25);
