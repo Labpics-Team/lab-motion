@@ -80,6 +80,14 @@ jobs:
       - name: Сравнить численное ядро easing
         run: node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"
 
+      - name: Сохранить размер импортов и численное сравнение
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: motion-imports-${{ github.sha }}
+          path: ${{ runner.temp }}/motion-performance/
+          if-no-files-found: error
+          retention-days: 5
+
       - name: Установить зависимости сравнения
         run: pnpm --dir candidate/bench/compare install --frozen-lockfile
 
