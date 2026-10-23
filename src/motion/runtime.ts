@@ -403,22 +403,22 @@ class Surface {
       if (!selected.some(owns)) return;
       if (typeof action === 'function') {
         action(this, selected.filter(owns));
-        this._reconcile(); this._engine._flush(); return;
-      }
-      this._detach();
-      for (const track of selected) {
-        if (!owns(track)) continue;
-        if (action === 'pause') track._paused = true;
-        else if (action === 'play') track._paused = false;
-        else if (action === 'seek') track._elapsed = Math.min(time, track._program._duration);
-        else if (action === 'finish') track._elapsed = track._program._duration;
-        this._sample(track);
-      }
-      this._render();
-      for (const track of selected) {
-        if (!owns(track)) continue;
-        if (action === 'stop') this._end(track, false);
-        else if (action === 'finish' || action === 'seek' && this._ended(track)) this._end(track, true);
+      } else {
+        this._detach();
+        for (const track of selected) {
+          if (!owns(track)) continue;
+          if (action === 'pause') track._paused = true;
+          else if (action === 'play') track._paused = false;
+          else if (action === 'seek') track._elapsed = Math.min(time, track._program._duration);
+          else if (action === 'finish') track._elapsed = track._program._duration;
+          this._sample(track);
+        }
+        this._render();
+        for (const track of selected) {
+          if (!owns(track)) continue;
+          if (action === 'stop') this._end(track, false);
+          else if (action === 'finish' || action === 'seek' && this._ended(track)) this._end(track, true);
+        }
       }
       this._reconcile();
       this._engine._flush();

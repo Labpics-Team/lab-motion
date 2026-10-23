@@ -94,13 +94,13 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   const times = authored ? timing._times : undefined;
   if (times && times.length !== resolved.length) failMotion('times: другая длина');
   if (timing._spring && resolved.length > 2) failMotion('keyframes: задайте duration/ease');
-  const velocity = authored ? resolved[0]!._coordinates.map(() => 0) : [...initialVelocity];
+  // _draft и layout передают собственный снимок; Segment читает его без мутаций.
   const _segments: Segment[] = [];
   const duration = timing._duration ?? 0;
   for (let i = 0; i < resolved.length - 1; i++) {
     const a = times?.[i] ?? i / (resolved.length - 1);
     const b = times?.[i + 1] ?? (i + 1) / (resolved.length - 1);
-    _segments.push(segment(resolved[i]!, resolved[i + 1]!, i === 0 ? velocity : resolved[i]!._coordinates.map(() => 0), timing,
+    _segments.push(segment(resolved[i]!, resolved[i + 1]!, i === 0 ? initialVelocity : resolved[i]!._coordinates.map(() => 0), timing,
       offset + timing._delay + a * duration, (b - a) * duration));
   }
   const last = _segments.at(-1)!;
