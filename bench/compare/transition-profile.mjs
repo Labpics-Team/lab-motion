@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, appendFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, appendFileSync, mkdirSync, realpathSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -6,13 +6,21 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
 
-const rootPath = path.resolve(process.argv[2] ?? process.cwd());
+const rootPath = realpathSync(process.argv[2] ?? process.cwd());
+const baselinePath = process.argv[5] ? realpathSync(process.argv[5]) : undefined;
+if (baselinePath === rootPath) throw new Error('Baseline and candidate must be distinct checkouts');
 const benchPath = path.join(rootPath, 'bench/compare');
 const output = path.resolve(process.argv[3] ?? path.join(benchPath, 'results', `transition-${Date.now()}`));
 const load = file => import(pathToFileURL(path.join(rootPath, file)).href);
 const { startBenchmarkOrigin, runSemanticStartCheck } = await load('bench/compare/bench.mjs');
 const { START_SCENARIO_MANIFEST, makeRoundRobinOrders, PRODUCTION_ADAPTER_PROFILE } = await load('bench/compare/methodology.mjs');
 const { canonicalGzip, observationalBrotli } = await load('scripts/compression-oracle.mjs');
+const { hashFileTree } = await load('bench/compare/provenance.mjs');
+const measuredRoots = { candidate: rootPath, ...(baselinePath ? { baseline: baselinePath } : {}) };
+const sourceIdentity = Object.fromEntries(Object.entries(measuredRoots).map(([id, directory]) => [id, {
+  revision: execFileSync('git', ['-C', directory, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+  dist: hashFileTree(path.join(directory, 'dist')),
+}]));
 const require = createRequire(path.join(benchPath, 'package.json'));
 const { chromium } = require('playwright');
 const esbuild = require('esbuild');
@@ -26,12 +34,14 @@ if (!['full', 'native'].includes(group)) throw new Error('Expected full or nativ
 const ids = group === 'native'
   ? ['lab', 'lab-nano', 'motion-mini', 'waapi-ctl']
   : ['lab', 'motion', 'gsap', 'anime', 'waapi-ctl'];
+if (baselinePath) ids.push('baseline');
 const counts = [1, 100, 1000];
-const rounds = 20, durationMs = 400, watchdogMs = 10_000;
+const rounds = Math.ceil(20 / ids.length) * ids.length, durationMs = 400, watchdogMs = 10_000;
 const entries = { 'lab-nano': 'lab-nano', lab: 'lab', motion: 'motion', gsap: 'gsap', anime: 'anime', 'waapi-ctl': 'waapi-control', 'motion-mini': 'motion-mini', 'anime-waapi': 'anime-waapi' };
+if (baselinePath) entries.baseline = 'lab';
 const adapters = Object.fromEntries(Object.entries(entries).map(([id, entry]) => {
   const outputPath = path.join(output, 'adapters', `${id}.js`);
-  esbuild.buildSync({ ...PRODUCTION_ADAPTER_PROFILE, entryPoints: [path.join(benchPath, 'entries', `${entry}.entry.mjs`)], format: 'iife', globalName: '__adapterModule', outfile: outputPath });
+  esbuild.buildSync({ ...PRODUCTION_ADAPTER_PROFILE, entryPoints: [path.join(id === 'baseline' ? path.join(baselinePath, 'bench/compare') : benchPath, 'entries', `${entry}.entry.mjs`)], format: 'iife', globalName: '__adapterModule', outfile: outputPath });
   const bytes = readFileSync(outputPath);
   return [id, { path: outputPath, sha256: hash(bytes), raw: bytes.length, gzip: canonicalGzip(bytes).length, brotli: observationalBrotli(bytes).length }];
 }));
@@ -51,7 +61,7 @@ const metadata = {
   versions: { lab: root.version, ...installed, chromium: browser.version(), node: process.version },
   environment: { cpu: os.cpus()[0].model, cpuMax: optionalFile('/sys/fs/cgroup/cpu.max'), memoryMax: optionalFile('/sys/fs/cgroup/memory.max') },
   scenario: { group, counts, rounds, durationMs, watchdogMs, targetPx: 300, easing: 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
-  adapters, orders,
+  adapters, orders, sourceIdentity,
 };
 writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
 const samples = [];
@@ -136,6 +146,10 @@ try {
     console.log(`ROUND ${round + 1}/${rounds}`);
   }
   for (const [id, adapter] of Object.entries(adapters)) if (hash(readFileSync(adapter.path)) !== adapter.sha256) throw new Error(`Adapter changed: ${id}`);
+  for (const [id, directory] of Object.entries(measuredRoots)) {
+    if (hashFileTree(path.join(directory, 'dist')).sha256 !== sourceIdentity[id].dist.sha256)
+      throw new Error(`Measured dist changed: ${id}`);
+  }
   const quantile = (values, p) => [...values].sort((a, b) => a - b)[Math.ceil(values.length * p) - 1];
   const summary = counts.flatMap(count => ids.map(id => {
     const rows = samples.filter(s => s.count === count && s.id === id);
