@@ -123,6 +123,8 @@ export default defineConfig({
   terserOptions: {
     get compress() { return { passes: 3, pure_getters: true }; },
     get mangle() { return { properties: { regex: /^_/ } }; },
+    // Чистые фабрики должны оставаться видимыми сборщику потребителя после публикации dist.
+    get format() { return { preserve_annotations: true }; },
   },
   treeshake: true,
   esbuildPlugins: [sharedFramePlugin],
