@@ -1,0 +1,23 @@
+{
+  "base": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+  "operations": [
+    {
+      "path": "src/motion/program.ts",
+      "replace": [
+        [
+          "export function transform(values: Readonly<Record<string, number>>, translationOnly = false): string {\n  const translation = `translate(${values.x ?? 0}px,${values.y ?? 0}px)`;\n  // Полная топология сохраняется для любой активной оси помимо x/y.\n  return translationOnly ? translation : `${translation} rotate(${values.rotate ?? 0}deg) skew(${values.skewX ?? 0}deg,${values.skewY ?? 0}deg) scale(${values.scaleX ?? 1},${values.scaleY ?? 1})`;\n}",
+          "export function transform(values: Readonly<Record<string, number>>): string {\n  // Одинаковая топология сохраняет независимые оси и авторские полные обороты.\n  return `translate(${values.x ?? 0}px,${values.y ?? 0}px) rotate(${values.rotate ?? 0}deg) skew(${values.skewX ?? 0}deg,${values.skewY ?? 0}deg) scale(${values.scaleX ?? 1},${values.scaleY ?? 1})`;\n}"
+        ]
+      ]
+    },
+    {
+      "path": "src/motion/runtime.ts",
+      "replace": [
+        [
+          "      let identity = !at, translationOnly = !!at;\n      for (const key in TRANSFORMS) {\n        const neutral = state[key] === TRANSFORMS[key];\n        identity &&= neutral;\n        if (key !== 'x' && key !== 'y') translationOnly &&= neutral && !this._tracks.has(key);\n      }\n      return identity ? 'none' : transform(state, translationOnly);",
+          "      let identity = !at;\n      for (const key in TRANSFORMS) identity &&= state[key] === TRANSFORMS[key];\n      return identity ? 'none' : transform(state);"
+        ]
+      ]
+    }
+  ]
+}
