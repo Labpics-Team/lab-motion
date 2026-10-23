@@ -53,22 +53,17 @@ jobs:
           corepack install --global pnpm@11.11.0
 
       - name: Собрать обе версии
+        id: build
         run: |
           pnpm --dir baseline install --frozen-lockfile
           pnpm --dir candidate install --frozen-lockfile
           pnpm --dir baseline build
           pnpm --dir candidate build
 
-      - name: Измерить потребительские сборки
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/motion-performance"
-          node baseline/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/baseline-size.txt"
-          node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt"
-
       - name: Измерить каждый публичный root-импорт
-        run: node candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"
+        run: |
+          mkdir -p "$RUNNER_TEMP/motion-performance"
+          node candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"
 
       - name: Сравнить численное ядро easing
         run: node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"
@@ -95,6 +90,15 @@ jobs:
       - name: Проверить сравнительные утверждения
         working-directory: candidate/bench/compare
         run: xvfb-run -a node bench.mjs
+
+      - name: Измерить потребительские сборки
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/motion-performance"
+          node baseline/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/baseline-size.txt"
+          node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt"
 
       - name: Сохранить исходные измерения
         if: always()

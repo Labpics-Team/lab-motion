@@ -862,6 +862,12 @@ async function runCli() {
   const { rows, totalGzBytes, totalBrBytes, hasWarnings: measuredWarnings } = measureEntries(entries, ROOT);
   let hasWarnings = measuredWarnings;
 
+  const annotateError = (message) => {
+    if (process.env.GITHUB_ACTIONS !== 'true') return;
+    const escaped = String(message).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+    console.log(`::error title=Bundle size::${escaped}`);
+  };
+
   // ─── вывод ────────────────────────────────────────────────────────────────
 
   const COL = { label: 22, files: 7, raw: 10, gz: 10, br: 10 };
@@ -883,6 +889,7 @@ async function runCli() {
   for (const row of rows) {
     if (row.error) {
       console.log(pad(row.label, COL.label) + '  ' + row.error);
+      annotateError(`entry ${row.label}: ${row.error}`);
       continue;
     }
 
@@ -894,6 +901,7 @@ async function runCli() {
     let status = 'OK';
     if (row.exceeded) {
       status = `WARN > ${(row.gate / 1024).toFixed(1)} KB gz [OPEN ITEM]`;
+      annotateError(`entry ${row.label}: gzip ${row.gzBytes} B > budget ${row.gate} B; excess ${row.gzBytes - row.gate} B`);
     }
 
     console.log(pad(row.label, COL.label) + filesFmt + rawFmt + gzFmt + brFmt + '  ' + status);
@@ -933,10 +941,17 @@ ${core.label} gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.g
     if (m.error) {
       hasWarnings = true;
       console.log(pad(m.name, COL.label) + `  FAIL: ${m.error}`);
+      annotateError(`import ${m.name}: ${m.error}`);
       continue;
     }
     const budget = evaluateScenarioBudget(m);
     if (budget.exceeded) hasWarnings = true;
+    if (budget.initialExceeded) {
+      annotateError(`import ${m.name}: initial gzip ${m.gzBytes} B > budget ${m.gate} B; excess ${m.gzBytes - m.gate} B`);
+    }
+    if (budget.totalExceeded && (m.totalGzBytes !== m.gzBytes || m.totalGate !== m.gate)) {
+      annotateError(`import ${m.name}: total gzip ${m.totalGzBytes} B > budget ${m.totalGate} B; excess ${m.totalGzBytes - m.totalGate} B`);
+    }
     const failures = [];
     if (budget.initialExceeded) failures.push(`initial ${m.gzBytes} B > ${m.gate} B`);
     if (

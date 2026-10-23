@@ -700,6 +700,10 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
   ));
   if (!terminalValid) return false;
 
+  const clockErrorMs = expected.semanticClockErrorMs ?? 0;
+  if (!Number.isFinite(clockErrorMs) || clockErrorMs < 0 ||
+      !Number.isFinite(expected.durationMs) || expected.durationMs <= 0) return false;
+
   if (expected.completionTimeoutMs !== undefined) {
     const completion = evidence.completion;
     const times = [completion?.waitStartedMs, completion?.observedAtMs,
@@ -707,8 +711,11 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
     if (!Number.isFinite(expected.completionTimeoutMs) || expected.completionTimeoutMs <= 0 ||
         completion?.timeoutMs !== expected.completionTimeoutMs ||
         times.some((value) => !Number.isFinite(value) || value < 0) ||
-        times.some((value, index) => index > 0 && value < times[index - 1]) ||
+        // Только переходы perf↔rAF используют уже зарегистрированную clock uncertainty.
+        times.some((value, index) => index > 0 && value < (index === 2 || index === 3
+          ? nextDown(times[index - 1] - clockErrorMs) : times[index - 1])) ||
         completion.observedAtMs > completion.timeoutMs ||
+        completion.terminalReadStartedMs < completion.observedAtMs ||
         !Array.isArray(completion.calls) || completion.calls.length !== calls ||
         completion.calls.some((call, index) => call?.state !== 'fulfilled' ||
           !Number.isFinite(call.observedAtMs) || call.observedAtMs < evidence.callStartedAtMs[index] ||
@@ -721,9 +728,6 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
   const observations = Array.from({ length: calls }, () => []);
   const phases = Array.from({ length: calls }, () => ({ low: -Infinity, high: Infinity }));
   const resolved = Array.from({ length: calls }, () => Array(expected.targetsPerCall).fill(false));
-  const clockErrorMs = expected.semanticClockErrorMs ?? 0;
-  if (!Number.isFinite(clockErrorMs) || clockErrorMs < 0 ||
-      !Number.isFinite(expected.durationMs) || expected.durationMs <= 0) return false;
   const slope = expected.toPx / expected.durationMs;
   const coordinateError = 2 * expected.movementThresholdPx;
   const interior = (value) => value >= expected.movementThresholdPx && value < expected.toPx - expected.finalTolerancePx;

@@ -555,6 +555,43 @@ describe('benchmark methodology fail-closed contracts', () => {
     }
   });
 
+  it('completion различает clock uncertainty и обратный ход одного perf clock', () => {
+    const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128, semanticClockErrorMs: 0.018 };
+    const evidence: any = {
+      topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: 128, toPx: 300 },
+      callStartedAtMs: [0],
+      checkpoints: [32, 64, 80].map((time, index) => ({ frameTimestampMs: time, groups: [{
+        readStartedMs: time, readEndedMs: time, documentFrame: { beforeMs: time, afterMs: time },
+        positions: Array(3).fill([75, 150, 187.5][index]),
+      }] })),
+      terminal: [[300, 300, 300]],
+      completion: completionEvidence(config, 1, 80),
+    };
+    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(true);
+    for (const [before, after] of [['observedAtMs', 'terminalFrameTimestampMs'],
+      ['terminalFrameTimestampMs', 'terminalReadStartedMs']]) {
+      const within = structuredClone(evidence);
+      within.completion[after!] = within.completion[before!] - 0.001;
+      expect(evaluateStartSemanticEvidence(within, config, 1)).toBe(true);
+      expect(evaluateStartSemanticEvidence(within, { ...config, semanticClockErrorMs: 0 }, 1)).toBe(false);
+      const outside = structuredClone(evidence);
+      outside.completion[after!] = outside.completion[before!] - 0.02;
+      expect(evaluateStartSemanticEvidence(outside, config, 1)).toBe(false);
+    }
+    for (const [before, after] of [['waitStartedMs', 'observedAtMs'],
+      ['terminalReadStartedMs', 'terminalReadEndedMs']]) {
+      const reversed = structuredClone(evidence);
+      reversed.completion[before!] = reversed.completion[after!] + 0.001;
+      expect(evaluateStartSemanticEvidence(reversed, config, 1)).toBe(false);
+    }
+    // Два допустимых перехода perf→rAF→perf не разрешают обратный
+    // порядок самих perf readings по разные стороны frame timestamp.
+    const acrossFrame = structuredClone(evidence);
+    acrossFrame.completion.terminalFrameTimestampMs = acrossFrame.completion.observedAtMs - 0.01;
+    acrossFrame.completion.terminalReadStartedMs = acrossFrame.completion.observedAtMs - 0.02;
+    expect(evaluateStartSemanticEvidence(acrossFrame, config, 1)).toBe(false);
+  });
+
   it.each([0, 5])('finished связан с фазой и последней stagger целью, gap=%s', (staggerGapMs) => {
     const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128, staggerGapMs };
     const times = staggerGapMs ? [4, 32, 64, 80] : [32, 64, 80];
@@ -750,7 +787,41 @@ describe('benchmark methodology fail-closed contracts', () => {
     expect(source).toContain('page.evaluate(() => globalThis.crossOriginIsolated)');
     expect(source).not.toContain('timerEvidence: { crossOriginIsolated: true');
     expect(source).not.toContain('semantic: true');
-    expect(source.match(/assertStartSemanticEvidence\(/g)).toHaveLength(3);
+    // Every measured path must reach the real gate through the diagnostic wrapper
+    // before its raw cluster is accepted. The wrapper's failure behavior is exercised
+    // with invalid evidence in benchmark-report-contract.test.ts.
+    const diagnosticGuard = source.slice(
+      source.indexOf('export function assertStartSemanticEvidenceWithDiagnostic('),
+      source.indexOf('async function measurePageTimerProbe('),
+    );
+    expect(source.match(/assertStartSemanticEvidence\(/g)).toHaveLength(1);
+    expect(diagnosticGuard).toContain('assertStartSemanticEvidence(label, evidence);');
+    const main = source.slice(source.indexOf('async function main()'));
+    expect(main).toContain('assertStartSemanticEvidenceWithDiagnostic(label, evidence, {');
+    expect(main.match(/assertSemantic\(/g)).toHaveLength(3);
+    for (const route of [
+      {
+        call: 'assertSemantic(`${id}.${scenario} run ${run + 1}`, semanticEvidence, {',
+        metric: 'metric: `warm.${scenario}`',
+        append: 'results[id].raw.warm[scenario].push(',
+      },
+      {
+        call: 'assertSemantic(`${id}.cold.${scenario} run ${run + 1}`, semanticEvidence, {',
+        metric: 'metric: `cold.${scenario}`',
+        append: 'results[id].raw.cold[scenario].push(',
+      },
+      {
+        call: 'assertSemantic(`cold.firstPresented ${id} run ${run + 1}`, semanticEvidence, {',
+        metric: "scenario: 's1', run, metric: 'cold.firstPresented'",
+        append: 'results[id].raw.cold.firstPresented.push(',
+      },
+    ]) {
+      const gate = main.indexOf(route.call);
+      const append = main.indexOf(route.append);
+      expect(gate).toBeGreaterThanOrEqual(0);
+      expect(append).toBeGreaterThan(gate);
+      expect(main.slice(gate, append)).toContain(route.metric);
+    }
     expect(source).toContain("const rawJson = JSON.stringify(rawPayload) + '\\n';");
     expect(source).not.toContain('JSON.stringify(rawPayload, null, 2)');
   });
