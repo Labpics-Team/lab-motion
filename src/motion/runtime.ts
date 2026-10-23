@@ -13,14 +13,18 @@ export interface RuntimeHost {
   supports(easing: string): boolean;
 }
 // Один браузерный ответ: повторный native-start не разбирает ту же CSS-кривую.
-let supportCache: [typeof CSS, typeof CSS.supports, string, boolean] | undefined;
+let cachedHost: typeof CSS | undefined;
+let cachedCheck: typeof CSS.supports | undefined;
+let cachedEasing: string | undefined;
+let cachedResult = false;
 function supports(easing: string): boolean {
   if (typeof CSS === 'undefined') return false;
-  const host = CSS, check = host.supports, previous = supportCache;
-  if (previous && previous[0] === host && previous[1] === check && previous[2] === easing) return previous[3];
-  const result: boolean = Reflect.apply(check, host, ['animation-timing-function', easing]);
-  supportCache = [host, check, easing, result];
-  return result;
+  const host = CSS, check = host.supports;
+  if (host !== cachedHost || check !== cachedCheck || easing !== cachedEasing) {
+    const result: boolean = Reflect.apply(check, host, ['animation-timing-function', easing]);
+    cachedHost = host; cachedCheck = check; cachedEasing = easing; cachedResult = result;
+  }
+  return cachedResult;
 }
 const defaultHost: RuntimeHost = {
   frame,
@@ -230,15 +234,16 @@ class Surface {
     if (this._key === 'transform') Object.assign(this._transforms, initialTransforms(this._engine._host.styles(this._element)));
     this._rest = undefined;
   }
-  _read(key: string): { point: Point; _velocity: readonly number[] } {
+  _read(key: string): Point & { readonly _velocity: readonly number[] } {
     const track = this._tracks.get(key);
-    if (track) return { point: { _coordinates: [...track._value], _unit: track._program._unit }, _velocity: [...track._velocity] };
-    if (isTransform(key)) return { point: { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], _unit: '' }, _velocity: [0] };
-    const saved = this._rest;
-    if (saved) return { point: saved, _velocity: saved._coordinates.map(() => 0) };
-    const text = this._engine._host.styles(this._element).getPropertyValue(key);
-    const initial = point(key, key === 'opacity' ? text === '' ? 1 : number(Number(text), 'opacity') : text || 0);
-    return { point: initial, _velocity: initial._coordinates.map(() => 0) };
+    if (track) return { _coordinates: [...track._value], _unit: track._program._unit, _velocity: [...track._velocity] };
+    if (isTransform(key)) return { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], _unit: '', _velocity: [0] };
+    let initial = this._rest;
+    if (!initial) {
+      const text = this._engine._host.styles(this._element).getPropertyValue(key);
+      initial = point(key, key === 'opacity' ? text === '' ? 1 : number(Number(text), 'opacity') : text || 0);
+    }
+    return { ...initial, _velocity: initial._coordinates.map(() => 0) };
   }
   _sync(): void {
     if (this._busy) failMotion('easing: повторный вход');
@@ -273,7 +278,7 @@ class Surface {
         const value = (at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value)[0]!;
         state[track._program._key] = value;
       }
-      let identity = !at, translationOnly = true;
+      let identity = !at, translationOnly = !!at;
       for (const key in TRANSFORMS) {
         const neutral = state[key] === TRANSFORMS[key];
         identity &&= neutral;
@@ -555,11 +560,11 @@ export class Runtime {
           if (!synced.has(group)) { synced.add(group); group._sync(); }
           const values = reusable?.[j] ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
-          const current = explicit ? { point: explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
+          const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
           // Предыдущая цель той же property уже хранит неизменяемую программу.
           const previous = i > 0 && reusable?.[j] ? result[result.length - props.length]!._program : undefined;
-          const spec = previous && sameStart(previous, current.point, current._velocity) ? previous
-            : program(property._key, current.point, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+          const spec = previous && sameStart(previous, current, current._velocity) ? previous
+            : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
           result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });
         }
       }

@@ -1,5 +1,33 @@
 import { expect, test } from './fixtures/harness';
 
+test('JS seek(1 мс) сохраняет точную матрицу полной CSS-записи', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { animate } = await import('/browser/.artifacts/motion-root.js');
+    const make = () => {
+      const el = document.createElement('div');
+      el.style.cssText = 'position:absolute;width:2px;height:2px;transform:none;transform-origin:0 0';
+      document.body.append(el); return el;
+    };
+    const elements = Array.from({ length: 100 }, make), reference = make();
+    const read = (el: Element) => {
+      const matrix = new DOMMatrixReadOnly(getComputedStyle(el).transform);
+      return [matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f];
+    };
+    // Аналитическое положение; reference не вызывает serializer или sampler пакета.
+    const p = 1 / 400, x = 300 * (p * p * (3 - 2 * p));
+    reference.style.transform = `translate(${x}px,0px) rotate(0deg) skew(0deg,0deg) scale(1,1)`;
+    const run = animate(elements, { x: 300 }, { duration: 400, ease: p => p * p * (3 - 2 * p) });
+    try {
+      run.pause(); run.seek(1);
+      return { poses: elements.map(read), expected: read(reference), duration: run.duration,
+        state: run.state, effects: elements.reduce((sum, el) => sum + el.getAnimations().length, 0) };
+    } finally { run.stop(); for (const el of [...elements, reference]) el.remove(); }
+  });
+  expect(result.duration).toBe(400); expect(result.state).toBe('paused'); expect(result.effects).toBe(0);
+  expect(result.poses).toHaveLength(100); expect(result.expected[4]).toBeGreaterThan(0);
+  for (const pose of result.poses) expect(pose).toEqual(result.expected);
+});
+
 for (const js of [false, true]) test(`translation сохраняет нетрансляционные оси (JS=${js})`, async ({ page }) => {
   const rows = await page.evaluate(async js => {
     const { animate } = await import('/browser/.artifacts/motion-root.js');

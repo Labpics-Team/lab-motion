@@ -85,10 +85,12 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
 }
 
 export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0): Program {
-  const resolved: Point[] = [];
+  // _draft уже разобрал первый authored keyframe; используем готовый снимок.
+  const resolved: Point[] = [from];
   let current = from;
-  for (const input of values) { current = point(key, input, current); resolved.push(current); }
-  if (!authored) resolved.unshift(from);
+  for (let i = authored ? 1 : 0; i < values.length; i++) {
+    current = point(key, values[i]!, current); resolved.push(current);
+  }
   const times = authored ? timing._times : undefined;
   if (times && times.length !== resolved.length) failMotion('times: другая длина');
   if (timing._spring && resolved.length > 2) failMotion('keyframes: задайте duration/ease');
