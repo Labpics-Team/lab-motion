@@ -1,7 +1,7 @@
 import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
-import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, type PropertyInput, type Timing } from './model.js';
+import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
 import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
@@ -110,9 +110,6 @@ interface Track {
 }
 
 function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
-function isVariable(value: MotionScalar): value is string {
-  return typeof value === 'string' && /^var\(/i.test(value.trim());
-}
 
 function sameStart(program: Program, point: Point, velocity: readonly number[]): boolean {
   const first = program._segments[0]!;
@@ -547,9 +544,6 @@ export class Runtime {
     if (elements.length * props.reduce((sum, p) => sum + p._values.length, 0) > MAX_CHANNELS) failMotion('Слишком много каналов');
     const reduced = clock._reduced || this._host.reduced();
     const author = authoredTiming(clock);
-    const reusable = elements.length > 1 && clock._stagger === 0
-      ? props.map(property => !property._values.some(isVariable))
-      : undefined;
     const result: Draft[] = [], synced = new Set<Surface>();
     try {
       for (let i = 0; i < elements.length; i++) {
@@ -558,11 +552,11 @@ export class Runtime {
           const property = props[j]!;
           const group = this._surface(element, property._key);
           if (!synced.has(group)) { synced.add(group); group._sync(); }
-          const values = reusable?.[j] ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
+          const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
           // Предыдущая цель той же property уже хранит неизменяемую программу.
-          const previous = i > 0 && reusable?.[j] ? result[result.length - props.length]!._program : undefined;
+          const previous = i > 0 && clock._stagger === 0 && property._literal ? result[result.length - props.length]!._program : undefined;
           const spec = previous && sameStart(previous, current, current._velocity) ? previous
             : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
           result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });

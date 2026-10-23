@@ -129,7 +129,11 @@ export function authoredTiming(clock: Timing): Timing {
   };
 }
 
-export interface PropertyInput { readonly _key: string; readonly _values: readonly MotionScalar[]; readonly _authored: boolean }
+export function isVariable(value: MotionScalar): value is string {
+  return typeof value === 'string' && /^var\(/i.test(value.trim());
+}
+
+export interface PropertyInput { readonly _key: string; readonly _values: readonly MotionScalar[]; readonly _authored: boolean; readonly _literal: boolean }
 export function properties(input: MotionProperties): PropertyInput[] {
   const source = record(input, 'properties');
   const keys = Object.keys(source);
@@ -141,9 +145,11 @@ export function properties(input: MotionProperties): PropertyInput[] {
       failMotion(`Недопустимое свойство ${key}`);
     const value = source[key], authored = Array.isArray(value);
     const values = authored ? snapshot(value, key, 2) : [value];
+    let literal = true;
     for (const entry of values) {
       if (typeof entry !== 'number' && typeof entry !== 'string' || typeof entry === 'number' && !Number.isFinite(entry))
         failMotion(`${key}: нужно конечное число или CSS`);
+      literal &&= !isVariable(entry);
     }
     const name = key.startsWith('--') ? key : key.replace(/[A-Z]/g, c => '-' + c.toLowerCase());
     const normalized = name === 'scale-x' ? 'scaleX' : name === 'scale-y' ? 'scaleY'
@@ -156,7 +162,7 @@ export function properties(input: MotionProperties): PropertyInput[] {
     for (const channel of channels) {
       if (declared.has(channel)) failMotion(`Свойство ${channel} задано несколько раз`);
       declared.add(channel);
-      result.push({ _key: channel, _values: values as MotionScalar[], _authored: authored });
+      result.push({ _key: channel, _values: values as MotionScalar[], _authored: authored, _literal: literal });
     }
   }
   return result;
