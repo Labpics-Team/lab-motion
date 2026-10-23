@@ -288,6 +288,11 @@ export const BESPOKE_SUBPATH_GATES = {
 export const IMPORT_COST_SCENARIOS = [
   { name: 'root animate', gate: FULL_ANIMATE_GATE_BYTES, code: `import { animate } from '%DIST%/../motion/index.js'; export { animate };` },
   { name: 'root component scope', gate: 15_700, code: `import { scope } from '%DIST%/../motion/index.js'; export { scope };` },
+  // Изолированные root-импорты не должны удерживать соседний Runtime.
+  // Факт 326f84: 7 283 / 2 305 / 884 B gzip, initial = total.
+  { name: 'root layout', gate: 7600, code: `import { layout } from '%DIST%/../motion/index.js'; export { layout };` },
+  { name: 'root playhead', gate: 2500, code: `import { playhead } from '%DIST%/../motion/index.js'; export { playhead };` },
+  { name: 'root MotionError', gate: 1000, code: `import { MotionError } from '%DIST%/../motion/index.js'; export { MotionError };` },
 
   {
     name: 'reorder-controlled',

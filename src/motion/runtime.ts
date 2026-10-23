@@ -112,9 +112,9 @@ function isVariable(value: MotionScalar): value is string {
 
 function sameStart(program: Program, point: Point, velocity: readonly number[]): boolean {
   const first = program._segments[0]!;
-  if (program._unit !== point._unit || first.from.length !== point._coordinates.length || first._velocity.length !== velocity.length) return false;
-  for (let i = 0; i < first.from.length; i++)
-    if (!Object.is(first.from[i], point._coordinates[i]) || !Object.is(first._velocity[i], velocity[i])) return false;
+  if (program._unit !== point._unit || first._from.length !== point._coordinates.length || first._velocity.length !== velocity.length) return false;
+  for (let i = 0; i < first._from.length; i++)
+    if (!Object.is(first._from[i], point._coordinates[i]) || !Object.is(first._velocity[i], velocity[i])) return false;
   return true;
 }
 
@@ -266,22 +266,26 @@ class Surface {
   _ended(track: Track): boolean {
     return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
   }
-  private _text(at?: 'from' | 'to'): string {
+  private _text(at: 0 | 1 | 2 = 0): string {
     if (this._key === 'transform') {
       const state = this._transforms;
       for (const track of this._tracks.values()) {
-        const value = at ? track._program._segments[0]![at][0]! : track._value[0]!;
+        const value = (at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value)[0]!;
         state[track._program._key] = value;
       }
-      let identity = !at;
-      for (const key in TRANSFORMS) identity &&= state[key] === TRANSFORMS[key];
-      return identity ? 'none' : transform(state);
+      let identity = !at, translationOnly = true;
+      for (const key in TRANSFORMS) {
+        const neutral = state[key] === TRANSFORMS[key];
+        identity &&= neutral;
+        if (key !== 'x' && key !== 'y') translationOnly &&= neutral && !this._tracks.has(key);
+      }
+      return identity ? 'none' : transform(state, translationOnly);
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {
       const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
-    return format(track._program._key, at ? track._program._segments[0]![at] : track._value, track._program._unit);
+    return format(track._program._key, at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value, track._program._unit);
   }
   _render(): void {
     if (this._busy) failMotion('style: повторная запись');
@@ -345,7 +349,7 @@ class Surface {
     if (!canNative) { this._engine._wake(this); return; }
     try {
       this._lock(true);
-      const effect = this._element.animate([{ [this._key]: this._text('from') }, { [this._key]: this._text('to') }], {
+      const effect = this._element.animate([{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
         duration: seg._end - seg._at, delay: seg._at, easing: _nativeEase, fill: 'both',
       });
       this._native = effect; this._nativeTime = first._elapsed;
@@ -535,11 +539,11 @@ export class Runtime {
   _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
     origin?: (element: Element, key: string) => Point | undefined): Draft[] {
     const elements = targets(input);
-    if (elements.length * props.reduce((sum, p) => sum + p.values.length, 0) > MAX_CHANNELS) failMotion('Слишком много каналов');
+    if (elements.length * props.reduce((sum, p) => sum + p._values.length, 0) > MAX_CHANNELS) failMotion('Слишком много каналов');
     const reduced = clock._reduced || this._host.reduced();
     const author = authoredTiming(clock);
     const reusable = elements.length > 1 && clock._stagger === 0
-      ? props.map(property => !property.values.some(isVariable))
+      ? props.map(property => !property._values.some(isVariable))
       : undefined;
     const result: Draft[] = [], synced = new Set<Surface>();
     try {
@@ -547,16 +551,16 @@ export class Runtime {
         const element = elements[i]!;
         for (let j = 0; j < props.length; j++) {
           const property = props[j]!;
-          const group = this._surface(element, property.key);
+          const group = this._surface(element, property._key);
           if (!synced.has(group)) { synced.add(group); group._sync(); }
-          const values = reusable?.[j] ? property.values : property.values.map(v => this._resolveValue(element, property.key, v));
-          const explicit = property.authored ? point(property.key, values[0]!) : origin?.(element, property.key);
-          const current = explicit ? { point: explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property.key);
+          const values = reusable?.[j] ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
+          const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
+          const current = explicit ? { point: explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
           // Предыдущая цель той же property уже хранит неизменяемую программу.
           const previous = i > 0 && reusable?.[j] ? result[result.length - props.length]!._program : undefined;
           const spec = previous && sameStart(previous, current.point, current._velocity) ? previous
-            : program(property.key, current.point, values, property.authored, property.authored ? author : clock, current._velocity, offset + i * clock._stagger);
-          result.push({ _element: element, _key: property.key, _program: spec, _reduced: reduced });
+            : program(property._key, current.point, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+          result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });
         }
       }
     } finally {
@@ -576,7 +580,7 @@ export class Runtime {
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
         if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
-        const first = draft._program._segments[0]!.from;
+        const first = draft._program._segments[0]!._from;
         const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: first.map(() => 0),
           _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _rate: 1, _paused: false };
         group._sample(track);

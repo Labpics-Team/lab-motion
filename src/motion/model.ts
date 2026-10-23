@@ -129,7 +129,7 @@ export function authoredTiming(clock: Timing): Timing {
   };
 }
 
-export interface PropertyInput { readonly key: string; readonly values: readonly MotionScalar[]; readonly authored: boolean }
+export interface PropertyInput { readonly _key: string; readonly _values: readonly MotionScalar[]; readonly _authored: boolean }
 export function properties(input: MotionProperties): PropertyInput[] {
   const source = record(input, 'properties');
   const keys = Object.keys(source);
@@ -156,7 +156,7 @@ export function properties(input: MotionProperties): PropertyInput[] {
     for (const channel of channels) {
       if (declared.has(channel)) failMotion(`Свойство ${channel} задано несколько раз`);
       declared.add(channel);
-      result.push({ key: channel, values: values as MotionScalar[], authored });
+      result.push({ _key: channel, _values: values as MotionScalar[], _authored: authored });
     }
   }
   return result;

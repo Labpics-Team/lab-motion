@@ -33,16 +33,17 @@ export function format(key: string, value: readonly number[], unit: string): str
   const n = key === 'opacity' ? Math.max(0, Math.min(1, value[0]!)) : value[0]!;
   return `${n === 0 ? 0 : n}${unit}`;
 }
-export function transform(values: Readonly<Record<string, number>>): string {
-  // Одинаковая топология сохраняет независимые оси и авторские полные обороты.
-  return `translate(${values.x ?? 0}px,${values.y ?? 0}px) rotate(${values.rotate ?? 0}deg) skew(${values.skewX ?? 0}deg,${values.skewY ?? 0}deg) scale(${values.scaleX ?? 1},${values.scaleY ?? 1})`;
+export function transform(values: Readonly<Record<string, number>>, translationOnly = false): string {
+  const translation = `translate(${values.x ?? 0}px,${values.y ?? 0}px)`;
+  // Полная топология сохраняется для любой активной оси помимо x/y.
+  return translationOnly ? translation : `${translation} rotate(${values.rotate ?? 0}deg) skew(${values.skewX ?? 0}deg,${values.skewY ?? 0}deg) scale(${values.scaleX ?? 1},${values.scaleY ?? 1})`;
 }
 
 export interface Segment {
   readonly _at: number;
   readonly _end: number;
-  readonly from: readonly number[];
-  readonly to: readonly number[];
+  readonly _from: readonly number[];
+  readonly _to: readonly number[];
   readonly _velocity: readonly number[];
   readonly _timing: Timing;
   readonly _artifact: SpringExecutionArtifactTuple | undefined;
@@ -80,7 +81,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, energy) * 1000;
   }
   if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) failMotion('Непредставимая длительность');
-  return { _at: at, _end: at + length, from: from._coordinates, to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
+  return { _at: at, _end: at + length, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
 }
 
 export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0): Program {
@@ -102,9 +103,9 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   }
   const last = _segments.at(-1)!;
   const first = _segments[0]!;
-  const _identity = authored ? undefined : [resolved[0]!._unit, ...last.to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
+  const _identity = authored ? undefined : [resolved[0]!._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
-  return { _key: key, _unit: resolved[0]!._unit, _segments, _duration: last._end, _final: last.to,
+  return { _key: key, _unit: resolved[0]!._unit, _segments, _duration: last._end, _final: last._to,
     _nativeEase: resolved[0]!._unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : _segments.length === 1 ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
     _identity };
 }
@@ -122,7 +123,7 @@ export function sample(program: Program, time: number, value: number[], velocity
   const segment = _segments[at]!;
   const _elapsed = Math.max(0, time - segment._at), duration = segment._end - segment._at;
   if (time >= segment._end) {
-    for (let i = 0; i < segment.to.length; i++) { value[i] = segment.to[i]!; velocity[i] = 0; }
+    for (let i = 0; i < segment._to.length; i++) { value[i] = segment._to[i]!; velocity[i] = 0; }
     return;
   }
   let p = duration === 0 ? 1 : Math.min(1, _elapsed / duration), dp = 0;
@@ -138,8 +139,8 @@ export function sample(program: Program, time: number, value: number[], velocity
     p = ease(p);
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
-  for (let i = 0; i < segment.from.length; i++) {
-    const a = segment.from[i]!, distance = segment.to[i]! - a;
+  for (let i = 0; i < segment._from.length; i++) {
+    const a = segment._from[i]!, distance = segment._to[i]! - a;
     if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
     else if (segment._timing._spring && !segment._artifact) {
       value[i] = a + distance * basis._value + (segment._velocity[i] ?? 0) * basis._valueV0;
