@@ -128,7 +128,7 @@ export class Run implements Playback {
   private _natural = true;
   declare _capture?: (track: Track) => void;
   private _notifications = 0;
-  private _failure: { error: unknown } | undefined;
+  private _failure: { _error: unknown } | undefined;
   private _cleaning = false;
   private _resolve!: (value: MotionResult) => void;
   private _reject!: (error: unknown) => void;
@@ -149,7 +149,7 @@ export class Run implements Playback {
   _release(): void { this._notifications--; this._complete(); }
   _fault(error: unknown): void {
     if (this._failure) return;
-    this._failure = { error }; this._status = 'failed';
+    this._failure = { _error: error }; this._status = 'failed';
   }
   _error(error: unknown): void {
     this._fault(error);
@@ -164,7 +164,7 @@ export class Run implements Playback {
   }
   private _complete(): void {
     if (this._tracks.size || this._notifications) return;
-    if (this._failure) this._reject(this._failure.error);
+    if (this._failure) this._reject(this._failure._error);
     else {
       const result = this._natural ? FINISHED : STOPPED;
       this._status = result.status; this._resolve(result);
@@ -177,11 +177,11 @@ export class Run implements Playback {
     track._owner?._settle(track, false);
     this._tracks.add(track); track._owner = this;
   }
-  _settle(track: Track, natural: boolean, failure?: { error: unknown }): void {
+  _settle(track: Track, natural: boolean, failure?: { _error: unknown }): void {
     this._capture?.(track);
     this._tracks.delete(track);
     this._natural &&= natural;
-    if (failure) this._error(failure.error);
+    if (failure) this._error(failure._error);
     this._complete();
   }
   _empty(): void { this._complete(); }
@@ -320,7 +320,7 @@ class Surface {
     this._tracks.set(track._program._key, track);
     if (previous) this._end(previous, false);
   }
-  _end(track: Track, natural: boolean, failure?: { error: unknown }): void {
+  _end(track: Track, natural: boolean, failure?: { _error: unknown }): void {
     const owner = track._owner;
     if (!owner) return;
     track._owner = undefined;
@@ -328,7 +328,7 @@ class Surface {
     if (this._key !== 'transform') this._rest = { _coordinates: [...track._value], _unit: track._program._unit };
     if (isTransform(track._program._key)) this._transforms[track._program._key] = track._value[0]!;
     if (this._tracks.size === 0) {
-      try { this._engine._idle(this); } catch (error) { failure ??= { error }; }
+      try { this._engine._idle(this); } catch (error) { failure ??= { _error: error }; }
     }
     owner._settle(track, natural, failure);
   }
@@ -339,7 +339,7 @@ class Surface {
     const native = this._native; this._native = undefined; this._token = undefined;
     try { native?.cancel(); } catch { /* исходное исключение остаётся причиной */ }
     for (const [track, owner] of owned) {
-      if (owner && track._owner === owner) this._end(track, false, { error });
+      if (owner && track._owner === owner) this._end(track, false, { _error: error });
     }
   }
   _reconcile(): void {

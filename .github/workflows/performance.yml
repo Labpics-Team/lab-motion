@@ -124,8 +124,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/motion-performance"
-          node baseline/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/baseline-size.txt"
-          node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt"
+          motion_size_status=0
+          node baseline/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/baseline-size.txt" || motion_size_status=1
+          node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt" || motion_size_status=1
+          exit "$motion_size_status"
 
       - name: Сохранить исходные измерения
         if: always()
