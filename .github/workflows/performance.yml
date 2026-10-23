@@ -58,7 +58,6 @@ jobs:
           pnpm --dir candidate install --frozen-lockfile
           pnpm --dir baseline build
           pnpm --dir candidate build
-          pnpm --dir candidate/bench/compare install --frozen-lockfile
 
       - name: Измерить потребительские сборки
         shell: bash
@@ -74,14 +73,11 @@ jobs:
       - name: Сравнить численное ядро easing
         run: node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"
 
+      - name: Установить зависимости сравнения
+        run: pnpm --dir candidate/bench/compare install --frozen-lockfile
+
       - name: Установить Chromium
         run: pnpm --dir candidate/bench/compare exec playwright install --with-deps chromium
-
-      - name: Сравнить полную стоимость в одном браузере
-        shell: bash
-        run: |
-          set -euo pipefail
-          xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline
 
       - name: Сравнить spring и JS-исполнение с baseline
         shell: bash
@@ -89,6 +85,12 @@ jobs:
           set -euo pipefail
           xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/spring" spring-pair baseline
           xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline
+
+      - name: Сравнить полную стоимость в одном браузере
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline
 
       - name: Проверить сравнительные утверждения
         working-directory: candidate/bench/compare

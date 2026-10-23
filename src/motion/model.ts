@@ -46,7 +46,7 @@ export interface Timing {
   readonly spring: SpringParams | undefined;
   readonly duration: number | undefined;
   readonly ease: (progress: number) => number;
-  readonly cssEase: string | undefined;
+  readonly _cssEase: string | undefined;
   readonly delay: number;
   readonly stagger: number;
   readonly times: readonly number[] | undefined;
@@ -87,10 +87,10 @@ export function timing(input: MotionOptions | undefined, authored = false): Timi
   if (reducedMotion !== undefined && reducedMotion !== 'user' && reducedMotion !== 'always')
     throw new MotionError('reducedMotion: user|always');
   let easeFunction: (p: number) => number = authored ? linear : standard;
-  let cssEase: string | undefined = authored ? 'linear' : standardCss;
+  let _cssEase: string | undefined = authored ? 'linear' : standardCss;
   if (ease !== undefined) {
-    if (typeof ease === 'function') { easeFunction = ease as (p: number) => number; cssEase = undefined; }
-    else if (ease === 'linear') { easeFunction = linear; cssEase = 'linear'; }
+    if (typeof ease === 'function') { easeFunction = ease as (p: number) => number; _cssEase = undefined; }
+    else if (ease === 'linear') { easeFunction = linear; _cssEase = 'linear'; }
     else {
       const points = typeof ease === 'string' && Object.hasOwn(EASES, ease) ? EASES[ease] : ease;
       const values = snapshot(points as readonly number[], 'ease', 4);
@@ -99,7 +99,7 @@ export function timing(input: MotionOptions | undefined, authored = false): Timi
       if (values[0]! < 0 || values[0]! > 1 || values[2]! < 0 || values[2]! > 1)
         throw new MotionError('ease: X вне [0,1]');
       easeFunction = cubicBezierUnchecked(values[0]!, values[1]!, values[2]!, values[3]!);
-      cssEase = `cubic-bezier(${values.join(',')})`;
+      _cssEase = `cubic-bezier(${values.join(',')})`;
     }
   }
   const stops = times === undefined ? undefined : snapshot(times as readonly number[], 'times', 2);
@@ -113,7 +113,7 @@ export function timing(input: MotionOptions | undefined, authored = false): Timi
     _defaultEase: ease === undefined,
     spring: duration !== undefined || ease !== undefined || authored && spring === undefined ? undefined : physics(spring as MotionSpring | undefined),
     duration: duration === undefined ? authored || ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
-    ease: easeFunction, cssEase, delay: number(delay ?? 0, 'delay', 0), stagger: number(stagger ?? 0, 'stagger', 0),
+    ease: easeFunction, _cssEase, delay: number(delay ?? 0, 'delay', 0), stagger: number(stagger ?? 0, 'stagger', 0),
     times: stops, reduced: reducedMotion === 'always',
   };
 }
@@ -124,7 +124,7 @@ export function authoredTiming(clock: Timing): Timing {
     spring: clock._defaultMotion ? undefined : clock.spring,
     duration: clock._defaultMotion ? DEFAULT_DURATION_MS : clock.duration,
     ease: clock._defaultEase ? linear : clock.ease,
-    cssEase: clock._defaultEase ? 'linear' : clock.cssEase,
+    _cssEase: clock._defaultEase ? 'linear' : clock._cssEase,
   };
 }
 

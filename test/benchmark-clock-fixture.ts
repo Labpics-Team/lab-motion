@@ -20,3 +20,22 @@ export const startClock = () => ({
   pageApiNowMs: 10.02,
   cdpRuntimeTimestampMs: TIMER_ORIGIN_MS + 10.01,
 });
+
+/** Независимый завершённый lifecycle для синтетических trajectory fixtures. */
+export function completionEvidence(
+  config: { durationMs: number; staggerGapMs: number; targetsPerCall: number; completionTimeoutMs: number },
+  calls: number,
+  waitStartedMs: number,
+) {
+  const settledAtMs = config.durationMs + config.staggerGapMs * (config.targetsPerCall - 1);
+  const observedAtMs = Math.max(waitStartedMs, settledAtMs);
+  return {
+    timeoutMs: config.completionTimeoutMs,
+    calls: Array.from({ length: calls }, () => ({ state: 'fulfilled', observedAtMs: settledAtMs })),
+    waitStartedMs,
+    observedAtMs,
+    terminalFrameTimestampMs: observedAtMs + 16,
+    terminalReadStartedMs: observedAtMs + 16,
+    terminalReadEndedMs: observedAtMs + 16.1,
+  };
+}

@@ -52,11 +52,11 @@ class LayoutRun implements Playback {
   readonly finished: Promise<MotionResult>;
   constructor(root: Element, mutate: () => void | Promise<void>, options?: LayoutOptions) {
     const config = timing(options as MotionOptions | undefined);
-    if (typeof config.ease === 'function' && !config.cssEase) throw new MotionError('layout использует CSS easing');
-    const path = program('--lab-motion-progress', { _coordinates: [0], unit: '' }, [1], false, config, [0]);
+    if (typeof config.ease === 'function' && !config._cssEase) throw new MotionError('layout использует CSS easing');
+    const path = program('--lab-motion-progress', { _coordinates: [0], _unit: '' }, [1], false, config, [0]);
     const win = root.ownerDocument.defaultView;
     const reduced = config.reduced || win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-    this.duration = reduced ? 0 : path.duration;
+    this.duration = reduced ? 0 : path._duration;
     this.finished = new Promise((yes, no) => { this._resolve = yes; this._reject = no; });
     void this.finished.catch(() => {});
     this._mutate = mutate;

@@ -16,7 +16,7 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     const input = properties(props), clock = timing(rest);
     const drafts = engine._draft(target, input, clock, offset + sequenceClock.delay, (element, key) => {
       const prior = merged.get(element)?.get(key)?._program;
-      return prior && { _coordinates: prior.final, unit: prior.unit };
+      return prior && { _coordinates: prior._final, _unit: prior._unit };
     });
     for (const draft of drafts) {
       count += draft._program._segments.length;
@@ -26,16 +26,16 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
       const before = channels.get(draft.key);
       let next = draft;
       if (before) {
-        const at = draft._program._segments[0]!.at;
-        if (at < before._program.duration) throw new MotionError('Пересечение шагов');
+        const at = draft._program._segments[0]!._at;
+        if (at < before._program._duration) throw new MotionError('Пересечение шагов');
         next = { ...draft, _program: { ...draft._program, _segments: [...before._program._segments, ...draft._program._segments], _nativeEase: undefined, _identity: undefined } };
       }
       channels.set(draft.key, next);
-      end = Math.max(end, next._program.duration);
+      end = Math.max(end, next._program._duration);
     }
     previousStart = offset; cursor = Math.max(0, end - sequenceClock.delay);
   }
-  const drafts = [...merged.values()].flatMap(map => [...map.values()]).map(d => ({ ...d, reduced: d.reduced || sequenceClock.reduced, _program: { ...d._program, duration: end, _nativeEase: undefined, _identity: undefined } }));
+  const drafts = [...merged.values()].flatMap(map => [...map.values()]).map(d => ({ ...d, reduced: d.reduced || sequenceClock.reduced, _program: { ...d._program, _duration: end, _nativeEase: undefined, _identity: undefined } }));
   return engine._execute(drafts, drafts.every(draft => draft.reduced) ? 0 : end);
 }
 

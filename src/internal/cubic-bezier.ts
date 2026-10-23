@@ -53,14 +53,15 @@ export function cubicBezierUnchecked(
     sample--;
     const distance = (input - table[sample]!) / (table[sample + 1]! - table[sample]!);
     let guess = intervalStart + distance / last;
-    if (dxAt(guess, x1, x2) >= DERIV_THRESHOLD) {
+    let slope = dxAt(guess, x1, x2);
+    if (slope >= DERIV_THRESHOLD) {
       for (let i = 0; i < NEWTON_ITERS; i++) {
-        const slope = dxAt(guess, x1, x2);
         if (slope === 0) break;
         const next = guess - (xAt(guess, x1, x2) - input) / slope;
         // В неподвижной точке оставшиеся шаги дают те же binary64-биты.
         if (next === guess) break;
         guess = next;
+        slope = dxAt(guess, x1, x2);
       }
     } else {
       let lo = intervalStart;

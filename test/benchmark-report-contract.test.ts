@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+  completionEvidence,
   startClock,
   TIMER_ORIGIN_MS,
   timerEvidence,
@@ -36,6 +37,7 @@ import {
   validateBenchmarkReportForPublication,
 } from '../bench/compare/report-contract.mjs';
 import { S5_MOTION_CONTRACT } from '../bench/compare/motion-conformance.mjs';
+import { assertStartSemanticEvidenceWithDiagnostic } from '../bench/compare/bench.mjs';
 
 const START = ['lab', 'motion', 'gsap', 'anime'];
 const FREEZE = [
@@ -88,6 +90,7 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
       groups: Array.from({ length: calls }, () => ({
         readStartedMs: elapsedMs,
         readEndedMs: elapsedMs,
+        documentFrame: { beforeMs: elapsedMs, afterMs: elapsedMs },
         positions: Array.from({ length: config.targetsPerCall }, (_, target) => {
           const progress = config.staggerGapMs === 0
             ? elapsedMs / config.durationMs
@@ -99,6 +102,7 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
     terminal: Array.from({ length: calls }, () => (
       Array.from({ length: config.targetsPerCall }, () => config.toPx)
     )),
+    completion: completionEvidence(config, calls, checkpointTimes.at(-1)!),
   };
   evidence.valid = evaluateStartSemanticEvidence(evidence, config, calls);
   return evidence;
@@ -484,6 +488,76 @@ function freeze25To65(): MotionPoint[] {
   return linearMotionPoints().map((point) => point.t >= 0.6 && point.t <= 1.54
     ? { ...point, x: 150 } : point);
 }
+
+describe('failed start semantic diagnostics', () => {
+  it('retains rejected raw observations and run identity while the semantic gate still throws', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'lab-motion-semantic-diagnostic-'));
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const evidence = semanticEvidence('s1', 1);
+      expect(evidence.valid).toBe(true);
+      [NaN, Infinity, -Infinity].forEach((value, index) => {
+        evidence.checkpoints[index].groups[0].positions[0] = value;
+      });
+      evidence.valid = evaluateStartSemanticEvidence(evidence, START_SCENARIO_MANIFEST.s1, 1);
+      expect(evidence.valid).toBe(false);
+      const metadata = {
+        generatedAt: '2026-10-23T06:00:00.000Z',
+        participant: { id: 'motion', version: 'motion@14.5.0', adapterSha256: SHA('a') },
+        run: 1,
+        metric: 'warm.s1',
+        scenario: 's1',
+        scenarioConfig: START_SCENARIO_MANIFEST.s1,
+        startOrder: START,
+        provenance: { revision: 'b'.repeat(40) },
+        browser: { name: 'chromium', version: 'fixture' },
+      };
+      expect(() => assertStartSemanticEvidenceWithDiagnostic(
+        'motion.s1 run 1', evidence, metadata, directory,
+      )).toThrow(/motion\.s1 run 1.*semantic/);
+      const attempts = readdirSync(directory);
+      expect(attempts).toHaveLength(1);
+      const diagnostic = JSON.parse(readFileSync(join(directory, attempts[0], 'evidence.json'), 'utf8'));
+      expect(diagnostic).toMatchObject({
+        ...metadata,
+        diagnostic: 'start-semantic-failure',
+        label: 'motion.s1 run 1',
+        semanticEvidence: { valid: false, terminal: evidence.terminal, completion: evidence.completion },
+      });
+      expect(diagnostic.semanticEvidence.checkpoints.map((point: any) => point.groups[0].positions[0]))
+        .toEqual([{ $number: 'NaN' }, { $number: 'Infinity' }, { $number: '-Infinity' }]);
+      expect(evidence.checkpoints.map((point: any) => point.groups[0].positions[0]))
+        .toEqual([NaN, Infinity, -Infinity]);
+    } finally {
+      stderr.mockRestore();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('never converts a failed diagnostic write into a pass, and writes nothing for accepted evidence', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'lab-motion-semantic-diagnostic-'));
+    const absent = join(directory, 'absent');
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const evidence = semanticEvidence('s1', 1);
+      expect(() => assertStartSemanticEvidenceWithDiagnostic(
+        'motion.s1 run 1', evidence, {}, absent,
+      )).not.toThrow();
+      expect(existsSync(absent)).toBe(false);
+      evidence.checkpoints[1].groups[0].positions[0] = 10;
+      evidence.valid = evaluateStartSemanticEvidence(evidence, START_SCENARIO_MANIFEST.s1, 1);
+      expect(evidence.valid).toBe(false);
+      expect(() => assertStartSemanticEvidenceWithDiagnostic(
+        'motion.s1 run 1', evidence, {}, absent,
+      )).toThrow(/motion\.s1 run 1.*semantic/);
+      expect(stderr).toHaveBeenCalledWith(expect.stringContaining('diagnostic could not be saved'));
+      expect(readdirSync(directory)).toEqual([]);
+    } finally {
+      stderr.mockRestore();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
 
 describe('schema 10 motion conformance admission', () => {
   it('публикация принимает отчёт с обязательным качеством движения', () => {
