@@ -76,7 +76,7 @@ class LayoutRun implements Playback {
   private _complete(failure?: { _error: unknown }): void {
     if (this._settled) return;
     this._settled = true; this._mutate = undefined;
-    try { this._release(Boolean(failure)); } catch (error) { failure ??= { _error: error }; }
+    try { this._release(!!failure); } catch (error) { failure ??= { _error: error }; }
     if (failure) { this._status = 'failed'; this._reject(failure._error); }
     else { const result = this._terminal ?? FINISHED; this._status = result.status; this._resolve(result); }
   }

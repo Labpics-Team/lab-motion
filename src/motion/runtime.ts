@@ -151,7 +151,7 @@ export class Run implements Playback {
       }
     } finally { this._cleaning = false; this._complete(); }
   }
-  private _complete(): void {
+  _complete(): void {
     if (this._tracks.size || this._notifications) return;
     if (this._failure) this._reject(this._failure._error);
     else {
@@ -173,7 +173,6 @@ export class Run implements Playback {
     if (failure) this._error(failure._error);
     this._complete();
   }
-  _empty(): void { this._complete(); }
   _apply(action: ControlAction, time = 0): void {
     if (this._status !== 'running') return;
     const engine = this._tracks.values().next().value?._group._engine;
@@ -579,7 +578,7 @@ export class Runtime {
         for (const track of [...group._tracks.values()]) if (track._elapsed >= track._program._duration) group._end(track, true);
         group._reconcile();
       }
-      run._empty();
+      run._complete();
     } catch (error) { run._error(error); throw error; }
     this._flush(); return run;
   }

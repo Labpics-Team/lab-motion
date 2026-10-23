@@ -105,10 +105,10 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   }
   const last = _segments.at(-1)!;
   const first = _segments[0]!;
-  const _identity = authored ? undefined : [resolved[0]!._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
+  const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
-  return { _key: key, _unit: resolved[0]!._unit, _segments, _duration: last._end, _final: last._to,
-    _nativeEase: resolved[0]!._unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : _segments.length === 1 ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
+  return { _key: key, _unit: from._unit, _segments, _duration: last._end, _final: last._to,
+    _nativeEase: from._unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : _segments.length === 1 ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
     _identity };
 }
 
