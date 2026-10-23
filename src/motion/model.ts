@@ -76,7 +76,7 @@ export function physics(input: MotionSpring | undefined): SpringParams {
   return result;
 }
 
-export function timing(input: MotionOptions | undefined, authored = false): Timing {
+export function timing(input: MotionOptions | undefined): Timing {
   const source = input === undefined ? {} : record(input, 'options');
   for (const key of Object.keys(source)) {
     if (!['spring', 'duration', 'ease', 'delay', 'stagger', 'times', 'reducedMotion'].includes(key))
@@ -87,8 +87,8 @@ export function timing(input: MotionOptions | undefined, authored = false): Timi
     failMotion('Задайте spring или duration/ease');
   if (reducedMotion !== undefined && reducedMotion !== 'user' && reducedMotion !== 'always')
     failMotion('reducedMotion: user|always');
-  let easeFunction: (p: number) => number = authored ? linear : standard;
-  let _cssEase: string | undefined = authored ? 'linear' : standardCss;
+  let easeFunction: (p: number) => number = standard;
+  let _cssEase: string | undefined = standardCss;
   if (ease !== undefined) {
     if (typeof ease === 'function') { easeFunction = ease as (p: number) => number; _cssEase = undefined; }
     else if (ease === 'linear') { easeFunction = linear; _cssEase = 'linear'; }
@@ -112,8 +112,8 @@ export function timing(input: MotionOptions | undefined, authored = false): Timi
   return {
     _defaultMotion: spring === undefined && duration === undefined && ease === undefined,
     _defaultEase: ease === undefined,
-    _spring: duration !== undefined || ease !== undefined || authored && spring === undefined ? undefined : physics(spring as MotionSpring | undefined),
-    _duration: duration === undefined ? authored || ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
+    _spring: duration !== undefined || ease !== undefined ? undefined : physics(spring as MotionSpring | undefined),
+    _duration: duration === undefined ? ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
     _ease: easeFunction, _cssEase, _delay: number(delay ?? 0, 'delay', 0), _stagger: number(stagger ?? 0, 'stagger', 0),
     _times: stops, _reduced: reducedMotion === 'always',
   };

@@ -60,6 +60,18 @@ jobs:
           pnpm --dir baseline build
           pnpm --dir candidate build
 
+      - name: Сохранить собранные версии для разбора размера
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: motion-builds-${{ github.sha }}
+          path: |
+            baseline/dist/
+            baseline/package.json
+            candidate/dist/
+            candidate/package.json
+          if-no-files-found: error
+          retention-days: 5
+
       - name: Измерить каждый публичный root-импорт
         run: |
           mkdir -p "$RUNNER_TEMP/motion-performance"
