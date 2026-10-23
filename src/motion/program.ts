@@ -73,11 +73,11 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     else if (normalized !== v / distance) aligned = false;
   }
   let artifact: SpringExecutionArtifactTuple | undefined;
-  let length = duration ?? timing.duration ?? 0;
-  if (timing.spring) {
-    if (aligned && Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing.spring, normalized ?? 0, Math.min(0.001, 0.05 / extent));
+  let length = duration ?? timing._duration ?? 0;
+  if (timing._spring) {
+    if (aligned && Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, 0.05 / extent));
     const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
-    length = artifact?.[2] ?? settleTimeUpperBound(timing.spring, energy) * 1000;
+    length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, energy) * 1000;
   }
   if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) throw new MotionError('Непредставимая длительность');
   return { _at: at, _end: at + length, from: from._coordinates, to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
@@ -88,24 +88,24 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   let current = from;
   for (const input of values) { current = point(key, input, current); resolved.push(current); }
   if (!authored) resolved.unshift(from);
-  const times = authored ? timing.times : undefined;
+  const times = authored ? timing._times : undefined;
   if (times && times.length !== resolved.length) throw new MotionError('times: другая длина');
-  if (timing.spring && resolved.length > 2) throw new MotionError('keyframes: задайте duration/ease');
+  if (timing._spring && resolved.length > 2) throw new MotionError('keyframes: задайте duration/ease');
   const velocity = authored ? resolved[0]!._coordinates.map(() => 0) : [...initialVelocity];
   const _segments: Segment[] = [];
-  const duration = timing.duration ?? 0;
+  const duration = timing._duration ?? 0;
   for (let i = 0; i < resolved.length - 1; i++) {
     const a = times?.[i] ?? i / (resolved.length - 1);
     const b = times?.[i + 1] ?? (i + 1) / (resolved.length - 1);
     _segments.push(segment(resolved[i]!, resolved[i + 1]!, i === 0 ? velocity : resolved[i]!._coordinates.map(() => 0), timing,
-      offset + timing.delay + a * duration, (b - a) * duration));
+      offset + timing._delay + a * duration, (b - a) * duration));
   }
   const last = _segments.at(-1)!;
   const first = _segments[0]!;
-  const _identity = authored ? undefined : [resolved[0]!._unit, ...last.to, timing.spring?.mass, timing.spring?.stiffness, timing.spring?.damping,
-    timing.duration, timing._cssEase ?? timing.ease, timing.delay + offset];
+  const _identity = authored ? undefined : [resolved[0]!._unit, ...last.to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
+    timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
   return { _key: key, _unit: resolved[0]!._unit, _segments, _duration: last._end, _final: last.to,
-    _nativeEase: resolved[0]!._unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : _segments.length === 1 ? first._artifact?.[0] ?? (timing.spring ? undefined : timing._cssEase) : undefined,
+    _nativeEase: resolved[0]!._unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : _segments.length === 1 ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
     _identity };
 }
 
@@ -129,11 +129,11 @@ export function sample(program: Program, time: number, value: number[], velocity
   if (segment._artifact) {
     sampleSerializedSpringIntoUnchecked(segment._artifact[1], duration, _elapsed, 0, springSample);
     p = springSample.value; dp = springSample.velocity;
-  } else if (segment._timing.spring) {
-    sampleSpringBasisUnchecked(segment._timing.spring, _elapsed / 1000, basis);
+  } else if (segment._timing._spring) {
+    sampleSpringBasisUnchecked(segment._timing._spring, _elapsed / 1000, basis);
   } else if (_elapsed > 0 && p < 1) {
     const low = Math.max(0, p - 0.001), high = Math.min(1, p + 0.001);
-    const ease = segment._timing.ease;
+    const ease = segment._timing._ease;
     dp = (ease(high) - ease(low)) * 1000 / ((high - low) * duration);
     p = ease(p);
   }
@@ -141,7 +141,7 @@ export function sample(program: Program, time: number, value: number[], velocity
   for (let i = 0; i < segment.from.length; i++) {
     const a = segment.from[i]!, distance = segment.to[i]! - a;
     if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
-    else if (segment._timing.spring && !segment._artifact) {
+    else if (segment._timing._spring && !segment._artifact) {
       value[i] = a + distance * basis._value + (segment._velocity[i] ?? 0) * basis._valueV0;
       velocity[i] = distance * basis._velocity + (segment._velocity[i] ?? 0) * basis._velocityV0;
     } else { value[i] = a + distance * p; velocity[i] = distance * dp; }

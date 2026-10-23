@@ -43,14 +43,14 @@ export function snapshot<T>(input: readonly T[], name: string, minimum = 0): T[]
 export interface Timing {
   readonly _defaultMotion: boolean;
   readonly _defaultEase: boolean;
-  readonly spring: SpringParams | undefined;
-  readonly duration: number | undefined;
-  readonly ease: (progress: number) => number;
+  readonly _spring: SpringParams | undefined;
+  readonly _duration: number | undefined;
+  readonly _ease: (progress: number) => number;
   readonly _cssEase: string | undefined;
-  readonly delay: number;
-  readonly stagger: number;
-  readonly times: readonly number[] | undefined;
-  readonly reduced: boolean;
+  readonly _delay: number;
+  readonly _stagger: number;
+  readonly _times: readonly number[] | undefined;
+  readonly _reduced: boolean;
 }
 
 export function physics(input: MotionSpring | undefined): SpringParams {
@@ -111,19 +111,19 @@ export function timing(input: MotionOptions | undefined, authored = false): Timi
   return {
     _defaultMotion: spring === undefined && duration === undefined && ease === undefined,
     _defaultEase: ease === undefined,
-    spring: duration !== undefined || ease !== undefined || authored && spring === undefined ? undefined : physics(spring as MotionSpring | undefined),
-    duration: duration === undefined ? authored || ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
-    ease: easeFunction, _cssEase, delay: number(delay ?? 0, 'delay', 0), stagger: number(stagger ?? 0, 'stagger', 0),
-    times: stops, reduced: reducedMotion === 'always',
+    _spring: duration !== undefined || ease !== undefined || authored && spring === undefined ? undefined : physics(spring as MotionSpring | undefined),
+    _duration: duration === undefined ? authored || ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
+    _ease: easeFunction, _cssEase, _delay: number(delay ?? 0, 'delay', 0), _stagger: number(stagger ?? 0, 'stagger', 0),
+    _times: stops, _reduced: reducedMotion === 'always',
   };
 }
 
 /** Авторская траектория выбирает собственные defaults без повторного чтения опций. */
 export function authoredTiming(clock: Timing): Timing {
   return { ...clock,
-    spring: clock._defaultMotion ? undefined : clock.spring,
-    duration: clock._defaultMotion ? DEFAULT_DURATION_MS : clock.duration,
-    ease: clock._defaultEase ? linear : clock.ease,
+    _spring: clock._defaultMotion ? undefined : clock._spring,
+    _duration: clock._defaultMotion ? DEFAULT_DURATION_MS : clock._duration,
+    _ease: clock._defaultEase ? linear : clock._ease,
     _cssEase: clock._defaultEase ? 'linear' : clock._cssEase,
   };
 }

@@ -93,7 +93,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
 export type ControlOperation = (surface: Surface, selected: readonly Track[]) => void;
 type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | ControlOperation;
 
-export interface Draft { readonly element: Element; readonly key: string; readonly _program: Program; readonly reduced: boolean }
+export interface Draft { readonly _element: Element; readonly _key: string; readonly _program: Program; readonly _reduced: boolean }
 interface Track {
   readonly _program: Program;
   readonly _group: Surface;
@@ -266,9 +266,9 @@ class Surface {
   private _text(at?: 'from' | 'to'): string {
     if (this._key === 'transform') {
       const state = this._transforms;
-      for (const [key, track] of this._tracks) {
+      for (const track of this._tracks.values()) {
         const value = at ? track._program._segments[0]![at][0]! : track._value[0]!;
-        state[key] = value;
+        state[track._program._key] = value;
       }
       let identity = !at;
       for (const key in TRANSFORMS) identity &&= state[key] === TRANSFORMS[key];
@@ -533,9 +533,9 @@ export class Runtime {
     origin?: (element: Element, key: string) => Point | undefined): Draft[] {
     const elements = targets(input);
     if (elements.length * props.reduce((sum, p) => sum + p.values.length, 0) > MAX_CHANNELS) throw new MotionError('Слишком много каналов');
-    const reduced = clock.reduced || this._host.reduced();
+    const reduced = clock._reduced || this._host.reduced();
     const author = authoredTiming(clock);
-    const reusable = elements.length > 1 && clock.stagger === 0
+    const reusable = elements.length > 1 && clock._stagger === 0
       ? props.map(property => !property.values.some(value => typeof value === 'string' && /^var\(/i.test(value.trim())))
       : undefined;
     const result: Draft[] = [], synced = new Set<Surface>();
@@ -552,8 +552,8 @@ export class Runtime {
           // Предыдущая цель той же property уже хранит неизменяемую программу.
           const previous = i > 0 && reusable?.[j] ? result[result.length - props.length]!._program : undefined;
           const spec = previous && sameStart(previous, current.point, current._velocity) ? previous
-            : program(property.key, current.point, values, property.authored, property.authored ? author : clock, current._velocity, offset + i * clock.stagger);
-          result.push({ element, key: property.key, _program: spec, reduced });
+            : program(property.key, current.point, values, property.authored, property.authored ? author : clock, current._velocity, offset + i * clock._stagger);
+          result.push({ _element: element, _key: property.key, _program: spec, _reduced: reduced });
         }
       }
     } finally {
@@ -567,17 +567,17 @@ export class Runtime {
     const touched = new Set<Surface>();
     try {
       for (const draft of drafts) {
-        const group = this._surface(draft.element, draft.key);
-        const existing = group._tracks.get(draft.key);
-        const equal = !draft.reduced && draft._program._identity && existing?._program._identity &&
+        const group = this._surface(draft._element, draft._key);
+        const existing = group._tracks.get(draft._key);
+        const equal = !draft._reduced && draft._program._identity && existing?._program._identity &&
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
         if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!.from;
         const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: first.map(() => 0),
-          _owner: undefined, _elapsed: draft.reduced ? draft._program._duration : 0, _rate: 1, _paused: false };
+          _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _rate: 1, _paused: false };
         group._sample(track);
-        run._own(track, draft.reduced); group._attach(track);
+        run._own(track, draft._reduced); group._attach(track);
       }
       for (const group of touched) {
         group._render();

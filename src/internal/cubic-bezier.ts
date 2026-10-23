@@ -1,5 +1,7 @@
 /** Невалидирующее ядро CSS cubic-bezier для публичного easing и defaults. */
 
+import { clampFinite as finite } from './finite.js';
+
 const NEWTON_ITERS = 8;
 const EPSILON = 1e-7;
 const DERIV_THRESHOLD = 1e-6;
@@ -10,12 +12,6 @@ function endpoint(t: number): number | undefined {
   if (t <= 0) return 0;
   if (t >= 1) return 1;
   return undefined;
-}
-
-function finite(value: number): number {
-  if (Number.isFinite(value)) return value;
-  if (Number.isNaN(value)) return 0;
-  return value > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
 }
 
 function xAt(t: number, x1: number, x2: number): number {
