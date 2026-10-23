@@ -110,14 +110,6 @@ function isVariable(value: MotionScalar): value is string {
   return typeof value === 'string' && /^var\(/i.test(value.trim());
 }
 
-function sameStart(program: Program, point: Point, velocity: readonly number[]): boolean {
-  const first = program._segments[0]!;
-  if (program._unit !== point._unit || first._from.length !== point._coordinates.length || first._velocity.length !== velocity.length) return false;
-  for (let i = 0; i < first._from.length; i++)
-    if (!Object.is(first._from[i], point._coordinates[i]) || !Object.is(first._velocity[i], velocity[i])) return false;
-  return true;
-}
-
 export class Run implements Playback {
   readonly _tracks: Set<Track> = new Set();
   private _status: PlaybackState = 'running';
@@ -556,10 +548,7 @@ export class Runtime {
           const values = reusable?.[j] ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { point: explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
-          // Предыдущая цель той же property уже хранит неизменяемую программу.
-          const previous = i > 0 && reusable?.[j] ? result[result.length - props.length]!._program : undefined;
-          const spec = previous && sameStart(previous, current.point, current._velocity) ? previous
-            : program(property._key, current.point, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+          const spec = program(property._key, current.point, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
           result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });
         }
       }
