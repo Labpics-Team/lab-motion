@@ -35,6 +35,7 @@ export function completionEvidence(
     waitStartedMs,
     observedAtMs,
     terminalFrameTimestampMs: observedAtMs + 16,
+    terminalFrameObservedAtMs: observedAtMs + 16,
     terminalReadStartedMs: observedAtMs + 16,
     terminalReadEndedMs: observedAtMs + 16.1,
   };

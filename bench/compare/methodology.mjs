@@ -707,21 +707,24 @@ export function evaluateStartSemanticEvidence(evidence, expected, calls) {
   if (expected.completionTimeoutMs !== undefined) {
     const completion = evidence.completion;
     const times = [completion?.waitStartedMs, completion?.observedAtMs,
-      completion?.terminalFrameTimestampMs, completion?.terminalReadStartedMs, completion?.terminalReadEndedMs];
+      completion?.terminalFrameObservedAtMs, completion?.terminalReadStartedMs, completion?.terminalReadEndedMs];
     if (!Number.isFinite(expected.completionTimeoutMs) || expected.completionTimeoutMs <= 0 ||
         completion?.timeoutMs !== expected.completionTimeoutMs ||
         times.some((value) => !Number.isFinite(value) || value < 0) ||
-        // Только переходы perf↔rAF используют уже зарегистрированную clock uncertainty.
-        times.some((value, index) => index > 0 && value < (index === 2 || index === 3
-          ? nextDown(times[index - 1] - clockErrorMs) : times[index - 1])) ||
+        // Порядок finished → callback → чтение доказан одним perf clock.
+        times.some((value, index) => index > 0 && value < times[index - 1]) ||
         completion.observedAtMs > completion.timeoutMs ||
-        completion.terminalReadStartedMs < completion.observedAtMs ||
+        !Number.isFinite(completion.terminalFrameTimestampMs) || completion.terminalFrameTimestampMs < 0 ||
+        // Document timestamp не обязан быть новее finished wall time,
+        // но не может находиться в будущем своего acquired callback.
+        completion.terminalFrameTimestampMs > nextUp(completion.terminalFrameObservedAtMs + clockErrorMs) ||
         !Array.isArray(completion.calls) || completion.calls.length !== calls ||
         completion.calls.some((call, index) => call?.state !== 'fulfilled' ||
           !Number.isFinite(call.observedAtMs) || call.observedAtMs < evidence.callStartedAtMs[index] ||
           call.observedAtMs > completion.observedAtMs) ||
-        evidence.checkpoints.some((checkpoint) => checkpoint.groups?.some((group) =>
-          group.readEndedMs > completion.waitStartedMs))) return false;
+        evidence.checkpoints.some((checkpoint) => !Number.isFinite(checkpoint?.frameTimestampMs) ||
+          completion.terminalFrameTimestampMs < checkpoint.frameTimestampMs ||
+          checkpoint.groups?.some((group) => group.readEndedMs > completion.waitStartedMs))) return false;
   }
 
   let provedPartialStagger = expected.staggerGapMs === 0;

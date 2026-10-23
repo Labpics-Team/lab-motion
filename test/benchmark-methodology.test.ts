@@ -555,7 +555,59 @@ describe('benchmark methodology fail-closed contracts', () => {
     }
   });
 
-  it('completion различает clock uncertainty и обратный ход одного perf clock', () => {
+  it('completion принимает поздний rAF callback при документированном timestamp на 3.63 мс раньше finished', () => {
+    const config = START_SCENARIO_MANIFEST.s4;
+    const count = config.targetsPerCall;
+    const checkpoints = [
+      { frame: 315.56, started: 316.72, ended: 322.865, x: 78.8487 },
+      { frame: 598.88, started: 601.605, ended: 608.685, x: 149.679 },
+      { frame: 748.875, started: 752.33, ended: 759.57, x: 187.178 },
+    ];
+    const evidence: any = {
+      topology: { calls: 1, targetsPerCall: count, staggerGapMs: 0, durationMs: 1200, toPx: 300 },
+      callStartedAtMs: [0.005],
+      checkpoints: checkpoints.map(({ frame, started, ended, x }) => ({
+        frameTimestampMs: frame,
+        groups: [{ readStartedMs: started, readEndedMs: ended,
+          documentFrame: { beforeMs: frame, afterMs: frame }, positions: Array(count).fill(x) }],
+      })),
+      terminal: [Array(count).fill(300)],
+      completion: {
+        timeoutMs: config.completionTimeoutMs,
+        calls: [{ state: 'fulfilled', observedAtMs: 1235.795 }],
+        waitStartedMs: 759.575,
+        observedAtMs: 1235.815,
+        terminalFrameTimestampMs: 1232.185,
+        // Синтетическое положительное свидетельство callback; старый raw
+        // без этого поля остаётся failed evidence и не достраивается.
+        terminalFrameObservedAtMs: 1254.36,
+        terminalReadStartedMs: 1254.365,
+        terminalReadEndedMs: 1257.83,
+      },
+    };
+    expect(evidence.completion.terminalFrameTimestampMs).toBeLessThan(evidence.completion.observedAtMs - 3.6);
+    expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(true);
+    for (const mutate of [
+      (raw: any) => { delete raw.completion.terminalFrameObservedAtMs; },
+      (raw: any) => { raw.completion.terminalFrameObservedAtMs = Number.NaN; },
+      (raw: any) => { raw.completion.terminalFrameTimestampMs = Number.NaN; },
+      (raw: any) => { raw.completion.terminalFrameObservedAtMs = raw.completion.observedAtMs - 0.001; },
+      (raw: any) => { raw.completion.terminalReadStartedMs = raw.completion.terminalFrameObservedAtMs - 0.001; },
+      (raw: any) => { raw.completion.terminalReadEndedMs = raw.completion.terminalReadStartedMs - 0.001; },
+      (raw: any) => { raw.completion.terminalFrameTimestampMs = 748.874; },
+      (raw: any) => { raw.completion.terminalFrameTimestampMs = raw.completion.terminalFrameObservedAtMs + 0.001; },
+      (raw: any) => { raw.completion.calls[0].state = 'rejected'; },
+      (raw: any) => { raw.completion.calls[0].observedAtMs = 1198; },
+      (raw: any) => { raw.completion.calls[0].observedAtMs = 1; },
+      (raw: any) => { raw.checkpoints[1].groups[0].positions[0] = 140; },
+    ]) {
+      const wrong = structuredClone(evidence);
+      mutate(wrong);
+      expect(evaluateStartSemanticEvidence(wrong, config, 1)).toBe(false);
+    }
+  });
+
+  it('completion сохраняет clock uncertainty только на связи document timestamp с wall clock callback', () => {
     const config = { ...START_SCENARIO_MANIFEST.s2, targetsPerCall: 3, durationMs: 128, semanticClockErrorMs: 0.018 };
     const evidence: any = {
       topology: { calls: 1, targetsPerCall: 3, staggerGapMs: 0, durationMs: 128, toPx: 300 },
@@ -568,26 +620,24 @@ describe('benchmark methodology fail-closed contracts', () => {
       completion: completionEvidence(config, 1, 80),
     };
     expect(evaluateStartSemanticEvidence(evidence, config, 1)).toBe(true);
-    for (const [before, after] of [['observedAtMs', 'terminalFrameTimestampMs'],
-      ['terminalFrameTimestampMs', 'terminalReadStartedMs']]) {
-      const within = structuredClone(evidence);
-      within.completion[after!] = within.completion[before!] - 0.001;
-      expect(evaluateStartSemanticEvidence(within, config, 1)).toBe(true);
-      expect(evaluateStartSemanticEvidence(within, { ...config, semanticClockErrorMs: 0 }, 1)).toBe(false);
-      const outside = structuredClone(evidence);
-      outside.completion[after!] = outside.completion[before!] - 0.02;
-      expect(evaluateStartSemanticEvidence(outside, config, 1)).toBe(false);
-    }
+    const within = structuredClone(evidence);
+    within.completion.terminalFrameTimestampMs = within.completion.terminalFrameObservedAtMs + 0.001;
+    expect(evaluateStartSemanticEvidence(within, config, 1)).toBe(true);
+    expect(evaluateStartSemanticEvidence(within, { ...config, semanticClockErrorMs: 0 }, 1)).toBe(false);
+    const outside = structuredClone(evidence);
+    outside.completion.terminalFrameTimestampMs = outside.completion.terminalFrameObservedAtMs + 0.02;
+    expect(evaluateStartSemanticEvidence(outside, config, 1)).toBe(false);
     for (const [before, after] of [['waitStartedMs', 'observedAtMs'],
+      ['observedAtMs', 'terminalFrameObservedAtMs'], ['terminalFrameObservedAtMs', 'terminalReadStartedMs'],
       ['terminalReadStartedMs', 'terminalReadEndedMs']]) {
       const reversed = structuredClone(evidence);
       reversed.completion[before!] = reversed.completion[after!] + 0.001;
       expect(evaluateStartSemanticEvidence(reversed, config, 1)).toBe(false);
     }
-    // Два допустимых перехода perf→rAF→perf не разрешают обратный
-    // порядок самих perf readings по разные стороны frame timestamp.
+    // Позднее исполнение кадра не разрешает обратный порядок perf readings.
     const acrossFrame = structuredClone(evidence);
     acrossFrame.completion.terminalFrameTimestampMs = acrossFrame.completion.observedAtMs - 0.01;
+    acrossFrame.completion.terminalFrameObservedAtMs = acrossFrame.completion.observedAtMs;
     acrossFrame.completion.terminalReadStartedMs = acrossFrame.completion.observedAtMs - 0.02;
     expect(evaluateStartSemanticEvidence(acrossFrame, config, 1)).toBe(false);
   });

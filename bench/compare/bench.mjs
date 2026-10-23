@@ -599,7 +599,12 @@ export async function runSemanticStartCheck(page, scenario, calls) {
         }
         phase = 'terminal';
         await rendered();
-        completion.terminalFrameTimestampMs = await rendered() - epoch;
+        await new Promise((resolve) => requestAnimationFrame((timestamp) => {
+          completion.terminalFrameTimestampMs = timestamp - epoch;
+          // Timestamp кадра может отставать от wall clock его callback.
+          completion.terminalFrameObservedAtMs = performance.now() - epoch;
+          resolve();
+        }));
         completion.terminalReadStartedMs = performance.now() - epoch;
       } else {
         // Locked server profile сохраняет прежний terminal contract;
