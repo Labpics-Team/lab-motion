@@ -275,13 +275,9 @@ class Surface {
         const value = (at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value)[0]!;
         state[track._program._key] = value;
       }
-      let identity = !at, translationOnly = !!at;
-      for (const key in TRANSFORMS) {
-        const neutral = state[key] === TRANSFORMS[key];
-        identity &&= neutral;
-        if (key !== 'x' && key !== 'y') translationOnly &&= neutral && !this._tracks.has(key);
-      }
-      return identity ? 'none' : transform(state, translationOnly);
+      let identity = !at;
+      for (const key in TRANSFORMS) identity &&= state[key] === TRANSFORMS[key];
+      return identity ? 'none' : transform(state);
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {

@@ -33,10 +33,9 @@ export function format(key: string, value: readonly number[], unit: string): str
   const n = key === 'opacity' ? Math.max(0, Math.min(1, value[0]!)) : value[0]!;
   return `${n === 0 ? 0 : n}${unit}`;
 }
-export function transform(values: Readonly<Record<string, number>>, translationOnly = false): string {
-  const translation = `translate(${values.x ?? 0}px,${values.y ?? 0}px)`;
-  // Полная топология сохраняется для любой активной оси помимо x/y.
-  return translationOnly ? translation : `${translation} rotate(${values.rotate ?? 0}deg) skew(${values.skewX ?? 0}deg,${values.skewY ?? 0}deg) scale(${values.scaleX ?? 1},${values.scaleY ?? 1})`;
+export function transform(values: Readonly<Record<string, number>>): string {
+  // Одинаковая топология сохраняет независимые оси и авторские полные обороты.
+  return `translate(${values.x ?? 0}px,${values.y ?? 0}px) rotate(${values.rotate ?? 0}deg) skew(${values.skewX ?? 0}deg,${values.skewY ?? 0}deg) scale(${values.scaleX ?? 1},${values.scaleY ?? 1})`;
 }
 
 export interface Segment {
