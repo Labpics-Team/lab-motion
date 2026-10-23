@@ -1,5 +1,5 @@
 import { rethrow } from './attempt-all.js';
-import { MotionError, number } from './model.js';
+import { failMotion, number } from './model.js';
 import { runtime } from './runtime.js';
 import type { Disposable, MotionOptions, Playback } from './types.js';
 
@@ -51,12 +51,12 @@ export function value(initial: number = 0): MotionValue {
       if (live) start(number(next, 'value'), { duration: 0 });
     },
     animate(next, options): Playback {
-      if (!live) throw new MotionError('Значение уже освобождено');
+      if (!live) failMotion('Значение уже освобождено');
       return start(next, options);
     },
     subscribe(listener): () => void {
       if (!live) return () => {};
-      if (typeof listener !== 'function') throw new MotionError('subscribe ожидает функцию');
+      if (typeof listener !== 'function') failMotion('subscribe ожидает функцию');
       const token = {};
       listeners.set(listener, token);
       // Сохранённый off не удерживает callback и не снимает новую регистрацию.

@@ -3,7 +3,7 @@ import { settleTimeUpperBound } from '../spring.js';
 import { sampleSpringBasisUnchecked, type MutableSpringBasis } from '../internal/solver.js';
 import { tryCompileSpringExecutionArtifactTupleUnchecked, type SpringExecutionArtifactTuple } from '../compositor/curve.js';
 import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
-import { MotionError, number, type Timing } from './model.js';
+import { failMotion, number, type Timing } from './model.js';
 import type { MotionScalar } from './types.js';
 
 export const TRANSFORMS: Readonly<Record<string, number>> = { x: 0, y: 0, rotate: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1 };
@@ -14,15 +14,15 @@ export interface Point { readonly _coordinates: readonly number[]; readonly _uni
 export function point(key: string, input: MotionScalar, reference?: Point): Point {
   if (isTransform(key) || key === 'opacity') return { _coordinates: [number(input, key)], _unit: '' };
   const ast = tryParseValue(input);
-  if (!ast) throw new MotionError(`${key}: неподдерживаемый CSS ${String(input)}`);
+  if (!ast) failMotion(`${key}: неподдерживаемый CSS ${String(input)}`);
   if (ast.kind === 'unit') return { _coordinates: [ast.value], _unit: typeof input === 'number' && PIXELS.test(key) ? 'px' : ast.unit };
   if (ast.kind === 'relative') {
     if (!reference || reference._coordinates.length !== 1 || ast.unit && ast.unit !== reference._unit)
-      throw new MotionError(`${key}: несовместимая единица относительного значения`);
+      failMotion(`${key}: несовместимая единица относительного значения`);
     return { _coordinates: [reference._coordinates[0]! + (ast.op === '+' ? ast.amount : -ast.amount)], _unit: reference._unit };
   }
   if (ast.kind === 'color') return { _coordinates: [ast.r * ast.r, ast.g * ast.g, ast.b * ast.b, ast.a], _unit: 'color' };
-  throw new MotionError(`${key}: неразрешённая CSS-переменная`);
+  failMotion(`${key}: неразрешённая CSS-переменная`);
 }
 function colorChannel(value: number): number { return Math.sqrt(Math.max(0, Math.min(65025, value))); }
 
@@ -60,12 +60,12 @@ export interface Program {
 
 function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration?: number): Segment {
   if (from._unit !== to._unit || from._coordinates.length !== to._coordinates.length)
-    throw new MotionError('Разные единицы from/to');
+    failMotion('Разные единицы from/to');
   let normalized: number | undefined;
   let aligned = true, extent = 1;
   for (let i = 0; i < from._coordinates.length; i++) {
     const distance = to._coordinates[i]! - from._coordinates[i]!;
-    if (!Number.isFinite(distance)) throw new MotionError('Диапазон вне Number');
+    if (!Number.isFinite(distance)) failMotion('Диапазон вне Number');
     const v = velocity[i] ?? 0;
     extent = Math.max(extent, Math.abs(distance));
     if (distance === 0) { if (v !== 0) aligned = false; }
@@ -79,7 +79,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
     length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, energy) * 1000;
   }
-  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) throw new MotionError('Непредставимая длительность');
+  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) failMotion('Непредставимая длительность');
   return { _at: at, _end: at + length, from: from._coordinates, to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
 }
 
@@ -89,8 +89,8 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   for (const input of values) { current = point(key, input, current); resolved.push(current); }
   if (!authored) resolved.unshift(from);
   const times = authored ? timing._times : undefined;
-  if (times && times.length !== resolved.length) throw new MotionError('times: другая длина');
-  if (timing._spring && resolved.length > 2) throw new MotionError('keyframes: задайте duration/ease');
+  if (times && times.length !== resolved.length) failMotion('times: другая длина');
+  if (timing._spring && resolved.length > 2) failMotion('keyframes: задайте duration/ease');
   const velocity = authored ? resolved[0]!._coordinates.map(() => 0) : [...initialVelocity];
   const _segments: Segment[] = [];
   const duration = timing._duration ?? 0;
@@ -137,7 +137,7 @@ export function sample(program: Program, time: number, value: number[], velocity
     dp = (ease(high) - ease(low)) * 1000 / ((high - low) * duration);
     p = ease(p);
   }
-  if (!Number.isFinite(p) || !Number.isFinite(dp)) throw new MotionError('easing: не число');
+  if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
   for (let i = 0; i < segment.from.length; i++) {
     const a = segment.from[i]!, distance = segment.to[i]! - a;
     if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
@@ -146,6 +146,6 @@ export function sample(program: Program, time: number, value: number[], velocity
       velocity[i] = distance * basis._velocity + (segment._velocity[i] ?? 0) * basis._velocityV0;
     } else { value[i] = a + distance * p; velocity[i] = distance * dp; }
     if (rate !== 1) velocity[i] = rate === 0 ? 0 : velocity[i]! * rate;
-    if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) throw new MotionError('Переполнение при sample');
+    if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) failMotion('Переполнение при sample');
   }
 }

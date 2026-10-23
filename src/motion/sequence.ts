@@ -1,4 +1,4 @@
-import { MAX_CHANNELS, MotionError, number, properties, snapshot, timing } from './model.js';
+import { MAX_CHANNELS, failMotion, number, properties, snapshot, timing } from './model.js';
 import { runtime, type Runtime, type Draft } from './runtime.js';
 import type { MotionOptions, Playback, SequenceOptions, SequenceStep } from './types.js';
 
@@ -10,7 +10,7 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
   let cursor = 0, previousStart = 0, end = 0, count = 0;
   for (const tuple of list) {
     const [target, props, option] = snapshot(tuple, 'sequence step', 2) as unknown as SequenceStep;
-    if (tuple.length > 3) throw new MotionError('Шаг: [target, properties, options]');
+    if (tuple.length > 3) failMotion('Шаг: [target, properties, options]');
     const { at, ...rest } = option ?? {};
     const offset = at === '<' ? previousStart : at === undefined || at === '>' ? cursor : number(at, 'at', 0);
     const input = properties(props), clock = timing(rest);
@@ -20,14 +20,14 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     });
     for (const draft of drafts) {
       count += draft._program._segments.length;
-      if (count > MAX_CHANNELS) throw new MotionError('Слишком много сегментов');
+      if (count > MAX_CHANNELS) failMotion('Слишком много сегментов');
       let channels = merged.get(draft._element);
       if (!channels) { channels = new Map(); merged.set(draft._element, channels); }
       const before = channels.get(draft._key);
       let next = draft;
       if (before) {
         const at = draft._program._segments[0]!._at;
-        if (at < before._program._duration) throw new MotionError('Пересечение шагов');
+        if (at < before._program._duration) failMotion('Пересечение шагов');
         next = { ...draft, _program: { ...draft._program, _segments: [...before._program._segments, ...draft._program._segments], _nativeEase: undefined, _identity: undefined } };
       }
       channels.set(draft._key, next);

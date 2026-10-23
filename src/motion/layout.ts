@@ -1,4 +1,4 @@
-import { FINISHED, STOPPED, MotionError, number, timing } from './model.js';
+import { FINISHED, STOPPED, failMotion, number, timing } from './model.js';
 import { program } from './program.js';
 import type { MotionEase, MotionOptions, MotionResult, MotionSpring, Playback, PlaybackState } from './types.js';
 
@@ -52,7 +52,7 @@ class LayoutRun implements Playback {
   readonly finished: Promise<MotionResult>;
   constructor(root: Element, mutate: () => void | Promise<void>, options?: LayoutOptions) {
     const config = timing(options as MotionOptions | undefined);
-    if (typeof config._ease === 'function' && !config._cssEase) throw new MotionError('layout использует CSS easing');
+    if (typeof config._ease === 'function' && !config._cssEase) failMotion('layout использует CSS easing');
     const path = program('--lab-motion-progress', { _coordinates: [0], _unit: '' }, [1], false, config, [0]);
     const win = root.ownerDocument.defaultView;
     const reduced = config._reduced || win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
@@ -147,7 +147,7 @@ class LayoutRun implements Playback {
 /** Обновляет приложение один раз; временные снимки принадлежат браузеру. */
 export function layout(root: Element, mutate: () => void | Promise<void>, options?: LayoutOptions): Playback {
   if (!root?.ownerDocument || typeof root.getBoundingClientRect !== 'function' || !(root as HTMLElement).style)
-    throw new MotionError('layout ожидает DOM-элемент');
-  if (typeof mutate !== 'function') throw new MotionError('layout ожидает функцию изменения DOM');
+    failMotion('layout ожидает DOM-элемент');
+  if (typeof mutate !== 'function') failMotion('layout ожидает функцию изменения DOM');
   const run = new LayoutRun(root, mutate, options); run.start(); return run;
 }

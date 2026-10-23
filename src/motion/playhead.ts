@@ -1,5 +1,5 @@
 import { stoppedMotion } from './stopped.js';
-import { MotionError, number } from './model.js';
+import { failMotion, number } from './model.js';
 import { Run, type ControlOperation } from './runtime.js';
 import type { MotionPlayback, Playback } from './types.js';
 
@@ -13,11 +13,11 @@ export function playhead(playback: Playback): MotionPlayback {
     reverse() {},
   };
   if (stoppedView && playback === stoppedView) return stoppedView;
-  if (!(playback instanceof Run)) throw new MotionError('playhead: неподдерживаемый Playback');
+  if (!(playback instanceof Run)) failMotion('playhead: неподдерживаемый Playback');
   const run = playback;
   if (run._capture) return run as Run & MotionPlayback;
   if (!Object.isExtensible(run) || ['time', 'timeScale', 'reverse'].some(key => key in run))
-    throw new MotionError('playhead: свойства контролов недоступны');
+    failMotion('playhead: свойства контролов недоступны');
   let lastTime: number | undefined = run.duration === 0 ? 0 : undefined;
   let lastRate: number | undefined = run._tracks.size ? 1 : undefined;
   Object.defineProperties(run, {

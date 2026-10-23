@@ -1,6 +1,6 @@
 import { stoppedMotion, stoppedLayout as stopped } from './stopped.js';
 import { attemptAll, rethrow } from './attempt-all.js';
-import { MotionError, record, snapshot, timing } from './model.js';
+import { failMotion, record, snapshot, timing } from './model.js';
 import { animate, targets } from './runtime.js';
 import { sequence } from './sequence.js';
 import { layout, type LayoutOptions } from './layout.js';
@@ -50,7 +50,7 @@ function own<T extends Disposable>(resources: Set<Disposable>, resource: T): T {
 }
 
 export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
-  if (!root || typeof root.querySelectorAll !== 'function') throw new MotionError('scope ожидает Element, Document или ShadowRoot');
+  if (!root || typeof root.querySelectorAll !== 'function') failMotion('scope ожидает Element, Document или ShadowRoot');
   let owner: ParentNode | undefined = root;
   let settings: MotionOptions = snapshotOptions(defaults);
   const playbacks = new Set<Playback>(), resources = new Set<Disposable>();
@@ -91,16 +91,16 @@ export function scope(root: ParentNode, defaults?: MotionOptions): MotionScope {
     layout(mutate, options): Playback {
       if (!owner) return stopped;
       const root = owner as Element;
-      if (typeof root.getBoundingClientRect !== 'function') throw new MotionError('layout требует Element-контейнер');
+      if (typeof root.getBoundingClientRect !== 'function') failMotion('layout требует Element-контейнер');
       const { times: _times, stagger: _stagger, ...defaults } = settings;
       return adopt(layout(root, mutate, mergeOptions(defaults as MotionOptions, options) as LayoutOptions));
     },
     value(initial): MotionValue {
-      if (!owner) throw new MotionError('Область уже освобождена');
+      if (!owner) failMotion('Область уже освобождена');
       return own(resources, value(initial));
     },
     scope(root, defaults): MotionScope {
-      if (!owner) throw new MotionError('Область уже освобождена');
+      if (!owner) failMotion('Область уже освобождена');
       return own(resources, scope(root, mergeOptions(settings, defaults)));
     },
     on(target, event, listener, options): () => void {

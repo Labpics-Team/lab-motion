@@ -1,7 +1,7 @@
 import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
-import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, authoredTiming, type PropertyInput, type Timing } from './model.js';
+import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, type PropertyInput, type Timing } from './model.js';
 import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
@@ -33,27 +33,27 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
   const selected = typeof input === 'string'
     ? (root ?? (typeof document === 'undefined' ? undefined : document))?.querySelectorAll(input)
     : input;
-  if (selected === undefined) throw new MotionError('Селектор: нет DOM');
+  if (selected === undefined) failMotion('Селектор: нет DOM');
   let result: Element[];
   if (selected && typeof selected === 'object' && 'style' in selected) result = [selected as Element];
   else {
-    if (!selected || typeof selected !== 'object') throw new MotionError('Нужен Element/список');
+    if (!selected || typeof selected !== 'object') failMotion('Нужен Element/список');
     if (Symbol.iterator in selected) {
       result = [];
       for (const item of selected as Iterable<Element>) {
-        if (result.length === MAX_CHANNELS) throw new MotionError('Лимит элементов');
+        if (result.length === MAX_CHANNELS) failMotion('Лимит элементов');
         result.push(item);
       }
     } else {
       const list = selected as ArrayLike<Element>, length = list.length;
-      if (!Number.isSafeInteger(length) || length < 0 || length > MAX_CHANNELS) throw new MotionError('Неверный список');
+      if (!Number.isSafeInteger(length) || length < 0 || length > MAX_CHANNELS) failMotion('Неверный список');
       result = Array.from({ length }, (_, i) => list[i]!);
     }
   }
   for (const element of result) {
     const style = (element as HTMLElement)?.style;
     if (!style || typeof style.getPropertyValue !== 'function' || typeof style.setProperty !== 'function')
-      throw new MotionError('У цели нет CSS style');
+      failMotion('У цели нет CSS style');
   }
   return [...new Set(result)];
 }
@@ -63,10 +63,10 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   if (!text || text === 'none') return values;
   if (typeof DOMMatrixReadOnly !== 'undefined') {
     const matrix = new DOMMatrixReadOnly(text);
-    if (!matrix.is2D) throw new MotionError('x/y: нужен 2D transform');
+    if (!matrix.is2D) failMotion('x/y: нужен 2D transform');
     const { a, b, c, d, e, f } = matrix;
     const sx = Math.hypot(a, b), determinant = a * d - b * c;
-    if (sx > 0 && determinant === 0 && (c !== 0 || d !== 0)) throw new MotionError('transform вырожден');
+    if (sx > 0 && determinant === 0 && (c !== 0 || d !== 0)) failMotion('transform вырожден');
     values.x = e; values.y = f;
     values.scaleX = sx;
     values.scaleY = sx ? determinant / sx : Math.hypot(c, d);
@@ -77,7 +77,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   // Headless style-hosts поддерживают ту же каноническую форму, которую пишет Motion.
   const rest = text.replace(/(translate[XY]?|rotate|(?:skew|scale)[XY]?)\(([^)]+)\)/g, (_match, name: string, arguments_: string) => {
     const args = arguments_.trim().split(/[,\s]+/).map(Number.parseFloat);
-    if (args.some(n => !Number.isFinite(n))) throw new MotionError('transform: не число');
+    if (args.some(n => !Number.isFinite(n))) failMotion('transform: не число');
     const a = args[0]!;
     if (name === 'translate') { values.x = a; values.y = args[1] ?? 0; }
     else if (name === 'scale' || name === 'skew') {
@@ -86,7 +86,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
     } else values[name === 'translateX' ? 'x' : name === 'translateY' ? 'y' : name] = a;
     return '';
   });
-  if (rest.trim()) throw new MotionError('transform не поддержан');
+  if (rest.trim()) failMotion('transform не поддержан');
   return values;
 }
 
@@ -106,6 +106,9 @@ interface Track {
 }
 
 function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
+function isVariable(value: MotionScalar): value is string {
+  return typeof value === 'string' && /^var\(/i.test(value.trim());
+}
 
 function sameStart(program: Program, point: Point, velocity: readonly number[]): boolean {
   const first = program._segments[0]!;
@@ -238,7 +241,7 @@ class Surface {
     return { point: initial, _velocity: initial._coordinates.map(() => 0) };
   }
   _sync(): void {
-    if (this._busy) throw new MotionError('easing: повторный вход');
+    if (this._busy) failMotion('easing: повторный вход');
     this._lock(true);
     try {
       const now = number(this._engine._host.now(), 'clock');
@@ -281,7 +284,7 @@ class Surface {
     return format(track._program._key, at ? track._program._segments[0]![at] : track._value, track._program._unit);
   }
   _render(): void {
-    if (this._busy) throw new MotionError('style: повторная запись');
+    if (this._busy) failMotion('style: повторная запись');
     this._lock(true);
     try {
       const text = this._text();
@@ -358,7 +361,7 @@ class Surface {
     const effect = this._native!, finished = effect.finished;
     if (this._token === finished) return;
     const token = this._token = finished;
-    if (!finished || typeof finished.then !== 'function') throw new MotionError('У Animation нет finished');
+    if (!finished || typeof finished.then !== 'function') failMotion('У Animation нет finished');
     const fail = (error: unknown): void => {
       if (this._token !== token || this._native !== effect) return;
       if ((error as { name?: string })?.name !== 'AbortError') { this._fail(error); return; }
@@ -517,26 +520,26 @@ export class Runtime {
     return group;
   }
   private _resolveValue(element: Element, key: string, value: MotionScalar): MotionScalar {
-    if (typeof value !== 'string' || !/^var\(/i.test(value.trim())) return value;
+    if (!isVariable(value)) return value;
     let text = value;
     const seen = new Set<string>();
     for (let i = 0; i < 16; i++) {
       const variable = tryParseUnit(text);
-      if (variable?.kind !== 'var' || seen.has(variable.name)) throw new MotionError(`${key}: CSS var не найдена`);
+      if (variable?.kind !== 'var' || seen.has(variable.name)) failMotion(`${key}: CSS var не найдена`);
       seen.add(variable.name);
       text = this._host.styles(element).getPropertyValue(variable.name).trim() || variable.fallback || '';
-      if (!/^var\(/i.test(text)) { if (!text) throw new MotionError(`${key}: пустая CSS-переменная`); return text; }
+      if (!/^var\(/i.test(text)) { if (!text) failMotion(`${key}: пустая CSS-переменная`); return text; }
     }
-    throw new MotionError(`${key}: CSS var: цикл или глубина`);
+    failMotion(`${key}: CSS var: цикл или глубина`);
   }
   _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
     origin?: (element: Element, key: string) => Point | undefined): Draft[] {
     const elements = targets(input);
-    if (elements.length * props.reduce((sum, p) => sum + p.values.length, 0) > MAX_CHANNELS) throw new MotionError('Слишком много каналов');
+    if (elements.length * props.reduce((sum, p) => sum + p.values.length, 0) > MAX_CHANNELS) failMotion('Слишком много каналов');
     const reduced = clock._reduced || this._host.reduced();
     const author = authoredTiming(clock);
     const reusable = elements.length > 1 && clock._stagger === 0
-      ? props.map(property => !property.values.some(value => typeof value === 'string' && /^var\(/i.test(value.trim())))
+      ? props.map(property => !property.values.some(isVariable))
       : undefined;
     const result: Draft[] = [], synced = new Set<Surface>();
     try {
