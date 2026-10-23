@@ -1,0 +1,234 @@
+# Сравнительный бенчмарк — реальный прогон
+
+- Дата: 2026-10-23T10:13:06.566Z
+- Ревизия: e52a4b37c79c
+- Машина: AMD EPYC 9V45 96-Core Processor × 4, 16 GB RAM
+- ОС: Linux 6.17.0-1022-azure; Node v24.19.0; Chromium 149.0.7827.55 (binary SHA-256 2d18db9d8608b052b6a552ee00ec1e830f93692e928b65ecc67d693bd33fe801)
+- Справочный шаг сетки performance.now(): 0.005000000004656613 мс
+- Наблюдаемая граница погрешности часов: 0.010000000009313226 мс (128 исходных дельт)
+- Timer isolation: cross-origin isolated; COOP=same-origin, COEP=require-corp; claims используют before/after probes каждого realm
+- Шаг сетки: верхний край устойчивой одношаговой моды; дельты выше края обязаны лежать в диапазоне целого числа её шагов
+- Warm-калибровка: 3 pilot-кластера publish-формы × ≥4 шагов сетки; calls s1=40, s2=5, s3=3, s4=1
+- Прогонов: S1–S4 × 20 (p50/p95), freeze × 8 (p50); raw JSON
+- Библиотеки: @labpics/motion@0.6.0 (локальный dist), motion@14.5.0, gsap@3.15.0, animejs@4.5.0, платформа Chromium (без библиотеки), @labpics/motion@0.6.0 (локальный dist), motion@14.5.0, animejs@4.5.0
+- S6: канонический gzip через pako@3.0.2; системный Brotli-11 привязан к зафиксированному Node executable
+
+## Происхождение измеренных байтов
+
+- Checkout: `e52a4b37c79c` (полный commit `e52a4b37c79cf495adc10ac70dbceb5ac5b5fd85`).
+- Рабочее дерево: clean; SHA-256 `c9dd9529fb91e46bf1b65755a104017dc6d2cae9b34ef19cc258d3be27c38da1`.
+- Runtime-дерево dist: 92 файлов; SHA-256 `99cf4feb40538ca46dfe01dcb90eac9c15adc17bb6fc8580d6c33f383db27acd`.
+- Runtime: Node `v24.19.0`, pnpm `11.11.0`.
+- Node executable SHA-256: `bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12`.
+- Lock/package inputs:
+  - `root/package.json`: `dec5adfb2e21d5eabe078a284c39d7049f1a480682914e093f3d7c191094744d`
+  - `root/pnpm-lock.yaml`: `65d781477a2d9d1e79e3af9d2c08cf54801dec438423a921db7788712dc7843a`
+  - `root/pnpm-workspace.yaml`: `441719e7934121f087890902d0273c22a768a45a0e0697963e0f0690063ad600`
+  - `bench/package.json`: `a49b81c9540a90864c8a6f1410fb2534dd9d452fa70469c720aa2b8b3203bc0a`
+  - `bench/pnpm-lock.yaml`: `6e6401b2004bc1eaae05440a0457635e6b8ee56564a4172794974d60606eaa90`
+  - `bench/pnpm-workspace.yaml`: `ac02d96368617c760f093cfe61fdec64b6244007ab3553e0d6621f706f54a353`
+  - `root/scripts/compression-policy.mjs`: `78535921e66d3f1e9bb2936722cce03f0464ec835cd88ab4ac9a1cbd97cc38a4`
+  - `root/scripts/compression-oracle.mjs`: `736f72336d54bca93dca1cfe426ff79476eb6b2fbd266296b00802eef565a6bb`
+  - `bench/bench.mjs`: `f8e7e71983a2b6afb3fb8ecfe8aa021a9dc57e6ea1794c96499120054963d3bb`
+  - `bench/methodology.mjs`: `8ec57637a9e926ca9d8386b8a1fd046de0ffb47b1e2eca83a3f6a0726a10f3b7`
+  - `bench/provenance.mjs`: `51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623`
+  - `bench/report-contract.mjs`: `1f4b24106011a25cb8bfe54fdcdbffc71ff82fc30ce39609eca720095769da6a`
+  - `bench/motion-conformance.mjs`: `d05f0cec91a48eb9e85ec6b12ba49f0ac3673d4489d6dd5af470aa878fbc7f28`
+  - `bench/entries/lab.entry.mjs`: `32757fe65d3a3bbbe55a293b314124df04478b6155dd84e8ea9aef238db2a9ae`
+  - `bench/entries/motion.entry.mjs`: `982ee2a8db956e275ca8664dd26b6e37acd5c21c242e728da611a51ea179cc91`
+  - `bench/entries/gsap.entry.mjs`: `06f146b9fdf284c5f24b53941a18a17b4661ab9ef76a4dba0d9e2b160cbbc84c`
+  - `bench/entries/anime.entry.mjs`: `6ebf96c859f44b05fc824a64022855594d35c3e87d52fd4019b94e522e6531b0`
+  - `bench/entries/waapi-control.entry.mjs`: `78e1e259834b2edd70dd1705a4d77df6c0eb15ef7722d3bf34dd69925e36a919`
+  - `bench/entries/lab-spring.entry.mjs`: `bdcab773aa792b67d767f11f81a973dc468b656eaaa4f9a0f854dd9134ceeb53`
+  - `bench/entries/motion-mini.entry.mjs`: `4a028941c4085709fa70ffedf770f9696f9e2319d3de807167fc02f30c02679f`
+  - `bench/entries/anime-waapi.entry.mjs`: `cee62343f6aa836288b8ebd3c20bda0471e064dcd40f86941645e0318ecd17ed`
+- Фактически установленные benchmark-пакеты:
+  - `animejs@4.5.0`: 215 файлов; SHA-256 `186102a8378cd4531697ee409d284593980fd770e9f718db17fee440003af0ff`
+  - `esbuild@0.28.1`: 8 файлов; SHA-256 `41af5b9caffc5320ba2f77e4689e55ff65cd3ee3b58c8bfa91ed143fdb2191a4`
+  - `gsap@3.15.0`: 179 файлов; SHA-256 `2f7e7524219e647e73e092714262ef2473a59817bf22e04db3952f769710ba35`
+  - `motion@14.5.0`: 40 файлов; SHA-256 `373de740683b5eca4c8c2cbd1a0b710f9993cc5032c84a6a9e1ca1551329fa3b`
+  - `playwright@1.61.1`: 63 файлов; SHA-256 `a4fa4d41fb8119214c562b1344f92b700ade83f7de0efd83b507b0eb5b6c89e9`
+  - `pngjs@7.0.0`: 27 файлов; SHA-256 `9b9c2cd4e661c2d54b3cca48b5f5fc1be08d4fede7d3ffc66a3662e486ca2fec`
+- Фактически установленный root-tooling:
+  - `pako@3.0.2`: 20 файлов; SHA-256 `d25b61fb8b74f8fc46fb16312d80fdafeabb83bbef355e92c880ace60339d763`
+- Собранные адаптеры:
+  - `lab`: runtime `29d2dd1b7487932cb241cdd99b5a39718e1823f61a61a670760abc775f37a6bf`; size-bundle `265af8256f3bd37c0534ba565fc58b5b01ce15973fccfe06fb3559de10a19006`
+  - `motion`: runtime `563a4391d249382bd4f9b3c058ba562cc953101d98522d56d5b11f5ca6be99a7`; size-bundle `823b381360ec53644f26f4aa3f4bffff749f06bbed13c0c2a265e1cc50d5696a`
+  - `gsap`: runtime `0edf67b70ff3020b13e807ee472911e6bf9ec5941f98525830dcc5c513157e74`; size-bundle `f0765be9d823cd772a019df821e39cf7747edbea8e4780253d545f884598b48b`
+  - `anime`: runtime `771e40298a68d57f11c47b19fa89afef0bc407d06cecabdfb2afe20981c489ad`; size-bundle `d3a760e7166f2bb42332af9108021a1a6a570fa9f439ef1cd70f44dec54378c9`
+  - `waapi-ctl`: runtime `d98bebdef4a7e509c622a494932a6d318429c8fdb4e87370d128eb58638cb4f4`; size-bundle `f57d387c68cebb5c5842506c4a26c04b952e8da8973b2e4b1dc587eede5a197c`
+  - `lab-spring`: runtime `70c5b4b7e6c9fdc7cd4426eba024ed82a4df63a0e188f2256ab03dbaf7795b5c`; size-bundle `7456ef45b40e5785d5d670098b7fb00e56797103ca78e27de0a480b1f248180f`
+  - `motion-mini`: runtime `e4f618e514bd2d18d4b9908b30b76161e7e451e56ab5a58fbfda500b365c2ae1`; size-bundle `ee8cb1cfb429e898155fe7f9c90a1ebe0ddf3adf4543e280a61360dde02396f7`
+  - `anime-waapi`: runtime `2ec291f7710da293e14d1064a907c7405cd67e30e199aa3615339b32c3430e76`; size-bundle `a5869dbdb86d86df48fb50ddba0fe025ca613d73ca1b1289f5c486169151fa43`
+
+- Raw samples: [2026-10-23-e52a4b37c79c-99cf4feb4053.json](./2026-10-23-e52a4b37c79c-99cf4feb4053.json).
+
+Все runtime-адаптеры собраны одним production-minified профилем.
+S1–S4 публикуют `p50 / p95` по 20 прогонам; freeze — только p50. p99 не публикуется: выборка меньше 100 прогонов делала бы его max.
+Raw-значения и фактический round-robin порядок лежат в companion JSON.
+
+## S1–S4: linear full API
+
+### Warm API-return, мс
+
+| Метрика | lab | motion | gsap | anime |
+|---|---|---|---|---|
+| Версия | @labpics/motion@0.6.0 (локальный dist) | motion@14.5.0 | gsap@3.15.0 | animejs@4.5.0 |
+| S1: 1 элемент × 40 вызовов | 0.080 / 0.124 | 0.010 / 0.014 | 0.004 / 0.009 | 0.010 / 0.015 |
+| S2: 100 элементов × 5 вызовов | 2.907 / 4.251 | 0.364 / 0.893 | 0.017 / 0.075 | 0.213 / 0.687 |
+| S3: stagger 200, gap 5мс × 3 вызовов | 5.238 / 7.510 | 0.658 / 1.720 | 0.172 / 0.973 | 0.527 / 1.527 |
+| S4: 1000 элементов × 1 вызовов | 20.690 / 27.370 | 3.913 / 7.250 | 0.125 / 0.285 | 4.117 / 10.320 |
+
+### Cold realm
+
+| Метрика | lab | motion | gsap | anime |
+|---|---|---|---|---|
+| Версия | @labpics/motion@0.6.0 (локальный dist) | motion@14.5.0 | gsap@3.15.0 | animejs@4.5.0 |
+| S1: start marker→первый сдвинувшийся screencast-пиксель, мс | 18.10 / 25.45 | 12.14 / 17.26 | 15.86 / 21.23 | 12.48 / 19.20 |
+| S2: API-return 100 элементов, мс | 5.260 / 6.200 | 1.642 / 2.470 | 0.172 / 0.210 | 3.340 / 4.415 |
+| S3: API-return stagger 200, мс | 11.740 / 13.845 | 2.348 / 3.090 | 1.345 / 2.715 | 9.713 / 11.555 |
+| S4: API-return 1000 элементов, мс | 34.813 / 37.800 | 10.440 / 13.260 | 0.535 / 0.680 | 17.267 / 21.315 |
+
+Cold API-return одного элемента не публикуется: вместо него берётся первый сдвинувшийся пиксель
+compositor-screencast. Это browser-presented evidence, но не input→photon физического дисплея.
+CDP Runtime marker ставится непосредственно перед API; marker и screencast frame используют
+pinned CDP TimeSinceEpoch, а raw page-интервал marker→API входит в clock uncertainty.
+Null/ноль любой публикуемой cold-метрики инвалидирует весь отчёт; survivor filtering и «н/д» запрещены.
+Cold realm означает новый JS realm с уже загруженным production-адаптером; network/module fetch и parse
+в эту метрику не входят и не выдаются за startup приложения.
+
+## Статистически проверяемые утверждения
+
+95% CI отношения Lab / конкурент получен paired cluster bootstrap по независимым round-robin runs.
+Победа требует CI целиком ниже 1, выигрыш не менее 5% и строго больше clock uncertainty, зелёную семантику,
+Holm-гейт всего семейства и p95 upper CI ≤ 1.05. Общего рейтинга нет.
+Один calls-батч на сценарий выбирается общими pilot-раундами всех участников и удваивается,
+пока каждое пакетное измерение каждого из 3 pilot-кластеров publish-формы не достигнет 4 локальных шагов performance.now(); pilots не входят в выборку.
+Каждый publish-кластер повторяет исходные пробы часов до и после измерения; пакет ниже собственного пола инвалидирует отчёт.
+Порог часов — сумма максимумов всех наблюдаемых дельт Lab и конкурента с учётом числа вызовов; равенство порогу не считается различием.
+5% для p50 — продуктовая граница практической значимости; 5% для p95 — отдельная продуктовая
+non-inferiority policy. Эти значения не выдаются за статистические константы.
+
+| Метрика | Конкурент | p50 ratio, 95% CI | p95 ratio, 95% CI | Δ / порог, мс | Holm p | Verdict |
+|---|---|---|---|---:|---:|---|
+| warm.s1 | motion | 8.095 [7.627, 8.776] | 8.779 [7.726, 9.907] | -0.070 / 0.002125 | 1.0000 | неопределённо |
+| warm.s1 | gsap | 18.809 [17.681, 19.824] | 14.171 [7.714, 18.370] | -0.076 / 0.001875 | 1.0000 | неопределённо |
+| warm.s1 | anime | 7.994 [7.699, 8.704] | 8.131 [7.228, 8.843] | -0.070 / 0.012250 | 1.0000 | неопределённо |
+| warm.s2 | motion | 7.999 [7.037, 10.502] | 4.760 [3.467, 5.839] | -2.544 / 0.155000 | 1.0000 | неопределённо |
+| warm.s2 | gsap | 171.029 [161.559, 190.353] | 56.680 [45.660, 65.439] | -2.891 / 0.008000 | 1.0000 | неопределённо |
+| warm.s2 | anime | 13.682 [12.881, 14.998] | 6.188 [5.417, 7.289] | -2.695 / 0.012000 | 1.0000 | неопределённо |
+| warm.s3 | motion | 7.957 [5.385, 8.727] | 4.366 [3.808, 5.295] | -4.580 / 0.021667 | 1.0000 | неопределённо |
+| warm.s3 | gsap | 30.367 [28.624, 32.323] | 7.716 [4.195, 10.579] | -5.066 / 0.018333 | 1.0000 | неопределённо |
+| warm.s3 | anime | 9.946 [8.225, 10.843] | 4.919 [4.098, 5.896] | -4.712 / 0.021667 | 1.0000 | неопределённо |
+| warm.s4 | motion | 5.288 [4.437, 7.028] | 3.775 [3.300, 4.175] | -16.777 / 0.350000 | 1.0000 | неопределённо |
+| warm.s4 | gsap | 165.520 [143.537, 176.958] | 96.035 [87.406, 106.302] | -20.565 / 0.110000 | 1.0000 | неопределённо |
+| warm.s4 | anime | 5.025 [4.286, 6.307] | 2.652 [2.441, 3.011] | -16.573 / 0.100000 | 1.0000 | неопределённо |
+| cold.s2 | motion | 3.202 [2.761, 3.555] | 2.510 [1.867, 3.542] | -3.618 / 0.205000 | 1.0000 | неопределённо |
+| cold.s2 | gsap | 30.493 [29.400, 33.894] | 29.524 [23.900, 40.108] | -5.088 / 0.195000 | 1.0000 | неопределённо |
+| cold.s2 | anime | 1.575 [1.392, 1.684] | 1.404 [1.297, 1.920] | -1.920 / 0.210000 | 1.0000 | неопределённо |
+| cold.s3 | motion | 5.001 [4.176, 5.366] | 4.481 [3.758, 5.981] | -9.392 / 0.040000 | 1.0000 | неопределённо |
+| cold.s3 | gsap | 8.729 [7.339, 9.504] | 5.099 [4.434, 10.097] | -10.395 / 0.050000 | 1.0000 | неопределённо |
+| cold.s3 | anime | 1.209 [1.037, 1.337] | 1.198 [1.040, 1.581] | -2.027 / 0.040000 | 1.0000 | неопределённо |
+| cold.s4 | motion | 3.335 [2.969, 3.787] | 2.851 [2.619, 3.498] | -24.372 / 0.645000 | 1.0000 | неопределённо |
+| cold.s4 | gsap | 65.070 [60.703, 67.698] | 55.588 [35.216, 75.070] | -34.277 / 0.640000 | 1.0000 | неопределённо |
+| cold.s4 | anime | 2.016 [1.873, 2.146] | 1.773 [1.645, 2.314] | -17.545 / 0.760000 | 1.0000 | неопределённо |
+| cold.firstPresented | motion | 1.491 [1.199, 1.882] | 1.475 [1.207, 1.741] | -5.959 / 0.865954 | 1.0000 | неопределённо |
+| cold.firstPresented | gsap | 1.141 [0.912, 1.633] | 1.199 [1.047, 1.382] | -2.236 / 0.870954 | 1.0000 | неопределённо |
+| cold.firstPresented | anime | 1.450 [1.042, 1.894] | 1.325 [1.174, 1.507] | -5.614 / 0.620954 | 1.0000 | неопределённо |
+
+## S5: freeze main thread
+
+### Независимый контракт движения
+
+Контракт: `s5-motion-v1`; 600 px / 2400 мс. Допуски: позиция 3 px, время ±20 мс, разрыв наблюдения ≤50 мс.
+Это объявленные пределы данного сценария, не доказательство абсолютной плавности. Линейное движение
+сверяется с уравнением времени, пружина — с независимым решением ОДУ; собственный baseline не служит эталоном.
+Зелёный native-свидетель снимается в том же кадре и обеспечивает наблюдение неподвижной красной цели.
+CDP start marker связывается с часами этого page realm; измеренная неопределённость вычитается из временного допуска.
+
+| Путь | Запись кадров | Без блокировки | С блокировкой |
+|---|---|---|---|
+| lab | соответствует | соответствует | соответствует |
+| motion | соответствует | соответствует | соответствует |
+| gsap | недостаточно данных | соответствует | не соответствует |
+| anime | недостаточно данных | соответствует | не соответствует |
+| waapi-ctl | соответствует | соответствует | соответствует |
+| lab-spring | соответствует | соответствует | соответствует |
+| motion-mini | соответствует | соответствует | соответствует |
+| anime-waapi | соответствует | соответствует | соответствует |
+
+Приём отчёта подтверждает достоверность его данных, не выполнение требований движения.
+Любой неуспешный прогон препятствует соответствующему утверждению; медиана не скрывает нарушение.
+Наблюдения с пробелами не дополняются вымышленными кадрами. Поведение между захваченными кадрами и input→photon не доказаны.
+
+### Linear full API пути
+
+| Метрика | lab | motion | gsap | anime |
+|---|---|---|---|---|
+| Версия | @labpics/motion@0.6.0 (локальный dist) | motion@14.5.0 | gsap@3.15.0 | animejs@4.5.0 |
+| Точность к own unblocked baseline, p50 % | 100.0 | 99.4 | 39.5 | 39.3 |
+| Кадры в окне, p50 / WAAPI-control | 45 / 101% | 44 / 100% | 45 / 101% | 44 / 100% |
+| Distinct позиции в окне, p50 | 45 | 44 | 1 | 1 |
+| Суммарное видимое продвижение, p50 px | 181 | 180 | 0 | 0 |
+| Финальная x, p50 px | 600.0 | 600.0 | 600.0 | 600.0 |
+
+### Linear native пути и платформенный контроль
+
+| Метрика | waapi-ctl | motion-mini | anime-waapi |
+|---|---|---|---|
+| Версия | платформа Chromium (без библиотеки) | motion@14.5.0 | animejs@4.5.0 |
+| Точность к own unblocked baseline, p50 % | 100.0 | 100.0 | 100.0 |
+| Кадры в окне, p50 / WAAPI-control | 44 / 100% | 45 / 102% | 45 / 101% |
+| Distinct позиции в окне, p50 | 44 | 45 | 45 |
+| Суммарное видимое продвижение, p50 px | 179 | 183 | 181 |
+| Финальная x, p50 px | 600.0 | 600.0 | 600.0 |
+
+### Lab spring→WAAPI путь
+
+| Метрика | lab-spring |
+|---|---|
+| Версия | @labpics/motion@0.6.0 (локальный dist) |
+| Точность к own unblocked baseline, p50 % | 100.0 |
+| Кадры в окне, p50 / WAAPI-control | 45 / 101% |
+| Distinct позиции в окне, p50 | 36 |
+| Суммарное видимое продвижение, p50 px | 155 |
+| Финальная x, p50 px | 600.0 |
+
+Группы разделены намеренно: spring→WAAPI не ранжируется против linear-native — траектории и
+набор возможностей разные. Каждая blocked-траектория сравнивается симметричной ошибкой только
+с собственным unblocked-прогоном той же библиотеки; ранний jump и отставание штрафуются одинаково.
+Кадры берутся `Page.startScreencast`, позиция — пиксель-скан. В отчёт проходят только все валидные
+runs; survivor filtering запрещён. Полные seeded-блоки проводят каждого участника через каждую позицию.
+WAAPI-control обязан доказать distinct движение, иначе падает стенд. Companion JSON хранит baseline,
+blocked и grid каждого run, поэтому score независимо пересчитывается через `scoreAgainstBaseline`.
+
+## S6: executable import-cost адаптера
+
+### Одинаковый esbuild production profile
+
+| Метрика | lab | motion | gsap | anime | waapi-ctl | lab-spring | motion-mini | anime-waapi |
+|---|---|---|---|---|---|---|---|---|
+| Версия | @labpics/motion@0.6.0 (локальный dist) | motion@14.5.0 | gsap@3.15.0 | animejs@4.5.0 | платформа Chromium (без библиотеки) | @labpics/motion@0.6.0 (локальный dist) | motion@14.5.0 | animejs@4.5.0 |
+| min+канонический gzip-9, B | 12682 | 24824 | 27589 | 14272 | 326 | 12706 | 3457 | 4673 |
+| min+системный Brotli-11, B | 11541 | 22549 | 24991 | 12930 | 292 | 11587 | 3151 | 4257 |
+| Capability-группа | transform-linear-start+stagger-adapter | transform-linear-start+stagger-adapter | transform-linear-start+stagger-adapter | transform-linear-start+stagger-adapter | transform-linear-waapi-control | transform-spring-start-adapter | transform-linear-native-start-adapter | transform-linear-native-start-adapter |
+
+| Конкурент | Точная capability-группа | gzip | Brotli | Verdict |
+|---|---|---:|---:|---|
+| motion | transform-linear-start+stagger-adapter | 12682 / 24824 | 11541 / 22549 | победа |
+| gsap | transform-linear-start+stagger-adapter | 12682 / 27589 | 11541 / 24991 | победа |
+| anime | transform-linear-start+stagger-adapter | 12682 / 14272 | 11541 / 12930 | победа |
+
+Size-победа допускается только внутри точной capability-группы и только при одновременном
+уменьшении канонического gzip-9 и системного Brotli-11.
+
+## Оговорки честности
+
+- API-return не равен полной стоимости: lazy-работу отражает отдельный first-presented screencast metric.
+- Нулевой/null cold API-return прерывает отчёт, а не становится «н/д» или победным нулём.
+- GSAP после лага не прыгает (lag smoothing), а доигрывает сдвинутый таймлайн — поэтому его
+  финальная позиция снимается с запасом +700мс. Это не освобождает путь от проверки wall-clock контракта S5.
+- Headed Chromium и screencast — один браузерный контур, не универсальный рейтинг браузеров.
+- S6 исключает legal comments одинаково у всех и измеряет executable payload, не лицензионные файлы npm.
+
+_Файл сгенерирован bench/compare/bench.mjs; правки руками = подлог._
