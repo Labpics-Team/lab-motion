@@ -116,7 +116,7 @@ export class Run implements Playback {
   private _status: PlaybackState = 'running';
   private _natural = true;
   declare _capture?: (track: Track) => void;
-  private _notifications = 0;
+  _notifications = 0;
   private _failure: { _error: unknown } | undefined;
   private _cleaning = false;
   private _resolve!: (value: MotionResult) => void;
@@ -134,7 +134,6 @@ export class Run implements Playback {
     }
     return this._status;
   }
-  _hold(): void { this._notifications++; }
   _release(): void { this._notifications--; this._complete(); }
   _fault(error: unknown): void {
     if (this._failure) return;
@@ -446,7 +445,7 @@ export class Runtime {
   _operation(enter: boolean): void { this._operations += enter ? 1 : -1; }
   _notify(element: Element, key: string, action: () => void): void {
     const owner = this._surfaces.get(element)?.[key]?._tracks.get(key)?._owner;
-    owner?._hold();
+    if (owner) owner._notifications++;
     this._after(() => {
       try { action(); }
       catch (error) { owner?._error(error); throw error; }
