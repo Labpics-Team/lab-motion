@@ -68,6 +68,9 @@ jobs:
           node baseline/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/baseline-size.txt"
           node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt"
 
+      - name: Измерить каждый публичный root-импорт
+        run: node candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"
+
       - name: Сравнить численное ядро easing
         run: node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"
 
@@ -79,6 +82,13 @@ jobs:
         run: |
           set -euo pipefail
           xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline
+
+      - name: Сравнить spring и JS-исполнение с baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/spring" spring-pair baseline
+          xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline
 
       - name: Проверить сравнительные утверждения
         working-directory: candidate/bench/compare
@@ -92,4 +102,4 @@ jobs:
           path: |
             ${{ runner.temp }}/motion-performance/
             candidate/bench/compare/results/
-          retention-days: 30
+          retention-days: 5

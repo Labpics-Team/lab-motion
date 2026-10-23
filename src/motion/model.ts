@@ -14,7 +14,7 @@ const EASES: Readonly<Record<string, readonly [number, number, number, number]>>
   standard: STANDARD_EASING_COORDS, ease: [.25, .1, .25, 1],
   'ease-in': [.42, 0, 1, 1], 'ease-out': [0, 0, .58, 1], 'ease-in-out': [.42, 0, .58, 1],
 };
-const standard: (t: number) => number = cubicBezierUnchecked(...STANDARD_EASING_COORDS);
+const standard: (t: number) => number = /* @__PURE__ */ cubicBezierUnchecked(...STANDARD_EASING_COORDS);
 const standardCss = `cubic-bezier(${STANDARD_EASING_COORDS.join(',')})`;
 
 export function number(value: unknown, name: string, minimum: number = -Infinity): number {

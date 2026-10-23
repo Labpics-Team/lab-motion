@@ -1,7 +1,8 @@
 import { stoppedMotion, stoppedLayout as stopped } from './stopped.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { MotionError, record, snapshot, timing } from './model.js';
-import { animate, sequence, targets } from './runtime.js';
+import { animate, targets } from './runtime.js';
+import { sequence } from './sequence.js';
 import { layout, type LayoutOptions } from './layout.js';
 import { value, type MotionValue } from './value.js';
 import { listen } from './listener.js';

@@ -30,8 +30,10 @@ mkdirSync(path.join(output, 'adapters'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const optionalFile = file => { try { return readFileSync(file, 'utf8').trim(); } catch { return null; } };
 const group = process.argv[4] ?? 'full';
-if (!['full', 'native'].includes(group)) throw new Error('Expected full or native capability group');
-const ids = group === 'native'
+if (!['full', 'native', 'spring-pair', 'js-pair'].includes(group)) throw new Error('Unknown capability group');
+const paired = group.endsWith('-pair');
+if (paired && !baselinePath) throw new Error('Paired runtime profile requires an immutable baseline');
+const ids = paired ? ['lab'] : group === 'native'
   ? ['lab', 'lab-nano', 'motion-mini', 'waapi-ctl']
   : ['lab', 'motion', 'gsap', 'anime', 'waapi-ctl'];
 if (baselinePath) ids.push('baseline');
@@ -41,7 +43,15 @@ const entries = { 'lab-nano': 'lab-nano', lab: 'lab', motion: 'motion', gsap: 'g
 if (baselinePath) entries.baseline = 'lab';
 const adapters = Object.fromEntries(Object.entries(entries).map(([id, entry]) => {
   const outputPath = path.join(output, 'adapters', `${id}.js`);
-  esbuild.buildSync({ ...PRODUCTION_ADAPTER_PROFILE, entryPoints: [path.join(id === 'baseline' ? path.join(baselinePath, 'bench/compare') : benchPath, 'entries', `${entry}.entry.mjs`)], format: 'iife', globalName: '__adapterModule', outfile: outputPath });
+  const directory = id === 'baseline' ? baselinePath : rootPath;
+  const options = group === 'spring-pair' ? '{}' : '{duration, ease: p => p * p * (3 - 2 * p)}';
+  const input = paired && (id === 'lab' || id === 'baseline')
+    ? { stdin: { contents: 'import { animate } from ' + JSON.stringify(path.join(directory, 'dist/motion/index.js')) +
+      '; export function start(els, px, duration) { const run = animate(els, {x:px}, ' + options +
+      '); return {finished: () => run.finished, cancel: () => run.stop(), pause: () => run.pause(), seek: t => run.seek(t), duration: run.duration}; }',
+      resolveDir: directory, sourcefile: 'root-pair.mjs', loader: 'js' } }
+    : { entryPoints: [path.join(directory, 'bench/compare/entries', entry + '.entry.mjs')] };
+  esbuild.buildSync({ ...PRODUCTION_ADAPTER_PROFILE, ...input, format: 'iife', globalName: '__adapterModule', outfile: outputPath });
   const bytes = readFileSync(outputPath);
   return [id, { path: outputPath, sha256: hash(bytes), raw: bytes.length, gzip: canonicalGzip(bytes).length, brotli: observationalBrotli(bytes).length }];
 }));
@@ -60,7 +70,7 @@ const metadata = {
   profileSha256: hash(readFileSync(new URL(import.meta.url))),
   versions: { lab: root.version, ...installed, chromium: browser.version(), node: process.version },
   environment: { cpu: os.cpus()[0].model, cpuMax: optionalFile('/sys/fs/cgroup/cpu.max'), memoryMax: optionalFile('/sys/fs/cgroup/memory.max') },
-  scenario: { group, counts, rounds, durationMs, watchdogMs, targetPx: 300, easing: 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
+  scenario: { group, counts, rounds, durationMs: group === 'spring-pair' ? null : durationMs, watchdogMs, targetPx: 300, easing: group === 'spring-pair' ? 'default spring' : group === 'js-pair' ? 'p*p*(3-2*p), custom JS callback' : 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
   adapters, orders, sourceIdentity,
 };
 writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
@@ -75,6 +85,35 @@ async function pageFor(id) {
   return { context, page };
 }
 try {
+  if (paired) {
+    // Сравнивается публичный seek в браузере; проверка не входит в timed samples.
+    const evidence = {};
+    for (const id of ids) {
+      const { context, page } = await pageFor(id);
+      try {
+        await settle(page);
+        evidence[id] = await page.evaluate(duration => {
+          const els = Array.from({ length: 100 }, () => {
+            const el = document.createElement('div');
+            el.className = 'box'; document.body.appendChild(el); return el;
+          });
+          let run;
+          try {
+            run = window.__adapterModule.start(els, 300, duration);
+            run.pause();
+            const times = [0, 1, 16, 63, 127, 255, 399, 500, 999];
+            return { duration: run.duration, samples: times.map(time => {
+              run.seek(time);
+              return { time, positions: els.map(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).e) };
+            }) };
+          } finally { run?.cancel(); for (const el of els) el.remove(); }
+        }, durationMs);
+      } finally { await context.close(); }
+    }
+    const exact = JSON.stringify(evidence.lab) === JSON.stringify(evidence.baseline);
+    writeFileSync(path.join(output, 'paired-semantics.json'), JSON.stringify({ exact, evidence }, null, 2));
+    if (!exact) throw new Error('Baseline and candidate public trajectories differ');
+  }
   // Сохраняется исходная проверка траектории вместе с её отказами.
   for (const id of ids) {
     const { context, page } = await pageFor(id);

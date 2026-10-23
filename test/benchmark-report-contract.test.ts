@@ -537,7 +537,7 @@ describe('schema 10 motion conformance admission', () => {
 
   it('фиксирует scoped требования: baseline для всех и blocked для заявленных native-путей', () => {
     expect(S5_MOTION_REQUIREMENTS).toEqual({
-      baseline: FREEZE, blocked: ['lab', 'waapi-ctl', 'lab-spring', 'motion-mini', 'anime-waapi'],
+      baseline: FREEZE, blocked: ['lab', 'motion', 'waapi-ctl', 'lab-spring', 'motion-mini', 'anime-waapi'],
     });
     expect(Object.isFrozen(S5_MOTION_REQUIREMENTS)).toBe(true);
     expect(Object.isFrozen(S5_MOTION_REQUIREMENTS.baseline)).toBe(true);
@@ -581,18 +581,30 @@ describe('schema 10 motion conformance admission', () => {
     })).toThrow(/motion conformance: lab\.baseline = fail/);
   });
 
-  it('один плохой native-прогон не исчезает за медианой score 100', () => {
+  it.each(['motion', 'motion-mini'])(
+    'один плохой native-прогон %s не исчезает за медианой score 100',
+    (id) => {
+      const report = motionFixture();
+      report.payload.results[id].raw.freeze[7].evidence.blocked = freeze25To65();
+      refreshMotionReport(report);
+      expect(report.payload.results[id].summary.freeze.score.p50).toBe(100);
+      expect(report.payload.motionConformance[id].runs.filter(
+        (run: { blocked: { verdict: string } }) => run.blocked.verdict === 'pass',
+      )).toHaveLength(7);
+      expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+      expect(() => validateBenchmarkReportForPublication(report))
+        .toThrow('motion conformance: ' + id + '.blocked = fail');
+    },
+  );
+
+  it('сохраняет blocked-отказ JS-пути в диагностике без native-обещания', () => {
     const report = motionFixture();
-    report.payload.results['motion-mini'].raw.freeze[7].evidence.blocked = freeze25To65();
+    report.payload.results.gsap.raw.freeze[0].evidence.blocked = freeze25To65();
     refreshMotionReport(report);
-    expect(report.payload.results['motion-mini'].summary.freeze.score.p50).toBe(100);
-    expect(report.payload.motionConformance['motion-mini'].runs.filter(
-      (run: { blocked: { verdict: string } }) => run.blocked.verdict === 'pass',
-    )).toHaveLength(7);
-    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
-    expect(() => validateBenchmarkReportPair({
-      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion conformance: motion-mini\.blocked = fail/);
+    expect(report.payload.motionConformance.gsap).toMatchObject({
+      baseline: 'pass', blocked: 'fail', capture: 'pass',
+    });
+    expect(() => validateBenchmarkReportForPublication(report)).not.toThrow();
   });
 
   it('не принимает подделанный cached PASS даже с каноническими Markdown и SHA', () => {

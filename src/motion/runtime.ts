@@ -1,9 +1,9 @@
 import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
-import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, authoredTiming, snapshot, type PropertyInput, type Timing } from './model.js';
+import { FINISHED, STOPPED, MAX_CHANNELS, MotionError, number, properties, timing, authoredTiming, type PropertyInput, type Timing } from './model.js';
 import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
-import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState, SequenceOptions, SequenceStep } from './types.js';
+import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
   readonly frame: FrameLoop;
@@ -12,12 +12,22 @@ export interface RuntimeHost {
   styles(element: Element): CSSStyleDeclaration;
   supports(easing: string): boolean;
 }
+// Один браузерный ответ: повторный native-start не разбирает ту же CSS-кривую.
+let supportCache: [typeof CSS, typeof CSS.supports, string, boolean] | undefined;
+function supports(easing: string): boolean {
+  if (typeof CSS === 'undefined') return false;
+  const host = CSS, check = host.supports, previous = supportCache;
+  if (previous && previous[0] === host && previous[1] === check && previous[2] === easing) return previous[3];
+  const result: boolean = Reflect.apply(check, host, ['animation-timing-function', easing]);
+  supportCache = [host, check, easing, result];
+  return result;
+}
 const defaultHost: RuntimeHost = {
   frame,
   now: () => typeof performance === 'undefined' ? Date.now() : performance.now(),
   reduced: () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches,
   styles: element => typeof getComputedStyle === 'function' && 'ownerDocument' in element ? getComputedStyle(element) : (element as HTMLElement).style,
-  supports: easing => typeof CSS !== 'undefined' && CSS.supports('animation-timing-function', easing),
+  supports,
 };
 export function targets(input: MotionTarget, root?: ParentNode): Element[] {
   const selected = typeof input === 'string'
@@ -83,7 +93,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
 export type ControlOperation = (surface: Surface, selected: readonly Track[]) => void;
 type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | ControlOperation;
 
-interface Draft { readonly element: Element; readonly key: string; readonly _program: Program; readonly reduced: boolean }
+export interface Draft { readonly element: Element; readonly key: string; readonly _program: Program; readonly reduced: boolean }
 interface Track {
   readonly _program: Program;
   readonly _group: Surface;
@@ -96,6 +106,14 @@ interface Track {
 }
 
 function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
+
+function sameStart(program: Program, point: Point, velocity: readonly number[]): boolean {
+  const first = program._segments[0]!;
+  if (program.unit !== point.unit || first.from.length !== point._coordinates.length || first.velocity.length !== velocity.length) return false;
+  for (let i = 0; i < first.from.length; i++)
+    if (!Object.is(first.from[i], point._coordinates[i]) || !Object.is(first.velocity[i], velocity[i])) return false;
+  return true;
+}
 
 export class Run implements Playback {
   readonly _tracks: Set<Track> = new Set();
@@ -483,7 +501,7 @@ export class Runtime {
     if (this._active.size !== 0) return;
     const update = this._offUpdate, render = this._offRender;
     this._offUpdate = this._offRender = undefined; this._prepared = [];
-    rethrow(attemptAll([update, render], release => release?.()), 'Frame cleanup failed');
+    if (update || render) rethrow(attemptAll([update, render], release => release?.()), 'Frame cleanup failed');
   }
   private _surface(element: Element, key: string): Surface {
     let groups = this._surfaces.get(element);
@@ -511,23 +529,30 @@ export class Runtime {
     }
     throw new MotionError(`${key}: CSS var: цикл или глубина`);
   }
-  private _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
+  _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
     origin?: (element: Element, key: string) => Point | undefined): Draft[] {
     const elements = targets(input);
     if (elements.length * props.reduce((sum, p) => sum + p.values.length, 0) > MAX_CHANNELS) throw new MotionError('Слишком много каналов');
     const reduced = clock.reduced || this._host.reduced();
     const author = authoredTiming(clock);
+    const reusable = elements.length > 1 && clock.stagger === 0
+      ? props.map(property => !property.values.some(value => typeof value === 'string' && /^var\(/i.test(value.trim())))
+      : undefined;
     const result: Draft[] = [], synced = new Set<Surface>();
     try {
       for (let i = 0; i < elements.length; i++) {
         const element = elements[i]!;
-        for (const property of props) {
+        for (let j = 0; j < props.length; j++) {
+          const property = props[j]!;
           const group = this._surface(element, property.key);
           if (!synced.has(group)) { synced.add(group); group._sync(); }
           const values = property.values.map(v => this._resolveValue(element, property.key, v));
           const explicit = property.authored ? point(property.key, values[0]!) : origin?.(element, property.key);
           const current = explicit ? { point: explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property.key);
-          const spec = program(property.key, current.point, values, property.authored, property.authored ? author : clock, current._velocity, offset + i * clock.stagger);
+          // Предыдущая цель той же property уже хранит неизменяемую программу.
+          const previous = i > 0 && reusable?.[j] ? result[result.length - props.length]!._program : undefined;
+          const spec = previous && sameStart(previous, current.point, current._velocity) ? previous
+            : program(property.key, current.point, values, property.authored, property.authored ? author : clock, current._velocity, offset + i * clock.stagger);
           result.push({ element, key: property.key, _program: spec, reduced });
         }
       }
@@ -537,7 +562,7 @@ export class Runtime {
     }
     return result;
   }
-  private _execute(drafts: readonly Draft[], total?: number): Playback {
+  _execute(drafts: readonly Draft[], total?: number): Playback {
     const run = new Run(total ?? 0);
     const touched = new Set<Surface>();
     try {
@@ -568,43 +593,9 @@ export class Runtime {
     const clock = timing(options);
     return this._execute(this._draft(target, input, clock));
   }
-  sequence(steps: readonly SequenceStep[], options?: SequenceOptions): Playback {
-    const list = snapshot(steps, 'sequence');
-    const sequenceClock = timing(options as MotionOptions | undefined);
-    const merged = new Map<Element, Map<string, Draft>>();
-    let cursor = 0, previousStart = 0, end = 0, count = 0;
-    for (const tuple of list) {
-      const [target, props, option] = snapshot(tuple, 'sequence step', 2) as unknown as SequenceStep;
-      if (tuple.length > 3) throw new MotionError('Шаг: [target, properties, options]');
-      const { at, ...rest } = option ?? {};
-      const offset = at === '<' ? previousStart : at === undefined || at === '>' ? cursor : number(at, 'at', 0);
-      const input = properties(props), clock = timing(rest);
-      const drafts = this._draft(target, input, clock, offset + sequenceClock.delay, (element, key) => {
-        const prior = merged.get(element)?.get(key)?._program;
-        return prior && { _coordinates: prior.final, unit: prior.unit };
-      });
-      for (const draft of drafts) {
-        count += draft._program._segments.length;
-        if (count > MAX_CHANNELS) throw new MotionError('Слишком много сегментов');
-        let channels = merged.get(draft.element);
-        if (!channels) { channels = new Map(); merged.set(draft.element, channels); }
-        const before = channels.get(draft.key);
-        let next = draft;
-        if (before) {
-          const at = draft._program._segments[0]!.at;
-          if (at < before._program.duration) throw new MotionError('Пересечение шагов');
-          next = { ...draft, _program: { ...draft._program, _segments: [...before._program._segments, ...draft._program._segments], _nativeEase: undefined, _identity: undefined } };
-        }
-        channels.set(draft.key, next);
-        end = Math.max(end, next._program.duration);
-      }
-      previousStart = offset; cursor = Math.max(0, end - sequenceClock.delay);
-    }
-    const drafts = [...merged.values()].flatMap(map => [...map.values()]).map(d => ({ ...d, reduced: d.reduced || sequenceClock.reduced, _program: { ...d._program, duration: end, _nativeEase: undefined, _identity: undefined } }));
-    return this._execute(drafts, drafts.every(draft => draft.reduced) ? 0 : end);
-  }
 }
 
-export const runtime: Runtime = new Runtime();
-export const animate: (target: MotionTarget, props: MotionProperties, options?: MotionOptions) => Playback = runtime.animate.bind(runtime);
-export const sequence: (steps: readonly SequenceStep[], options?: SequenceOptions) => Playback = runtime.sequence.bind(runtime);
+export const runtime: Runtime = /* @__PURE__ */ new Runtime();
+export function animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): Playback {
+  return runtime.animate(target, props, options);
+}
