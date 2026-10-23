@@ -40,6 +40,6 @@
     "js/paired-semantics.json": "3254368af8ef97a65d42f74dbc2b154c691f82c18f1f7fee48134469c231ed69",
     "spring/paired-semantics.json": "1ada59efe4bbb670c5029f27e1ffa10a014d9edc45bea4a6d1dbaf47f5b5cd37",
     "easing.json": "acc65c359bfcc67dda8cc5df49a06acf49c17f371ccf8ff788fb9f2781830047",
-    "../runtime-native-translation-ablation-patch.json": "d63ce162f25adadcacd6e15d7442eb16d7d9a3f4a5c8b05d3c3bd21a1e85141a"
+    "intervention.json": "d63ce162f25adadcacd6e15d7442eb16d7d9a3f4a5c8b05d3c3bd21a1e85141a"
   }
 }
