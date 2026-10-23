@@ -176,7 +176,7 @@ export class Run implements Playback {
   _apply(action: ControlAction, time = 0): void {
     if (this._status !== 'running') return;
     const engine = this._tracks.values().next().value?._group._engine;
-    if (engine?._busy()) { engine._after(() => this._apply(action, time)); return; }
+    if (engine?._operations) { engine._after(() => this._apply(action, time)); return; }
     const groups = new Set<Surface>();
     for (const track of this._tracks) groups.add(track._group);
     const failures: unknown[] = [];
@@ -440,10 +440,9 @@ export class Runtime {
   private _pending: Array<() => void> = [];
   private _prepared: Surface[] = [];
   private _draining = false;
-  private _operations = 0;
+  _operations = 0;
   private _subscribing = false;
   constructor(readonly _host: RuntimeHost = defaultHost) {}
-  _busy(): boolean { return this._operations !== 0; }
   _operation(enter: boolean): void { this._operations += enter ? 1 : -1; }
   _notify(element: Element, key: string, action: () => void): void {
     const owner = this._surfaces.get(element)?.[key]?._tracks.get(key)?._owner;
