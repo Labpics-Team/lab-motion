@@ -111,14 +111,6 @@ interface Track {
 
 function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
 
-function sameStart(program: Program, point: Point, velocity: readonly number[]): boolean {
-  const first = program._segments[0]!;
-  if (program._unit !== point._unit || first._from.length !== point._coordinates.length || first._velocity.length !== velocity.length) return false;
-  for (let i = 0; i < first._from.length; i++)
-    if (!Object.is(first._from[i], point._coordinates[i]) || !Object.is(first._velocity[i], velocity[i])) return false;
-  return true;
-}
-
 export class Run implements Playback {
   readonly _tracks: Set<Track> = new Set();
   private _status: PlaybackState = 'running';
@@ -555,10 +547,7 @@ export class Runtime {
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
-          // Предыдущая цель той же property уже хранит неизменяемую программу.
-          const previous = i > 0 && clock._stagger === 0 && property._literal ? result[result.length - props.length]!._program : undefined;
-          const spec = previous && sameStart(previous, current, current._velocity) ? previous
-            : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
           result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });
         }
       }
