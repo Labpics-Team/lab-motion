@@ -101,6 +101,19 @@ const securityCommand = [
   '# а записи .trivyignore.yaml к секретам не применяются.',
   String.raw`printf 'disable-allow-rules:\n  - tests\n  - examples\n  - markdown\n' > "$dir/secret.yaml"`,
   'scan --scanners secret --secret-config "$dir/secret.yaml" --ignorefile /dev/null',
+  '# Тот же путь сканирования должен заметить тестовый ключ внутри examples/.',
+  '# Проба живёт только в окружении CI и не попадает в исходники.',
+  'probe_dir=$(mktemp -d examples/ci-trivy-canary.XXXXXXXX)',
+  String.raw`trap 'rm -rf -- "$probe_dir"' EXIT`,
+  'probe_file="$probe_dir/credentials.txt"',
+  'python3 test/ci-trivy-canary.py seed "$probe_file"',
+  'set +e',
+  'scan --scanners secret --secret-config "$dir/secret.yaml" --ignorefile /dev/null --format json > "$dir/secret-canary.json"',
+  'canary_status=$?',
+  'set -e',
+  'python3 test/ci-trivy-canary.py verify "$dir/secret-canary.json" "$probe_file" "$canary_status"',
+  'rm -rf -- "$probe_dir"',
+  'trap - EXIT',
 ].join('\n');
 const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
   + '[[ ${#archives[@]} -eq 1 ]] \\\n'
