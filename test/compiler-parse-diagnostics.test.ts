@@ -13,7 +13,7 @@ describe('motionCompiler: parse failure виден в диагностике', (
     const warn = vi.fn();
     const result = (plugin.transform as (this: unknown, c: string, id: string) => unknown).call(
       { parse: () => { throw new Error('boom'); }, warn },
-      "import { animate } from '@labpics/motion/nano'; ???",
+      "import { animate } from '@labpics/motion/native'; ???",
       '/app/broken.js',
     );
     expect(result).toBeUndefined();

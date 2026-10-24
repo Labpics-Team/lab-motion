@@ -217,9 +217,9 @@ progress.dispose();
 `@labpics/motion/animate` прежняя область называется `createAnimateScope` и
 освобождается через `destroy`. Её контролы принадлежат этому низкоуровневому API.
 
-### Нативные контролы прежнего API
+### Нативные контролы
 
-Импорт `@labpics/motion/nano` сохранён для существующих интеграций. Он требует
+Прямой низкоуровневый импорт `@labpics/motion/native` требует
 WAAPI и возвращает настоящие браузерные `Animation[]` с общим `finished`.
 Этими объектами можно управлять напрямую, включая `reverse` и повторный `play`.
 Общий `finished` относится к первому завершению и при повторном запуске
@@ -232,7 +232,7 @@ WAAPI и возвращает настоящие браузерные `Animation
 ## Управляемая перестановка `./behaviors/reorder`
 
 `createReorder({ items, axis?, direction?, onReorder })` — опциональный headless
-resolver. Не импортируется корнем, `./animate`, `./nano` или `./behaviors`.
+resolver. Не импортируется корнем, `./animate`, `./native` или `./behaviors`.
 Типы: `ReorderKey`, `ReorderItem`, `ReorderOptions`, `ReorderController`,
 `ReorderSession`, `ReorderProposal`, `ReorderAxis`, `ReorderStep`.
 

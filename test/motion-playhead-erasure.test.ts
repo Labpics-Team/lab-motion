@@ -17,8 +17,8 @@ it('представление playhead отсутствует в обычном
   expect(controlled.length).toBeGreaterThan(ordinary.length);
 });
 
-it('Nano и статический executor не получают transport корневого runtime', () => {
-  for (const entry of ['nano', 'compiler/runtime']) {
+it('Native и статический executor не получают transport корневого runtime', () => {
+  for (const entry of ['native', 'compiler/runtime']) {
     const code = buildSync({
       entryPoints: [resolve('dist', entry, 'index.js')], bundle: true, write: false,
       minify: true, format: 'esm', platform: 'browser',

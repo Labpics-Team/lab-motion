@@ -2,7 +2,7 @@
  * compiler-acceptance.mjs — приёмочный гейт компиляторного среза (#208).
  *
  * Заявление среза: build-time lowering статических вызовов —
- * (1) `animate(el, { opacity: N })` из '@labpics/motion/nano' → precomputed-
+ * (1) `animate(el, { opacity: N })` из '@labpics/motion/native' → precomputed-
  * артефакт + hoisted-импорт приватного executor '@labpics/motion/compiler/
  * runtime'; (2) `animate(el, { width: [w0, w1] }, { layout: 'project' })`
  * из '@labpics/motion/animate' → сертифицированный НА СБОРКЕ артефакт
@@ -28,7 +28,7 @@ import { gzipSync } from 'node:zlib';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readCompilerNanoRecipe } from './compiler-doc-recipe.mjs';
+import { readCompilerNativeRecipe } from './compiler-doc-recipe.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = resolve(ROOT, 'dist');
@@ -36,7 +36,7 @@ const TMP = resolve(ROOT, 'scripts', '.compiler-acceptance-tmp');
 
 /** Alias публичных субпутей на реальные dist-артефакты (байты потребителя). */
 const ALIAS = {
-  '@labpics/motion/nano': resolve(DIST, 'nano/index.js'),
+  '@labpics/motion/native': resolve(DIST, 'native/index.js'),
   '@labpics/motion/compiler/runtime': resolve(DIST, 'compiler/runtime/index.js'),
   '@labpics/motion/animate': resolve(DIST, 'animate/index.js'),
   '@labpics/motion/compiler/surface': resolve(DIST, 'compiler/surface/index.js'),
@@ -82,7 +82,7 @@ async function buildFixture(name, code, withPlugin, entryName = name, extension 
 }
 
 // TypeScript-вход (бриф, этап C): аннотации, as const, satisfies, interface.
-const LOWERABLE_TS = `import { animate } from '@labpics/motion/nano';
+const LOWERABLE_TS = `import { animate } from '@labpics/motion/native';
 interface Marker { readonly kind: 'fixture' }
 const marker = { kind: 'fixture' } as const satisfies Marker;
 export function play(el: Element): typeof marker {
@@ -90,7 +90,7 @@ export function play(el: Element): typeof marker {
   return marker;
 }`;
 // TSX-вход: плагин заявляет поддержку через дефолтную фазу Vite.
-const LOWERABLE_TSX = `import { animate } from '@labpics/motion/nano';
+const LOWERABLE_TSX = `import { animate } from '@labpics/motion/native';
 export function Play(props: { el: Element }): unknown {
   animate(props.el, { opacity: 0.5 });
   return <div data-ok="1" />;
@@ -99,9 +99,9 @@ export function Play(props: { el: Element }): unknown {
 // Статическая opacity — единственная форма в скоупе lowering (#208 §core).
 // Это буквальный runnable-рецепт документации: acceptance и browser proof
 // не владеют отдельными копиями входа.
-const LOWERABLE = readCompilerNanoRecipe(ROOT);
+const LOWERABLE = readCompilerNativeRecipe(ROOT);
 // Динамическая opacity — вне скоупа: плагин обязан отказать (positive control).
-const DYNAMIC = `import { animate } from '@labpics/motion/nano';
+const DYNAMIC = `import { animate } from '@labpics/motion/native';
 export function play(el, v) { return animate(el, { opacity: v }); }`;
 // Surface-вызов полного фасада: статические концы + явный layout:'project' —
 // единственная форма, которую плагин обязан понизить в surface-executor.
@@ -117,7 +117,7 @@ export function play(el) { return animate(el, { width: [240, 360] }, { layout: '
 /** Fingerprint spring-солвера: замкнутая форма тянет Math.exp/cos/sin/sqrt. */
 const SPRING_MATH = /Math\.(?:exp|cos|sin|sqrt)/;
 const RUNTIME_MODULE = 'compiler/runtime/index.js';
-const NANO_MODULE = 'nano/index.js';
+const NATIVE_MODULE = 'native/index.js';
 const ANIMATE_MODULE = 'animate/index.js';
 const SURFACE_MODULE = 'compiler/surface/index.js';
 /**
@@ -149,7 +149,7 @@ function recordTrace(id, goal, result, refusal) {
   const owners = [
     [RUNTIME_MODULE, '@labpics/motion/compiler/runtime', 'compiled'],
     [SURFACE_MODULE, '@labpics/motion/compiler/surface', 'compiled'],
-    [NANO_MODULE, '@labpics/motion/nano', 'runtime'],
+    [NATIVE_MODULE, '@labpics/motion/native', 'runtime'],
     [ANIMATE_MODULE, '@labpics/motion/animate', 'runtime'],
   ].filter(([module]) => result.modules.includes(module));
   if (owners.length !== 1) {
@@ -188,8 +188,8 @@ async function run() {
     // ── Контроль fixture'а: без плагина путь ДЕЙСТВИТЕЛЬНО рантаймовый ─────────
     // (иначе «элиминация» ничего не значит — нечего было элиминировать).
     check(
-      baseline.modules.includes(NANO_MODULE),
-      `baseline не тянет ${NANO_MODULE} (fixture не исполняет рантаймовый путь): ${baseline.modules.join(', ')}`,
+      baseline.modules.includes(NATIVE_MODULE),
+      `baseline не тянет ${NATIVE_MODULE} (fixture не исполняет рантаймовый путь): ${baseline.modules.join(', ')}`,
     );
     check(
       SPRING_MATH.test(baseline.code),
@@ -202,7 +202,7 @@ async function run() {
       `compiled не тянет executor ${RUNTIME_MODULE}: ${compiled.modules.join(', ')}`,
     );
     // Несущий структурный инвариант: единственный dist-модуль compiled-графа —
-    // приватный executor. Ни nano, ни solver, ни motion-program, ни compiler/core.
+    // приватный executor. Ни native, ни solver, ни motion-program, ни compiler/core.
     const compiledExtra = compiled.modules.filter((m) => m !== RUNTIME_MODULE);
     check(
       compiledExtra.length === 0,
@@ -232,13 +232,13 @@ async function run() {
 
     // ── Positive control: динамическая opacity — плагин no-op ─────────────────
     check(
-      control.modules.includes(NANO_MODULE) && !control.modules.includes(RUNTIME_MODULE),
+      control.modules.includes(NATIVE_MODULE) && !control.modules.includes(RUNTIME_MODULE),
       `плагин ошибочно понизил динамический вызов (граф: ${control.modules.join(', ')})`,
     );
-    notes.push(`no-op контроль: динамическая opacity сохранила рантаймовый путь (${NANO_MODULE})`);
+    notes.push(`no-op контроль: динамическая opacity сохранила рантаймовый путь (${NATIVE_MODULE})`);
     notes.push(`граф compiled: ${compiled.modules.join(', ') || '(только entry)'}`);
-    recordTrace('nano-static', 'static opacity=0.5', compiled);
-    recordTrace('nano-dynamic', 'dynamic opacity', control, 'opacity is not build-known');
+    recordTrace('native-static', 'static opacity=0.5', compiled);
+    recordTrace('native-dynamic', 'dynamic opacity', control, 'opacity is not build-known');
 
     // ── Surface lowering: layout:'project' реально стирает фасад ───────────────
     const surfaceBaseline = await buildFixture('surface-uncompiled', SURFACE, false, 'surface');
@@ -331,8 +331,8 @@ async function run() {
       `TS-вход не понижен: graph=${tsCompiled.modules.join(',') || '(пусто)'}`,
     );
     check(
-      !tsCompiled.modules.includes(NANO_MODULE),
-      'TS-вход: nano runtime остался в бандле — lowering не заменил вызов',
+      !tsCompiled.modules.includes(NATIVE_MODULE),
+      'TS-вход: native runtime остался в бандле — lowering не заменил вызов',
     );
     const tsxCompiled = await buildFixture('tsx-compiled', LOWERABLE_TSX, true, 'tsx-fixture', 'tsx');
     check(
@@ -340,8 +340,8 @@ async function run() {
       `TSX-вход не понижен: graph=${tsxCompiled.modules.join(',') || '(пусто)'}`,
     );
     check(
-      !tsxCompiled.modules.includes(NANO_MODULE),
-      'TSX-вход: nano runtime остался в бандле — lowering не заменил вызов',
+      !tsxCompiled.modules.includes(NATIVE_MODULE),
+      'TSX-вход: native runtime остался в бандле — lowering не заменил вызов',
     );
     // Диагностика не скрыта: сборка с плагином не давит предупреждения — сам
     // факт lowering выше доказывает, что parse failure не съел трансформацию.

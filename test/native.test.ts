@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { animate } from '../src/nano/index.js';
+import { animate } from '../src/native/index.js';
 
 type Timing = KeyframeAnimationOptions & { easing?: string };
 
@@ -50,7 +50,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('nano: публичный WAAPI-only контракт', () => {
+describe('native: публичный WAAPI-only контракт', () => {
   it('отдаёт сами native Animation и строит to-only individual-transform кадр', async () => {
     const first = recordingElement();
     const second = recordingElement();
@@ -248,7 +248,7 @@ function expectCertifiedLinearBudget(
   expect(terminalSnap).toBeLessThanOrEqual(1e-3);
 }
 
-describe('nano: spring → linear() differential', () => {
+describe('native: spring → linear() differential', () => {
   it.each([
     [170, 26, 1, 'underdamped default'],
     [200, 2 * Math.sqrt(200), 1, 'critical'],

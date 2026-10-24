@@ -6,7 +6,7 @@
  * layout:'project' в versioned surface program ещё не существует.
  *
  * RED PROOF (история): до GREEN src/compiler/core.ts умел только
- * nano-lowering; seam `lowerSurfaceCall` отсутствовал — pick-хелпер
+ * native-lowering; seam `lowerSurfaceCall` отсутствовал — pick-хелпер
  * возвращал undefined, тест падал СВОИМ ассертом
  * (канон test/animate-facade-helpers.ts:9-31).
  * GREEN: seam добавлен (conservative lowering, каждый guard с positive

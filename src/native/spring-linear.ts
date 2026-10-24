@@ -1,6 +1,6 @@
 /**
- * nano/spring-linear.ts — SSOT дефолт-пружины nano: замкнутая форма →
- * длительность и CSS linear()-строка. Общий шов для runtime ./nano и
+ * native/spring-linear.ts — SSOT дефолт-пружины native: замкнутая форма →
+ * длительность и CSS linear()-строка. Общий шов для runtime ./native и
  * build-time compiler-lowering (#208): компилятор потребляет ровно тот же
  * канонический артефакт, что уходит браузеру, поэтому обе стороны совпадают
  * бит-в-бит по построению. Любое изменение здесь меняет и runtime, и compiled
@@ -9,13 +9,13 @@
 
 import { BASE_GRID_MAX } from '../compositor/segmenter.js';
 
-export interface NanoSpring {
+export interface NativeSpring {
   readonly mass: number;
   readonly stiffness: number;
   readonly damping: number;
 }
 
-export function springLinear(input?: NanoSpring): [number, string] {
+export function springLinear(input?: NativeSpring): [number, string] {
   const k = input?.stiffness ?? 170;
   const c = input?.damping ?? 26;
   const m = input?.mass ?? 1;
