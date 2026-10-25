@@ -15,7 +15,7 @@ const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
 
 const native = pkg.scripts?.['typecheck:native'];
 if (!native) {
-  console.log('native-gate: скрипт typecheck:native не объявлен — гвард не применим');
+  console.log('native-ci: скрипт typecheck:native не объявлен — гвард не применим');
   process.exit(0);
 }
 
@@ -28,8 +28,8 @@ const inCi = /(^|\n)\s*run:\s*pnpm\s+(?:run\s+)?typecheck:native\b/.test(ci);
 
 if (!aggregated && !inCi) {
   console.error(
-    'native-gate: typecheck:native объявлен, но не вызывается ни в ci.yml, ни в check:static — нативный тайпчек перестал быть обязательным гейтом',
+    'native-ci: typecheck:native объявлен, но не вызывается ни в ci.yml, ни в check:static — нативный тайпчек перестал быть обязательным гейтом',
   );
   process.exit(1);
 }
-console.log(`native-gate: OK (${inCi ? 'шаг ci.yml' : 'внутри check:static'})`);
+console.log(`native-ci: OK (${inCi ? 'шаг ci.yml' : 'внутри check:static'})`);
