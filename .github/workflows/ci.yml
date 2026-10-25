@@ -82,7 +82,7 @@ jobs:
       # шагом, а не внутри check:static: его отказ должен быть виден как свой
       # красный чек, а release.yml зовёт check:static и не обязан зависеть от
       # preview-компилятора. Согласованность шага с package.json стережёт
-      # check:native-gate — выпадение native-скрипта из CI ловится тестом.
+      # check:native-ci — выпадение native-скрипта из CI ловится тестом.
       - name: Native typecheck (TS7)
         run: pnpm typecheck:native
 
