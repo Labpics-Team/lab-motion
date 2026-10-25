@@ -28,6 +28,7 @@ type Job = {
   uses?: string;
   permissions?: Record<string, string>;
   defaults?: unknown;
+  container?: { image: string; options: string };
   'continue-on-error'?: boolean;
   steps?: Step[];
   strategy?: {
@@ -42,6 +43,11 @@ type Workflow = {
   defaults?: unknown;
   jobs: Record<string, Job>;
 };
+
+const playwrightPackage = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+const playwrightVersion = playwrightPackage.devDependencies['@playwright/test'] as string;
+// Образ закреплён в контракте; обновление пакета требует повторной проверки образа.
+const playwrightImage = 'mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea';
 
 const directory = fileURLToPath(new URL('../.github/workflows/', import.meta.url));
 const sources = () => new Map(readdirSync(directory)
@@ -158,7 +164,7 @@ const mutationCommands = [
 const browserCommands = [
   activatePnpm,
   'pnpm install --frozen-lockfile',
-  'pnpm exec playwright install --with-deps ${{ matrix.browser }}',
+  'pnpm exec playwright install --dry-run ${{ matrix.browser }}',
   'pnpm typecheck:browser',
   'pnpm build',
   'pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }} --fail-on-flaky-tests',
@@ -447,6 +453,10 @@ function assertNativeGraph(files: Map<string, string>) {
   assertCommands(mutation, mutationCommands);
   assertCommands(security, securityCommands);
   assertCommands(conformance, browserCommands);
+  expect(conformance.container).toEqual({ image: playwrightImage, options: '--user 1001' });
+  const imageVersion = /^mcr\.microsoft\.com\/playwright:v([^@]+)-noble@sha256:[a-f0-9]{64}$/.exec(conformance.container!.image);
+  expect(imageVersion?.[1]).toBe(playwrightVersion);
+  for (const item of conformance.steps!.filter(item => item.run)) expect(item.shell).toBe('bash');
   expect(step(tests, 'Vitest').id).toBe('vitest');
   const gate = ci.jobs.CI!;
   expect(gate.name).toBe('CI');
@@ -493,6 +503,13 @@ describe('нативный граф CI', () => {
     ['подмена Node floor настройкой Node 24', 'ci.yml', (w: Workflow) => {
       step(w.jobs.verify!, 'Setup consumer Node floor').with!['node-version'] = '24';
     }],
+    ['несовпадение версии browser-образа', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.image = playwrightImage.replace(`v${playwrightVersion}`, 'v0.0.0'); }],
+    ['несовпадение digest browser-образа', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.image = playwrightImage.replace(/sha256:[a-f0-9]{64}$/, `sha256:${'0'.repeat(64)}`); }],
+    ['browser-образ без закреплённого digest', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.image = playwrightImage.split('@')[0]!; }],
+    ['запуск browser-контейнера с root UID', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.options = '--user 0'; }],
+    ['неявный UID browser-контейнера', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.options = ''; }],
+    ['привилегированные параметры browser-контейнера', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.options += ' --privileged'; }],
+    ['неявная оболочка browser-шага', 'browser.yml', (w: Workflow) => { delete step(w.jobs.conformance!, 'Install Playwright browser').shell; }],
     ['пропуск browser Setup Node', 'browser.yml', (w: Workflow) => {
       step(w.jobs.conformance!, 'Setup Node').if = false;
     }],

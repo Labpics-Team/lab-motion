@@ -23,6 +23,9 @@ jobs:
   conformance:
     name: ${{ matrix.browser }} · ${{ matrix.shard }}/${{ matrix.shards }}
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+      options: --user 1001
     timeout-minutes: 25
     strategy:
       fail-fast: false
@@ -50,26 +53,32 @@ jobs:
           node-version: "24"
 
       - name: Activate pinned pnpm
+        shell: bash
         run: |
           corepack enable
           corepack install --global pnpm@11.11.0
 
       - name: Install dependencies
+        shell: bash
         run: pnpm install --frozen-lockfile
 
-      # Устанавливаем ТОЛЬКО нужный движок матрицы (+ системные зависимости).
+      # Образ содержит браузеры точной версии и системные зависимости; apt не запускается.
       - name: Install Playwright browser
-        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+        shell: bash
+        run: pnpm exec playwright install --dry-run ${{ matrix.browser }}
 
       # Типопроверка browser-спеков (отдельный tsconfig: DOM lib + /dist/*→src/*
       # path-mapping) — специфичный tsc не входит в основной `pnpm typecheck`.
       - name: Typecheck browser specs
+        shell: bash
         run: pnpm typecheck:browser
 
       - name: Build library
+        shell: bash
         run: pnpm build
 
       - name: Run conformance (${{ matrix.browser }})
+        shell: bash
         run: pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }} --fail-on-flaky-tests
 
       # Trace/video/screenshot пишутся только on-failure (playwright.config) —
