@@ -1,4 +1,5 @@
 import { defineConfig } from 'tsup';
+import { minify } from 'terser';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 
@@ -28,6 +29,11 @@ const sharedFramePlugin = {
 async function makeSharedFrameBrowserNative(): Promise<void> {
   const dist = resolve('dist');
   const frame = join(dist, 'frame', 'index.js');
+  const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
+    exports: { '.': { import: { default: string }; require: { default: string } } };
+  };
+  const root = pkg.exports['.'];
+  const annotated = new Set([root.import.default, root.require.default].map(file => resolve(file)));
   if (!existsSync(frame)) throw new Error('build: отсутствует dist/frame/index.js');
   const pending = [dist];
   while (pending.length > 0) {
@@ -38,16 +44,30 @@ async function makeSharedFrameBrowserNative(): Promise<void> {
         pending.push(file);
         continue;
       }
-      if (!entry.name.endsWith('.js')) continue;
+      const esm = entry.name.endsWith('.js');
+      if (!esm && !entry.name.endsWith('.cjs')) continue;
       const source = readFileSync(file, 'utf8');
-      if (!source.includes('#frame')) continue;
-      let specifier = relative(dirname(file), frame).replaceAll('\\', '/');
-      if (!specifier.startsWith('.')) specifier = './' + specifier;
-      const rewritten = source.replace(/(["'])#frame\1/g, JSON.stringify(specifier));
-      if (rewritten.includes('#frame')) {
-        throw new Error(`build: не переписан browser-import #frame в ${file}`);
+      let rewritten = source;
+      if (esm && rewritten.includes('#frame')) {
+        let specifier = relative(dirname(file), frame).replaceAll('\\', '/');
+        if (!specifier.startsWith('.')) specifier = './' + specifier;
+        rewritten = rewritten.replace(/(["'])#frame\1/g, JSON.stringify(specifier));
+        if (rewritten.includes('#frame')) {
+          throw new Error(`build: не переписан browser-import #frame в ${file}`);
+        }
       }
-      writeFileSync(file, rewritten);
+      if (!annotated.has(file) && /[@#]__[A-Z_]+__/.test(rewritten)) {
+        // Legacy entries сохраняют прежнюю политику вывода; root оставляет
+        // PURE для downstream tree-shaking. Удаляем только metadata через AST:
+        // строки и шаблоны могут сами содержать текст, похожий на комментарий.
+        const rendered = await minify(rewritten, {
+          compress: false, mangle: false, module: esm,
+          format: { preserve_annotations: false },
+        });
+        if (rendered.code === undefined) throw new Error(`build: нет JavaScript для ${file}`);
+        rewritten = rendered.code;
+      }
+      if (rewritten !== source) writeFileSync(file, rewritten);
     }
   }
 }
@@ -123,6 +143,8 @@ export default defineConfig({
   terserOptions: {
     get compress() { return { passes: 3, pure_getters: true }; },
     get mangle() { return { properties: { regex: /^_/ } }; },
+    // Чистые фабрики должны оставаться видимыми сборщику потребителя после публикации dist.
+    get format() { return { preserve_annotations: true }; },
   },
   treeshake: true,
   esbuildPlugins: [sharedFramePlugin],

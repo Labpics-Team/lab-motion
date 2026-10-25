@@ -91,6 +91,50 @@ test('рецепт панели: повторный pickup, native settle, focus
   expect(await page.evaluate(() => (window as unknown as ProbeWindow).followProbe.animations.length)).toBe(result.count);
 });
 
+test('закрытие панели мышью и клавиатурой возвращает фокус кнопке открытия', async ({ page }) => {
+  await page.setContent(`<section id="panel-root"><button data-open>Открыть</button>
+    <section data-panel><div data-handle>Потяните</div><button data-close>Закрыть</button></section></section>`);
+  await page.evaluate(async () => {
+    // @ts-expect-error Модуль собирается из буквального кода docs/recipes.md.
+    const { mountSnapPanel } = await import('/browser/.artifacts/compositor-follow-recipes.js');
+    (window as unknown as ProbeWindow).followProbe.cleanup = mountSnapPanel(document.getElementById('panel-root'));
+  });
+  await page.locator('[data-open]').click();
+  await page.locator('[data-close]').click();
+  await expect(page.locator('[data-open]')).toBeFocused();
+  await expect(page.locator('[data-open]')).toHaveAttribute('aria-expanded', 'false');
+  await page.locator('[data-open]').click();
+  await page.locator('[data-close]').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-open]')).toBeFocused();
+  await expect(page.locator('[data-open]')).toHaveAttribute('aria-expanded', 'false');
+  await page.evaluate(() => (window as unknown as ProbeWindow).followProbe.cleanup());
+});
+
+test('автоматический pointer settle сохраняет внешний фокус', async ({ page }) => {
+  await page.setContent(`<style>
+    [data-panel] { position:absolute; top:50px; width:320px; height:300px; }
+    [data-handle] { height:40px; width:320px; touch-action:none; }
+  </style><section id="panel-root"><button data-open>Открыть</button>
+    <section data-panel><div data-handle>Потяните</div><button data-close>Закрыть</button></section></section>
+    <input data-external>`);
+  await page.evaluate(async () => {
+    // @ts-expect-error Модуль собирается из буквального кода docs/recipes.md.
+    const { mountSnapPanel } = await import('/browser/.artifacts/compositor-follow-recipes.js');
+    (window as unknown as ProbeWindow).followProbe.cleanup = mountSnapPanel(document.getElementById('panel-root'));
+  });
+  await page.locator('[data-open]').click();
+  const handle = await page.locator('[data-handle]').boundingBox();
+  await page.mouse.move(handle!.x + 20, handle!.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(handle!.x + 20, handle!.y + 300, { steps: 3 });
+  await page.locator('[data-external]').focus();
+  await page.mouse.up();
+  await expect(page.locator('#panel-root')).toHaveAttribute('data-snap', '320');
+  await expect(page.locator('[data-external]')).toBeFocused();
+  await page.evaluate(() => (window as unknown as ProbeWindow).followProbe.cleanup());
+});
+
 test('рецепт карусели: локальная страница, повторный захват, кнопки и cleanup', async ({ page }) => {
   await page.setContent(`<style>
     [data-viewport] { width:240px; overflow:hidden; }

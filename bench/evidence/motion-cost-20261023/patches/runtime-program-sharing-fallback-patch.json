@@ -1,0 +1,18 @@
+{
+  "base": "87ce1f1c5572fa6bd45d715c2196fbd5965f748c",
+  "operations": [
+    {
+      "path": "src/motion/runtime.ts",
+      "replace": [
+        [
+          "function sameStart(program: Program, point: Point, velocity: readonly number[]): boolean {\n  const first = program._segments[0]!;\n  if (program._unit !== point._unit || first._from.length !== point._coordinates.length || first._velocity.length !== velocity.length) return false;\n  for (let i = 0; i < first._from.length; i++)\n    if (!Object.is(first._from[i], point._coordinates[i]) || !Object.is(first._velocity[i], velocity[i])) return false;\n  return true;\n}\n\n",
+          ""
+        ],
+        [
+          "          // Предыдущая цель той же property уже хранит неизменяемую программу.\n          const previous = i > 0 && clock._stagger === 0 && property._literal ? result[result.length - props.length]!._program : undefined;\n          const spec = previous && sameStart(previous, current, current._velocity) ? previous\n            : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);",
+          "          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);"
+        ]
+      ]
+    }
+  ]
+}

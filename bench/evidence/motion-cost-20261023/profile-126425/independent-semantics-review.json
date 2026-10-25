@@ -1,0 +1,403 @@
+{
+  "scope": "Independent read-only audit of saved paired semantics, sample matrix and easing data; no project execution",
+  "inputs": {
+    "js/metadata.json": "ee45e57529759c19774c6757ebf8db59f7a240bae573b3eeb7670806b7942f89",
+    "js/paired-semantics.json": "3254368af8ef97a65d42f74dbc2b154c691f82c18f1f7fee48134469c231ed69",
+    "js/samples.jsonl": "9c87cd60c65bc72dc57d23dcdad38e9a4e375f07895d84d924a4474cff05e45c",
+    "spring/metadata.json": "fbc0c9c3a32e0e3705bb537211f8c37bf0024c9bf2975684d135685651c8f736",
+    "spring/paired-semantics.json": "1ada59efe4bbb670c5029f27e1ffa10a014d9edc45bea4a6d1dbaf47f5b5cd37",
+    "spring/samples.jsonl": "bf1e4cd33def3683293ca976af17f6ed4dc60c2234d81aec993da0ee4d64c843",
+    "easing.json": "473c96a9c382301a7bafcd5b68effa940c62009726a7001f6010b8159dc4b6b9"
+  },
+  "profiles": {
+    "js": {
+      "durationMs": 400,
+      "timesMs": [
+        0,
+        1,
+        16,
+        63,
+        127,
+        255,
+        399,
+        500,
+        999
+      ],
+      "targetsPerTime": 100,
+      "exactRecordedCoordinatePairs": 900,
+      "recordedFiniteCoordinates": 1800,
+      "at1ms": 0.00561563,
+      "sameCoordinateForAllTargetsAtEveryTime": true,
+      "rawMatrix": {
+        "rows": 120,
+        "counts": [
+          1,
+          100,
+          1000
+        ],
+        "rounds": 20,
+        "ids": [
+          "baseline",
+          "lab"
+        ],
+        "completeOrderedUnique": true,
+        "firstPositions": {
+          "baseline": 10,
+          "lab": 10
+        }
+      },
+      "allRawEndpointsExact300": true,
+      "allPostCleanupEffectsZero": true,
+      "sourceIdentity": {
+        "candidate": {
+          "revision": "12642570555cf8c8ec65a026dab7caf64c787469",
+          "dist": {
+            "sha256": "3ba95fa7d2658925fbaac82c4b79e891a8bb33293ac09dccc64c2fbb11bc5402",
+            "files": 340
+          }
+        },
+        "baseline": {
+          "revision": "15137fba618e962ef0319bba21d49cc123ae1e2f",
+          "dist": {
+            "sha256": "ce88164996c355867d306bfbbbc68e724e1afab022cb0e72b26a0d4e0002ae78",
+            "files": 338
+          }
+        }
+      },
+      "profileSourceHashMatchesLocalCopy": true,
+      "originalStartSemanticCheck": "not-applicable: adapter-has-no-stagger",
+      "recordedAdapterHashes": {
+        "baseline": "87c81154e15b068356f1ba9a7029b05a19eda903c896b80675ec3083604967b0",
+        "lab": "ce669c8b162b1f09d61e12232cd6e6953c4c3542fdaf3f47adf48b0487914147"
+      }
+    },
+    "spring": {
+      "durationMs": 1277.5309159615554,
+      "timesMs": [
+        0,
+        1,
+        16,
+        63,
+        127,
+        255,
+        399,
+        500,
+        999
+      ],
+      "targetsPerTime": 100,
+      "exactRecordedCoordinatePairs": 900,
+      "recordedFiniteCoordinates": 1800,
+      "at1ms": 0.0434881,
+      "sameCoordinateForAllTargetsAtEveryTime": true,
+      "rawMatrix": {
+        "rows": 120,
+        "counts": [
+          1,
+          100,
+          1000
+        ],
+        "rounds": 20,
+        "ids": [
+          "baseline",
+          "lab"
+        ],
+        "completeOrderedUnique": true,
+        "firstPositions": {
+          "baseline": 10,
+          "lab": 10
+        }
+      },
+      "allRawEndpointsExact300": true,
+      "allPostCleanupEffectsZero": true,
+      "sourceIdentity": {
+        "candidate": {
+          "revision": "12642570555cf8c8ec65a026dab7caf64c787469",
+          "dist": {
+            "sha256": "3ba95fa7d2658925fbaac82c4b79e891a8bb33293ac09dccc64c2fbb11bc5402",
+            "files": 340
+          }
+        },
+        "baseline": {
+          "revision": "15137fba618e962ef0319bba21d49cc123ae1e2f",
+          "dist": {
+            "sha256": "ce88164996c355867d306bfbbbc68e724e1afab022cb0e72b26a0d4e0002ae78",
+            "files": 338
+          }
+        }
+      },
+      "profileSourceHashMatchesLocalCopy": true,
+      "originalStartSemanticCheck": "not-applicable: adapter-has-no-stagger",
+      "recordedAdapterHashes": {
+        "baseline": "1d6874034647fdc3807f17834cf362cbee0e9a1461933447d5d606fa8a11e8ed",
+        "lab": "f0b0d92c2cf7b8f10f7d8cd926ee2fd1097e2f834e617ae9b1ed5a2bcd994745"
+      }
+    }
+  },
+  "limitations": [
+    "Paired browser semantics cover only DOMMatrix.e for 100 paused/seeking x-only targets at nine times, not all six matrix components, autoplay trajectories, arbitrary easing, rotations or all public API histories.",
+    "Browser coordinate equality is exact in saved JSON; JSON does not preserve signed zero. It is not a claim of Object.is equality for unrecorded runtime floating-point values.",
+    "Spring seek samples stop at999ms before its1277.5309159615554ms duration; timed rows separately provide exact300 endpoint and zero post-cleanup effects.",
+    "Adapters and built dist are absent here: source/adapter hashes are recorded and cross-consistent, but their bytes cannot be rehashed locally.",
+    "Easing report records a successful Object.is assertion corpus, not its4110x9 raw outputs; exact corpus assertion cannot be rerun from this artifact alone. Timed pair checksums and summaries can be rechecked independently.",
+    "Easing is warmed Node/V8 evaluation of4096 interior inputs; factory construction, browser DOM costs and general full-runtime speed are outside this measurement. Percentiles describe the observed32 pairs, not confidence intervals.",
+    "Original START semantic checks for spring/js pair adapters are explicitly not-applicable. Profile analysis passed with publicationAdmission not evaluated; original S1-S5 failure is not superseded."
+  ],
+  "jsRegression": {
+    "oldEvidenceSha256": "5039ac9921c6a0eb4461004756e9705f1ee61107e093ff768ec49a391d9a6b28",
+    "baselineEvidenceUnchanged": true,
+    "oldMismatches": 100,
+    "oldMismatchTimeMs": 1,
+    "oldCandidateValue": 0.0056156,
+    "baselineAndNewCandidateValue": 0.00561563,
+    "newMismatches": 0
+  },
+  "easing": {
+    "identities": [
+      {
+        "revision": "15137fba618e962ef0319bba21d49cc123ae1e2f",
+        "entrySha256": "061e46b69aa2e61e248efccbd2821f6aa44f286f44992b0ea619cc49a69c8639"
+      },
+      {
+        "revision": "12642570555cf8c8ec65a026dab7caf64c787469",
+        "entrySha256": "579582f72f1c497ed79bf9d79ec152b7b4a40529af704e17ffe5c8beefda2356"
+      }
+    ],
+    "runtime": {
+      "node": "v24.19.0",
+      "v8": "13.6.233.17-node.51",
+      "cpu": "AMD EPYC 9V74 80-Core Processor"
+    },
+    "profile": {
+      "inputs": 4096,
+      "repeats": 32,
+      "warmups": 4,
+      "pairs": 32,
+      "curves": [
+        [
+          0.2,
+          0,
+          0,
+          1
+        ],
+        [
+          0.25,
+          0.1,
+          0.25,
+          1
+        ],
+        [
+          0.42,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0.58,
+          1
+        ],
+        [
+          0.42,
+          0,
+          0.58,
+          1
+        ],
+        [
+          0.1,
+          -1,
+          0.8,
+          2
+        ],
+        [
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          0,
+          1,
+          1
+        ],
+        [
+          1,
+          0,
+          0,
+          1
+        ]
+      ]
+    },
+    "reportedExactPairs": 36990,
+    "reportedExactInputsPerCurve": {
+      "interiorMidpointGrid": 4096,
+      "boundaryAndNonfinite": 14
+    },
+    "rawTimedPairs": 288,
+    "timedCallsPerSidePerPair": 131072,
+    "balancedOrderEachCurve": [
+      16,
+      16
+    ],
+    "allPairChecksumsExact": true,
+    "allWithinCurveChecksumsExact": true,
+    "allSummariesRecomputedExactly": true,
+    "observedAccumulatorRecomputedExactly": true,
+    "results": [
+      {
+        "coordinates": [
+          0.2,
+          0,
+          0,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 94.08635711669923,
+        "candidateNsP50": 62.598190307616534,
+        "pairedSpeedup": {
+          "p05": 1.4522958751603654,
+          "p50": 1.5015855032874605,
+          "p95": 1.5281319063296819
+        }
+      },
+      {
+        "coordinates": [
+          0.25,
+          0.1,
+          0.25,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 97.33488464355386,
+        "candidateNsP50": 69.67281341552743,
+        "pairedSpeedup": {
+          "p05": 1.3651100379511572,
+          "p50": 1.402231317607533,
+          "p95": 1.4429873558277693
+        }
+      },
+      {
+        "coordinates": [
+          0.42,
+          0,
+          1,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 95.2694778442384,
+        "candidateNsP50": 71.55599975585888,
+        "pairedSpeedup": {
+          "p05": 1.302881491069842,
+          "p50": 1.3328270227419174,
+          "p95": 1.364550652205149
+        }
+      },
+      {
+        "coordinates": [
+          0,
+          0,
+          0.58,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 97.39476013183659,
+        "candidateNsP50": 67.5106506347646,
+        "pairedSpeedup": {
+          "p05": 1.4123270729309874,
+          "p50": 1.4424084914919313,
+          "p95": 1.4848669190072517
+        }
+      },
+      {
+        "coordinates": [
+          0.42,
+          0,
+          0.58,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 96.42799377441308,
+        "candidateNsP50": 71.40062713622761,
+        "pairedSpeedup": {
+          "p05": 1.299550792137853,
+          "p50": 1.3466526634875493,
+          "p95": 1.4044653561915963
+        }
+      },
+      {
+        "coordinates": [
+          0.1,
+          -1,
+          0.8,
+          2
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 96.03273010254377,
+        "candidateNsP50": 68.33838653564489,
+        "pairedSpeedup": {
+          "p05": 1.3754357883167172,
+          "p50": 1.406743775036319,
+          "p95": 1.4559153131773874
+        }
+      },
+      {
+        "coordinates": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 99.35071563720726,
+        "candidateNsP50": 62.94055938720761,
+        "pairedSpeedup": {
+          "p05": 1.5505160620623155,
+          "p50": 1.5767630954198348,
+          "p95": 1.5847388812701106
+        }
+      },
+      {
+        "coordinates": [
+          1,
+          0,
+          1,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 93.61744689941747,
+        "candidateNsP50": 72.19490051269678,
+        "pairedSpeedup": {
+          "p05": 1.2347409415521498,
+          "p50": 1.298277706550203,
+          "p95": 1.3065112925454623
+        }
+      },
+      {
+        "coordinates": [
+          1,
+          0,
+          0,
+          1
+        ],
+        "pairs": 32,
+        "candidateFasterPairs": 32,
+        "baselineNsP50": 97.68959045410725,
+        "candidateNsP50": 75.36785888671848,
+        "pairedSpeedup": {
+          "p05": 1.253730156238023,
+          "p50": 1.297143648462537,
+          "p95": 1.3138368460131875
+        }
+      }
+    ]
+  }
+}

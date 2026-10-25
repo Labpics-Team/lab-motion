@@ -1,0 +1,45 @@
+{
+  "scope": "Short independent static intervention and saved semantics audit; no builds/tests/project/API execution",
+  "baseline": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+  "candidate": "e52a4b37c79cf495adc10ac70dbceb5ac5b5fd85",
+  "intervention": "Restore complete native endpoint transform topology; remove compact selection from shared formatter",
+  "staticVerdict": "PASS",
+  "semantics": {
+    "js": {
+      "exactSavedPairs": 900,
+      "durationMs": 400,
+      "all1800RecordedCoordinatesFinite": true
+    },
+    "spring": {
+      "exactSavedPairs": 900,
+      "durationMs": 1277.5309159615554,
+      "all1800RecordedCoordinatesFinite": true
+    }
+  },
+  "easing": {
+    "entrySha256Both": "579582f72f1c497ed79bf9d79ec152b7b4a40529af704e17ffe5c8beefda2356",
+    "timedPairs": 288,
+    "allSavedPairChecksumsEqual": true,
+    "recordedExactCorpus": {
+      "exactSamplesPerCurve": 4110,
+      "exact": true
+    },
+    "runtime": {
+      "node": "v24.19.0",
+      "v8": "13.6.233.17-node.51",
+      "cpu": "AMD EPYC 9V45 96-Core Processor"
+    }
+  },
+  "causalNotes": [
+    "JS current-pose output is unchanged, but its CPU path is directly simplified: translationOnly flag/key branches and unconditional neutral calculations disappear; the formatter no longer branches on compact output. JS CPU is not an untouched negative control.",
+    "The easing entry hashes are recorded identical, so easing provides an unchanged-code negative control. Built entry bytes are not present locally for independent rehashing.",
+    "Paired browser evidence checks paused/seeking x-only DOMMatrix.e at9times, not a standalone native autoplay or all-components proof. Original START/browser gates remain necessary.",
+    "This C pair ran on EPYC9V45. Do not attribute differences from the earlier3832 profile on another CPU to this intervention. Publication admission is not established by this audit."
+  ],
+  "inputs": {
+    "js/paired-semantics.json": "3254368af8ef97a65d42f74dbc2b154c691f82c18f1f7fee48134469c231ed69",
+    "spring/paired-semantics.json": "1ada59efe4bbb670c5029f27e1ffa10a014d9edc45bea4a6d1dbaf47f5b5cd37",
+    "easing.json": "acc65c359bfcc67dda8cc5df49a06acf49c17f371ccf8ff788fb9f2781830047",
+    "intervention.json": "d63ce162f25adadcacd6e15d7442eb16d7d9a3f4a5c8b05d3c3bd21a1e85141a"
+  }
+}

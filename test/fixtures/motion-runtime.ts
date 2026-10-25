@@ -1,4 +1,6 @@
 import { Runtime, type RuntimeHost } from '../../src/motion/runtime.js';
+import { runSequence } from '../../src/motion/sequence.js';
+import type { Playback, SequenceOptions, SequenceStep } from '../../src/motion/types.js';
 import type { FrameLoop } from '../../src/frame/index.js';
 
 export function harness(native = false) {
@@ -13,7 +15,12 @@ export function harness(native = false) {
   const effects: Array<{ currentTime: number | null; playbackRate: number; updatePlaybackRate(rate: number): void; cancelled: boolean; keys: Keyframe[]; timing: KeyframeAnimationOptions; finished: Promise<unknown>; complete(): void; cancel(): void }> = [];
   const host: RuntimeHost = { frame: loop, now: () => time, reduced: () => false,
     styles: element => (element as HTMLElement).style, supports: () => native };
-  const runtime = new Runtime(host);
+  const engine = new Runtime(host);
+  const runtime = Object.assign(engine, {
+    sequence(steps: readonly SequenceStep[], options?: SequenceOptions): Playback {
+      return runSequence(engine, steps, options);
+    },
+  });
   const writes: Array<[string, string]> = [];
   const values = new Map<string, string>();
   const element = { style: {

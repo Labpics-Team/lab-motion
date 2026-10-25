@@ -29,9 +29,9 @@ describe('preset ownership', () => {
     const first = timing({ spring: profile });
     profile.stiffness = 400;
     const second = timing({ spring: profile });
-    expect(first.spring).toEqual({ mass: 2, stiffness: 240, damping: 36 });
-    expect(second.spring).toEqual(profile);
-    expect(timing(undefined).spring).toEqual(defaults);
+    expect(first._spring).toEqual({ mass: 2, stiffness: 240, damping: 36 });
+    expect(second._spring).toEqual(profile);
+    expect(timing(undefined)._spring).toEqual(defaults);
   });
 
   it('the browser runtime does not load optional preset dictionaries', async () => {
