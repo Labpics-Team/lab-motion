@@ -232,6 +232,53 @@ jobs:
       - name: Driver mutation gate
         run: pnpm exec stryker run stryker.driver.config.mjs
 
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Scan dependencies, configuration and secrets
+        run: |
+          set -euo pipefail
+          # trivy читает переменные TRIVY_* как флаги: охват проверки задаёт только этот шаг.
+          unset "${!TRIVY_@}"
+          version=0.74.0
+          sum=2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a
+          dir="$RUNNER_TEMP/trivy"
+          mkdir -p "$dir"
+          curl -fsSL --retry 3 --retry-all-errors -o "$dir/trivy.tgz" \
+            "https://github.com/aquasecurity/trivy/releases/download/v$version/trivy_${version}_Linux-64bit.tar.gz"
+          echo "$sum  $dir/trivy.tgz" | sha256sum -c -
+          tar -xzf "$dir/trivy.tgz" -C "$dir" trivy
+          accepted=(--ignorefile /dev/null)
+          [ -f .trivyignore.yaml ] && accepted=(--ignorefile .trivyignore.yaml)
+          # Настройки сканера задаёт шаг: trivy.yaml из проверяемого дерева их не меняет.
+          scan() { "$dir/trivy" fs --config /dev/null --cache-dir "$dir/cache" --exit-code 1 --no-progress "$@" .; }
+          scan --scanners vuln,misconfig --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps "${accepted[@]}"
+          # Исправление вышло — принятая раньше уязвимость снова блокирует.
+          scan --scanners vuln --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps --ignore-unfixed --ignorefile /dev/null
+          # Секрет в тестах, примерах и документации — такая же утечка: встроенные исключения trivy для них сняты,
+          # а записи .trivyignore.yaml к секретам не применяются.
+          printf 'disable-allow-rules:\n  - tests\n  - examples\n  - markdown\n' > "$dir/secret.yaml"
+          scan --scanners secret --secret-config "$dir/secret.yaml" --ignorefile /dev/null
+          # Тот же путь сканирования должен заметить тестовый ключ внутри examples/.
+          # Проба живёт только в окружении CI и не попадает в исходники.
+          probe_dir=$(mktemp -d examples/ci-trivy-canary.XXXXXXXX)
+          trap 'rm -rf -- "$probe_dir"' EXIT
+          probe_file="$probe_dir/credentials.txt"
+          python3 test/ci-trivy-canary.py seed "$probe_file"
+          set +e
+          scan --scanners secret --secret-config "$dir/secret.yaml" --ignorefile /dev/null --format json > "$dir/secret-canary.json"
+          canary_status=$?
+          set -e
+          python3 test/ci-trivy-canary.py verify "$dir/secret-canary.json" "$probe_file" "$canary_status"
+          rm -rf -- "$probe_dir"
+          trap - EXIT
+
   documentation:
     uses: ./.github/workflows/docs.yml
 
@@ -241,7 +288,7 @@ jobs:
   CI:
     name: CI
     if: ${{ always() }}
-    needs: [verify, tests, mutation, browser-static, documentation]
+    needs: [verify, tests, mutation, browser-static, documentation, security]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -254,6 +301,7 @@ jobs:
           MUTATION_RESULT: ${{ needs.mutation.result }}
           BROWSER_RESULT: ${{ needs.browser-static.result }}
           DOCS_RESULT: ${{ needs.documentation.result }}
+          SECURITY_RESULT: ${{ needs.security.result }}
         run: |
           set -euo pipefail
           [[ "$VERIFY_RESULT" == success ]]
@@ -261,3 +309,4 @@ jobs:
           [[ "$MUTATION_RESULT" == success ]]
           [[ "$BROWSER_RESULT" == success ]]
           [[ "$DOCS_RESULT" == success ]]
+          [[ "$SECURITY_RESULT" == success ]]
