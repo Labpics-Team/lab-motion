@@ -2,13 +2,13 @@
  * compiler/core.ts — parse-независимое ядро build-time lowering (#208).
  *
  * Скоуп ровно один: статический вызов `animate(target, { opacity: N })` из
- * direct named import '@labpics/motion/nano' без опций. Всё остальное —
+ * direct named import '@labpics/motion/native' без опций. Всё остальное —
  * консервативный отказ: source остаётся семантически исходным.
  *
- * Пайплайн артефакта: nano SSOT (springLinear) → кандидат MotionProgram V1 →
+ * Пайплайн артефакта: native SSOT (springLinear) → кандидат MotionProgram V1 →
  * parseMotionProgramV1 (единственный оракул доверия) → проекция обратно в
  * `{ frame, durationMs, cssLinear }` с обязательным bit-exact сверением
- * с исходным nano-артефактом. Любое расхождение после доказанного match —
+ * с исходным native-артефактом. Любое расхождение после доказанного match —
  * ошибка сборки, не silent fallback.
  *
  * Ядро не знает о Vite/Rollup: адаптеры передают ESTree-совместимый Program
@@ -25,33 +25,33 @@ import {
   type MotionProgramCurveV1,
   type MotionProgramV1,
 } from '../internal/motion-program.js';
-import { springLinear } from '../nano/spring-linear.js';
+import { springLinear } from '../native/spring-linear.js';
 import { tryCompileSurfaceArtifact } from '../future-layout/artifact.js';
 import { DEFAULT_SPRING } from '../internal/motion-defaults.js';
 import type { SpringParams } from '../spring.js';
 
 // ─── Артефакт ────────────────────────────────────────────────────────────────
 
-export interface CompiledNanoOpacityArtifact {
+export interface CompiledNativeOpacityArtifact {
   readonly frame: { readonly opacity: number };
   readonly durationMs: number;
   readonly cssLinear: string;
 }
 
-/** Разбор канонической linear()-строки nano обратно в узлы (точный round-trip). */
+/** Разбор канонической linear()-строки native обратно в узлы (точный round-trip). */
 function linearPoints(cssLinear: string): number[] {
   if (!cssLinear.startsWith('linear(') || !cssLinear.endsWith(')')) {
-    throw new Error('lab-motion compiler: неканоническая linear()-строка nano');
+    throw new Error('lab-motion compiler: неканоническая linear()-строка native');
   }
   return cssLinear.slice(7, -1).split(',').map(Number);
 }
 
 /**
- * Строит доверенный артефакт compiled-nano для `{ opacity }`-вызова.
+ * Строит доверенный артефакт compiled-native для `{ opacity }`-вызова.
  * Бросает (ошибка сборки) при непредставимой программе или расхождении
- * проекции с nano SSOT.
+ * проекции с native SSOT.
  */
-export function compileNanoOpacityArtifact(opacity: number): CompiledNanoOpacityArtifact {
+export function compileNativeOpacityArtifact(opacity: number): CompiledNativeOpacityArtifact {
   if (typeof opacity !== 'number' || !Number.isFinite(opacity)) {
     throw new Error('lab-motion compiler: opacity обязана быть конечным числом');
   }
@@ -88,7 +88,7 @@ export function compileNanoOpacityArtifact(opacity: number): CompiledNanoOpacity
   // Единственный оракул доверия — канонический V1-парсер пакета.
   const program: MotionProgramV1 = parseMotionProgramV1(candidate);
 
-  // Проекция обратно: артефакт обязан бит-в-бит совпасть с nano SSOT.
+  // Проекция обратно: артефакт обязан бит-в-бит совпасть с native SSOT.
   const track = program[5][0]!;
   const segment = track[7][0]!;
   const to = segment[3];
@@ -104,7 +104,7 @@ export function compileNanoOpacityArtifact(opacity: number): CompiledNanoOpacity
     to[0] !== 1 || to[1]![0] !== 0 || to[1]![1] !== opacity ||
     `linear(${projected})` !== cssLinear
   ) {
-    throw new Error('lab-motion compiler: проекция V1 разошлась с nano SSOT');
+    throw new Error('lab-motion compiler: проекция V1 разошлась с native SSOT');
   }
   return { frame: { opacity }, durationMs, cssLinear };
 }
@@ -119,29 +119,29 @@ export interface AstNode {
   readonly [key: string]: unknown;
 }
 
-export interface NanoLoweringEdit {
+export interface NativeLoweringEdit {
   readonly start: number;
   readonly end: number;
   readonly replacement: string;
 }
 
-export interface NanoLoweringPlan {
+export interface NativeLoweringPlan {
   /** Непересекающиеся правки в порядке возрастания start. */
-  readonly edits: readonly NanoLoweringEdit[];
+  readonly edits: readonly NativeLoweringEdit[];
   /** Локальное имя executor-биндинга; адаптер добавляет hoisted-импорт. */
   readonly importLocal: string;
   /** Экспортируемое имя executor'а в hoisted-импорте. */
   readonly importName: string;
   /** Субпуть executor-импорта. */
   readonly importSource: string;
-  /** Число НЕтрансформированных вызовов nano-animate (для manifest). */
+  /** Число НЕтрансформированных вызовов native-animate (для manifest). */
   readonly runtimeCalls: number;
 }
 
-const NANO_SOURCE = '@labpics/motion/nano';
+const NATIVE_SOURCE = '@labpics/motion/native';
 export const COMPILED_IMPORT_SOURCE = '@labpics/motion/compiler/runtime';
 const COMPILED_IMPORT_NAME = 'animateCompiled';
-const IMPORT_LOCAL = '__labMotionNanoCompiled';
+const IMPORT_LOCAL = '__labMotionNativeCompiled';
 
 function walk(node: unknown, visit: (node: AstNode, parent: AstNode | undefined) => void, parent?: AstNode): void {
   if (Array.isArray(node)) {
@@ -243,14 +243,14 @@ function canLowerImport(program: AstNode, sourceName: string, importLocal: strin
  * отличает `animate(el, …)` от `(animate)(el, …)` и `animate((x, y), …)` —
  * первые правки без неё производили битый или тихо неверный вывод.
  */
-export function planNanoOpacityLowering(
+export function planNativeOpacityLowering(
   program: AstNode,
   code: string,
   artifactLiteral: (opacity: number) => string,
-): NanoLoweringPlan | undefined {
-  if (!canLowerImport(program, NANO_SOURCE, IMPORT_LOCAL)) return undefined;
+): NativeLoweringPlan | undefined {
+  if (!canLowerImport(program, NATIVE_SOURCE, IMPORT_LOCAL)) return undefined;
 
-  const edits: NanoLoweringEdit[] = [];
+  const edits: NativeLoweringEdit[] = [];
   let runtimeCalls = 0;
 
   walk(program, (node) => {
@@ -315,8 +315,8 @@ function staticOpacityLiteral(props: AstNode): number | undefined {
 }
 
 /** Компактный литерал артефакта для инъекции в код (детерминированный). */
-export function nanoArtifactLiteral(opacity: number): string {
-  const artifact = compileNanoOpacityArtifact(opacity);
+export function nativeArtifactLiteral(opacity: number): string {
+  const artifact = compileNativeOpacityArtifact(opacity);
   return `{o:${artifact.frame.opacity},d:${artifact.durationMs},e:${JSON.stringify(artifact.cssLinear)}}`;
 }
 
@@ -598,10 +598,10 @@ const dynamicNode = (): { kind: string } => ({ kind: 'dynamic' });
 export function planSurfaceLowering(
   program: AstNode,
   code: string,
-): NanoLoweringPlan | undefined {
+): NativeLoweringPlan | undefined {
   if (!canLowerImport(program, ANIMATE_SOURCE, SURFACE_LOCAL)) return undefined;
 
-  const edits: NanoLoweringEdit[] = [];
+  const edits: NativeLoweringEdit[] = [];
   let runtimeCalls = 0;
 
   walk(program, (node, parent) => {
@@ -638,7 +638,7 @@ export function planSurfaceLowering(
     const literal = surfaceArtifactLiteral(result.program);
     if (literal === undefined) { runtimeCalls++; return; }
 
-    // Побайтная верификация тривиа-зон (как в nano-плане): скобки/запятые.
+    // Побайтная верификация тривиа-зон (как в native-плане): скобки/запятые.
     if (
       !/^\s*\(\s*$/.test(code.slice(callee.end, targetArg.start)) ||
       !/^\s*,\s*$/.test(code.slice(targetArg.end, propsArg.start)) ||

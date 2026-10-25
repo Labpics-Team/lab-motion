@@ -1,21 +1,7 @@
-/**
- * naming-inventory — фактический нейминг-инвентарь lab-motion.
- *
- * Роль: справка-скрипт и библиотека фактов ФС. Единственный источник фактов
- * для docs/NAMING.md и scripts/check-docs-drift.mjs (гейт импортирует отсюда,
- * чтобы дока и гейт сверялись с ОДНОЙ реальностью, а не с двумя копиями).
- *
- * Инвентарь:
- *   1. экспорт-субпути package.json (`.`, `./easing`, …) — публичный API;
- *   2. фреймворк-биндинги: канонический реестр BINDINGS ∩ субпути;
- *   3. литералы CSS-кастом-свойств в строках src (комментарии вырезаны,
- *      сканируются только строковые/шаблонные литералы — `--i` в коде не CSS);
- *   4. файлы src|test|scripts|docs вне kebab-закона имён.
- *
- * CLI: `node scripts/naming-inventory.mjs` — сводка + полный JSON.
- */
+/** Исходные модули, публичные субпути и CSS-литералы для проверки документации. */
 
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { lstatSync, readFileSync, readdirSync } from 'node:fs';
+import ts from 'typescript';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -38,29 +24,49 @@ export const BINDINGS = [
 /** Генерируемое/чужое — не инвентарь. */
 const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', 'coverage', 'reports', '.stryker-tmp']);
 
-/** Рекурсивный список файлов (POSIX-пути относительно base). */
-export function walk(dir, out = [], base = dir) {
-  if (!existsSync(dir)) return out;
-  for (const e of readdirSync(dir, { withFileTypes: true })) {
-    if (e.isDirectory()) {
-      if (!SKIP_DIRS.has(e.name)) walk(join(dir, e.name), out, base);
-    } else {
-      out.push(relative(base, join(dir, e.name)).replaceAll('\\', '/'));
+/** Полный обход объявленного корня; недоступное дерево не означает пустое. */
+export function walk(dir) {
+  const files = [];
+  function visit(directory) {
+    const info = lstatSync(directory);
+    if (info.isSymbolicLink()) throw new Error('symlink in source tree: ' + directory);
+    if (!info.isDirectory()) throw new Error('not a source directory: ' + directory);
+    for (const name of readdirSync(directory).sort()) {
+      const filename = join(directory, name);
+      const entry = lstatSync(filename);
+      if (entry.isSymbolicLink()) throw new Error('symlink in source tree: ' + filename);
+      if (entry.isDirectory()) {
+        if (!SKIP_DIRS.has(name)) visit(filename);
+      } else if (entry.isFile()) {
+        files.push(relative(dir, filename).replaceAll('\\', '/'));
+      } else {
+        throw new Error('not a regular source file: ' + filename);
+      }
     }
   }
-  return out;
+  visit(dir);
+  return files.sort();
 }
 
-/** Вырезает блочные и строчные комментарии: примеры в докстрингах — не факт. */
-export function stripComments(text) {
-  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
-}
-
-/** Содержимое строковых и шаблонных литералов кода. */
-export function stringLiterals(code) {
-  const out = [];
-  for (const m of code.matchAll(/(["'`])((?:\\.|(?!\1)[^\\])*)\1/g)) out.push(m[2]);
-  return out;
+/** Синтаксические литералы: URL, escapes и комментарии разбирает TypeScript. */
+export function stringLiterals(code, filename = 'source.ts') {
+  const source = ts.createSourceFile(filename, code, ts.ScriptTarget.Latest, false);
+  // The pinned compiler exposes parse diagnostics before type checking.
+  // A recovered, malformed AST must not certify absence of a CSS literal.
+  for (const diagnostic of source.parseDiagnostics) {
+    throw new Error(filename + ': ' + ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'));
+  }
+  const literals = [];
+  function visit(node) {
+    if (ts.isStringLiteralLike(node)) literals.push(node.text);
+    if (ts.isTemplateExpression(node)) {
+      literals.push(node.head.text);
+      for (const span of node.templateSpans) literals.push(span.literal.text);
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(source);
+  return literals;
 }
 
 /** Экспорт-субпути из package.json: ['.', './a11y', …]. */
@@ -77,9 +83,9 @@ export function cssVarLiterals(root = ROOT) {
   const byName = new Map();
   const src = join(root, 'src');
   for (const f of walk(src)) {
-    if (!f.endsWith('.ts')) continue;
-    const code = stripComments(readFileSync(join(src, f), 'utf8'));
-    for (const lit of stringLiterals(code)) {
+    if (!/\.(?:[cm]?[jt]s|[jt]sx)$/.test(f)) continue;
+    const code = readFileSync(join(src, f), 'utf8');
+    for (const lit of stringLiterals(code, f)) {
       for (const m of lit.matchAll(/(?<![\w-])--[a-z][\w-]*/g)) {
         const name = m[0];
         if (!byName.has(name)) byName.set(name, new Set());
@@ -95,7 +101,7 @@ export function cssVarLiterals(root = ROOT) {
 /**
  * Файлы src|test|scripts|docs вне закона имён.
  * Закон: kebab-case стема; докам-канонам в docs/*.md разрешён КАПС-стем
- * (`NAMING.md` — как в эталоне lab-icons).
+ * (например, `NAMING.md` и `RELEASES.md`).
  */
 export function nonKebabFiles(root = ROOT) {
   const bad = [];

@@ -324,6 +324,7 @@ type PlannedGroup = readonly [
  *                любые CSS-свойства; значение — цель или пара [from, to].
  * @param options { spring } ИЛИ { duration, ease }; delay; stagger; onComplete.
  * @returns Контролы { finished, play, pause, seek, cancel, stop }.
+ * @deprecated Для нового кода используйте animate из корневого @labpics/motion.
  * @throws {MotionParamError} рано, ДО записей в стиль: не-конечные числа,
  *         'transform' целиком, конфликт режимов, селектор без document.
  */
@@ -608,6 +609,7 @@ export interface AnimateScope {
  * Уничтожение в синхронном setup отменяет новый run сразу после получения controls;
  * уже совершённые синхронные эффекты не откатываются. Никакого покадрового слоя.
  */
+/** @deprecated Для нового кода используйте scope из корневого @labpics/motion. */
 export function createAnimateScope(root: AnimateScopeRoot): AnimateScope {
   if (typeof root?.querySelectorAll !== 'function') {
     throw new TypeError('scope: querySelectorAll() required');

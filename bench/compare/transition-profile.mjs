@@ -24,11 +24,11 @@ const optionalFile = file => { try { return readFileSync(file, 'utf8').trim(); }
 const group = process.argv[4] ?? 'full';
 if (!['full', 'native'].includes(group)) throw new Error('Expected full or native capability group');
 const ids = group === 'native'
-  ? ['lab', 'lab-nano', 'motion-mini', 'waapi-ctl']
+  ? ['lab', 'lab-native', 'motion-mini', 'waapi-ctl']
   : ['lab', 'motion', 'gsap', 'anime', 'waapi-ctl'];
 const counts = [1, 100, 1000];
 const rounds = 20, durationMs = 400, watchdogMs = 10_000;
-const entries = { 'lab-nano': 'lab-nano', lab: 'lab', motion: 'motion', gsap: 'gsap', anime: 'anime', 'waapi-ctl': 'waapi-control', 'motion-mini': 'motion-mini', 'anime-waapi': 'anime-waapi' };
+const entries = { 'lab-native': 'lab-native', lab: 'lab', motion: 'motion', gsap: 'gsap', anime: 'anime', 'waapi-ctl': 'waapi-control', 'motion-mini': 'motion-mini', 'anime-waapi': 'anime-waapi' };
 const adapters = Object.fromEntries(Object.entries(entries).map(([id, entry]) => {
   const outputPath = path.join(output, 'adapters', `${id}.js`);
   esbuild.buildSync({ ...PRODUCTION_ADAPTER_PROFILE, entryPoints: [path.join(benchPath, 'entries', `${entry}.entry.mjs`)], format: 'iife', globalName: '__adapterModule', outfile: outputPath });

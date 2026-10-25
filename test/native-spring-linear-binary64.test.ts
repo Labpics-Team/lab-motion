@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { BASE_GRID_MAX } from '../src/compositor/segmenter.js';
 import {
   springLinear,
-  type NanoSpring,
-} from '../src/nano/spring-linear.js';
+  type NativeSpring,
+} from '../src/native/spring-linear.js';
 
 const EPSILON = 1e-3;
 
@@ -13,7 +13,7 @@ const EPSILON = 1e-3;
  * если algebraic golf изменит хотя бы один binary64 бит или CSS-артефакт.
  */
 function referenceUnderdamped(
-  input: NanoSpring,
+  input: NativeSpring,
   durationScale = 1,
 ): [number, string] {
   const w = Math.sqrt(input.stiffness / input.mass);
@@ -41,14 +41,14 @@ function referenceUnderdamped(
   return [duration * 1000, `linear(${points})`];
 }
 
-function expectBitExact(input: NanoSpring): void {
+function expectBitExact(input: NativeSpring): void {
   const expected = referenceUnderdamped(input);
   const actual = springLinear(input);
   expect(Object.is(actual[0], expected[0])).toBe(true);
   expect(actual[1]).toBe(expected[1]);
 }
 
-describe('nano springLinear: binary64 underdamped envelope', () => {
+describe('native springLinear: binary64 underdamped envelope', () => {
   it.each([
     [{ mass: 1, stiffness: 100, damping: 10 }, 'position bound'],
     [{ mass: 1, stiffness: 10_000, damping: 100 }, 'velocity bound'],
@@ -86,7 +86,7 @@ describe('nano springLinear: binary64 underdamped envelope', () => {
         mass,
         stiffness: mass * w * w,
         damping: 2 * mass * w * dampingRatio,
-      } satisfies NanoSpring;
+      } satisfies NativeSpring;
 
       if (w <= 30) positionBoundCases++;
       else velocityBoundCases++;
@@ -98,7 +98,7 @@ describe('nano springLinear: binary64 underdamped envelope', () => {
   });
 
   it('positive controls ловят exact-duration и артефактный sabotage', () => {
-    const input = { mass: 1, stiffness: 170, damping: 26 } satisfies NanoSpring;
+    const input = { mass: 1, stiffness: 170, damping: 26 } satisfies NativeSpring;
     const actual = springLinear(input);
     const durationSabotage = referenceUnderdamped(input, 1 + 1e-12);
     const artifactSabotage = referenceUnderdamped(input, 1.001);

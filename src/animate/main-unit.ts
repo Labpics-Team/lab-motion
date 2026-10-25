@@ -122,7 +122,9 @@ export class MainUnit implements GroupOwner, SurfaceUnit {
   _numericKeys(): readonly string[] {
     if (this._done) return [];
     const bound = this._o!._bound;
-    return [...bound._numeric.map((channel) => channel._key), ...bound._residuals.keys()];
+    const keys = bound._numeric.map((channel) => channel._key);
+    for (const key of bound._residuals.keys()) keys.push(key);
+    return keys;
   }
 
   _supersede(replacement?: () => void): void {

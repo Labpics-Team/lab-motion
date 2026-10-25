@@ -15,12 +15,12 @@
  */
 
 import {
-  planNanoOpacityLowering,
+  planNativeOpacityLowering,
   planSurfaceLowering,
   type AstNode,
-  type NanoLoweringEdit,
+  type NativeLoweringEdit,
 } from '../core.js';
-import { nanoDefaultArtifactLiteral } from '../nano-default-artifact.js';
+import { nativeDefaultArtifactLiteral } from '../native-default-artifact.js';
 
 interface TransformResult {
   readonly code: string;
@@ -71,7 +71,7 @@ function vlq(value: number): string {
  */
 function buildMap(
   code: string,
-  edits: readonly NanoLoweringEdit[],
+  edits: readonly NativeLoweringEdit[],
   id: string,
 ): TransformResult['map'] {
   for (const edit of edits) {
@@ -113,7 +113,7 @@ function buildMap(
     }
   };
   /** Пройти правку: исходный курсор до edit.end, замена — в генерируемый. */
-  const splice = (edit: NanoLoweringEdit): void => {
+  const splice = (edit: NativeLoweringEdit): void => {
     segment();
     genColumn += edit.replacement.length;
     for (let index = edit.start; index < edit.end; index++) {
@@ -141,7 +141,7 @@ function buildMap(
   };
 }
 
-function applyEdits(code: string, edits: readonly NanoLoweringEdit[]): string {
+function applyEdits(code: string, edits: readonly NativeLoweringEdit[]): string {
   let out = '';
   let cursor = 0;
   for (const edit of edits) {
@@ -152,7 +152,7 @@ function applyEdits(code: string, edits: readonly NanoLoweringEdit[]): string {
 }
 
 /** Быстрый отсев до парсинга: модуль вообще не упоминает целевые субпути. */
-const QUICK_FILTERS = ['@labpics/motion/nano', '@labpics/motion/animate'];
+const QUICK_FILTERS = ['@labpics/motion/native', '@labpics/motion/animate'];
 
 export function motionCompiler(): MotionCompilerPlugin {
   return {
@@ -176,7 +176,7 @@ export function motionCompiler(): MotionCompilerPlugin {
       // Оба планировщика требуют прямой импорт с одним локальным именем `animate`.
       // Валидный ESM не может объявить его дважды, поэтому применим максимум один план;
       // его правки уже отсортированы ядром, в том числе для вложенных вызовов.
-      const plan = planNanoOpacityLowering(ast, code, nanoDefaultArtifactLiteral)
+      const plan = planNativeOpacityLowering(ast, code, nativeDefaultArtifactLiteral)
         ?? planSurfaceLowering(ast, code);
       if (plan === undefined) return undefined;
       const edits = plan.edits;

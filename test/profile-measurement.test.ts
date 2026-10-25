@@ -119,21 +119,29 @@ describe('PROFILE: замороженный протокол проверяет�
   it('исполняемый size-gate сохраняет потолки действующих сценариев baseline', async () => {
     const gate = await import('../scripts/size-gate.mjs');
     const registered = PROFILE_01.oldCostVectorGzipBytes;
-    // Историческая регистрация сохраняет снятый sheet consumer. Для остальных
-    // сценариев и всех публичных субпутей действуют прежние точные потолки.
-    const { 'behaviors-sheet-one-liner': retiredSheet, ...retained } = registered.scenarios;
+    // Историческая регистрация сохраняет снятый sheet consumer и имена
+    // PRODUCT_BASE: ./nano и его сценарий продолжаются в ./native с тем же
+    // потолком. Для остальных сценариев и субпутей действуют прежние потолки.
+    const {
+      'behaviors-sheet-one-liner': retiredSheet,
+      'nano spring-to': nativeScenario,
+      ...retained
+    } = registered.scenarios;
+    const { './nano': nativeSubpath, ...bespoke } = registered.bespoke;
     expect(retiredSheet).toBe(3700);
-    expect(gate.BESPOKE_SUBPATH_GATES).toMatchObject(registered.bespoke);
+    expect(gate.BESPOKE_SUBPATH_GATES).toMatchObject({ ...bespoke, './native': nativeSubpath });
+    expect(gate.BESPOKE_SUBPATH_GATES).not.toHaveProperty('./nano');
     const scenarios = Object.fromEntries(
       gate.IMPORT_COST_SCENARIOS.map(({ name, gate: ceiling }) => [name, ceiling]),
     );
-    expect(scenarios).toMatchObject(retained);
+    expect(scenarios).toMatchObject({ ...retained, 'native spring-to': nativeScenario });
     expect(scenarios).not.toHaveProperty('behaviors-sheet-one-liner');
+    expect(scenarios).not.toHaveProperty('nano spring-to');
     expect(scenarios['state-cascade']).toBe(1024);
     expect(registered.core).toBe(gate.CORE_GATE_BYTES);
     expect(registered.subpath).toBe(gate.SUBPATH_GATE_BYTES);
     expect(registered.fullCoreConsumer).toBe(gate.FULL_CORE_CONSUMER_GATE_BYTES);
-    expect(registered.nano).toBe(gate.NANO_GATE_BYTES);
+    expect(registered.nano).toBe(gate.NATIVE_GATE_BYTES);
     expect(registered.compiledRuntime).toBe(gate.BESPOKE_SUBPATH_GATES['./compiler/runtime']);
     expect(registered.compilerSurface).toBe(gate.BESPOKE_SUBPATH_GATES['./compiler/surface']);
     expect(registered.inView).toBe(gate.IN_VIEW_GATE_BYTES);
@@ -141,6 +149,18 @@ describe('PROFILE: замороженный протокол проверяет�
     expect(registered.compositorCapability).toBe(gate.COMPOSITOR_CAPABILITY_GATE_BYTES);
     expect(registered.fullAnimate).toBe(gate.FULL_ANIMATE_GATE_BYTES);
     expect(registered.animateCompositorMixed).toBe(gate.ANIMATE_COMPOSITOR_MIXED_GATE_BYTES);
+  });
+
+  it('историческая регистрация называет сценарии так же, как size-gate PRODUCT_BASE', () => {
+    // old-vector ищет каждое зарегистрированное имя в результате size-gate на
+    // PRODUCT_BASE: переименование текущего субпутя не переписывает регистрацию.
+    const root = fileURLToPath(new URL('../', import.meta.url));
+    const historical = `${PROFILE_01.productBase.sourceSha}:scripts/size-gate.mjs`;
+    const git = (...args: string[]) => execFileSync('git', ['--no-replace-objects', ...args],
+      { cwd: root, encoding: 'utf8', timeout: 10_000 });
+    expect(git('rev-parse', historical).trim()).toBe(PROFILE_01.productBase.sizeGateBlob);
+    const names = [...git('show', historical).matchAll(/^ {4}name: '([^']+)',$/gm)].map((match) => match[1]);
+    expect(names).toEqual(Object.keys(PROFILE_01.oldCostVectorGzipBytes.scenarios));
   });
 
   it('принимает независимую JSON-копию полного протокола', () => {

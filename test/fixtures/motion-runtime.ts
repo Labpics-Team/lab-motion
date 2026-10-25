@@ -10,7 +10,7 @@ export function harness(native = false) {
     render: cb => { renders.add(cb); return () => { renders.delete(cb); }; },
     cancelAll() { updates.clear(); renders.clear(); },
   };
-  const effects: Array<{ currentTime: number | null; cancelled: boolean; keys: Keyframe[]; timing: KeyframeAnimationOptions; finished: Promise<unknown>; complete(): void; cancel(): void }> = [];
+  const effects: Array<{ currentTime: number | null; playbackRate: number; updatePlaybackRate(rate: number): void; cancelled: boolean; keys: Keyframe[]; timing: KeyframeAnimationOptions; finished: Promise<unknown>; complete(): void; cancel(): void }> = [];
   const host: RuntimeHost = { frame: loop, now: () => time, reduced: () => false,
     styles: element => (element as HTMLElement).style, supports: () => native };
   const runtime = new Runtime(host);
@@ -21,7 +21,8 @@ export function harness(native = false) {
     getPropertyValue(key: string) { return values.get(key) ?? ''; },
   }, ...(native ? { animate(keys: Keyframe[], timing: KeyframeAnimationOptions) {
     let finish!: () => void;
-    const effect = { keys, timing, currentTime: 0 as number | null, cancelled: false,
+    const effect = { keys, timing, currentTime: 0 as number | null, playbackRate: 1, cancelled: false,
+      updatePlaybackRate(rate: number) { effect.playbackRate = rate; },
       finished: new Promise<void>(resolve => { finish = resolve; }),
       complete() { finish(); }, cancel() { effect.cancelled = true; } };
     effects.push(effect); return effect;

@@ -18,6 +18,7 @@
 
 import { MotionParamError } from './errors.js';
 import { CONVERGENCE_THRESHOLD, FIXED_DT_S, MAX_FRAMES } from './internal/constants.js';
+import { clampFinite } from './internal/finite.js';
 import { solveSpring } from './internal/solver.js';
 import { type SpringParams } from './internal/types.js';
 
@@ -206,27 +207,6 @@ export const validateSpringParams: (p: SpringParams) => void =
   validateSpringForFrameLoop;
 
 /**
- * Clamp a value to be finite. Defensive guard — analytical solver should
- * never produce non-finite values for valid inputs, but floating-point
- * edge cases near critical damping can produce tiny infinities or NaN.
- *
- * NaN is treated as the spring-at-rest position (0) because:
- *   - NaN can only arise from indeterminate forms (0/0, Infinity*0) during
- *     degenerate floating-point evaluation (e.g. t=Infinity passed externally).
- *   - The spring at rest at the start position (0, normalized) is the safest
- *     CSS-safe fallback — it produces no visual glitch and does not inject a
- *     wrong-sign huge value into consumer CSS transforms.
- *   - The "always finite" invariant is met; the wrong-sign -MAX_VALUE branch
- *     (NaN > 0 === false) was a semantic violation: a solver targeting x=1
- *     returning -1.8e308 is physically absurd.
- */
-function clampFinite(x: number): number {
-  if (Number.isFinite(x)) return x;
-  if (Number.isNaN(x)) return 0;
-  return x > 0 ? Number.MAX_VALUE : -Number.MAX_VALUE;
-}
-
-/**
  * Internal solver — same as spring() but skips validation.
  * Used by drive() which validates spring params once at its boundary (before any
  * Promise or frame is scheduled) so the per-frame tick loop pays zero validation cost.
@@ -236,8 +216,8 @@ function clampFinite(x: number): number {
  */
 export function springUnchecked(params: SpringParams, t: number): SpringResult {
   // Делегат к общему солверу (internal/solver.ts, v0=0 — частный случай):
-  // формы решений символьно идентичны прежним построчным. Страж прежний
-  // (clampFinite) — политика этого модуля, у motion-value своя.
+  // формы решений символьно идентичны прежним построчным. Общий clampFinite
+  // сохраняет политику результата spring; у motion-value своя.
   const { value, velocity } = solveSpring(params, t, 0);
   return {
     value: clampFinite(value),

@@ -1,7 +1,7 @@
-// Узкий нативный переход CSS transform через публичный Nano.
-import { animate } from '../../../dist/nano/index.js';
+// Узкий нативный переход CSS transform через публичный Native.
+import { animate } from '../../../dist/native/index.js';
 
-export const name = '@labpics/motion/nano';
+export const name = '@labpics/motion/native';
 
 export function start(elements, px, durationMs) {
   const controls = animate(elements, { transform: 'translateX(' + px + 'px)' }, {

@@ -1,17 +1,17 @@
 /**
- * test/compiler-nano-lowering.test.ts — compiler proof #208: артефакт,
+ * test/compiler-native-lowering.test.ts — compiler proof #208: артефакт,
  * AST-план и Vite-адаптер узкого lowering `animate(target, { opacity: N })`
- * из '@labpics/motion/nano'.
+ * из '@labpics/motion/native'.
  *
  * Инварианты:
- *   C1. Артефакт бит-в-бит совпадает с nano SSOT (springLinear) и проходит
+ *   C1. Артефакт бит-в-бит совпадает с native SSOT (springLinear) и проходит
  *       канонический parseMotionProgramV1 (единственный оракул доверия).
  *   C2. Позитивный паттерн понижается: вызов заменяется executor-вызовом с
  *       литеральным артефактом, target-выражение остаётся байт-в-байт и
  *       вычисляется ровно один раз в исходном порядке.
  *   C3. Hostile/сомнительный AST не трансформируется вовсе (источник
  *       семантически исходный) — консервативный отказ.
- *   C4. Executor (private runtime) ведёт себя как nano.animate для того же
+ *   C4. Executor (private runtime) ведёт себя как native.animate для того же
  *       вызова: те же keyframes/timing, reduced-политика и finished-протокол.
  */
 
@@ -19,15 +19,15 @@ import { describe, expect, it } from 'vitest';
 import { parseAstAsync } from 'vite';
 import {
   COMPILED_IMPORT_SOURCE,
-  compileNanoOpacityArtifact,
-  nanoArtifactLiteral,
-  planNanoOpacityLowering,
+  compileNativeOpacityArtifact,
+  nativeArtifactLiteral,
+  planNativeOpacityLowering,
   type AstNode,
 } from '../src/compiler/core.js';
 import { motionCompiler } from '../src/compiler/vite/index.js';
 import { animateCompiled } from '../src/compiler/runtime/index.js';
-import { animate as nanoAnimate } from '../src/nano/index.js';
-import { springLinear } from '../src/nano/spring-linear.js';
+import { animate as nativeAnimate } from '../src/native/index.js';
+import { springLinear } from '../src/native/spring-linear.js';
 
 // ─── Хелперы ─────────────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ async function applyPlugin(code: string): Promise<string | undefined> {
 
 async function plan(code: string) {
   const ast = await parseAstAsync(code);
-  return planNanoOpacityLowering(ast as unknown as AstNode, code, nanoArtifactLiteral);
+  return planNativeOpacityLowering(ast as unknown as AstNode, code, nativeArtifactLiteral);
 }
 
 /** Декодер mappings v3 (обратный к VLQ-энкодеру адаптера) для карт-ассертов. */
@@ -77,7 +77,7 @@ function decodeMappings(mappings: string): [gen: number, line: number, col: numb
   });
 }
 
-const POSITIVE = `import { animate } from '@labpics/motion/nano';
+const POSITIVE = `import { animate } from '@labpics/motion/native';
 export function open(card) {
   return animate(card, { opacity: 1 });
 }
@@ -85,18 +85,18 @@ export function open(card) {
 
 // ─── C1: артефакт ────────────────────────────────────────────────────────────
 
-describe('compileNanoOpacityArtifact — доверенный артефакт nano SSOT', () => {
-  it('durationMs и cssLinear бит-в-бит равны springLinear() nano', () => {
+describe('compileNativeOpacityArtifact — доверенный артефакт native SSOT', () => {
+  it('durationMs и cssLinear бит-в-бит равны springLinear() native', () => {
     const [durationMs, cssLinear] = springLinear();
-    const artifact = compileNanoOpacityArtifact(0.25);
+    const artifact = compileNativeOpacityArtifact(0.25);
     expect(artifact.durationMs).toBe(durationMs);
     expect(artifact.cssLinear).toBe(cssLinear);
     expect(artifact.frame).toEqual({ opacity: 0.25 });
   });
 
   it('литерал артефакта детерминирован и парсится обратно', () => {
-    const literal = nanoArtifactLiteral(1);
-    expect(nanoArtifactLiteral(1)).toBe(literal);
+    const literal = nativeArtifactLiteral(1);
+    expect(nativeArtifactLiteral(1)).toBe(literal);
     const parsed = JSON.parse(
       literal.replace(/([{,])([a-z]+):/g, '$1"$2":'),
     ) as { o: number; d: number; e: string };
@@ -105,8 +105,8 @@ describe('compileNanoOpacityArtifact — доверенный артефакт n
   });
 
   it('нечисловая/неконечная opacity — ошибка сборки, не silent fallback', () => {
-    expect(() => compileNanoOpacityArtifact(Number.NaN)).toThrow();
-    expect(() => compileNanoOpacityArtifact(Number.POSITIVE_INFINITY)).toThrow();
+    expect(() => compileNativeOpacityArtifact(Number.NaN)).toThrow();
+    expect(() => compileNativeOpacityArtifact(Number.POSITIVE_INFINITY)).toThrow();
   });
 });
 
@@ -116,28 +116,28 @@ describe('позитивный паттерн — единственный, ко
   it('вызов заменяется executor-вызовом; target остаётся байт-в-байт', async () => {
     const output = await applyPlugin(POSITIVE);
     expect(output).toBeDefined();
-    expect(output).toContain('__labMotionNanoCompiled(card, {o:1,d:');
+    expect(output).toContain('__labMotionNativeCompiled(card, {o:1,d:');
     expect(output).toContain(
-      `import { animateCompiled as __labMotionNanoCompiled } from "${COMPILED_IMPORT_SOURCE}";`,
+      `import { animateCompiled as __labMotionNativeCompiled } from "${COMPILED_IMPORT_SOURCE}";`,
     );
     // Исходный вызов исчез, повторного animate-идентификатора не осталось.
     expect(output).not.toContain('animate(card');
     // Исходные строки не сдвинуты: импорт дописан в конец (hoisted ESM).
-    expect(output!.startsWith("import { animate } from '@labpics/motion/nano';")).toBe(true);
+    expect(output!.startsWith("import { animate } from '@labpics/motion/native';")).toBe(true);
   });
 
   it('несколько валидных вызовов понижаются все, литералы независимы', async () => {
-    const output = await applyPlugin(`import { animate } from '@labpics/motion/nano';
+    const output = await applyPlugin(`import { animate } from '@labpics/motion/native';
 animate(a, { opacity: 0 });
 animate(b, { opacity: 0.5 });
 `);
     expect(output).toContain('(a, {o:0,d:');
     expect(output).toContain('(b, {o:0.5,d:');
-    expect((output!.match(/__labMotionNanoCompiled\(/g) ?? []).length).toBe(2);
+    expect((output!.match(/__labMotionNativeCompiled\(/g) ?? []).length).toBe(2);
   });
 
   it('смешанный модуль: валидный понижается, динамический остаётся runtime', async () => {
-    const result = await plan(`import { animate } from '@labpics/motion/nano';
+    const result = await plan(`import { animate } from '@labpics/motion/native';
 animate(a, { opacity: 1 });
 animate(b, { opacity: level });
 `);
@@ -152,15 +152,15 @@ animate(b, { opacity: level });
 describe('консервативный отказ: источник остаётся семантически исходным', () => {
   // Модульные отказы: план undefined целиком (доверять нечему).
   const MODULE_CASES: readonly [name: string, code: string][] = [
-    ['alias-импорт', `import { animate as go } from '@labpics/motion/nano'; go(el, { opacity: 1 });`],
-    ['namespace-импорт', `import * as nano from '@labpics/motion/nano'; nano.animate(el, { opacity: 1 });`],
+    ['alias-импорт', `import { animate as go } from '@labpics/motion/native'; go(el, { opacity: 1 });`],
+    ['namespace-импорт', `import * as native from '@labpics/motion/native'; native.animate(el, { opacity: 1 });`],
     ['чужой пакет', `import { animate } from 'other-motion'; animate(el, { opacity: 1 });`],
-    ['shadowing функцией', `import { animate } from '@labpics/motion/nano';
+    ['shadowing функцией', `import { animate } from '@labpics/motion/native';
 function scope(animate) { return animate(el, { opacity: 1 }); }`],
-    ['shadowing переменной', `import { animate } from '@labpics/motion/nano';
+    ['shadowing переменной', `import { animate } from '@labpics/motion/native';
 { const animate = fake; animate(el, { opacity: 1 }); }`],
-    ['коллизия локального имени', `import { animate } from '@labpics/motion/nano';
-const __labMotionNanoCompiled = 1; animate(el, { opacity: 1 });`],
+    ['коллизия локального имени', `import { animate } from '@labpics/motion/native';
+const __labMotionNativeCompiled = 1; animate(el, { opacity: 1 });`],
   ];
 
   for (const [name, code] of MODULE_CASES) {
@@ -196,7 +196,7 @@ const __labMotionNanoCompiled = 1; animate(el, { opacity: 1 });`],
 
   for (const [name, call] of PER_CALL_CASES) {
     it(`${name} → вызов остаётся runtime, контрольный понижается`, async () => {
-      const result = await plan(`import { animate } from '@labpics/motion/nano';
+      const result = await plan(`import { animate } from '@labpics/motion/native';
 ${call}
 animate(ok, { opacity: 1 });
 `);
@@ -206,39 +206,39 @@ animate(ok, { opacity: 1 });
     });
   }
 
-  it('re-export nano не трансформируется', async () => {
-    expect(await plan(`export { animate } from '@labpics/motion/nano';`)).toBeUndefined();
+  it('re-export native не трансформируется', async () => {
+    expect(await plan(`export { animate } from '@labpics/motion/native';`)).toBeUndefined();
   });
 
-  it('отдельный export-statement: вызов понижается, nano-импорт сохраняется', async () => {
+  it('отдельный export-statement: вызов понижается, native-импорт сохраняется', async () => {
     // Re-export живого биндинга обязан продолжать указывать на настоящий
-    // nano-animate: lowering не смеет удалять исходный импорт.
-    const output = await applyPlugin(`import { animate } from '@labpics/motion/nano';
+    // native-animate: lowering не смеет удалять исходный импорт.
+    const output = await applyPlugin(`import { animate } from '@labpics/motion/native';
 export { animate };
 animate(el, { opacity: 1 });
 `);
     expect(output).toBeDefined();
-    expect(output).toContain(`import { animate } from '@labpics/motion/nano';`);
+    expect(output).toContain(`import { animate } from '@labpics/motion/native';`);
     expect(output).toContain('export { animate };');
-    expect(output).toContain('__labMotionNanoCompiled(el, {o:1,d:');
+    expect(output).toContain('__labMotionNativeCompiled(el, {o:1,d:');
   });
 });
 
 describe('вложенные и многострочные вызовы', () => {
   it('вложенный lowerable-вызов в позиции target понижается вместе с внешним', async () => {
-    const output = await applyPlugin(`import { animate } from '@labpics/motion/nano';
+    const output = await applyPlugin(`import { animate } from '@labpics/motion/native';
 export const r = animate(animate(x, { opacity: 1 }), { opacity: 0.5 });
 `);
     expect(output).toBeDefined();
     // Оба вызова понижены, target внешнего — понижённый внутренний.
-    expect(output).toContain('__labMotionNanoCompiled(__labMotionNanoCompiled(x, {o:1,d:');
-    expect((output!.match(/__labMotionNanoCompiled\(/g) ?? []).length).toBe(2);
+    expect(output).toContain('__labMotionNativeCompiled(__labMotionNativeCompiled(x, {o:1,d:');
+    expect((output!.match(/__labMotionNativeCompiled\(/g) ?? []).length).toBe(2);
     // Выход обязан парситься (регрессия: несортированные правки дублировали хвост).
     await expect(parseAstAsync(output!)).resolves.toBeDefined();
   });
 
   it('многострочный вызов (Prettier-формат) понижается со схлопыванием строк', async () => {
-    const output = await applyPlugin(`import { animate } from '@labpics/motion/nano';
+    const output = await applyPlugin(`import { animate } from '@labpics/motion/native';
 export function open(card) {
   return animate(card, {
     opacity: 1,
@@ -246,7 +246,7 @@ export function open(card) {
 }
 `);
     expect(output).toBeDefined();
-    expect(output).toContain('__labMotionNanoCompiled(card, {o:1,d:');
+    expect(output).toContain('__labMotionNativeCompiled(card, {o:1,d:');
     await expect(parseAstAsync(output!)).resolves.toBeDefined();
   });
 });
@@ -273,7 +273,7 @@ describe('sourcemap адаптера', () => {
   });
 
   it('многострочный вызов: строки ПОСЛЕ схлопнутого вызова мапятся верно', async () => {
-    const source = `import { animate } from '@labpics/motion/nano';
+    const source = `import { animate } from '@labpics/motion/native';
 export function open(card) {
   return animate(card, {
     opacity: 1,
@@ -294,7 +294,7 @@ next();
   });
 });
 
-// ─── C4: executor ≡ nano для того же вызова ──────────────────────────────────
+// ─── C4: executor ≡ native для того же вызова ──────────────────────────────────
 
 interface JournalEntry {
   frame: Record<string, unknown>;
@@ -315,35 +315,35 @@ function fakeElement(journal: JournalEntry[]): Element {
   } as unknown as Element;
 }
 
-describe('animateCompiled ≡ nano.animate для позитивного паттерна', () => {
+describe('animateCompiled ≡ native.animate для позитивного паттерна', () => {
   it('идентичные keyframes и WAAPI-опции (обычный режим)', () => {
-    const nanoJournal: JournalEntry[] = [];
+    const nativeJournal: JournalEntry[] = [];
     const compiledJournal: JournalEntry[] = [];
-    nanoAnimate(fakeElement(nanoJournal), { opacity: 0.25 });
-    const artifact = compileNanoOpacityArtifact(0.25);
+    nativeAnimate(fakeElement(nativeJournal), { opacity: 0.25 });
+    const artifact = compileNativeOpacityArtifact(0.25);
     animateCompiled(fakeElement(compiledJournal), {
       o: artifact.frame.opacity,
       d: artifact.durationMs,
       e: artifact.cssLinear,
     });
-    expect(compiledJournal).toEqual(nanoJournal);
+    expect(compiledJournal).toEqual(nativeJournal);
   });
 
-  it('reduced-motion: duration 0 и linear, как у nano', () => {
+  it('reduced-motion: duration 0 и linear, как у native', () => {
     const original = globalThis.matchMedia;
     (globalThis as { matchMedia?: unknown }).matchMedia =
       () => ({ matches: true });
     try {
-      const nanoJournal: JournalEntry[] = [];
+      const nativeJournal: JournalEntry[] = [];
       const compiledJournal: JournalEntry[] = [];
-      nanoAnimate(fakeElement(nanoJournal), { opacity: 1 });
-      const artifact = compileNanoOpacityArtifact(1);
+      nativeAnimate(fakeElement(nativeJournal), { opacity: 1 });
+      const artifact = compileNativeOpacityArtifact(1);
       animateCompiled(fakeElement(compiledJournal), {
         o: 1,
         d: artifact.durationMs,
         e: artifact.cssLinear,
       });
-      expect(compiledJournal).toEqual(nanoJournal);
+      expect(compiledJournal).toEqual(nativeJournal);
       expect(compiledJournal[0]!.options['duration']).toBe(0);
       expect(compiledJournal[0]!.options['easing']).toBe('linear');
     } finally {
@@ -354,7 +354,7 @@ describe('animateCompiled ≡ nano.animate для позитивного пат�
 
   it('finished-агрегат и controls-массив совпадают по форме', () => {
     const journal: JournalEntry[] = [];
-    const artifact = compileNanoOpacityArtifact(1);
+    const artifact = compileNativeOpacityArtifact(1);
     const controls = animateCompiled(fakeElement(journal), {
       o: 1,
       d: artifact.durationMs,
