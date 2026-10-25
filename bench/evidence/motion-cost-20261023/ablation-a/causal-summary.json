@@ -1,0 +1,5663 @@
+{
+  "scope": "Program sharing ablation: S=baseline c9 sharing enabled; A=candidate42 no sharing. Ratios A/S >1 mean sharing faster. No final shipping/publication admission.",
+  "quantiles": "nearest rank empirical quantiles, not confidence intervals",
+  "sourceAnalysisSha256": "10a6fd2199f2ae17ad6c9b6aaec74f0ec23ed3ac5c6c1a5e94579cb4bf8c23de",
+  "sourceArchive": {
+    "run": 39921736547,
+    "artifact": 12488112235,
+    "sha256": "690f76af60ed57f58e40887dc73f8e57b027efa2d545083aefa5d6f7e5963bf7"
+  },
+  "omitted": "Full A sample rows and per-metric pairEvidence are in the CI artifact; this is a derived summary, not an independently replayable replacement for those rows.",
+  "rawHashes": {
+    "transition": "0186c17c432c277da299a446e400a6f15d03551495002d309c541b125ae25332",
+    "spring": "900bf418e7709e71eff5a7748ff764ebb09e815a403a2b847f0429f661825a4e",
+    "js": "5f97f44eb0c56bdef20791051e9489c609943c0bbd4547167d07ae11811d7f64"
+  },
+  "patch": {
+    "path": "intervention.json",
+    "sha256": "e5dc1cf95324829e12520dfb1b319f8a1731a8675b00eb2cdcad45e331aa7197",
+    "paths": [
+      "src/motion/runtime.ts"
+    ]
+  },
+  "profiles": [
+    {
+      "name": "transition",
+      "metadata": {
+        "schema": 1,
+        "generatedAt": "2026-10-23T08:07:40.861Z",
+        "revision": "42a56a800db561104ee0f56f6d9c49f20f0bbc16",
+        "profileSha256": "c9fc979757e3d36f4496afcd372f38b0105a911045a15e0c77856fa937780956",
+        "versions": {
+          "lab": "0.6.0",
+          "animejs": "4.5.0",
+          "esbuild": "0.28.1",
+          "gsap": "3.15.0",
+          "motion": "14.5.0",
+          "playwright": "1.61.1",
+          "pngjs": "7.0.0",
+          "chromium": "149.0.7827.55",
+          "node": "v24.19.0"
+        },
+        "environment": {
+          "cpu": "AMD EPYC 7763 64-Core Processor",
+          "cpuMax": null,
+          "memoryMax": null
+        },
+        "scenario": {
+          "group": "full",
+          "counts": [
+            1,
+            100,
+            1000
+          ],
+          "rounds": 24,
+          "durationMs": 400,
+          "watchdogMs": 10000,
+          "targetPx": 300,
+          "easing": "linear",
+          "viewport": {
+            "width": 1200,
+            "height": 600
+          },
+          "page": "fresh realm; modules loaded before measurement",
+          "timeDomain": "threadTicks",
+          "intervals": "actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded"
+        },
+        "adapters": {
+          "lab-nano": {
+            "path": "/home/runner/work/_temp/motion-performance/transition/adapters/lab-nano.js",
+            "sha256": "18d958a2dcc19e06c4873484bc9f0b6a6a37db07d14a8c57b1cc3c30e09037bd",
+            "raw": 2377,
+            "gzip": 1304,
+            "brotli": 1189
+          },
+          "lab": {
+            "path": "/home/runner/work/_temp/motion-performance/transition/adapters/lab.js",
+            "sha256": "53f1be8b37971e63a245a1b8102d94da641469e5c71098850ab66243b33e8958",
+            "raw": 32204,
+            "gzip": 12933,
+            "brotli": 11775
+          },
+          "motion": {
+            "path": "/home/runner/work/_temp/motion-performance/transition/adapters/motion.js",
+            "sha256": "563a4391d249382bd4f9b3c058ba562cc953101d98522d56d5b11f5ca6be99a7",
+            "raw": 66498,
+            "gzip": 25034,
+            "brotli": 22788
+          },
+          "gsap": {
+            "path": "/home/runner/work/_temp/motion-performance/transition/adapters/gsap.js",
+            "sha256": "0edf67b70ff3020b13e807ee472911e6bf9ec5941f98525830dcc5c513157e74",
+            "raw": 70955,
+            "gzip": 27830,
+            "brotli": 25206
+          },
+          "anime": {
+            "path": "/home/runner/work/_temp/motion-performance/transition/adapters/anime.js",
+            "sha256": "771e40298a68d57f11c47b19fa89afef0bc407d06cecabdfb2afe20981c489ad",
+            "raw": 34821,
+            "gzip": 14495,
+            "brotli": 13123
+          },
+          "waapi-ctl": {
+            "path": "/home/runner/work/_temp/motion-performance/transition/adapters/waapi-ctl.js",
+            "sha256": "d98bebdef4a7e509c622a494932a6d318429c8fdb4e87370d128eb58638cb4f4",
+            "raw": 1101,
+            "gzip": 570,
+            "brotli": 510
+          },
+          "motion-mini": {
+            "path": "/home/runner/work/_temp/motion-performance/transition/adapters/motion-mini.js",
+            "sha256": "e4f618e514bd2d18d4b9908b30b76161e7e451e56ab5a58fbfda500b365c2ae1",
+            "raw": 9156,
+            "gzip": 3683,
+            "brotli": 3359
+          },
+          "anime-waapi": {
+            "path": "/home/runner/work/_temp/motion-performance/transition/adapters/anime-waapi.js",
+            "sha256": "2ec291f7710da293e14d1064a907c7405cd67e30e199aa3615339b32c3430e76",
+            "raw": 10656,
+            "gzip": 4889,
+            "brotli": 4453
+          },
+          "baseline": {
+            "path": "/home/runner/work/_temp/motion-performance/transition/adapters/baseline.js",
+            "sha256": "5245030ccbf13dc18d72de7010e26dc85b48c2384d4171e89c4a262be42e5ccb",
+            "raw": 32471,
+            "gzip": 13041,
+            "brotli": 11867
+          }
+        },
+        "orders": [
+          [
+            "waapi-ctl",
+            "lab",
+            "gsap",
+            "anime",
+            "baseline",
+            "motion"
+          ],
+          [
+            "lab",
+            "gsap",
+            "anime",
+            "baseline",
+            "motion",
+            "waapi-ctl"
+          ],
+          [
+            "gsap",
+            "anime",
+            "baseline",
+            "motion",
+            "waapi-ctl",
+            "lab"
+          ],
+          [
+            "anime",
+            "baseline",
+            "motion",
+            "waapi-ctl",
+            "lab",
+            "gsap"
+          ],
+          [
+            "baseline",
+            "motion",
+            "waapi-ctl",
+            "lab",
+            "gsap",
+            "anime"
+          ],
+          [
+            "motion",
+            "waapi-ctl",
+            "lab",
+            "gsap",
+            "anime",
+            "baseline"
+          ],
+          [
+            "lab",
+            "gsap",
+            "anime",
+            "baseline",
+            "waapi-ctl",
+            "motion"
+          ],
+          [
+            "gsap",
+            "anime",
+            "baseline",
+            "waapi-ctl",
+            "motion",
+            "lab"
+          ],
+          [
+            "anime",
+            "baseline",
+            "waapi-ctl",
+            "motion",
+            "lab",
+            "gsap"
+          ],
+          [
+            "baseline",
+            "waapi-ctl",
+            "motion",
+            "lab",
+            "gsap",
+            "anime"
+          ],
+          [
+            "waapi-ctl",
+            "motion",
+            "lab",
+            "gsap",
+            "anime",
+            "baseline"
+          ],
+          [
+            "motion",
+            "lab",
+            "gsap",
+            "anime",
+            "baseline",
+            "waapi-ctl"
+          ],
+          [
+            "waapi-ctl",
+            "baseline",
+            "lab",
+            "gsap",
+            "anime",
+            "motion"
+          ],
+          [
+            "baseline",
+            "lab",
+            "gsap",
+            "anime",
+            "motion",
+            "waapi-ctl"
+          ],
+          [
+            "lab",
+            "gsap",
+            "anime",
+            "motion",
+            "waapi-ctl",
+            "baseline"
+          ],
+          [
+            "gsap",
+            "anime",
+            "motion",
+            "waapi-ctl",
+            "baseline",
+            "lab"
+          ],
+          [
+            "anime",
+            "motion",
+            "waapi-ctl",
+            "baseline",
+            "lab",
+            "gsap"
+          ],
+          [
+            "motion",
+            "waapi-ctl",
+            "baseline",
+            "lab",
+            "gsap",
+            "anime"
+          ],
+          [
+            "waapi-ctl",
+            "anime",
+            "gsap",
+            "lab",
+            "baseline",
+            "motion"
+          ],
+          [
+            "anime",
+            "gsap",
+            "lab",
+            "baseline",
+            "motion",
+            "waapi-ctl"
+          ],
+          [
+            "gsap",
+            "lab",
+            "baseline",
+            "motion",
+            "waapi-ctl",
+            "anime"
+          ],
+          [
+            "lab",
+            "baseline",
+            "motion",
+            "waapi-ctl",
+            "anime",
+            "gsap"
+          ],
+          [
+            "baseline",
+            "motion",
+            "waapi-ctl",
+            "anime",
+            "gsap",
+            "lab"
+          ],
+          [
+            "motion",
+            "waapi-ctl",
+            "anime",
+            "gsap",
+            "lab",
+            "baseline"
+          ]
+        ],
+        "sourceIdentity": {
+          "candidate": {
+            "revision": "42a56a800db561104ee0f56f6d9c49f20f0bbc16",
+            "dist": {
+              "sha256": "584a7012bcc5a78c436af239e273250f11a7058430505f72a64ae2ffaba66e1a",
+              "files": 340
+            }
+          },
+          "baseline": {
+            "revision": "c9f2ccb1681bc56a9e3da163ff7c4f324fc7ea3a",
+            "dist": {
+              "sha256": "dc01975aa9516783a6d7533c137a332b20d1e22222c33722b46d520cb4505ed3",
+              "files": 340
+            }
+          }
+        }
+      },
+      "matrix": {
+        "participants": [
+          "lab",
+          "motion",
+          "gsap",
+          "anime",
+          "waapi-ctl",
+          "baseline"
+        ],
+        "counts": [
+          1,
+          100,
+          1000
+        ],
+        "rounds": 24,
+        "expectedRows": 432,
+        "acquiredRows": 432
+      },
+      "integrityPassed": true
+    },
+    {
+      "name": "spring",
+      "metadata": {
+        "schema": 1,
+        "generatedAt": "2026-10-23T08:03:02.135Z",
+        "revision": "42a56a800db561104ee0f56f6d9c49f20f0bbc16",
+        "profileSha256": "c9fc979757e3d36f4496afcd372f38b0105a911045a15e0c77856fa937780956",
+        "versions": {
+          "lab": "0.6.0",
+          "animejs": "4.5.0",
+          "esbuild": "0.28.1",
+          "gsap": "3.15.0",
+          "motion": "14.5.0",
+          "playwright": "1.61.1",
+          "pngjs": "7.0.0",
+          "chromium": "149.0.7827.55",
+          "node": "v24.19.0"
+        },
+        "environment": {
+          "cpu": "AMD EPYC 7763 64-Core Processor",
+          "cpuMax": null,
+          "memoryMax": null
+        },
+        "scenario": {
+          "group": "spring-pair",
+          "counts": [
+            1,
+            100,
+            1000
+          ],
+          "rounds": 20,
+          "durationMs": null,
+          "watchdogMs": 10000,
+          "targetPx": 300,
+          "easing": "default spring",
+          "viewport": {
+            "width": 1200,
+            "height": 600
+          },
+          "page": "fresh realm; modules loaded before measurement",
+          "timeDomain": "threadTicks",
+          "intervals": "actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded"
+        },
+        "adapters": {
+          "lab-nano": {
+            "path": "/home/runner/work/_temp/motion-performance/spring/adapters/lab-nano.js",
+            "sha256": "18d958a2dcc19e06c4873484bc9f0b6a6a37db07d14a8c57b1cc3c30e09037bd",
+            "raw": 2377,
+            "gzip": 1304,
+            "brotli": 1189
+          },
+          "lab": {
+            "path": "/home/runner/work/_temp/motion-performance/spring/adapters/lab.js",
+            "sha256": "3873876a1d9cc4e13f88c465d2493c20a4caf4b64d8d3e58477ff98b9ae576d8",
+            "raw": 32052,
+            "gzip": 12881,
+            "brotli": 11720
+          },
+          "motion": {
+            "path": "/home/runner/work/_temp/motion-performance/spring/adapters/motion.js",
+            "sha256": "563a4391d249382bd4f9b3c058ba562cc953101d98522d56d5b11f5ca6be99a7",
+            "raw": 66498,
+            "gzip": 25034,
+            "brotli": 22788
+          },
+          "gsap": {
+            "path": "/home/runner/work/_temp/motion-performance/spring/adapters/gsap.js",
+            "sha256": "0edf67b70ff3020b13e807ee472911e6bf9ec5941f98525830dcc5c513157e74",
+            "raw": 70955,
+            "gzip": 27830,
+            "brotli": 25206
+          },
+          "anime": {
+            "path": "/home/runner/work/_temp/motion-performance/spring/adapters/anime.js",
+            "sha256": "771e40298a68d57f11c47b19fa89afef0bc407d06cecabdfb2afe20981c489ad",
+            "raw": 34821,
+            "gzip": 14495,
+            "brotli": 13123
+          },
+          "waapi-ctl": {
+            "path": "/home/runner/work/_temp/motion-performance/spring/adapters/waapi-ctl.js",
+            "sha256": "d98bebdef4a7e509c622a494932a6d318429c8fdb4e87370d128eb58638cb4f4",
+            "raw": 1101,
+            "gzip": 570,
+            "brotli": 510
+          },
+          "motion-mini": {
+            "path": "/home/runner/work/_temp/motion-performance/spring/adapters/motion-mini.js",
+            "sha256": "e4f618e514bd2d18d4b9908b30b76161e7e451e56ab5a58fbfda500b365c2ae1",
+            "raw": 9156,
+            "gzip": 3683,
+            "brotli": 3359
+          },
+          "anime-waapi": {
+            "path": "/home/runner/work/_temp/motion-performance/spring/adapters/anime-waapi.js",
+            "sha256": "2ec291f7710da293e14d1064a907c7405cd67e30e199aa3615339b32c3430e76",
+            "raw": 10656,
+            "gzip": 4889,
+            "brotli": 4453
+          },
+          "baseline": {
+            "path": "/home/runner/work/_temp/motion-performance/spring/adapters/baseline.js",
+            "sha256": "40e78dd2b2306fe00d5d216b383d32ab60004ba265f3c2c67cf30ca6a146e99b",
+            "raw": 32319,
+            "gzip": 12985,
+            "brotli": 11798
+          }
+        },
+        "orders": [
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ]
+        ],
+        "sourceIdentity": {
+          "candidate": {
+            "revision": "42a56a800db561104ee0f56f6d9c49f20f0bbc16",
+            "dist": {
+              "sha256": "584a7012bcc5a78c436af239e273250f11a7058430505f72a64ae2ffaba66e1a",
+              "files": 340
+            }
+          },
+          "baseline": {
+            "revision": "c9f2ccb1681bc56a9e3da163ff7c4f324fc7ea3a",
+            "dist": {
+              "sha256": "dc01975aa9516783a6d7533c137a332b20d1e22222c33722b46d520cb4505ed3",
+              "files": 340
+            }
+          }
+        }
+      },
+      "matrix": {
+        "participants": [
+          "lab",
+          "baseline"
+        ],
+        "counts": [
+          1,
+          100,
+          1000
+        ],
+        "rounds": 20,
+        "expectedRows": 120,
+        "acquiredRows": 120
+      },
+      "integrityPassed": true
+    },
+    {
+      "name": "js",
+      "metadata": {
+        "schema": 1,
+        "generatedAt": "2026-10-23T08:06:17.058Z",
+        "revision": "42a56a800db561104ee0f56f6d9c49f20f0bbc16",
+        "profileSha256": "c9fc979757e3d36f4496afcd372f38b0105a911045a15e0c77856fa937780956",
+        "versions": {
+          "lab": "0.6.0",
+          "animejs": "4.5.0",
+          "esbuild": "0.28.1",
+          "gsap": "3.15.0",
+          "motion": "14.5.0",
+          "playwright": "1.61.1",
+          "pngjs": "7.0.0",
+          "chromium": "149.0.7827.55",
+          "node": "v24.19.0"
+        },
+        "environment": {
+          "cpu": "AMD EPYC 7763 64-Core Processor",
+          "cpuMax": null,
+          "memoryMax": null
+        },
+        "scenario": {
+          "group": "js-pair",
+          "counts": [
+            1,
+            100,
+            1000
+          ],
+          "rounds": 20,
+          "durationMs": 400,
+          "watchdogMs": 10000,
+          "targetPx": 300,
+          "easing": "p*p*(3-2*p), custom JS callback",
+          "viewport": {
+            "width": 1200,
+            "height": 600
+          },
+          "page": "fresh realm; modules loaded before measurement",
+          "timeDomain": "threadTicks",
+          "intervals": "actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded"
+        },
+        "adapters": {
+          "lab-nano": {
+            "path": "/home/runner/work/_temp/motion-performance/js/adapters/lab-nano.js",
+            "sha256": "18d958a2dcc19e06c4873484bc9f0b6a6a37db07d14a8c57b1cc3c30e09037bd",
+            "raw": 2377,
+            "gzip": 1304,
+            "brotli": 1189
+          },
+          "lab": {
+            "path": "/home/runner/work/_temp/motion-performance/js/adapters/lab.js",
+            "sha256": "9b2c3bf7148026cdaa8b8cf3482917870c044bb5e2c0af60b486eb77441b6605",
+            "raw": 32080,
+            "gzip": 12898,
+            "brotli": 11727
+          },
+          "motion": {
+            "path": "/home/runner/work/_temp/motion-performance/js/adapters/motion.js",
+            "sha256": "563a4391d249382bd4f9b3c058ba562cc953101d98522d56d5b11f5ca6be99a7",
+            "raw": 66498,
+            "gzip": 25034,
+            "brotli": 22788
+          },
+          "gsap": {
+            "path": "/home/runner/work/_temp/motion-performance/js/adapters/gsap.js",
+            "sha256": "0edf67b70ff3020b13e807ee472911e6bf9ec5941f98525830dcc5c513157e74",
+            "raw": 70955,
+            "gzip": 27830,
+            "brotli": 25206
+          },
+          "anime": {
+            "path": "/home/runner/work/_temp/motion-performance/js/adapters/anime.js",
+            "sha256": "771e40298a68d57f11c47b19fa89afef0bc407d06cecabdfb2afe20981c489ad",
+            "raw": 34821,
+            "gzip": 14495,
+            "brotli": 13123
+          },
+          "waapi-ctl": {
+            "path": "/home/runner/work/_temp/motion-performance/js/adapters/waapi-ctl.js",
+            "sha256": "d98bebdef4a7e509c622a494932a6d318429c8fdb4e87370d128eb58638cb4f4",
+            "raw": 1101,
+            "gzip": 570,
+            "brotli": 510
+          },
+          "motion-mini": {
+            "path": "/home/runner/work/_temp/motion-performance/js/adapters/motion-mini.js",
+            "sha256": "e4f618e514bd2d18d4b9908b30b76161e7e451e56ab5a58fbfda500b365c2ae1",
+            "raw": 9156,
+            "gzip": 3683,
+            "brotli": 3359
+          },
+          "anime-waapi": {
+            "path": "/home/runner/work/_temp/motion-performance/js/adapters/anime-waapi.js",
+            "sha256": "2ec291f7710da293e14d1064a907c7405cd67e30e199aa3615339b32c3430e76",
+            "raw": 10656,
+            "gzip": 4889,
+            "brotli": 4453
+          },
+          "baseline": {
+            "path": "/home/runner/work/_temp/motion-performance/js/adapters/baseline.js",
+            "sha256": "e222d6fa88b8d79b956fb3191757c76b71516bb41e758766ed52e1cc73dc096a",
+            "raw": 32347,
+            "gzip": 12998,
+            "brotli": 11839
+          }
+        },
+        "orders": [
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ],
+          [
+            "baseline",
+            "lab"
+          ],
+          [
+            "lab",
+            "baseline"
+          ]
+        ],
+        "sourceIdentity": {
+          "candidate": {
+            "revision": "42a56a800db561104ee0f56f6d9c49f20f0bbc16",
+            "dist": {
+              "sha256": "584a7012bcc5a78c436af239e273250f11a7058430505f72a64ae2ffaba66e1a",
+              "files": 340
+            }
+          },
+          "baseline": {
+            "revision": "c9f2ccb1681bc56a9e3da163ff7c4f324fc7ea3a",
+            "dist": {
+              "sha256": "dc01975aa9516783a6d7533c137a332b20d1e22222c33722b46d520cb4505ed3",
+              "files": 340
+            }
+          }
+        }
+      },
+      "matrix": {
+        "participants": [
+          "lab",
+          "baseline"
+        ],
+        "counts": [
+          1,
+          100,
+          1000
+        ],
+        "rounds": 20,
+        "expectedRows": 120,
+        "acquiredRows": 120
+      },
+      "integrityPassed": true
+    }
+  ],
+  "cells": [
+    {
+      "profile": "transition",
+      "count": 1,
+      "pairs": 24,
+      "metrics": {
+        "apiMs": {
+          "sharingP50": 2.940000000060536,
+          "noSharingP50": 2.8850000000093132,
+          "medianRatioNoSharingOverSharing": 0.9812925169897652,
+          "sharingP95": 3.6549999999115244,
+          "noSharingP95": 3.6899999999441206,
+          "sharingMax": 4.810000000055879,
+          "noSharingMax": 3.715000000083819,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 12,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7737430167451979,
+            "p50": 0.9901960783843767,
+            "p95": 1.2832469775681923
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.8100000000558794,
+            "p50": -0.030000000144355,
+            "p95": 0.8200000000651926
+          }
+        },
+        "completionMs": {
+          "sharingP50": 430.83500000002095,
+          "noSharingP50": 430.79999999993015,
+          "medianRatioNoSharingOverSharing": 0.9999187624030295,
+          "sharingP95": 431.5600000000559,
+          "noSharingP95": 431.60999999998603,
+          "sharingMax": 431.66500000003725,
+          "noSharingMax": 432.0249999999651,
+          "sharingCheaperPairs": 15,
+          "noSharingCheaperPairs": 9,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9950528315877073,
+            "p50": 1.0004890032485632,
+            "p95": 1.0061486407653926
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -2.1350000000093132,
+            "p50": 0.21000000007916242,
+            "p95": 2.6350000000093132
+          }
+        },
+        "taskCpuMs": {
+          "sharingP50": 7.829000000000001,
+          "noSharingP50": 7.626000000000001,
+          "medianRatioNoSharingOverSharing": 0.9740707625494955,
+          "sharingP95": 8.828,
+          "noSharingP95": 9.145,
+          "sharingMax": 9.194,
+          "noSharingMax": 9.796,
+          "sharingCheaperPairs": 14,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.905849511483314,
+            "p50": 1.009085977759696,
+            "p95": 1.0918094218415415
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.7420000000000018,
+            "p50": 0.06699999999999928,
+            "p95": 0.7240000000000002
+          }
+        },
+        "threadCpuMs": {
+          "sharingP50": 9.662,
+          "noSharingP50": 9.373999999999999,
+          "medianRatioNoSharingOverSharing": 0.9701925067273854,
+          "sharingP95": 11.121,
+          "noSharingP95": 11.536,
+          "sharingMax": 11.427999999999999,
+          "noSharingMax": 11.880000000000003,
+          "sharingCheaperPairs": 13,
+          "noSharingCheaperPairs": 11,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9115598182735991,
+            "p50": 1.0034436791824042,
+            "p95": 1.0764903169966464
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.8760000000000012,
+            "p50": 0.03100000000000236,
+            "p95": 0.7070000000000025
+          }
+        },
+        "scriptCpuMs": {
+          "sharingP50": 0.052,
+          "noSharingP50": 0.05,
+          "medianRatioNoSharingOverSharing": 0.9615384615384617,
+          "sharingP95": 0.09000000000000001,
+          "noSharingP95": 0.08600000000000001,
+          "sharingMax": 0.09000000000000001,
+          "noSharingMax": 0.093,
+          "sharingCheaperPairs": 8,
+          "noSharingCheaperPairs": 16,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7291666666666666,
+            "p50": 0.9423076923076924,
+            "p95": 1.296875
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.013000000000000005,
+            "p50": -0.0030000000000000027,
+            "p95": 0.013999999999999999
+          }
+        },
+        "styleCpuMs": {
+          "sharingP50": 0.377,
+          "noSharingP50": 0.392,
+          "medianRatioNoSharingOverSharing": 1.039787798408488,
+          "sharingP95": 0.505,
+          "noSharingP95": 0.514,
+          "sharingMax": 0.518,
+          "noSharingMax": 0.585,
+          "sharingCheaperPairs": 15,
+          "noSharingCheaperPairs": 9,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8455284552845528,
+            "p50": 1.039787798408488,
+            "p95": 1.1812297734627832
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.065,
+            "p50": 0.015000000000000013,
+            "p95": 0.07200000000000001
+          }
+        },
+        "layoutCpuMs": {
+          "sharingP50": 0.09899999999999999,
+          "noSharingP50": 0.091,
+          "medianRatioNoSharingOverSharing": 0.9191919191919192,
+          "sharingP95": 0.125,
+          "noSharingP95": 0.116,
+          "sharingMax": 0.145,
+          "noSharingMax": 0.129,
+          "sharingCheaperPairs": 8,
+          "noSharingCheaperPairs": 16,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.6724137931034483,
+            "p50": 0.9166666666666667,
+            "p95": 1.2133333333333334
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.038000000000000006,
+            "p50": -0.009000000000000008,
+            "p95": 0.016
+          }
+        }
+      },
+      "decomposition": {
+        "taskCpuMs": {
+          "execution": {
+            "sharingP50": 6.809,
+            "noSharingP50": 6.706,
+            "sharingP95": 7.736,
+            "noSharingP95": 8.038,
+            "sharingCheaperPairs": 15,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8878892733564014,
+              "p50": 1.0177924736262005,
+              "p95": 1.1070923989827635
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.9490000000000002,
+            "noSharingP50": 0.9049999999999996,
+            "sharingP95": 1.1800000000000006,
+            "noSharingP95": 1.2300000000000002,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 15,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8042813455657483,
+              "p50": 0.978417266187051,
+              "p95": 1.0936018957345972
+            }
+          },
+          "gap": {
+            "sharingP50": 0.6290000000000002,
+            "noSharingP50": 0.6030000000000002,
+            "sharingP95": 0.758,
+            "noSharingP95": 0.7539999999999994,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8307453416149087,
+              "p50": 0.9879725085910651,
+              "p95": 1.067919075144509
+            }
+          },
+          "inclusive": {
+            "sharingP50": 8.463,
+            "noSharingP50": 8.232,
+            "sharingP95": 9.586,
+            "noSharingP95": 9.82,
+            "sharingCheaperPairs": 14,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9054657958061189,
+              "p50": 1.0073925573236437,
+              "p95": 1.0853988283010365
+            }
+          }
+        },
+        "threadCpuMs": {
+          "execution": {
+            "sharingP50": 8.318,
+            "noSharingP50": 8.203999999999999,
+            "sharingP95": 9.603,
+            "noSharingP95": 10.107999999999999,
+            "sharingCheaperPairs": 13,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9132541238897218,
+              "p50": 1.0150952734471665,
+              "p95": 1.08106443267217
+            }
+          },
+          "cleanup": {
+            "sharingP50": 1.1940000000000006,
+            "noSharingP50": 1.155999999999999,
+            "sharingP95": 1.464,
+            "noSharingP95": 1.5279999999999998,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7749307479224373,
+              "p50": 0.9930139720558883,
+              "p95": 1.1041069723018146
+            }
+          },
+          "gap": {
+            "sharingP50": 0.688000000000001,
+            "noSharingP50": 0.6519999999999998,
+            "sharingP95": 0.8079999999999997,
+            "noSharingP95": 0.7989999999999994,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7710396039603967,
+              "p50": 0.9808481532147765,
+              "p95": 1.1212121212121215
+            }
+          },
+          "inclusive": {
+            "sharingP50": 10.3,
+            "noSharingP50": 10.012,
+            "sharingP95": 11.931000000000001,
+            "noSharingP95": 12.253,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9215875156535978,
+              "p50": 0.9931320068679932,
+              "p95": 1.0635384150639413
+            }
+          }
+        },
+        "scriptCpuMs": {
+          "execution": {
+            "sharingP50": 0.032,
+            "noSharingP50": 0.030000000000000002,
+            "sharingP95": 0.055,
+            "noSharingP95": 0.056,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 15,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6749999999999999,
+              "p50": 0.9375,
+              "p95": 1.4166666666666667
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.021,
+            "noSharingP50": 0.018999999999999996,
+            "sharingP95": 0.035,
+            "noSharingP95": 0.036,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6190476190476188,
+              "p50": 0.9374999999999998,
+              "p95": 1.380952380952381
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.052,
+            "noSharingP50": 0.05,
+            "sharingP95": 0.09000000000000001,
+            "noSharingP95": 0.08600000000000001,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 16,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7291666666666666,
+              "p50": 0.9423076923076924,
+              "p95": 1.296875
+            }
+          }
+        },
+        "styleCpuMs": {
+          "execution": {
+            "sharingP50": 0.377,
+            "noSharingP50": 0.392,
+            "sharingP95": 0.505,
+            "noSharingP95": 0.514,
+            "sharingCheaperPairs": 15,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8455284552845528,
+              "p50": 1.039787798408488,
+              "p95": 1.1812297734627832
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.377,
+            "noSharingP50": 0.392,
+            "sharingP95": 0.505,
+            "noSharingP95": 0.514,
+            "sharingCheaperPairs": 15,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8455284552845528,
+              "p50": 1.039787798408488,
+              "p95": 1.1812297734627832
+            }
+          }
+        },
+        "layoutCpuMs": {
+          "execution": {
+            "sharingP50": 0.043000000000000003,
+            "noSharingP50": 0.047,
+            "sharingP95": 0.068,
+            "noSharingP95": 0.064,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6101694915254239,
+              "p50": 0.98,
+              "p95": 1.4166666666666665
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.051,
+            "noSharingP50": 0.04700000000000001,
+            "sharingP95": 0.076,
+            "noSharingP95": 0.058,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 15,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5151515151515151,
+              "p50": 0.9333333333333332,
+              "p95": 1.2790697674418603
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.09899999999999999,
+            "noSharingP50": 0.091,
+            "sharingP95": 0.125,
+            "noSharingP95": 0.116,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 16,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6724137931034483,
+              "p50": 0.9166666666666667,
+              "p95": 1.2133333333333334
+            }
+          }
+        }
+      },
+      "metadataOrders": [
+        [
+          "waapi-ctl",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "motion"
+        ],
+        [
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "motion",
+          "waapi-ctl"
+        ],
+        [
+          "gsap",
+          "anime",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "lab"
+        ],
+        [
+          "anime",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "lab",
+          "gsap"
+        ],
+        [
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "lab",
+          "gsap",
+          "anime"
+        ],
+        [
+          "motion",
+          "waapi-ctl",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline"
+        ],
+        [
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "waapi-ctl",
+          "motion"
+        ],
+        [
+          "gsap",
+          "anime",
+          "baseline",
+          "waapi-ctl",
+          "motion",
+          "lab"
+        ],
+        [
+          "anime",
+          "baseline",
+          "waapi-ctl",
+          "motion",
+          "lab",
+          "gsap"
+        ],
+        [
+          "baseline",
+          "waapi-ctl",
+          "motion",
+          "lab",
+          "gsap",
+          "anime"
+        ],
+        [
+          "waapi-ctl",
+          "motion",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline"
+        ],
+        [
+          "motion",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "waapi-ctl"
+        ],
+        [
+          "waapi-ctl",
+          "baseline",
+          "lab",
+          "gsap",
+          "anime",
+          "motion"
+        ],
+        [
+          "baseline",
+          "lab",
+          "gsap",
+          "anime",
+          "motion",
+          "waapi-ctl"
+        ],
+        [
+          "lab",
+          "gsap",
+          "anime",
+          "motion",
+          "waapi-ctl",
+          "baseline"
+        ],
+        [
+          "gsap",
+          "anime",
+          "motion",
+          "waapi-ctl",
+          "baseline",
+          "lab"
+        ],
+        [
+          "anime",
+          "motion",
+          "waapi-ctl",
+          "baseline",
+          "lab",
+          "gsap"
+        ],
+        [
+          "motion",
+          "waapi-ctl",
+          "baseline",
+          "lab",
+          "gsap",
+          "anime"
+        ],
+        [
+          "waapi-ctl",
+          "anime",
+          "gsap",
+          "lab",
+          "baseline",
+          "motion"
+        ],
+        [
+          "anime",
+          "gsap",
+          "lab",
+          "baseline",
+          "motion",
+          "waapi-ctl"
+        ],
+        [
+          "gsap",
+          "lab",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "anime"
+        ],
+        [
+          "lab",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "anime",
+          "gsap"
+        ],
+        [
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "anime",
+          "gsap",
+          "lab"
+        ],
+        [
+          "motion",
+          "waapi-ctl",
+          "anime",
+          "gsap",
+          "lab",
+          "baseline"
+        ]
+      ]
+    },
+    {
+      "profile": "transition",
+      "count": 100,
+      "pairs": 24,
+      "metrics": {
+        "apiMs": {
+          "sharingP50": 9.690000000060536,
+          "noSharingP50": 9.75,
+          "medianRatioNoSharingOverSharing": 1.0061919504581103,
+          "sharingP95": 11.304999999934807,
+          "noSharingP95": 12.070000000006985,
+          "sharingMax": 11.474999999976717,
+          "noSharingMax": 12.114999999990687,
+          "sharingCheaperPairs": 14,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.810893246193473,
+            "p50": 1.0308775731346882,
+            "p95": 1.28336864405858
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -2.169999999925494,
+            "p50": 0.2850000000325963,
+            "p95": 2.674999999930151
+          }
+        },
+        "completionMs": {
+          "sharingP50": 431.25500000000466,
+          "noSharingP50": 431.49499999999534,
+          "medianRatioNoSharingOverSharing": 1.0005565152867577,
+          "sharingP95": 432.375,
+          "noSharingP95": 432.29000000003725,
+          "sharingMax": 432.39000000001397,
+          "noSharingMax": 432.54000000003725,
+          "sharingCheaperPairs": 14,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.997846648992359,
+            "p50": 1.0003469090405035,
+            "p95": 1.0054932265722873
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.9299999999348074,
+            "p50": 0.15000000002328306,
+            "p95": 2.35999999998603
+          }
+        },
+        "taskCpuMs": {
+          "sharingP50": 23.031,
+          "noSharingP50": 23.391,
+          "medianRatioNoSharingOverSharing": 1.0156311059007423,
+          "sharingP95": 25.96,
+          "noSharingP95": 26.379,
+          "sharingMax": 27.272000000000002,
+          "noSharingMax": 27.673000000000002,
+          "sharingCheaperPairs": 17,
+          "noSharingCheaperPairs": 7,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.884206471494607,
+            "p50": 1.0302003951453569,
+            "p95": 1.1418138306651264
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -3.006000000000004,
+            "p50": 0.6419999999999959,
+            "p95": 3.4370000000000047
+          }
+        },
+        "threadCpuMs": {
+          "sharingP50": 24.768000000000004,
+          "noSharingP50": 25.153,
+          "medianRatioNoSharingOverSharing": 1.0155442506459946,
+          "sharingP95": 27.997999999999998,
+          "noSharingP95": 28.081,
+          "sharingMax": 29.601000000000003,
+          "noSharingMax": 29.763000000000005,
+          "sharingCheaperPairs": 17,
+          "noSharingCheaperPairs": 7,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8913789987348635,
+            "p50": 1.0249682068673167,
+            "p95": 1.1293970325959097
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -2.984999999999996,
+            "p50": 0.5889999999999986,
+            "p95": 3.4100000000000072
+          }
+        },
+        "scriptCpuMs": {
+          "sharingP50": 0.48500000000000004,
+          "noSharingP50": 0.5,
+          "medianRatioNoSharingOverSharing": 1.0309278350515463,
+          "sharingP95": 0.5609999999999999,
+          "noSharingP95": 0.6,
+          "sharingMax": 0.579,
+          "noSharingMax": 0.618,
+          "sharingCheaperPairs": 17,
+          "noSharingCheaperPairs": 7,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7835820895522388,
+            "p50": 1.0432989690721648,
+            "p95": 1.2396907216494844
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.11599999999999999,
+            "p50": 0.020999999999999963,
+            "p95": 0.09899999999999998
+          }
+        },
+        "styleCpuMs": {
+          "sharingP50": 3.9960000000000004,
+          "noSharingP50": 4.002999999999999,
+          "medianRatioNoSharingOverSharing": 1.0017517517517514,
+          "sharingP95": 4.837,
+          "noSharingP95": 4.659,
+          "sharingMax": 4.953,
+          "noSharingMax": 4.674,
+          "sharingCheaperPairs": 11,
+          "noSharingCheaperPairs": 13,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8414967416438931,
+            "p50": 0.9767220902612826,
+            "p95": 1.2354430379746837
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.7540000000000004,
+            "p50": -0.09799999999999986,
+            "p95": 0.8370000000000002
+          }
+        },
+        "layoutCpuMs": {
+          "sharingP50": 0.258,
+          "noSharingP50": 0.211,
+          "medianRatioNoSharingOverSharing": 0.817829457364341,
+          "sharingP95": 0.33599999999999997,
+          "noSharingP95": 0.34,
+          "sharingMax": 0.439,
+          "noSharingMax": 0.347,
+          "sharingCheaperPairs": 11,
+          "noSharingCheaperPairs": 13,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.5833333333333334,
+            "p50": 0.9738805970149254,
+            "p95": 1.7009803921568627
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.13999999999999996,
+            "p50": -0.007000000000000006,
+            "p95": 0.143
+          }
+        }
+      },
+      "decomposition": {
+        "taskCpuMs": {
+          "execution": {
+            "sharingP50": 21.856,
+            "noSharingP50": 22.317,
+            "sharingP95": 24.799,
+            "noSharingP95": 25.275,
+            "sharingCheaperPairs": 17,
+            "noSharingCheaperPairs": 7,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8852776321625871,
+              "p50": 1.0316917125427763,
+              "p95": 1.1597947188349857
+            }
+          },
+          "cleanup": {
+            "sharingP50": 1.1080000000000014,
+            "noSharingP50": 1.0989999999999993,
+            "sharingP95": 1.4110000000000025,
+            "noSharingP95": 1.4289999999999998,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8613264427217907,
+              "p50": 0.9963898916967503,
+              "p95": 1.0738844184345284
+            }
+          },
+          "gap": {
+            "sharingP50": 0.950999999999997,
+            "noSharingP50": 0.9410000000000008,
+            "sharingP95": 1.1569999999999983,
+            "noSharingP95": 1.0879999999999987,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8807260155574768,
+              "p50": 0.9890329012961111,
+              "p95": 1.0559910414333682
+            }
+          },
+          "inclusive": {
+            "sharingP50": 24.021,
+            "noSharingP50": 24.308,
+            "sharingP95": 26.932000000000002,
+            "noSharingP95": 27.253,
+            "sharingCheaperPairs": 17,
+            "noSharingCheaperPairs": 7,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8863062527847911,
+              "p50": 1.0289071997838715,
+              "p95": 1.1347669399231717
+            }
+          }
+        },
+        "threadCpuMs": {
+          "execution": {
+            "sharingP50": 23.352,
+            "noSharingP50": 23.766,
+            "sharingP95": 26.268,
+            "noSharingP95": 26.665000000000003,
+            "sharingCheaperPairs": 17,
+            "noSharingCheaperPairs": 7,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8920736834059467,
+              "p50": 1.0287428932406824,
+              "p95": 1.1474763086183757
+            }
+          },
+          "cleanup": {
+            "sharingP50": 1.4370000000000007,
+            "noSharingP50": 1.3869999999999993,
+            "sharingP95": 1.739000000000001,
+            "noSharingP95": 1.7740000000000014,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8792528352234819,
+              "p50": 0.9853862212943607,
+              "p95": 1.0776959142665785
+            }
+          },
+          "gap": {
+            "sharingP50": 0.9909999999999988,
+            "noSharingP50": 0.9820000000000002,
+            "sharingP95": 1.2059999999999986,
+            "noSharingP95": 1.1380000000000001,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8880597014925375,
+              "p50": 0.9909182643794162,
+              "p95": 1.0866462793068317
+            }
+          },
+          "inclusive": {
+            "sharingP50": 25.815,
+            "noSharingP50": 26.09,
+            "sharingP95": 29.144,
+            "noSharingP95": 29.008,
+            "sharingCheaperPairs": 17,
+            "noSharingCheaperPairs": 7,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.893386326395426,
+              "p50": 1.0268880153884752,
+              "p95": 1.1230802903731807
+            }
+          }
+        },
+        "scriptCpuMs": {
+          "execution": {
+            "sharingP50": 0.456,
+            "noSharingP50": 0.47300000000000003,
+            "sharingP95": 0.544,
+            "noSharingP95": 0.5770000000000001,
+            "sharingCheaperPairs": 17,
+            "noSharingCheaperPairs": 7,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7528735632183908,
+              "p50": 1.028985507246377,
+              "p95": 1.2506738544474394
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.02099999999999997,
+            "noSharingP50": 0.02099999999999997,
+            "sharingP95": 0.04299999999999996,
+            "noSharingP95": 0.03600000000000006,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7187499999999967,
+              "p50": 1.0,
+              "p95": 1.7307692307692306
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.48500000000000004,
+            "noSharingP50": 0.5,
+            "sharingP95": 0.5609999999999999,
+            "noSharingP95": 0.6,
+            "sharingCheaperPairs": 17,
+            "noSharingCheaperPairs": 7,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7835820895522388,
+              "p50": 1.0432989690721648,
+              "p95": 1.2396907216494844
+            }
+          }
+        },
+        "styleCpuMs": {
+          "execution": {
+            "sharingP50": 3.9890000000000003,
+            "noSharingP50": 3.995,
+            "sharingP95": 4.825,
+            "noSharingP95": 4.642,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8419388830347735,
+              "p50": 0.9780743565300287,
+              "p95": 1.2376377507770555
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.011999999999999858,
+            "noSharingP50": 0.010999999999999725,
+            "sharingP95": 0.01700000000000052,
+            "noSharingP95": 0.016999999999999654,
+            "sharingCheaperPairs": 5,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6470588235294013,
+              "p50": 0.8947368421052487,
+              "p95": 1.5555555555555878
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 3.9960000000000004,
+            "noSharingP50": 4.002999999999999,
+            "sharingP95": 4.837,
+            "noSharingP95": 4.659,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8414967416438931,
+              "p50": 0.9767220902612826,
+              "p95": 1.2354430379746837
+            }
+          }
+        },
+        "layoutCpuMs": {
+          "execution": {
+            "sharingP50": 0.199,
+            "noSharingP50": 0.16699999999999998,
+            "sharingP95": 0.29500000000000004,
+            "noSharingP95": 0.289,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5663082437275985,
+              "p50": 0.8563535911602209,
+              "p95": 1.8692810457516342
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.04299999999999999,
+            "noSharingP50": 0.038,
+            "sharingP95": 0.06299999999999999,
+            "noSharingP95": 0.061999999999999986,
+            "sharingCheaperPairs": 6,
+            "noSharingCheaperPairs": 18,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5915492957746482,
+              "p50": 0.8947368421052636,
+              "p95": 1.5121951219512204
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.258,
+            "noSharingP50": 0.211,
+            "sharingP95": 0.33599999999999997,
+            "noSharingP95": 0.34,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5833333333333334,
+              "p50": 0.9738805970149254,
+              "p95": 1.7009803921568627
+            }
+          }
+        }
+      },
+      "metadataOrders": [
+        [
+          "waapi-ctl",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "motion"
+        ],
+        [
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "motion",
+          "waapi-ctl"
+        ],
+        [
+          "gsap",
+          "anime",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "lab"
+        ],
+        [
+          "anime",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "lab",
+          "gsap"
+        ],
+        [
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "lab",
+          "gsap",
+          "anime"
+        ],
+        [
+          "motion",
+          "waapi-ctl",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline"
+        ],
+        [
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "waapi-ctl",
+          "motion"
+        ],
+        [
+          "gsap",
+          "anime",
+          "baseline",
+          "waapi-ctl",
+          "motion",
+          "lab"
+        ],
+        [
+          "anime",
+          "baseline",
+          "waapi-ctl",
+          "motion",
+          "lab",
+          "gsap"
+        ],
+        [
+          "baseline",
+          "waapi-ctl",
+          "motion",
+          "lab",
+          "gsap",
+          "anime"
+        ],
+        [
+          "waapi-ctl",
+          "motion",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline"
+        ],
+        [
+          "motion",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "waapi-ctl"
+        ],
+        [
+          "waapi-ctl",
+          "baseline",
+          "lab",
+          "gsap",
+          "anime",
+          "motion"
+        ],
+        [
+          "baseline",
+          "lab",
+          "gsap",
+          "anime",
+          "motion",
+          "waapi-ctl"
+        ],
+        [
+          "lab",
+          "gsap",
+          "anime",
+          "motion",
+          "waapi-ctl",
+          "baseline"
+        ],
+        [
+          "gsap",
+          "anime",
+          "motion",
+          "waapi-ctl",
+          "baseline",
+          "lab"
+        ],
+        [
+          "anime",
+          "motion",
+          "waapi-ctl",
+          "baseline",
+          "lab",
+          "gsap"
+        ],
+        [
+          "motion",
+          "waapi-ctl",
+          "baseline",
+          "lab",
+          "gsap",
+          "anime"
+        ],
+        [
+          "waapi-ctl",
+          "anime",
+          "gsap",
+          "lab",
+          "baseline",
+          "motion"
+        ],
+        [
+          "anime",
+          "gsap",
+          "lab",
+          "baseline",
+          "motion",
+          "waapi-ctl"
+        ],
+        [
+          "gsap",
+          "lab",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "anime"
+        ],
+        [
+          "lab",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "anime",
+          "gsap"
+        ],
+        [
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "anime",
+          "gsap",
+          "lab"
+        ],
+        [
+          "motion",
+          "waapi-ctl",
+          "anime",
+          "gsap",
+          "lab",
+          "baseline"
+        ]
+      ]
+    },
+    {
+      "profile": "transition",
+      "count": 1000,
+      "pairs": 24,
+      "metrics": {
+        "apiMs": {
+          "sharingP50": 58.68500000005588,
+          "noSharingP50": 61.570000000006985,
+          "medianRatioNoSharingOverSharing": 1.0491607736209996,
+          "sharingP95": 64.82000000006519,
+          "noSharingP95": 67.94000000006054,
+          "sharingMax": 66.19499999994878,
+          "noSharingMax": 71.1600000000326,
+          "sharingCheaperPairs": 18,
+          "noSharingCheaperPairs": 6,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9178787383565143,
+            "p50": 1.0454335081756527,
+            "p95": 1.1986761141135671
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -5.024999999965075,
+            "p50": 2.9449999999487773,
+            "p95": 11.070000000065193
+          }
+        },
+        "completionMs": {
+          "sharingP50": 521.0449999999837,
+          "noSharingP50": 521.5949999999721,
+          "medianRatioNoSharingOverSharing": 1.0010555710159168,
+          "sharingP95": 537.0500000000466,
+          "noSharingP95": 539.0450000000419,
+          "sharingMax": 538.8299999999581,
+          "noSharingMax": 539.7600000000093,
+          "sharingCheaperPairs": 14,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9686762250244588,
+            "p50": 1.0014802995203802,
+            "p95": 1.0640642325359952
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -16.320000000006985,
+            "p50": 0.7700000000186265,
+            "p95": 32.35499999998137
+          }
+        },
+        "taskCpuMs": {
+          "sharingP50": 149.548,
+          "noSharingP50": 153.505,
+          "medianRatioNoSharingOverSharing": 1.0264597319924038,
+          "sharingP95": 167.91599999999997,
+          "noSharingP95": 170.329,
+          "sharingMax": 168.89600000000002,
+          "noSharingMax": 177.972,
+          "sharingCheaperPairs": 16,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9236150605098852,
+            "p50": 1.0155223469458026,
+            "p95": 1.1633761003868963
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -12.491000000000014,
+            "p50": 2.4130000000000393,
+            "p95": 23.774
+          }
+        },
+        "threadCpuMs": {
+          "sharingP50": 151.09399999999997,
+          "noSharingP50": 155.01500000000001,
+          "medianRatioNoSharingOverSharing": 1.0259507326564923,
+          "sharingP95": 169.90200000000002,
+          "noSharingP95": 172.233,
+          "sharingMax": 171.067,
+          "noSharingMax": 180.13800000000003,
+          "sharingCheaperPairs": 15,
+          "noSharingCheaperPairs": 9,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9244934315769062,
+            "p50": 1.0145458757162227,
+            "p95": 1.1618539173014144
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -12.461000000000013,
+            "p50": 2.330999999999989,
+            "p95": 23.798999999999978
+          }
+        },
+        "scriptCpuMs": {
+          "sharingP50": 3.907,
+          "noSharingP50": 3.785,
+          "medianRatioNoSharingOverSharing": 0.9687739953928846,
+          "sharingP95": 4.465,
+          "noSharingP95": 4.4559999999999995,
+          "sharingMax": 4.467,
+          "noSharingMax": 5.098,
+          "sharingCheaperPairs": 9,
+          "noSharingCheaperPairs": 15,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8471931050547402,
+            "p50": 0.9594217600811563,
+            "p95": 1.0926474548882303
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.6560000000000001,
+            "p50": -0.1600000000000006,
+            "p95": 0.3439999999999994
+          }
+        },
+        "styleCpuMs": {
+          "sharingP50": 38.775999999999996,
+          "noSharingP50": 38.268,
+          "medianRatioNoSharingOverSharing": 0.9868991128533114,
+          "sharingP95": 46.113,
+          "noSharingP95": 47.271,
+          "sharingMax": 49.772999999999996,
+          "noSharingMax": 51.38,
+          "sharingCheaperPairs": 14,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8457565924774919,
+            "p50": 1.0184418089996028,
+            "p95": 1.263426325910649
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -6.75,
+            "p50": 0.6499999999999986,
+            "p95": 9.451999999999998
+          }
+        },
+        "layoutCpuMs": {
+          "sharingP50": 1.7,
+          "noSharingP50": 1.6789999999999998,
+          "medianRatioNoSharingOverSharing": 0.9876470588235293,
+          "sharingP95": 2.313,
+          "noSharingP95": 2.863,
+          "sharingMax": 2.895,
+          "noSharingMax": 3.14,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 12,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7695831424644985,
+            "p50": 0.9920687376074023,
+            "p95": 1.5441717791411047
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.5029999999999997,
+            "p50": -0.012000000000000233,
+            "p95": 0.8870000000000005
+          }
+        }
+      },
+      "decomposition": {
+        "taskCpuMs": {
+          "execution": {
+            "sharingP50": 147.21,
+            "noSharingP50": 150.90300000000002,
+            "sharingP95": 164.982,
+            "noSharingP95": 167.67000000000002,
+            "sharingCheaperPairs": 16,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9225043646824188,
+              "p50": 1.0162926864748882,
+              "p95": 1.1645556362417606
+            }
+          },
+          "cleanup": {
+            "sharingP50": 2.479999999999982,
+            "noSharingP50": 2.4740000000000038,
+            "sharingP95": 2.9389999999999974,
+            "noSharingP95": 2.9659999999999966,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8949165402124434,
+              "p50": 0.9775374376040055,
+              "p95": 1.0899608865710617
+            }
+          },
+          "gap": {
+            "sharingP50": 3.9740000000000055,
+            "noSharingP50": 3.9019999999999886,
+            "sharingP95": 4.1020000000000225,
+            "noSharingP95": 5.177000000000015,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 15,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9061044373621,
+              "p50": 0.9879926912033437,
+              "p95": 1.2704294478527656
+            }
+          },
+          "inclusive": {
+            "sharingP50": 153.324,
+            "noSharingP50": 157.32100000000003,
+            "sharingP95": 172.197,
+            "noSharingP95": 174.231,
+            "sharingCheaperPairs": 16,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.926395211297896,
+              "p50": 1.015373238624414,
+              "p95": 1.1563611326506056
+            }
+          }
+        },
+        "threadCpuMs": {
+          "execution": {
+            "sharingP50": 148.585,
+            "noSharingP50": 152.234,
+            "sharingP95": 166.764,
+            "noSharingP95": 169.396,
+            "sharingCheaperPairs": 15,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9232968373577488,
+              "p50": 1.0157827828548127,
+              "p95": 1.1632204105068726
+            }
+          },
+          "cleanup": {
+            "sharingP50": 2.6700000000000057,
+            "noSharingP50": 2.692,
+            "sharingP95": 3.149999999999986,
+            "noSharingP95": 3.151999999999988,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8944209039548046,
+              "p50": 0.9674670797831136,
+              "p95": 1.0824286288701173
+            }
+          },
+          "gap": {
+            "sharingP50": 4.010999999999987,
+            "noSharingP50": 3.941,
+            "sharingP95": 4.139000000000004,
+            "noSharingP95": 5.222999999999978,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 16,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.904588492352518,
+              "p50": 0.9855558421459889,
+              "p95": 1.2692588092345003
+            }
+          },
+          "inclusive": {
+            "sharingP50": 154.914,
+            "noSharingP50": 158.864,
+            "sharingP95": 174.22700000000003,
+            "noSharingP95": 176.174,
+            "sharingCheaperPairs": 16,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9271309937436,
+              "p50": 1.0137809374751308,
+              "p95": 1.154843575308119
+            }
+          }
+        },
+        "scriptCpuMs": {
+          "execution": {
+            "sharingP50": 3.863,
+            "noSharingP50": 3.762,
+            "sharingP95": 4.441,
+            "noSharingP95": 4.433999999999999,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 15,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.847179967236134,
+              "p50": 0.9584713375796179,
+              "p95": 1.0914997292907418
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.023000000000000017,
+            "noSharingP50": 0.022000000000000318,
+            "sharingP95": 0.03800000000000027,
+            "noSharingP95": 0.030999999999999778,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6842105263157842,
+              "p50": 1.0,
+              "p95": 1.4705882352940636
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 3.907,
+            "noSharingP50": 3.785,
+            "sharingP95": 4.465,
+            "noSharingP95": 4.4559999999999995,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 15,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8471931050547402,
+              "p50": 0.9594217600811563,
+              "p95": 1.0926474548882303
+            }
+          }
+        },
+        "styleCpuMs": {
+          "execution": {
+            "sharingP50": 38.759,
+            "noSharingP50": 38.258,
+            "sharingP95": 46.102,
+            "noSharingP95": 47.260000000000005,
+            "sharingCheaperPairs": 14,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8457406687847135,
+              "p50": 1.0184748985441443,
+              "p95": 1.2634997630397813
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.011000000000004062,
+            "noSharingP50": 0.011999999999998123,
+            "sharingP95": 0.04099999999999937,
+            "noSharingP95": 0.04000000000000531,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.36585365853644913,
+              "p50": 1.0,
+              "p95": 2.500000000001084
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 38.775999999999996,
+            "noSharingP50": 38.268,
+            "sharingP95": 46.113,
+            "noSharingP95": 47.271,
+            "sharingCheaperPairs": 14,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8457565924774919,
+              "p50": 1.0184418089996028,
+              "p95": 1.263426325910649
+            }
+          }
+        },
+        "layoutCpuMs": {
+          "execution": {
+            "sharingP50": 1.656,
+            "noSharingP50": 1.635,
+            "sharingP95": 2.263,
+            "noSharingP95": 2.805,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7767220902612827,
+              "p50": 0.9938650306748467,
+              "p95": 1.5560453400503778
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.04799999999999986,
+            "noSharingP50": 0.04699999999999995,
+            "sharingP95": 0.059000000000000025,
+            "noSharingP95": 0.06799999999999992,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7288135593220347,
+              "p50": 0.9803921568627467,
+              "p95": 1.307692307692307
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 1.7,
+            "noSharingP50": 1.6789999999999998,
+            "sharingP95": 2.313,
+            "noSharingP95": 2.863,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7695831424644985,
+              "p50": 0.9920687376074023,
+              "p95": 1.5441717791411047
+            }
+          }
+        }
+      },
+      "metadataOrders": [
+        [
+          "waapi-ctl",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "motion"
+        ],
+        [
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "motion",
+          "waapi-ctl"
+        ],
+        [
+          "gsap",
+          "anime",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "lab"
+        ],
+        [
+          "anime",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "lab",
+          "gsap"
+        ],
+        [
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "lab",
+          "gsap",
+          "anime"
+        ],
+        [
+          "motion",
+          "waapi-ctl",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline"
+        ],
+        [
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "waapi-ctl",
+          "motion"
+        ],
+        [
+          "gsap",
+          "anime",
+          "baseline",
+          "waapi-ctl",
+          "motion",
+          "lab"
+        ],
+        [
+          "anime",
+          "baseline",
+          "waapi-ctl",
+          "motion",
+          "lab",
+          "gsap"
+        ],
+        [
+          "baseline",
+          "waapi-ctl",
+          "motion",
+          "lab",
+          "gsap",
+          "anime"
+        ],
+        [
+          "waapi-ctl",
+          "motion",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline"
+        ],
+        [
+          "motion",
+          "lab",
+          "gsap",
+          "anime",
+          "baseline",
+          "waapi-ctl"
+        ],
+        [
+          "waapi-ctl",
+          "baseline",
+          "lab",
+          "gsap",
+          "anime",
+          "motion"
+        ],
+        [
+          "baseline",
+          "lab",
+          "gsap",
+          "anime",
+          "motion",
+          "waapi-ctl"
+        ],
+        [
+          "lab",
+          "gsap",
+          "anime",
+          "motion",
+          "waapi-ctl",
+          "baseline"
+        ],
+        [
+          "gsap",
+          "anime",
+          "motion",
+          "waapi-ctl",
+          "baseline",
+          "lab"
+        ],
+        [
+          "anime",
+          "motion",
+          "waapi-ctl",
+          "baseline",
+          "lab",
+          "gsap"
+        ],
+        [
+          "motion",
+          "waapi-ctl",
+          "baseline",
+          "lab",
+          "gsap",
+          "anime"
+        ],
+        [
+          "waapi-ctl",
+          "anime",
+          "gsap",
+          "lab",
+          "baseline",
+          "motion"
+        ],
+        [
+          "anime",
+          "gsap",
+          "lab",
+          "baseline",
+          "motion",
+          "waapi-ctl"
+        ],
+        [
+          "gsap",
+          "lab",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "anime"
+        ],
+        [
+          "lab",
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "anime",
+          "gsap"
+        ],
+        [
+          "baseline",
+          "motion",
+          "waapi-ctl",
+          "anime",
+          "gsap",
+          "lab"
+        ],
+        [
+          "motion",
+          "waapi-ctl",
+          "anime",
+          "gsap",
+          "lab",
+          "baseline"
+        ]
+      ]
+    },
+    {
+      "profile": "spring",
+      "count": 1,
+      "pairs": 20,
+      "metrics": {
+        "apiMs": {
+          "sharingP50": 7.7850000000034925,
+          "noSharingP50": 8,
+          "medianRatioNoSharingOverSharing": 1.0276172125878498,
+          "sharingP95": 10.849999999976717,
+          "noSharingP95": 11.01500000001397,
+          "sharingMax": 11.169999999998254,
+          "noSharingMax": 11.10000000000582,
+          "sharingCheaperPairs": 10,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.6693320790204675,
+            "p50": 0.9893964110926136,
+            "p95": 1.63837920488755
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -3.51500000001397,
+            "p50": -0.0650000000023283,
+            "p95": 4.1749999999883585
+          }
+        },
+        "completionMs": {
+          "sharingP50": 1297,
+          "noSharingP50": 1296.7950000000128,
+          "medianRatioNoSharingOverSharing": 0.9998419429452682,
+          "sharingP95": 1298.0299999999697,
+          "noSharingP95": 1298.1900000000023,
+          "sharingMax": 1298.4249999999884,
+          "noSharingMax": 1298.7399999999907,
+          "sharingCheaperPairs": 9,
+          "noSharingCheaperPairs": 11,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9980314278119624,
+            "p50": 0.9995533049656413,
+            "p95": 1.0007945262540778
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -2.554999999993015,
+            "p50": -0.5799999999871943,
+            "p95": 1.0299999999988358
+          }
+        },
+        "taskCpuMs": {
+          "sharingP50": 11.956,
+          "noSharingP50": 12.032,
+          "medianRatioNoSharingOverSharing": 1.0063566410170626,
+          "sharingP95": 13.447,
+          "noSharingP95": 12.985,
+          "sharingMax": 14.473,
+          "noSharingMax": 14.01,
+          "sharingCheaperPairs": 10,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8512402404477301,
+            "p50": 0.9848321591380024,
+            "p95": 1.1147966274437133
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -2.1530000000000022,
+            "p50": -0.1830000000000016,
+            "p95": 1.238999999999999
+          }
+        },
+        "threadCpuMs": {
+          "sharingP50": 15.683000000000003,
+          "noSharingP50": 15.879999999999999,
+          "medianRatioNoSharingOverSharing": 1.0125613721864437,
+          "sharingP95": 17.39,
+          "noSharingP95": 16.904,
+          "sharingMax": 19.144000000000002,
+          "noSharingMax": 17.76,
+          "sharingCheaperPairs": 10,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8739030505641454,
+            "p50": 0.9948796421634983,
+            "p95": 1.0774081774081776
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -2.4140000000000015,
+            "p50": -0.08699999999999974,
+            "p95": 1.1170000000000027
+          }
+        },
+        "scriptCpuMs": {
+          "sharingP50": 0.054,
+          "noSharingP50": 0.055,
+          "medianRatioNoSharingOverSharing": 1.0185185185185186,
+          "sharingP95": 0.07100000000000001,
+          "noSharingP95": 0.088,
+          "sharingMax": 0.116,
+          "noSharingMax": 0.11299999999999999,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.46551724137931033,
+            "p50": 1.0869565217391306,
+            "p95": 1.712121212121212
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.062000000000000006,
+            "p50": 0.0040000000000000036,
+            "p95": 0.03799999999999999
+          }
+        },
+        "styleCpuMs": {
+          "sharingP50": 0.337,
+          "noSharingP50": 0.366,
+          "medianRatioNoSharingOverSharing": 1.086053412462908,
+          "sharingP95": 0.443,
+          "noSharingP95": 0.442,
+          "sharingMax": 0.5670000000000001,
+          "noSharingMax": 0.496,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.656084656084656,
+            "p50": 1.0303867403314917,
+            "p95": 1.3726708074534162
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.19500000000000006,
+            "p50": 0.010999999999999954,
+            "p95": 0.12
+          }
+        },
+        "layoutCpuMs": {
+          "sharingP50": 0.09000000000000001,
+          "noSharingP50": 0.092,
+          "medianRatioNoSharingOverSharing": 1.0222222222222221,
+          "sharingP95": 0.125,
+          "noSharingP95": 0.136,
+          "sharingMax": 0.126,
+          "noSharingMax": 0.14100000000000001,
+          "sharingCheaperPairs": 9,
+          "noSharingCheaperPairs": 10,
+          "ties": 1,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.5772357723577236,
+            "p50": 0.9896907216494846,
+            "p95": 1.6588235294117648
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.052000000000000005,
+            "p50": -0.0010000000000000009,
+            "p95": 0.05600000000000001
+          }
+        }
+      },
+      "decomposition": {
+        "taskCpuMs": {
+          "execution": {
+            "sharingP50": 11.045,
+            "noSharingP50": 11.171999999999999,
+            "sharingP95": 12.495,
+            "noSharingP95": 12.103000000000002,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8412132024977698,
+              "p50": 0.9795040717357489,
+              "p95": 1.125188840769463
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.9490000000000002,
+            "noSharingP50": 0.9129999999999989,
+            "sharingP95": 1.065,
+            "noSharingP95": 1.141999999999999,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8152985074626863,
+              "p50": 0.9833496571988235,
+              "p95": 1.2009345794392527
+            }
+          },
+          "gap": {
+            "sharingP50": 0.6020000000000001,
+            "noSharingP50": 0.6390000000000007,
+            "sharingP95": 0.7169999999999989,
+            "noSharingP95": 0.7699999999999998,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5759493670886067,
+              "p50": 0.99484536082474,
+              "p95": 1.2790697674418599
+            }
+          },
+          "inclusive": {
+            "sharingP50": 12.635,
+            "noSharingP50": 12.677000000000001,
+            "sharingP95": 14.112,
+            "noSharingP95": 13.571,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8590626241228649,
+              "p50": 0.9938921481957727,
+              "p95": 1.1074380165289255
+            }
+          }
+        },
+        "threadCpuMs": {
+          "execution": {
+            "sharingP50": 14.53,
+            "noSharingP50": 14.853,
+            "sharingP95": 16.284,
+            "noSharingP95": 15.705,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8657381615598886,
+              "p50": 0.9884196614009692,
+              "p95": 1.0843758687795386
+            }
+          },
+          "cleanup": {
+            "sharingP50": 1.1059999999999994,
+            "noSharingP50": 1.0830000000000006,
+            "sharingP95": 1.269000000000001,
+            "noSharingP95": 1.3559999999999997,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8086614173228346,
+              "p50": 0.9966499162479058,
+              "p95": 1.1910766246362747
+            }
+          },
+          "gap": {
+            "sharingP50": 0.6370000000000005,
+            "noSharingP50": 0.68,
+            "sharingP95": 0.7559999999999998,
+            "noSharingP95": 0.8160000000000007,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5987701767870877,
+              "p50": 0.9936204146730454,
+              "p95": 1.285039370078741
+            }
+          },
+          "inclusive": {
+            "sharingP50": 16.439000000000004,
+            "noSharingP50": 16.554,
+            "sharingP95": 18.088,
+            "noSharingP95": 17.526999999999997,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8794834283408163,
+              "p50": 0.9973490782021928,
+              "p95": 1.0728855225566407
+            }
+          }
+        },
+        "scriptCpuMs": {
+          "execution": {
+            "sharingP50": 0.030000000000000002,
+            "noSharingP50": 0.031,
+            "sharingP95": 0.046,
+            "noSharingP95": 0.046,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.25510204081632654,
+              "p50": 1.088235294117647,
+              "p95": 1.6190476190476193
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.023000000000000003,
+            "noSharingP50": 0.025,
+            "sharingP95": 0.029,
+            "noSharingP95": 0.041999999999999996,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5714285714285713,
+              "p50": 1.1249999999999996,
+              "p95": 1.633333333333333
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.054,
+            "noSharingP50": 0.055,
+            "sharingP95": 0.07100000000000001,
+            "noSharingP95": 0.088,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.46551724137931033,
+              "p50": 1.0869565217391306,
+              "p95": 1.712121212121212
+            }
+          }
+        },
+        "styleCpuMs": {
+          "execution": {
+            "sharingP50": 0.337,
+            "noSharingP50": 0.366,
+            "sharingP95": 0.443,
+            "noSharingP95": 0.442,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.656084656084656,
+              "p50": 1.0303867403314917,
+              "p95": 1.3726708074534162
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.337,
+            "noSharingP50": 0.366,
+            "sharingP95": 0.443,
+            "noSharingP95": 0.442,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.656084656084656,
+              "p50": 1.0303867403314917,
+              "p95": 1.3726708074534162
+            }
+          }
+        },
+        "layoutCpuMs": {
+          "execution": {
+            "sharingP50": 0.048,
+            "noSharingP50": 0.052,
+            "sharingP95": 0.061,
+            "noSharingP95": 0.08399999999999999,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6229508196721312,
+              "p50": 1.0526315789473684,
+              "p95": 1.8958333333333333
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.039,
+            "noSharingP50": 0.039,
+            "sharingP95": 0.07500000000000001,
+            "noSharingP95": 0.053000000000000005,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.47999999999999987,
+              "p50": 0.9736842105263156,
+              "p95": 1.4054054054054057
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.09000000000000001,
+            "noSharingP50": 0.092,
+            "sharingP95": 0.125,
+            "noSharingP95": 0.136,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5772357723577236,
+              "p50": 0.9896907216494846,
+              "p95": 1.6588235294117648
+            }
+          }
+        }
+      },
+      "metadataOrders": [
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ]
+      ]
+    },
+    {
+      "profile": "spring",
+      "count": 100,
+      "pairs": 20,
+      "metrics": {
+        "apiMs": {
+          "sharingP50": 20.480000000010477,
+          "noSharingP50": 19.125,
+          "medianRatioNoSharingOverSharing": 0.9338378906245223,
+          "sharingP95": 25.819999999992433,
+          "noSharingP95": 23.77499999999418,
+          "sharingMax": 26.089999999996508,
+          "noSharingMax": 25.605000000010477,
+          "sharingCheaperPairs": 8,
+          "noSharingCheaperPairs": 12,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7073591414342189,
+            "p50": 0.9570135746585143,
+            "p95": 1.2825545171338666
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -7.634999999980209,
+            "p50": -0.7600000000384171,
+            "p95": 4.5350000000034925
+          }
+        },
+        "completionMs": {
+          "sharingP50": 1300.859999999986,
+          "noSharingP50": 1298.4049999999988,
+          "medianRatioNoSharingOverSharing": 0.9981127869255821,
+          "sharingP95": 1315.0599999999977,
+          "noSharingP95": 1314.679999999993,
+          "sharingMax": 1315.390000000014,
+          "noSharingMax": 1317.875,
+          "sharingCheaperPairs": 11,
+          "noSharingCheaperPairs": 9,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9872126945005475,
+            "p50": 1.0000577416101755,
+            "p95": 1.0097155979508876
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -16.80999999999767,
+            "p50": 0.07500000004074536,
+            "p95": 12.64999999999418
+          }
+        },
+        "taskCpuMs": {
+          "sharingP50": 33.279999999999994,
+          "noSharingP50": 32.68300000000001,
+          "medianRatioNoSharingOverSharing": 0.9820612980769234,
+          "sharingP95": 37.837,
+          "noSharingP95": 38.93899999999999,
+          "sharingMax": 37.88100000000001,
+          "noSharingMax": 41.986999999999995,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.813574087273303,
+            "p50": 1.0130027949933165,
+            "p95": 1.1239392884867627
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -7.062000000000008,
+            "p50": 0.4280000000000044,
+            "p95": 4.6299999999999955
+          }
+        },
+        "threadCpuMs": {
+          "sharingP50": 37.006,
+          "noSharingP50": 36.576,
+          "medianRatioNoSharingOverSharing": 0.9883802626601091,
+          "sharingP95": 41.698,
+          "noSharingP95": 42.986,
+          "sharingMax": 41.821999999999996,
+          "noSharingMax": 46.81199999999999,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8345724015540313,
+            "p50": 1.000211176517171,
+            "p95": 1.1277554265340042
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -6.898000000000003,
+            "p50": 0.007999999999995566,
+            "p95": 5.2479999999999976
+          }
+        },
+        "scriptCpuMs": {
+          "sharingP50": 0.509,
+          "noSharingP50": 0.508,
+          "medianRatioNoSharingOverSharing": 0.9980353634577603,
+          "sharingP95": 0.625,
+          "noSharingP95": 0.6669999999999999,
+          "sharingMax": 0.647,
+          "noSharingMax": 0.6769999999999999,
+          "sharingCheaperPairs": 9,
+          "noSharingCheaperPairs": 11,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8139097744360901,
+            "p50": 0.9504587155963302,
+            "p95": 1.330058939096267
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.10399999999999998,
+            "p50": -0.027000000000000024,
+            "p95": 0.16799999999999993
+          }
+        },
+        "styleCpuMs": {
+          "sharingP50": 3.863,
+          "noSharingP50": 3.818,
+          "medianRatioNoSharingOverSharing": 0.9883510225213564,
+          "sharingP95": 4.401999999999999,
+          "noSharingP95": 4.463,
+          "sharingMax": 4.564,
+          "noSharingMax": 4.684,
+          "sharingCheaperPairs": 11,
+          "noSharingCheaperPairs": 9,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7550405561993047,
+            "p50": 1.0085126507448567,
+            "p95": 1.1163682864450128
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -1.0570000000000004,
+            "p50": 0.03599999999999959,
+            "p95": 0.45500000000000007
+          }
+        },
+        "layoutCpuMs": {
+          "sharingP50": 0.22599999999999998,
+          "noSharingP50": 0.235,
+          "medianRatioNoSharingOverSharing": 1.0398230088495575,
+          "sharingP95": 0.361,
+          "noSharingP95": 0.374,
+          "sharingMax": 0.444,
+          "noSharingMax": 0.434,
+          "sharingCheaperPairs": 9,
+          "noSharingCheaperPairs": 11,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.46846846846846846,
+            "p50": 0.9285714285714285,
+            "p95": 1.6548672566371683
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.23600000000000002,
+            "p50": -0.016000000000000014,
+            "p95": 0.16599999999999998
+          }
+        }
+      },
+      "decomposition": {
+        "taskCpuMs": {
+          "execution": {
+            "sharingP50": 32.192,
+            "noSharingP50": 31.677999999999997,
+            "sharingP95": 36.711,
+            "noSharingP95": 37.727,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8111607873071259,
+              "p50": 1.0197280278670953,
+              "p95": 1.125961084741999
+            }
+          },
+          "cleanup": {
+            "sharingP50": 1.1349999999999971,
+            "noSharingP50": 1.0900000000000007,
+            "sharingP95": 1.3330000000000009,
+            "noSharingP95": 1.3130000000000017,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7932123125493332,
+              "p50": 0.9338549075391209,
+              "p95": 1.105369807497467
+            }
+          },
+          "gap": {
+            "sharingP50": 0.9779999999999998,
+            "noSharingP50": 0.9510000000000005,
+            "sharingP95": 1.0599999999999985,
+            "noSharingP95": 1.0579999999999998,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8503336510962843,
+              "p50": 0.9737864077669977,
+              "p95": 1.0569430569430547
+            }
+          },
+          "inclusive": {
+            "sharingP50": 34.211,
+            "noSharingP50": 33.571000000000005,
+            "sharingP95": 38.743,
+            "noSharingP95": 39.961,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8197299943319422,
+              "p50": 1.0117038569528596,
+              "p95": 1.121144285082125
+            }
+          }
+        },
+        "threadCpuMs": {
+          "execution": {
+            "sharingP50": 35.757,
+            "noSharingP50": 35.431999999999995,
+            "sharingP95": 40.419000000000004,
+            "noSharingP95": 41.58,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8325187923292565,
+              "p50": 1.0032528574412842,
+              "p95": 1.1301782544563612
+            }
+          },
+          "cleanup": {
+            "sharingP50": 1.3130000000000017,
+            "noSharingP50": 1.242,
+            "sharingP95": 1.5319999999999987,
+            "noSharingP95": 1.5119999999999996,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.786795048143051,
+              "p50": 0.9242053789731018,
+              "p95": 1.0974978429680777
+            }
+          },
+          "gap": {
+            "sharingP50": 1.023000000000003,
+            "noSharingP50": 0.9819999999999968,
+            "sharingP95": 1.0970000000000009,
+            "noSharingP95": 1.0990000000000029,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8535911602209946,
+              "p50": 0.9738493723849401,
+              "p95": 1.0599999999999976
+            }
+          },
+          "inclusive": {
+            "sharingP50": 37.98199999999999,
+            "noSharingP50": 37.496,
+            "sharingP95": 42.675,
+            "noSharingP95": 44.059,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8399765670767428,
+              "p50": 0.999804926986958,
+              "p95": 1.1250528094634558
+            }
+          }
+        },
+        "scriptCpuMs": {
+          "execution": {
+            "sharingP50": 0.475,
+            "noSharingP50": 0.488,
+            "sharingP95": 0.605,
+            "noSharingP95": 0.643,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8051181102362205,
+              "p50": 0.9464627151051624,
+              "p95": 1.3402061855670102
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.024000000000000042,
+            "noSharingP50": 0.021999999999999992,
+            "sharingP95": 0.04099999999999997,
+            "noSharingP95": 0.034000000000000016,
+            "sharingCheaperPairs": 5,
+            "noSharingCheaperPairs": 15,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5714285714285692,
+              "p50": 0.8717948717948716,
+              "p95": 1.1578947368421098
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.509,
+            "noSharingP50": 0.508,
+            "sharingP95": 0.625,
+            "noSharingP95": 0.6669999999999999,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8139097744360901,
+              "p50": 0.9504587155963302,
+              "p95": 1.330058939096267
+            }
+          }
+        },
+        "styleCpuMs": {
+          "execution": {
+            "sharingP50": 3.853,
+            "noSharingP50": 3.8040000000000003,
+            "sharingP95": 4.386,
+            "noSharingP95": 4.453,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7555813953488373,
+              "p50": 1.009966777408638,
+              "p95": 1.1161836368299565
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.011000000000000159,
+            "noSharingP50": 0.009999999999999593,
+            "sharingP95": 0.017000000000000088,
+            "noSharingP95": 0.014999999999999823,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.41176470588234393,
+              "p50": 0.9230769230769128,
+              "p95": 1.2999999999999956
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 3.863,
+            "noSharingP50": 3.818,
+            "sharingP95": 4.401999999999999,
+            "noSharingP95": 4.463,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7550405561993047,
+              "p50": 1.0085126507448567,
+              "p95": 1.1163682864450128
+            }
+          }
+        },
+        "layoutCpuMs": {
+          "execution": {
+            "sharingP50": 0.189,
+            "noSharingP50": 0.193,
+            "sharingP95": 0.317,
+            "noSharingP95": 0.337,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.3906633906633906,
+              "p50": 1.0193548387096774,
+              "p95": 1.7830687830687832
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.038,
+            "noSharingP50": 0.03699999999999998,
+            "sharingP95": 0.066,
+            "noSharingP95": 0.04599999999999998,
+            "sharingCheaperPairs": 4,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5205479452054793,
+              "p50": 0.9428571428571431,
+              "p95": 1.2352941176470589
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.22599999999999998,
+            "noSharingP50": 0.235,
+            "sharingP95": 0.361,
+            "noSharingP95": 0.374,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.46846846846846846,
+              "p50": 0.9285714285714285,
+              "p95": 1.6548672566371683
+            }
+          }
+        }
+      },
+      "metadataOrders": [
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ]
+      ]
+    },
+    {
+      "profile": "spring",
+      "count": 1000,
+      "pairs": 20,
+      "metrics": {
+        "apiMs": {
+          "sharingP50": 99.74499999999534,
+          "noSharingP50": 103.05000000001746,
+          "medianRatioNoSharingOverSharing": 1.0331344929572637,
+          "sharingP95": 122.10000000003492,
+          "noSharingP95": 114.65000000002328,
+          "sharingMax": 125.67999999999302,
+          "noSharingMax": 115.125,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7762571610439457,
+            "p50": 1.0092235199759216,
+            "p95": 1.174512113916919
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -28.119999999995343,
+            "p50": 0.9199999999982538,
+            "p95": 17.035000000003492
+          }
+        },
+        "completionMs": {
+          "sharingP50": 1423.3800000000047,
+          "noSharingP50": 1423.484999999986,
+          "medianRatioNoSharingOverSharing": 1.0000737680731648,
+          "sharingP95": 1442.0400000000373,
+          "noSharingP95": 1440.2000000000116,
+          "sharingMax": 1456.0699999999779,
+          "noSharingMax": 1440.929999999993,
+          "sharingCheaperPairs": 10,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9791596557857785,
+            "p50": 0.9997462237749944,
+            "p95": 1.0122705640030558
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -30.345000000001164,
+            "p50": -0.3650000000197906,
+            "p95": 17.454999999987194
+          }
+        },
+        "taskCpuMs": {
+          "sharingP50": 202.098,
+          "noSharingP50": 197.827,
+          "medianRatioNoSharingOverSharing": 0.9788666884382824,
+          "sharingP95": 219.22,
+          "noSharingP95": 205.72299999999998,
+          "sharingMax": 219.40699999999998,
+          "noSharingMax": 218.46,
+          "sharingCheaperPairs": 7,
+          "noSharingCheaperPairs": 13,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8565140041966973,
+            "p50": 0.9885864531357375,
+            "p95": 1.038909043455566
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -31.455000000000013,
+            "p50": -2.29200000000003,
+            "p95": 7.454000000000036
+          }
+        },
+        "threadCpuMs": {
+          "sharingP50": 206.228,
+          "noSharingP50": 202.96099999999998,
+          "medianRatioNoSharingOverSharing": 0.9841583102197566,
+          "sharingP95": 223.19099999999997,
+          "noSharingP95": 209.515,
+          "sharingMax": 223.442,
+          "noSharingMax": 222.84599999999998,
+          "sharingCheaperPairs": 8,
+          "noSharingCheaperPairs": 12,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8581932067153247,
+            "p50": 0.9894143377885782,
+            "p95": 1.0454051184137307
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -31.64999999999995,
+            "p50": -2.1780000000000257,
+            "p95": 8.893999999999977
+          }
+        },
+        "scriptCpuMs": {
+          "sharingP50": 4.193,
+          "noSharingP50": 3.9659999999999997,
+          "medianRatioNoSharingOverSharing": 0.9458621512043883,
+          "sharingP95": 4.799,
+          "noSharingP95": 4.68,
+          "sharingMax": 4.854,
+          "noSharingMax": 5.191000000000001,
+          "sharingCheaperPairs": 7,
+          "noSharingCheaperPairs": 13,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7732861012710981,
+            "p50": 0.940625,
+            "p95": 1.177898797367824
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -1.0880000000000005,
+            "p50": -0.266,
+            "p95": 0.742
+          }
+        },
+        "styleCpuMs": {
+          "sharingP50": 35.312999999999995,
+          "noSharingP50": 33.411,
+          "medianRatioNoSharingOverSharing": 0.9461388157335827,
+          "sharingP95": 39.468999999999994,
+          "noSharingP95": 37.454,
+          "sharingMax": 40.273,
+          "noSharingMax": 43.629,
+          "sharingCheaperPairs": 5,
+          "noSharingCheaperPairs": 15,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7440324777101158,
+            "p50": 0.9342085453614767,
+            "p95": 1.1421632546616247
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -9.962000000000003,
+            "p50": -2.210000000000001,
+            "p95": 4.361000000000001
+          }
+        },
+        "layoutCpuMs": {
+          "sharingP50": 1.498,
+          "noSharingP50": 1.49,
+          "medianRatioNoSharingOverSharing": 0.9946595460614153,
+          "sharingP95": 1.75,
+          "noSharingP95": 1.81,
+          "sharingMax": 1.867,
+          "noSharingMax": 1.935,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7407605784681307,
+            "p50": 1.012634238787113,
+            "p95": 1.1791590493601463
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.484,
+            "p50": 0.020000000000000018,
+            "p95": 0.29400000000000004
+          }
+        }
+      },
+      "decomposition": {
+        "taskCpuMs": {
+          "execution": {
+            "sharingP50": 199.50699999999998,
+            "noSharingP50": 195.245,
+            "sharingP95": 216.861,
+            "noSharingP95": 203.2,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8557831975320598,
+              "p50": 0.98610614342208,
+              "p95": 1.070103971641155
+            }
+          },
+          "cleanup": {
+            "sharingP50": 2.4539999999999837,
+            "noSharingP50": 2.517000000000019,
+            "sharingP95": 10.31499999999999,
+            "noSharingP95": 2.7749999999999995,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.2248684327892245,
+              "p50": 0.9847027972028062,
+              "p95": 1.1261744966443104
+            }
+          },
+          "gap": {
+            "sharingP50": 3.8350000000000053,
+            "noSharingP50": 3.72900000000001,
+            "sharingP95": 4.86700000000001,
+            "noSharingP95": 4.154000000000019,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6651353568498785,
+              "p50": 0.9456688877498675,
+              "p95": 1.1340206185567043
+            }
+          },
+          "inclusive": {
+            "sharingP50": 205.858,
+            "noSharingP50": 201.566,
+            "sharingP95": 222.952,
+            "noSharingP95": 209.452,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8748833829703255,
+              "p50": 0.9846665605765825,
+              "p95": 1.0377160575948914
+            }
+          }
+        },
+        "threadCpuMs": {
+          "execution": {
+            "sharingP50": 203.471,
+            "noSharingP50": 200.21599999999998,
+            "sharingP95": 220.625,
+            "noSharingP95": 206.732,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8575048158640227,
+              "p50": 0.9868164735050472,
+              "p95": 1.0724570244132001
+            }
+          },
+          "cleanup": {
+            "sharingP50": 2.6259999999999897,
+            "noSharingP50": 2.6629999999999985,
+            "sharingP95": 10.603000000000002,
+            "noSharingP95": 2.967999999999998,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.228759286141236,
+              "p50": 0.9883252818035421,
+              "p95": 1.1554447215295023
+            }
+          },
+          "gap": {
+            "sharingP50": 3.8759999999999906,
+            "noSharingP50": 3.781000000000007,
+            "sharingP95": 4.900999999999989,
+            "noSharingP95": 4.196000000000005,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6666128771986429,
+              "p50": 0.9451776649746209,
+              "p95": 1.1297059631766968
+            }
+          },
+          "inclusive": {
+            "sharingP50": 210.02599999999998,
+            "noSharingP50": 206.82399999999998,
+            "sharingP95": 226.959,
+            "noSharingP95": 213.302,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.876435832022524,
+              "p50": 0.9906325034019291,
+              "p95": 1.044154231968645
+            }
+          }
+        },
+        "scriptCpuMs": {
+          "execution": {
+            "sharingP50": 4.171,
+            "noSharingP50": 3.94,
+            "sharingP95": 4.777,
+            "noSharingP95": 4.66,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7726606656897634,
+              "p50": 0.9397266412726865,
+              "p95": 1.1795164233576645
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.022000000000000318,
+            "noSharingP50": 0.020000000000000052,
+            "sharingP95": 0.03000000000000008,
+            "noSharingP95": 0.02599999999999998,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5714285714285678,
+              "p50": 0.9499999999999935,
+              "p95": 1.176470588235321
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 4.193,
+            "noSharingP50": 3.9659999999999997,
+            "sharingP95": 4.799,
+            "noSharingP95": 4.68,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7732861012710981,
+              "p50": 0.940625,
+              "p95": 1.177898797367824
+            }
+          }
+        },
+        "styleCpuMs": {
+          "execution": {
+            "sharingP50": 35.304,
+            "noSharingP50": 33.394,
+            "sharingP95": 39.454,
+            "noSharingP95": 37.439,
+            "sharingCheaperPairs": 5,
+            "noSharingCheaperPairs": 15,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.74399239250559,
+              "p50": 0.9341867469879518,
+              "p95": 1.1422422226570141
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.010999999999997123,
+            "noSharingP50": 0.010999999999997123,
+            "sharingP95": 0.015999999999995185,
+            "noSharingP95": 0.017000000000003124,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6249999999996747,
+              "p50": 1.0,
+              "p95": 1.2999999999999654
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 35.312999999999995,
+            "noSharingP50": 33.411,
+            "sharingP95": 39.468999999999994,
+            "noSharingP95": 37.454,
+            "sharingCheaperPairs": 5,
+            "noSharingCheaperPairs": 15,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7440324777101158,
+              "p50": 0.9342085453614767,
+              "p95": 1.1421632546616247
+            }
+          }
+        },
+        "layoutCpuMs": {
+          "execution": {
+            "sharingP50": 1.435,
+            "noSharingP50": 1.4400000000000002,
+            "sharingP95": 1.696,
+            "noSharingP95": 1.769,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7308750687947166,
+              "p50": 1.0040295500335796,
+              "p95": 1.1888818698673405
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.05299999999999988,
+            "noSharingP50": 0.054999999999999924,
+            "sharingP95": 0.07400000000000007,
+            "noSharingP95": 0.08299999999999996,
+            "sharingCheaperPairs": 13,
+            "noSharingCheaperPairs": 7,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6081081081081062,
+              "p50": 1.033333333333334,
+              "p95": 1.5769230769230789
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 1.498,
+            "noSharingP50": 1.49,
+            "sharingP95": 1.75,
+            "noSharingP95": 1.81,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7407605784681307,
+              "p50": 1.012634238787113,
+              "p95": 1.1791590493601463
+            }
+          }
+        }
+      },
+      "metadataOrders": [
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ]
+      ]
+    },
+    {
+      "profile": "js",
+      "count": 1,
+      "pairs": 20,
+      "metrics": {
+        "apiMs": {
+          "sharingP50": 2.820000000006985,
+          "noSharingP50": 2.9949999999953434,
+          "medianRatioNoSharingOverSharing": 1.0620567375843706,
+          "sharingP95": 3.25,
+          "noSharingP95": 3.4200000000419095,
+          "sharingMax": 3.419999999983702,
+          "noSharingMax": 3.9200000000419095,
+          "sharingCheaperPairs": 14,
+          "noSharingCheaperPairs": 6,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7865497076067683,
+            "p50": 1.0429936305760232,
+            "p95": 1.2363977485964766
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.7299999999813735,
+            "p50": 0.13500000000931323,
+            "p95": 0.6700000000419095
+          }
+        },
+        "completionMs": {
+          "sharingP50": 414.0200000000186,
+          "noSharingP50": 413.8850000000093,
+          "medianRatioNoSharingOverSharing": 0.9996739287956878,
+          "sharingP95": 415.0250000000233,
+          "noSharingP95": 414.6500000000233,
+          "sharingMax": 415.40499999996973,
+          "noSharingMax": 414.88000000000466,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9952412505269927,
+            "p50": 1.0000967738032807,
+            "p95": 1.0030154405086174
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -1.9750000000349246,
+            "p50": 0.03999999997904524,
+            "p95": 1.2449999999953434
+          }
+        },
+        "taskCpuMs": {
+          "sharingP50": 12.836,
+          "noSharingP50": 12.695,
+          "medianRatioNoSharingOverSharing": 0.9890152695543784,
+          "sharingP95": 14.304999999999998,
+          "noSharingP95": 13.828,
+          "sharingMax": 15.736,
+          "noSharingMax": 14.363,
+          "sharingCheaperPairs": 8,
+          "noSharingCheaperPairs": 12,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8442502621461029,
+            "p50": 0.9773272459955119,
+            "p95": 1.0667678300455234
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -2.227999999999998,
+            "p50": -0.29299999999999926,
+            "p95": 0.8360000000000003
+          }
+        },
+        "threadCpuMs": {
+          "sharingP50": 15.318,
+          "noSharingP50": 15.219999999999999,
+          "medianRatioNoSharingOverSharing": 0.993602297950124,
+          "sharingP95": 16.948,
+          "noSharingP95": 16.474000000000004,
+          "sharingMax": 18.324000000000005,
+          "noSharingMax": 16.802000000000003,
+          "sharingCheaperPairs": 8,
+          "noSharingCheaperPairs": 12,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8524309653056407,
+            "p50": 0.9681640870768843,
+            "p95": 1.07770383813941
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -2.501000000000003,
+            "p50": -0.506000000000002,
+            "p95": 1.1560000000000006
+          }
+        },
+        "scriptCpuMs": {
+          "sharingP50": 2.678,
+          "noSharingP50": 2.591,
+          "medianRatioNoSharingOverSharing": 0.9675130694548171,
+          "sharingP95": 3.113,
+          "noSharingP95": 2.958,
+          "sharingMax": 3.453,
+          "noSharingMax": 2.9589999999999996,
+          "sharingCheaperPairs": 8,
+          "noSharingCheaperPairs": 12,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8262589928057555,
+            "p50": 0.957558751315328,
+            "p95": 1.0894780447390224
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.4940000000000002,
+            "p50": -0.121,
+            "p95": 0.2160000000000002
+          }
+        },
+        "styleCpuMs": {
+          "sharingP50": 0.753,
+          "noSharingP50": 0.705,
+          "medianRatioNoSharingOverSharing": 0.9362549800796812,
+          "sharingP95": 0.958,
+          "noSharingP95": 0.825,
+          "sharingMax": 1.014,
+          "noSharingMax": 0.907,
+          "sharingCheaperPairs": 7,
+          "noSharingCheaperPairs": 12,
+          "ties": 1,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.6914016489988221,
+            "p50": 0.9290780141843973,
+            "p95": 1.1423173803526447
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.2709999999999999,
+            "p50": -0.05999999999999994,
+            "p95": 0.11299999999999999
+          }
+        },
+        "layoutCpuMs": {
+          "sharingP50": 0.089,
+          "noSharingP50": 0.08600000000000001,
+          "medianRatioNoSharingOverSharing": 0.9662921348314608,
+          "sharingP95": 0.115,
+          "noSharingP95": 0.107,
+          "sharingMax": 0.13699999999999998,
+          "noSharingMax": 0.171,
+          "sharingCheaperPairs": 10,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.5401459854014599,
+            "p50": 0.9863013698630139,
+            "p95": 1.4246575342465753
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.06299999999999999,
+            "p50": -0.000999999999999987,
+            "p95": 0.031
+          }
+        }
+      },
+      "decomposition": {
+        "taskCpuMs": {
+          "execution": {
+            "sharingP50": 11.93,
+            "noSharingP50": 11.745000000000001,
+            "sharingP95": 13.315999999999999,
+            "noSharingP95": 12.866000000000001,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8410183238209672,
+              "p50": 0.9800066644451848,
+              "p95": 1.0649751414366535
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.902,
+            "noSharingP50": 0.9040000000000002,
+            "sharingP95": 0.9669999999999991,
+            "noSharingP95": 0.9720000000000006,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8877654196157752,
+              "p50": 0.9948293691830405,
+              "p95": 1.1329987452948536
+            }
+          },
+          "gap": {
+            "sharingP50": 0.6009999999999991,
+            "noSharingP50": 0.586999999999999,
+            "sharingP95": 0.7100000000000005,
+            "noSharingP95": 0.6849999999999998,
+            "sharingCheaperPairs": 6,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.715492957746478,
+              "p50": 0.9737302977232937,
+              "p95": 1.1839285714285728
+            }
+          },
+          "inclusive": {
+            "sharingP50": 13.463000000000001,
+            "noSharingP50": 13.288,
+            "sharingP95": 15.035,
+            "noSharingP95": 14.406,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.841835716661124,
+              "p50": 0.9689152493925968,
+              "p95": 1.0614997713763146
+            }
+          }
+        },
+        "threadCpuMs": {
+          "execution": {
+            "sharingP50": 14.119000000000002,
+            "noSharingP50": 13.931000000000001,
+            "sharingP95": 15.682000000000002,
+            "noSharingP95": 15.211,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8485524805509499,
+              "p50": 0.9705253611453003,
+              "p95": 1.075384169324442
+            }
+          },
+          "cleanup": {
+            "sharingP50": 1.1660000000000004,
+            "noSharingP50": 1.1699999999999975,
+            "sharingP95": 1.2379999999999995,
+            "noSharingP95": 1.2889999999999984,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9004739336492881,
+              "p50": 0.9973427812223242,
+              "p95": 1.1122544434050534
+            }
+          },
+          "gap": {
+            "sharingP50": 0.6370000000000005,
+            "noSharingP50": 0.6320000000000006,
+            "sharingP95": 0.7509999999999999,
+            "noSharingP95": 0.7229999999999996,
+            "sharingCheaperPairs": 6,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7270306258322232,
+              "p50": 0.9718934911242606,
+              "p95": 1.1897435897435895
+            }
+          },
+          "inclusive": {
+            "sharingP50": 15.991999999999999,
+            "noSharingP50": 15.812,
+            "sharingP95": 17.717,
+            "noSharingP95": 17.118000000000002,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8501439295591805,
+              "p50": 0.9672609803068895,
+              "p95": 1.0732933668536069
+            }
+          }
+        },
+        "scriptCpuMs": {
+          "execution": {
+            "sharingP50": 2.6580000000000004,
+            "noSharingP50": 2.579,
+            "sharingP95": 3.0959999999999996,
+            "noSharingP95": 2.937,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8262604280014508,
+              "p50": 0.9568904593639574,
+              "p95": 1.0894274968658586
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.020000000000000052,
+            "noSharingP50": 0.01800000000000022,
+            "sharingP95": 0.022000000000000318,
+            "noSharingP95": 0.023000000000000017,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5999999999999913,
+              "p50": 1.0,
+              "p95": 1.3124999999999882
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 2.678,
+            "noSharingP50": 2.591,
+            "sharingP95": 3.113,
+            "noSharingP95": 2.958,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8262589928057555,
+              "p50": 0.957558751315328,
+              "p95": 1.0894780447390224
+            }
+          }
+        },
+        "styleCpuMs": {
+          "execution": {
+            "sharingP50": 0.753,
+            "noSharingP50": 0.705,
+            "sharingP95": 0.958,
+            "noSharingP95": 0.825,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6914016489988221,
+              "p50": 0.9290780141843973,
+              "p95": 1.1423173803526447
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.753,
+            "noSharingP50": 0.705,
+            "sharingP95": 0.958,
+            "noSharingP95": 0.825,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6914016489988221,
+              "p50": 0.9290780141843973,
+              "p95": 1.1423173803526447
+            }
+          }
+        },
+        "layoutCpuMs": {
+          "execution": {
+            "sharingP50": 0.049,
+            "noSharingP50": 0.048,
+            "sharingP95": 0.059,
+            "noSharingP95": 0.07100000000000001,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6101694915254239,
+              "p50": 0.9814814814814815,
+              "p95": 1.4999999999999998
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.03900000000000001,
+            "noSharingP50": 0.038,
+            "sharingP95": 0.054000000000000006,
+            "noSharingP95": 0.055999999999999994,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.45,
+              "p50": 1.0196078431372548,
+              "p95": 1.4358974358974355
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.089,
+            "noSharingP50": 0.08600000000000001,
+            "sharingP95": 0.115,
+            "noSharingP95": 0.107,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5401459854014599,
+              "p50": 0.9863013698630139,
+              "p95": 1.4246575342465753
+            }
+          }
+        }
+      },
+      "metadataOrders": [
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ]
+      ]
+    },
+    {
+      "profile": "js",
+      "count": 100,
+      "pairs": 20,
+      "metrics": {
+        "apiMs": {
+          "sharingP50": 5.179999999993015,
+          "noSharingP50": 5.559999999997672,
+          "medianRatioNoSharingOverSharing": 1.0733590733600713,
+          "sharingP95": 6.035000000032596,
+          "noSharingP95": 7.110000000044238,
+          "sharingMax": 6.625,
+          "noSharingMax": 7.964999999967404,
+          "sharingCheaperPairs": 11,
+          "noSharingCheaperPairs": 9,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.7766037735877171,
+            "p50": 1.0139720558895917,
+            "p95": 1.5376447876405683
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -1.4799999999813735,
+            "p50": 0.07000000000698492,
+            "p95": 2.5000000000582077
+          }
+        },
+        "completionMs": {
+          "sharingP50": 413.8500000000349,
+          "noSharingP50": 414.0650000000023,
+          "medianRatioNoSharingOverSharing": 1.0005195119003683,
+          "sharingP95": 415.0100000000093,
+          "noSharingP95": 414.98499999998603,
+          "sharingMax": 415.2850000000326,
+          "noSharingMax": 415.4000000000233,
+          "sharingCheaperPairs": 8,
+          "noSharingCheaperPairs": 12,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9964787883172445,
+            "p50": 0.9994328466274217,
+            "p95": 1.00311511434169
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -1.4600000000209548,
+            "p50": -0.2349999999278225,
+            "p95": 1.290000000037253
+          }
+        },
+        "taskCpuMs": {
+          "sharingP50": 35.678,
+          "noSharingP50": 36.78999999999999,
+          "medianRatioNoSharingOverSharing": 1.0311676663490104,
+          "sharingP95": 37.971000000000004,
+          "noSharingP95": 40.123999999999995,
+          "sharingMax": 40.199000000000005,
+          "noSharingMax": 41.70099999999999,
+          "sharingCheaperPairs": 11,
+          "noSharingCheaperPairs": 9,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9489988565958465,
+            "p50": 1.0224647907606348,
+            "p95": 1.1298330031135013
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -1.9179999999999993,
+            "p50": 0.7800000000000011,
+            "p95": 4.587000000000003
+          }
+        },
+        "threadCpuMs": {
+          "sharingP50": 37.978,
+          "noSharingP50": 39.075,
+          "medianRatioNoSharingOverSharing": 1.0288851440307547,
+          "sharingP95": 40.28,
+          "noSharingP95": 42.44499999999999,
+          "sharingMax": 42.63699999999999,
+          "noSharingMax": 44.30799999999999,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9534790051354344,
+            "p50": 1.0213932779497201,
+            "p95": 1.1202043313999897
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -1.848000000000006,
+            "p50": 0.7879999999999896,
+            "p95": 4.518000000000008
+          }
+        },
+        "scriptCpuMs": {
+          "sharingP50": 12.844,
+          "noSharingP50": 12.992,
+          "medianRatioNoSharingOverSharing": 1.0115228900654003,
+          "sharingP95": 13.33,
+          "noSharingP95": 14.271,
+          "sharingMax": 13.437,
+          "noSharingMax": 14.516,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9145536384096025,
+            "p50": 1.0219881602214191,
+            "p95": 1.121256204004792
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -1.1389999999999993,
+            "p50": 0.2859999999999996,
+            "p95": 1.4270000000000014
+          }
+        },
+        "styleCpuMs": {
+          "sharingP50": 6.406000000000001,
+          "noSharingP50": 6.572,
+          "medianRatioNoSharingOverSharing": 1.025913206369029,
+          "sharingP95": 7.208,
+          "noSharingP95": 7.154,
+          "sharingMax": 7.555,
+          "noSharingMax": 7.821,
+          "sharingCheaperPairs": 10,
+          "noSharingCheaperPairs": 10,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9021415823914336,
+            "p50": 0.997358864311654,
+            "p95": 1.1276796973518286
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.6710000000000003,
+            "p50": -0.016000000000000014,
+            "p95": 0.7999999999999998
+          }
+        },
+        "layoutCpuMs": {
+          "sharingP50": 0.217,
+          "noSharingP50": 0.22599999999999998,
+          "medianRatioNoSharingOverSharing": 1.0414746543778801,
+          "sharingP95": 0.389,
+          "noSharingP95": 0.372,
+          "sharingMax": 0.412,
+          "noSharingMax": 0.38699999999999996,
+          "sharingCheaperPairs": 12,
+          "noSharingCheaperPairs": 8,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.4858611825192802,
+            "p50": 1.0272727272727271,
+            "p95": 1.5778894472361809
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -0.204,
+            "p50": 0.005999999999999978,
+            "p95": 0.11499999999999999
+          }
+        }
+      },
+      "decomposition": {
+        "taskCpuMs": {
+          "execution": {
+            "sharingP50": 34.677,
+            "noSharingP50": 35.79599999999999,
+            "sharingP95": 36.851,
+            "noSharingP95": 39.033,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9515411241140596,
+              "p50": 1.0131949592290586,
+              "p95": 1.1285897735232313
+            }
+          },
+          "cleanup": {
+            "sharingP50": 1.0459999999999983,
+            "noSharingP50": 0.9939999999999949,
+            "sharingP95": 1.2040000000000037,
+            "noSharingP95": 1.246999999999998,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8061485909479091,
+              "p50": 0.9450777202072632,
+              "p95": 1.169793621013134
+            }
+          },
+          "gap": {
+            "sharingP50": 0.9230000000000003,
+            "noSharingP50": 0.9149999999999991,
+            "sharingP95": 1.0449999999999973,
+            "noSharingP95": 1.0350000000000013,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8445825932504483,
+              "p50": 0.9908571428571418,
+              "p95": 1.0670103092783534
+            }
+          },
+          "inclusive": {
+            "sharingP50": 36.613,
+            "noSharingP50": 37.65,
+            "sharingP95": 39.097,
+            "noSharingP95": 41.074999999999996,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.947066128531512,
+              "p50": 1.024644497620816,
+              "p95": 1.128154269972452
+            }
+          }
+        },
+        "threadCpuMs": {
+          "execution": {
+            "sharingP50": 36.704,
+            "noSharingP50": 37.894000000000005,
+            "sharingP95": 38.995000000000005,
+            "noSharingP95": 41.166000000000004,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9551818537348457,
+              "p50": 1.012505257255012,
+              "p95": 1.1184822386704456
+            }
+          },
+          "cleanup": {
+            "sharingP50": 1.1960000000000026,
+            "noSharingP50": 1.1670000000000014,
+            "sharingP95": 1.3709999999999973,
+            "noSharingP95": 1.455000000000005,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.7994164843180174,
+              "p50": 0.9682274247491611,
+              "p95": 1.170555108608209
+            }
+          },
+          "gap": {
+            "sharingP50": 0.9629999999999985,
+            "noSharingP50": 0.9489999999999985,
+            "sharingP95": 1.0859999999999967,
+            "noSharingP95": 1.0839999999999947,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8481228668941998,
+              "p50": 0.9858078602620097,
+              "p95": 1.0732673267326638
+            }
+          },
+          "inclusive": {
+            "sharingP50": 38.955000000000005,
+            "noSharingP50": 39.972,
+            "sharingP95": 41.452000000000005,
+            "noSharingP95": 43.439,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9513844645920118,
+              "p50": 1.0216496180240842,
+              "p95": 1.1189760596953051
+            }
+          }
+        },
+        "scriptCpuMs": {
+          "execution": {
+            "sharingP50": 12.827,
+            "noSharingP50": 12.975999999999999,
+            "sharingP95": 13.311,
+            "noSharingP95": 14.254,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.914131169709263,
+              "p50": 1.0225662353666052,
+              "p95": 1.1213471591396005
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.02000000000000092,
+            "noSharingP50": 0.01899999999999992,
+            "sharingP95": 0.02400000000000145,
+            "noSharingP95": 0.023999999999999716,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6190476190475719,
+              "p50": 1.0,
+              "p95": 1.5714285714285183
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 12.844,
+            "noSharingP50": 12.992,
+            "sharingP95": 13.33,
+            "noSharingP95": 14.271,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9145536384096025,
+              "p50": 1.0219881602214191,
+              "p95": 1.121256204004792
+            }
+          }
+        },
+        "styleCpuMs": {
+          "execution": {
+            "sharingP50": 6.393000000000001,
+            "noSharingP50": 6.558,
+            "sharingP95": 7.199,
+            "noSharingP95": 7.149,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9025625744934446,
+              "p50": 0.9975214805023132,
+              "p95": 1.1292054967619651
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.010999999999999725,
+            "noSharingP50": 0.00899999999999946,
+            "sharingP95": 0.014000000000000123,
+            "noSharingP95": 0.014000000000000123,
+            "sharingCheaperPairs": 6,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.3846153846153692,
+              "p50": 0.8333333333333093,
+              "p95": 2.1666666666668353
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 6.406000000000001,
+            "noSharingP50": 6.572,
+            "sharingP95": 7.208,
+            "noSharingP95": 7.154,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 10,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9021415823914336,
+              "p50": 0.997358864311654,
+              "p95": 1.1276796973518286
+            }
+          }
+        },
+        "layoutCpuMs": {
+          "execution": {
+            "sharingP50": 0.176,
+            "noSharingP50": 0.188,
+            "sharingP95": 0.321,
+            "noSharingP95": 0.33,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.45614035087719296,
+              "p50": 1.0432098765432098,
+              "p95": 1.770700636942675
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.038,
+            "noSharingP50": 0.036000000000000004,
+            "sharingP95": 0.049,
+            "noSharingP95": 0.04599999999999998,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5274725274725273,
+              "p50": 1.0,
+              "p95": 1.1470588235294112
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 0.217,
+            "noSharingP50": 0.22599999999999998,
+            "sharingP95": 0.389,
+            "noSharingP95": 0.372,
+            "sharingCheaperPairs": 12,
+            "noSharingCheaperPairs": 8,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.4858611825192802,
+              "p50": 1.0272727272727271,
+              "p95": 1.5778894472361809
+            }
+          }
+        }
+      },
+      "metadataOrders": [
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ]
+      ]
+    },
+    {
+      "profile": "js",
+      "count": 1000,
+      "pairs": 20,
+      "metrics": {
+        "apiMs": {
+          "sharingP50": 27.65999999997439,
+          "noSharingP50": 31.705000000016298,
+          "medianRatioNoSharingOverSharing": 1.1462400578469145,
+          "sharingP95": 32.92000000004191,
+          "noSharingP95": 34.634999999951106,
+          "sharingMax": 34.335000000020955,
+          "noSharingMax": 34.66500000003725,
+          "sharingCheaperPairs": 16,
+          "noSharingCheaperPairs": 4,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8641631896163514,
+            "p50": 1.0966772416082733,
+            "p95": 1.2396501457691922
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -4.394999999960419,
+            "p50": 2.894999999960419,
+            "p95": 6.164999999920838
+          }
+        },
+        "completionMs": {
+          "sharingP50": 433.34500000003027,
+          "noSharingP50": 433.6049999999814,
+          "medianRatioNoSharingOverSharing": 1.0005999838464759,
+          "sharingP95": 434.5,
+          "noSharingP95": 447.58499999996275,
+          "sharingMax": 434.9650000000256,
+          "noSharingMax": 448.0200000000186,
+          "sharingCheaperPairs": 11,
+          "noSharingCheaperPairs": 9,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9958342922899939,
+            "p50": 1.0002076268253106,
+            "p95": 1.0330990548072512
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -1.8099999999976717,
+            "p50": 0.08999999996740371,
+            "p95": 14.339999999967404
+          }
+        },
+        "taskCpuMs": {
+          "sharingP50": 189.175,
+          "noSharingP50": 186.88299999999998,
+          "medianRatioNoSharingOverSharing": 0.9878842341747058,
+          "sharingP95": 200.39100000000002,
+          "noSharingP95": 201.018,
+          "sharingMax": 201.73100000000002,
+          "noSharingMax": 202.94400000000002,
+          "sharingCheaperPairs": 9,
+          "noSharingCheaperPairs": 11,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9197548527399576,
+            "p50": 0.9866313525700309,
+            "p95": 1.0577933450087564
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -15.424000000000007,
+            "p50": -2.4429999999999836,
+            "p95": 11.087999999999994
+          }
+        },
+        "threadCpuMs": {
+          "sharingP50": 190.85000000000002,
+          "noSharingP50": 188.48000000000002,
+          "medianRatioNoSharingOverSharing": 0.9875818705789887,
+          "sharingP95": 201.98499999999999,
+          "noSharingP95": 202.70300000000006,
+          "sharingMax": 203.426,
+          "noSharingMax": 204.65300000000002,
+          "sharingCheaperPairs": 9,
+          "noSharingCheaperPairs": 11,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9201037573357261,
+            "p50": 0.986197399950124,
+            "p95": 1.0580647496148319
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -15.492999999999995,
+            "p50": -2.5460000000000207,
+            "p95": 11.230999999999995
+          }
+        },
+        "scriptCpuMs": {
+          "sharingP50": 65.247,
+          "noSharingP50": 64.71300000000001,
+          "medianRatioNoSharingOverSharing": 0.9918157156650882,
+          "sharingP95": 68.501,
+          "noSharingP95": 70.12400000000001,
+          "sharingMax": 69.59,
+          "noSharingMax": 70.31099999999999,
+          "sharingCheaperPairs": 9,
+          "noSharingCheaperPairs": 11,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.9100174073467932,
+            "p50": 0.9755568328782872,
+            "p95": 1.0677127159332773
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -6.047999999999995,
+            "p50": -1.7009999999999934,
+            "p95": 4.104000000000006
+          }
+        },
+        "styleCpuMs": {
+          "sharingP50": 54.323,
+          "noSharingP50": 53.86,
+          "medianRatioNoSharingOverSharing": 0.9914769066509581,
+          "sharingP95": 60.865,
+          "noSharingP95": 61.23,
+          "sharingMax": 62.596,
+          "noSharingMax": 61.244,
+          "sharingCheaperPairs": 7,
+          "noSharingCheaperPairs": 13,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.8613809189085566,
+            "p50": 0.9581955112033039,
+            "p95": 1.1428251539466319
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -8.676999999999992,
+            "p50": -2.237000000000002,
+            "p95": 7.6540000000000035
+          }
+        },
+        "layoutCpuMs": {
+          "sharingP50": 1.608,
+          "noSharingP50": 1.4040000000000001,
+          "medianRatioNoSharingOverSharing": 0.873134328358209,
+          "sharingP95": 2.491,
+          "noSharingP95": 2.283,
+          "sharingMax": 2.6470000000000002,
+          "noSharingMax": 2.307,
+          "sharingCheaperPairs": 6,
+          "noSharingCheaperPairs": 14,
+          "ties": 0,
+          "pairedNoSharingOverSharing": {
+            "p05": 0.5323007177937287,
+            "p50": 0.880597014925373,
+            "p95": 1.6377331420373025
+          },
+          "pairedDifferenceNoSharingMinusSharingMs": {
+            "p05": -1.2380000000000002,
+            "p50": -0.19200000000000017,
+            "p95": 0.8889999999999998
+          }
+        }
+      },
+      "decomposition": {
+        "taskCpuMs": {
+          "execution": {
+            "sharingP50": 187.341,
+            "noSharingP50": 182.194,
+            "sharingP95": 198.61200000000002,
+            "noSharingP95": 197.726,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9114506946744256,
+              "p50": 0.9693545552816134,
+              "p95": 1.0444347373019174
+            }
+          },
+          "cleanup": {
+            "sharingP50": 1.8779999999999908,
+            "noSharingP50": 4.2939999999999925,
+            "sharingP95": 1.9969999999999988,
+            "noSharingP95": 6.3089999999999815,
+            "sharingCheaperPairs": 20,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": {
+              "p05": 1.6066825775656257,
+              "p50": 2.2434691745036544,
+              "p95": 3.359424920127802
+            }
+          },
+          "gap": {
+            "sharingP50": 3.256000000000009,
+            "noSharingP50": 6.214999999999998,
+            "sharingP95": 3.600999999999993,
+            "noSharingP95": 7.325999999999999,
+            "sharingCheaperPairs": 20,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": {
+              "p05": 1.2651467832604688,
+              "p50": 1.8426862925482859,
+              "p95": 2.188217054263564
+            }
+          },
+          "inclusive": {
+            "sharingP50": 192.45700000000002,
+            "noSharingP50": 192.555,
+            "sharingP95": 204.71,
+            "noSharingP95": 208.344,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9392529569178599,
+              "p50": 1.0021553626982025,
+              "p95": 1.0723322670603674
+            }
+          }
+        },
+        "threadCpuMs": {
+          "execution": {
+            "sharingP50": 188.835,
+            "noSharingP50": 183.42,
+            "sharingP95": 200.048,
+            "noSharingP95": 199.21000000000004,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9118108757894517,
+              "p50": 0.9692812564404728,
+              "p95": 1.0450153883132423
+            }
+          },
+          "cleanup": {
+            "sharingP50": 2.043000000000017,
+            "noSharingP50": 4.434999999999994,
+            "sharingP95": 2.1819999999999897,
+            "noSharingP95": 6.4570000000000185,
+            "sharingCheaperPairs": 20,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": {
+              "p05": 1.5442982456140426,
+              "p50": 2.1539582321515214,
+              "p95": 3.194952993567514
+            }
+          },
+          "gap": {
+            "sharingP50": 3.298000000000023,
+            "noSharingP50": 6.3150000000000155,
+            "sharingP95": 3.640000000000004,
+            "noSharingP95": 7.414999999999977,
+            "sharingCheaperPairs": 20,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": {
+              "p05": 1.25615763546798,
+              "p50": 1.8465031789282447,
+              "p95": 2.1809844084377894
+            }
+          },
+          "inclusive": {
+            "sharingP50": 194.192,
+            "noSharingP50": 194.183,
+            "sharingP95": 206.35899999999998,
+            "noSharingP95": 210.11800000000002,
+            "sharingCheaperPairs": 11,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9396316956376485,
+              "p50": 1.000576552831801,
+              "p95": 1.0726510067114092
+            }
+          }
+        },
+        "scriptCpuMs": {
+          "execution": {
+            "sharingP50": 65.226,
+            "noSharingP50": 64.696,
+            "sharingP95": 68.47399999999999,
+            "noSharingP95": 70.09899999999999,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9099026698812394,
+              "p50": 0.9755347286108556,
+              "p95": 1.067749335709924
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.020999999999993246,
+            "noSharingP50": 0.020999999999993246,
+            "sharingP95": 0.027000000000013125,
+            "noSharingP95": 0.026999999999999247,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.49999999999956635,
+              "p50": 0.9615384615389543,
+              "p95": 1.3157894736846718
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 65.247,
+            "noSharingP50": 64.71300000000001,
+            "sharingP95": 68.501,
+            "noSharingP95": 70.12400000000001,
+            "sharingCheaperPairs": 9,
+            "noSharingCheaperPairs": 11,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.9100174073467932,
+              "p50": 0.9755568328782872,
+              "p95": 1.0677127159332773
+            }
+          }
+        },
+        "styleCpuMs": {
+          "execution": {
+            "sharingP50": 54.309000000000005,
+            "noSharingP50": 53.846,
+            "sharingP95": 60.854,
+            "noSharingP95": 61.214999999999996,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8614413550655161,
+              "p50": 0.9582242990654206,
+              "p95": 1.1427398282941394
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.010999999999997123,
+            "noSharingP50": 0.010999999999997123,
+            "sharingP95": 0.015999999999995185,
+            "noSharingP95": 0.016000000000002124,
+            "sharingCheaperPairs": 10,
+            "noSharingCheaperPairs": 9,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.6250000000001085,
+              "p50": 1.0,
+              "p95": 1.5555555555564122
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 54.323,
+            "noSharingP50": 53.86,
+            "sharingP95": 60.865,
+            "noSharingP95": 61.23,
+            "sharingCheaperPairs": 7,
+            "noSharingCheaperPairs": 13,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.8613809189085566,
+              "p50": 0.9581955112033039,
+              "p95": 1.1428251539466319
+            }
+          }
+        },
+        "layoutCpuMs": {
+          "execution": {
+            "sharingP50": 1.555,
+            "noSharingP50": 1.343,
+            "sharingP95": 2.399,
+            "noSharingP95": 2.231,
+            "sharingCheaperPairs": 5,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5265195509097949,
+              "p50": 0.8486554096310194,
+              "p95": 1.664925373134328
+            }
+          },
+          "cleanup": {
+            "sharingP50": 0.05599999999999984,
+            "noSharingP50": 0.05299999999999988,
+            "sharingP95": 0.09099999999999994,
+            "noSharingP95": 0.08699999999999984,
+            "sharingCheaperPairs": 8,
+            "noSharingCheaperPairs": 12,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5476190476190474,
+              "p50": 0.9285714285714268,
+              "p95": 1.526315789473682
+            }
+          },
+          "gap": {
+            "sharingP50": 0.0,
+            "noSharingP50": 0.0,
+            "sharingP95": 0.0,
+            "noSharingP95": 0.0,
+            "sharingCheaperPairs": 0,
+            "noSharingCheaperPairs": 0,
+            "pairedNoSharingOverSharing": null
+          },
+          "inclusive": {
+            "sharingP50": 1.608,
+            "noSharingP50": 1.4040000000000001,
+            "sharingP95": 2.491,
+            "noSharingP95": 2.283,
+            "sharingCheaperPairs": 6,
+            "noSharingCheaperPairs": 14,
+            "pairedNoSharingOverSharing": {
+              "p05": 0.5323007177937287,
+              "p50": 0.880597014925373,
+              "p95": 1.6377331420373025
+            }
+          }
+        }
+      },
+      "metadataOrders": [
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ],
+        [
+          "baseline",
+          "lab"
+        ],
+        [
+          "lab",
+          "baseline"
+        ]
+      ]
+    }
+  ]
+}

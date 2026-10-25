@@ -1,0 +1,317 @@
+{
+  "schema": 1,
+  "generatedAt": "2026-10-23T10:00:54.038Z",
+  "revision": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+  "profileSha256": "c9fc979757e3d36f4496afcd372f38b0105a911045a15e0c77856fa937780956",
+  "versions": {
+    "lab": "0.6.0",
+    "animejs": "4.5.0",
+    "esbuild": "0.28.1",
+    "gsap": "3.15.0",
+    "motion": "14.5.0",
+    "playwright": "1.61.1",
+    "pngjs": "7.0.0",
+    "chromium": "149.0.7827.55",
+    "node": "v24.19.0"
+  },
+  "environment": {
+    "cpu": "AMD EPYC 7763 64-Core Processor",
+    "cpuMax": null,
+    "memoryMax": null
+  },
+  "scenario": {
+    "group": "full",
+    "counts": [
+      1,
+      100,
+      1000
+    ],
+    "rounds": 24,
+    "durationMs": 400,
+    "watchdogMs": 10000,
+    "targetPx": 300,
+    "easing": "linear",
+    "viewport": {
+      "width": 1200,
+      "height": 600
+    },
+    "page": "fresh realm; modules loaded before measurement",
+    "timeDomain": "threadTicks",
+    "intervals": "actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded"
+  },
+  "adapters": {
+    "lab-nano": {
+      "path": "/home/runner/work/_temp/motion-performance/transition/adapters/lab-nano.js",
+      "sha256": "18d958a2dcc19e06c4873484bc9f0b6a6a37db07d14a8c57b1cc3c30e09037bd",
+      "raw": 2377,
+      "gzip": 1304,
+      "brotli": 1189
+    },
+    "lab": {
+      "path": "/home/runner/work/_temp/motion-performance/transition/adapters/lab.js",
+      "sha256": "fcc1f0ebdc44f86e3a6de1ab923ac6a8b03c9dab7fd49e4b9817fbf7fb967f18",
+      "raw": 32334,
+      "gzip": 12962,
+      "brotli": 11792
+    },
+    "motion": {
+      "path": "/home/runner/work/_temp/motion-performance/transition/adapters/motion.js",
+      "sha256": "563a4391d249382bd4f9b3c058ba562cc953101d98522d56d5b11f5ca6be99a7",
+      "raw": 66498,
+      "gzip": 25034,
+      "brotli": 22788
+    },
+    "gsap": {
+      "path": "/home/runner/work/_temp/motion-performance/transition/adapters/gsap.js",
+      "sha256": "0edf67b70ff3020b13e807ee472911e6bf9ec5941f98525830dcc5c513157e74",
+      "raw": 70955,
+      "gzip": 27830,
+      "brotli": 25206
+    },
+    "anime": {
+      "path": "/home/runner/work/_temp/motion-performance/transition/adapters/anime.js",
+      "sha256": "771e40298a68d57f11c47b19fa89afef0bc407d06cecabdfb2afe20981c489ad",
+      "raw": 34821,
+      "gzip": 14495,
+      "brotli": 13123
+    },
+    "waapi-ctl": {
+      "path": "/home/runner/work/_temp/motion-performance/transition/adapters/waapi-ctl.js",
+      "sha256": "d98bebdef4a7e509c622a494932a6d318429c8fdb4e87370d128eb58638cb4f4",
+      "raw": 1101,
+      "gzip": 570,
+      "brotli": 510
+    },
+    "motion-mini": {
+      "path": "/home/runner/work/_temp/motion-performance/transition/adapters/motion-mini.js",
+      "sha256": "e4f618e514bd2d18d4b9908b30b76161e7e451e56ab5a58fbfda500b365c2ae1",
+      "raw": 9156,
+      "gzip": 3683,
+      "brotli": 3359
+    },
+    "anime-waapi": {
+      "path": "/home/runner/work/_temp/motion-performance/transition/adapters/anime-waapi.js",
+      "sha256": "2ec291f7710da293e14d1064a907c7405cd67e30e199aa3615339b32c3430e76",
+      "raw": 10656,
+      "gzip": 4889,
+      "brotli": 4453
+    },
+    "baseline": {
+      "path": "/home/runner/work/_temp/motion-performance/transition/adapters/baseline.js",
+      "sha256": "f1d48be029647c3b3feea68554938752b1be50d676f0b8068eefb07f6b48eb7c",
+      "raw": 34211,
+      "gzip": 13302,
+      "brotli": 12108
+    }
+  },
+  "orders": [
+    [
+      "waapi-ctl",
+      "lab",
+      "gsap",
+      "anime",
+      "baseline",
+      "motion"
+    ],
+    [
+      "lab",
+      "gsap",
+      "anime",
+      "baseline",
+      "motion",
+      "waapi-ctl"
+    ],
+    [
+      "gsap",
+      "anime",
+      "baseline",
+      "motion",
+      "waapi-ctl",
+      "lab"
+    ],
+    [
+      "anime",
+      "baseline",
+      "motion",
+      "waapi-ctl",
+      "lab",
+      "gsap"
+    ],
+    [
+      "baseline",
+      "motion",
+      "waapi-ctl",
+      "lab",
+      "gsap",
+      "anime"
+    ],
+    [
+      "motion",
+      "waapi-ctl",
+      "lab",
+      "gsap",
+      "anime",
+      "baseline"
+    ],
+    [
+      "lab",
+      "gsap",
+      "anime",
+      "baseline",
+      "waapi-ctl",
+      "motion"
+    ],
+    [
+      "gsap",
+      "anime",
+      "baseline",
+      "waapi-ctl",
+      "motion",
+      "lab"
+    ],
+    [
+      "anime",
+      "baseline",
+      "waapi-ctl",
+      "motion",
+      "lab",
+      "gsap"
+    ],
+    [
+      "baseline",
+      "waapi-ctl",
+      "motion",
+      "lab",
+      "gsap",
+      "anime"
+    ],
+    [
+      "waapi-ctl",
+      "motion",
+      "lab",
+      "gsap",
+      "anime",
+      "baseline"
+    ],
+    [
+      "motion",
+      "lab",
+      "gsap",
+      "anime",
+      "baseline",
+      "waapi-ctl"
+    ],
+    [
+      "waapi-ctl",
+      "baseline",
+      "lab",
+      "gsap",
+      "anime",
+      "motion"
+    ],
+    [
+      "baseline",
+      "lab",
+      "gsap",
+      "anime",
+      "motion",
+      "waapi-ctl"
+    ],
+    [
+      "lab",
+      "gsap",
+      "anime",
+      "motion",
+      "waapi-ctl",
+      "baseline"
+    ],
+    [
+      "gsap",
+      "anime",
+      "motion",
+      "waapi-ctl",
+      "baseline",
+      "lab"
+    ],
+    [
+      "anime",
+      "motion",
+      "waapi-ctl",
+      "baseline",
+      "lab",
+      "gsap"
+    ],
+    [
+      "motion",
+      "waapi-ctl",
+      "baseline",
+      "lab",
+      "gsap",
+      "anime"
+    ],
+    [
+      "waapi-ctl",
+      "anime",
+      "gsap",
+      "lab",
+      "baseline",
+      "motion"
+    ],
+    [
+      "anime",
+      "gsap",
+      "lab",
+      "baseline",
+      "motion",
+      "waapi-ctl"
+    ],
+    [
+      "gsap",
+      "lab",
+      "baseline",
+      "motion",
+      "waapi-ctl",
+      "anime"
+    ],
+    [
+      "lab",
+      "baseline",
+      "motion",
+      "waapi-ctl",
+      "anime",
+      "gsap"
+    ],
+    [
+      "baseline",
+      "motion",
+      "waapi-ctl",
+      "anime",
+      "gsap",
+      "lab"
+    ],
+    [
+      "motion",
+      "waapi-ctl",
+      "anime",
+      "gsap",
+      "lab",
+      "baseline"
+    ]
+  ],
+  "sourceIdentity": {
+    "candidate": {
+      "revision": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+      "dist": {
+        "sha256": "7464855a2699e36b8445c8b82718cbd32b577afca34250c22a7772669c632185",
+        "files": 340
+      }
+    },
+    "baseline": {
+      "revision": "15137fba618e962ef0319bba21d49cc123ae1e2f",
+      "dist": {
+        "sha256": "ce88164996c355867d306bfbbbc68e724e1afab022cb0e72b26a0d4e0002ae78",
+        "files": 338
+      }
+    }
+  }
+}

@@ -55,17 +55,10 @@ export interface ParsedColor {
 
 const HEX_RE = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 
-const NUM_PCT = '(\\d+(?:\\.\\d+)?%?)';
-// Hue по W3C CSS Color (legacy comma-синтаксис) — <number> СО знаком и БЕЗ
-// процента: «hsl(50%,…)» невалиден и отклоняется целиком, «hsl(-120,…)» ≡
-// hsl(240,…). Angle-единицы (deg/turn) живут только в modern space-синтаксисе,
-// который этот парсер сознательно не поддерживает (как и RGB_RE рядом).
-const HUE = '(-?\\d+(?:\\.\\d+)?)';
-const ALPHA = '(\\d+(?:\\.\\d+)?)';
-const SEP = '\\s*,\\s*';
-
-const RGB_RE = new RegExp(`^rgba?\\(\\s*(\\d+(?:\\.\\d+)?)${SEP}(\\d+(?:\\.\\d+)?)${SEP}(\\d+(?:\\.\\d+)?)(?:${SEP}${ALPHA})?\\s*\\)$`, 'i');
-const HSL_RE = new RegExp(`^hsla?\\(\\s*${HUE}${SEP}${NUM_PCT}${SEP}${NUM_PCT}(?:${SEP}${ALPHA})?\\s*\\)$`, 'i');
+// Hue в legacy comma-синтаксисе имеет знак, но не процент;
+// angle-единицы modern space-синтаксиса здесь по-прежнему не принимаются.
+const RGB_RE = /^rgba?\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)(?:\s*,\s*(\d+(?:\.\d+)?))?\s*\)$/i;
+const HSL_RE = /^hsla?\(\s*(-?\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?%?)\s*,\s*(\d+(?:\.\d+)?%?)(?:\s*,\s*(\d+(?:\.\d+)?))?\s*\)$/i;
 
 /**
  * Парсит строку CSS-цвета в типизированный AST.

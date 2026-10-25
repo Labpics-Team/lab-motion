@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
+  completionEvidence,
   startClock,
   TIMER_ORIGIN_MS,
   timerEvidence,
@@ -36,6 +37,7 @@ import {
   validateBenchmarkReportForPublication,
 } from '../bench/compare/report-contract.mjs';
 import { S5_MOTION_CONTRACT } from '../bench/compare/motion-conformance.mjs';
+import { assertStartSemanticEvidenceWithDiagnostic } from '../bench/compare/bench.mjs';
 
 const START = ['lab', 'motion', 'gsap', 'anime'];
 const FREEZE = [
@@ -88,6 +90,7 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
       groups: Array.from({ length: calls }, () => ({
         readStartedMs: elapsedMs,
         readEndedMs: elapsedMs,
+        documentFrame: { beforeMs: elapsedMs, afterMs: elapsedMs },
         positions: Array.from({ length: config.targetsPerCall }, (_, target) => {
           const progress = config.staggerGapMs === 0
             ? elapsedMs / config.durationMs
@@ -99,6 +102,7 @@ function semanticEvidence(scenario: keyof typeof START_SCENARIO_MANIFEST, calls:
     terminal: Array.from({ length: calls }, () => (
       Array.from({ length: config.targetsPerCall }, () => config.toPx)
     )),
+    completion: completionEvidence(config, calls, checkpointTimes.at(-1)!),
   };
   evidence.valid = evaluateStartSemanticEvidence(evidence, config, calls);
   return evidence;
@@ -485,6 +489,76 @@ function freeze25To65(): MotionPoint[] {
     ? { ...point, x: 150 } : point);
 }
 
+describe('failed start semantic diagnostics', () => {
+  it('retains rejected raw observations and run identity while the semantic gate still throws', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'lab-motion-semantic-diagnostic-'));
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const evidence = semanticEvidence('s1', 1);
+      expect(evidence.valid).toBe(true);
+      [NaN, Infinity, -Infinity].forEach((value, index) => {
+        evidence.checkpoints[index].groups[0].positions[0] = value;
+      });
+      evidence.valid = evaluateStartSemanticEvidence(evidence, START_SCENARIO_MANIFEST.s1, 1);
+      expect(evidence.valid).toBe(false);
+      const metadata = {
+        generatedAt: '2026-10-23T06:00:00.000Z',
+        participant: { id: 'motion', version: 'motion@14.5.0', adapterSha256: SHA('a') },
+        run: 1,
+        metric: 'warm.s1',
+        scenario: 's1',
+        scenarioConfig: START_SCENARIO_MANIFEST.s1,
+        startOrder: START,
+        provenance: { revision: 'b'.repeat(40) },
+        browser: { name: 'chromium', version: 'fixture' },
+      };
+      expect(() => assertStartSemanticEvidenceWithDiagnostic(
+        'motion.s1 run 1', evidence, metadata, directory,
+      )).toThrow(/motion\.s1 run 1.*semantic/);
+      const attempts = readdirSync(directory);
+      expect(attempts).toHaveLength(1);
+      const diagnostic = JSON.parse(readFileSync(join(directory, attempts[0], 'evidence.json'), 'utf8'));
+      expect(diagnostic).toMatchObject({
+        ...metadata,
+        diagnostic: 'start-semantic-failure',
+        label: 'motion.s1 run 1',
+        semanticEvidence: { valid: false, terminal: evidence.terminal, completion: evidence.completion },
+      });
+      expect(diagnostic.semanticEvidence.checkpoints.map((point: any) => point.groups[0].positions[0]))
+        .toEqual([{ $number: 'NaN' }, { $number: 'Infinity' }, { $number: '-Infinity' }]);
+      expect(evidence.checkpoints.map((point: any) => point.groups[0].positions[0]))
+        .toEqual([NaN, Infinity, -Infinity]);
+    } finally {
+      stderr.mockRestore();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('never converts a failed diagnostic write into a pass, and writes nothing for accepted evidence', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'lab-motion-semantic-diagnostic-'));
+    const absent = join(directory, 'absent');
+    const stderr = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const evidence = semanticEvidence('s1', 1);
+      expect(() => assertStartSemanticEvidenceWithDiagnostic(
+        'motion.s1 run 1', evidence, {}, absent,
+      )).not.toThrow();
+      expect(existsSync(absent)).toBe(false);
+      evidence.checkpoints[1].groups[0].positions[0] = 10;
+      evidence.valid = evaluateStartSemanticEvidence(evidence, START_SCENARIO_MANIFEST.s1, 1);
+      expect(evidence.valid).toBe(false);
+      expect(() => assertStartSemanticEvidenceWithDiagnostic(
+        'motion.s1 run 1', evidence, {}, absent,
+      )).toThrow(/motion\.s1 run 1.*semantic/);
+      expect(stderr).toHaveBeenCalledWith(expect.stringContaining('diagnostic could not be saved'));
+      expect(readdirSync(directory)).toEqual([]);
+    } finally {
+      stderr.mockRestore();
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('schema 10 motion conformance admission', () => {
   it('публикация принимает отчёт с обязательным качеством движения', () => {
     expect(() => validateBenchmarkReportForPublication(motionFixture())).not.toThrow();
@@ -537,7 +611,7 @@ describe('schema 10 motion conformance admission', () => {
 
   it('фиксирует scoped требования: baseline для всех и blocked для заявленных native-путей', () => {
     expect(S5_MOTION_REQUIREMENTS).toEqual({
-      baseline: FREEZE, blocked: ['lab', 'waapi-ctl', 'lab-spring', 'motion-mini', 'anime-waapi'],
+      baseline: FREEZE, blocked: ['lab', 'motion', 'waapi-ctl', 'lab-spring', 'motion-mini', 'anime-waapi'],
     });
     expect(Object.isFrozen(S5_MOTION_REQUIREMENTS)).toBe(true);
     expect(Object.isFrozen(S5_MOTION_REQUIREMENTS.baseline)).toBe(true);
@@ -581,18 +655,30 @@ describe('schema 10 motion conformance admission', () => {
     })).toThrow(/motion conformance: lab\.baseline = fail/);
   });
 
-  it('один плохой native-прогон не исчезает за медианой score 100', () => {
+  it.each(['motion', 'motion-mini'])(
+    'один плохой native-прогон %s не исчезает за медианой score 100',
+    (id) => {
+      const report = motionFixture();
+      report.payload.results[id].raw.freeze[7].evidence.blocked = freeze25To65();
+      refreshMotionReport(report);
+      expect(report.payload.results[id].summary.freeze.score.p50).toBe(100);
+      expect(report.payload.motionConformance[id].runs.filter(
+        (run: { blocked: { verdict: string } }) => run.blocked.verdict === 'pass',
+      )).toHaveLength(7);
+      expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+      expect(() => validateBenchmarkReportForPublication(report))
+        .toThrow('motion conformance: ' + id + '.blocked = fail');
+    },
+  );
+
+  it('сохраняет blocked-отказ JS-пути в диагностике без native-обещания', () => {
     const report = motionFixture();
-    report.payload.results['motion-mini'].raw.freeze[7].evidence.blocked = freeze25To65();
+    report.payload.results.gsap.raw.freeze[0].evidence.blocked = freeze25To65();
     refreshMotionReport(report);
-    expect(report.payload.results['motion-mini'].summary.freeze.score.p50).toBe(100);
-    expect(report.payload.motionConformance['motion-mini'].runs.filter(
-      (run: { blocked: { verdict: string } }) => run.blocked.verdict === 'pass',
-    )).toHaveLength(7);
-    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
-    expect(() => validateBenchmarkReportPair({
-      ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion conformance: motion-mini\.blocked = fail/);
+    expect(report.payload.motionConformance.gsap).toMatchObject({
+      baseline: 'pass', blocked: 'fail', capture: 'pass',
+    });
+    expect(() => validateBenchmarkReportForPublication(report)).not.toThrow();
   });
 
   it('не принимает подделанный cached PASS даже с каноническими Markdown и SHA', () => {

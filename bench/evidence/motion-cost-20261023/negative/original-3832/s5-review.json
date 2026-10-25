@@ -1,0 +1,3587 @@
+{
+  "schemaVersion": 1,
+  "scope": "Independent saved-data S5 audit; the full original benchmark remains FAILED",
+  "revision": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+  "publicationAdmission": false,
+  "input": {
+    "bytes": 12817371,
+    "sha256": "13e2f68fadc3410bb254776775f7ed3a5aedec9e4f9bbd99d8497d1b30dce952",
+    "storedBytes": 704342,
+    "storedSha256": "c8ec85d0a3188d455c104aefb6c4787bd7718e5eee175603bc37484881caef7a"
+  },
+  "oracleSourceSha256": "d05f0cec91a48eb9e85ec6b12ba49f0ac3673d4489d6dd5af470aa878fbc7f28",
+  "oracleSourceBytesChecked": true,
+  "contract": {
+    "id": "s5-motion-v1",
+    "distancePx": 600,
+    "durationMs": 2400,
+    "positionTolerancePx": 3,
+    "timeToleranceMs": 20,
+    "maxObservationGapMs": 50,
+    "spring": {
+      "stiffness": 40,
+      "damping": 8,
+      "mass": 1
+    }
+  },
+  "requirements": {
+    "baseline": [
+      "lab",
+      "motion",
+      "gsap",
+      "anime",
+      "waapi-ctl",
+      "lab-spring",
+      "motion-mini",
+      "anime-waapi"
+    ],
+    "blocked": [
+      "lab",
+      "motion",
+      "waapi-ctl",
+      "lab-spring",
+      "motion-mini",
+      "anime-waapi"
+    ]
+  },
+  "blockers": [
+    {
+      "library": "lab-spring",
+      "mode": "blocked",
+      "verdict": "inconclusive",
+      "capture": "inconclusive"
+    }
+  ],
+  "counts": {
+    "capture_pass": 128,
+    "target_pass": 110,
+    "witness_pass": 124,
+    "target_fail": 18,
+    "witness_fail": 4
+  },
+  "aggregates": {
+    "lab": {
+      "baseline": "pass",
+      "blocked": "pass",
+      "capture": "pass"
+    },
+    "motion": {
+      "baseline": "pass",
+      "blocked": "pass",
+      "capture": "pass"
+    },
+    "gsap": {
+      "baseline": "pass",
+      "blocked": "fail",
+      "capture": "pass"
+    },
+    "anime": {
+      "baseline": "pass",
+      "blocked": "fail",
+      "capture": "inconclusive"
+    },
+    "waapi-ctl": {
+      "baseline": "pass",
+      "blocked": "pass",
+      "capture": "pass"
+    },
+    "lab-spring": {
+      "baseline": "pass",
+      "blocked": "inconclusive",
+      "capture": "inconclusive"
+    },
+    "motion-mini": {
+      "baseline": "pass",
+      "blocked": "pass",
+      "capture": "pass"
+    },
+    "anime-waapi": {
+      "baseline": "pass",
+      "blocked": "pass",
+      "capture": "pass"
+    }
+  },
+  "captureUncertaintyMs": {
+    "min": 0.49818456637114183,
+    "max": 1.668184566875119
+  },
+  "largestIndependentNumericDifference": 5.684341886080802e-14,
+  "comparisonOnlyArithmeticTolerance": 1e-09,
+  "verdictsExactlyReproduced": true,
+  "semanticBudgetsUnchanged": true,
+  "details": [
+    {
+      "library": "gsap",
+      "round": 1,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.5731845661040185
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 223.5990047454834,
+        "maxGapMs": 32.20510482788086,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 7.2907609939575195,
+        "maxGapMs": 32.20510482788086,
+        "samples": 144
+      },
+      "targetViolationCount": 125,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 73
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 344.3319797515869,
+          "x": 75,
+          "expectedX": 86.08299493789673,
+          "allowedMinX": 78.22629107942274,
+          "allowedMaxX": 93.93969879637072,
+          "errorPx": 11.082994937896729,
+          "outsidePx": 3.2262910794227366
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 360.9600067138672,
+          "x": 75,
+          "expectedX": 90.2400016784668,
+          "allowedMinX": 82.3832978199928,
+          "allowedMaxX": 98.09670553694079,
+          "errorPx": 15.240001678466797,
+          "outsidePx": 7.383297819992805
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 377.6700496673584,
+          "x": 75,
+          "expectedX": 94.4175124168396,
+          "allowedMinX": 86.56080855836561,
+          "allowedMaxX": 102.27421627531359,
+          "errorPx": 19.4175124168396,
+          "outsidePx": 11.560808558365608
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1194.3960189819336,
+        "x": 75,
+        "expectedX": 298.5990047454834,
+        "allowedMinX": 290.74230088700943,
+        "allowedMaxX": 306.45570860395736,
+        "errorPx": 223.5990047454834,
+        "outsidePx": 215.74230088700943
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 300.6398677825928,
+      "blockEndMs": 1200.669765472412,
+      "finalX": 600,
+      "relativeScore": 41.5,
+      "oldRawValid": true,
+      "rawFrameCount": 198,
+      "participantPosition": 1
+    },
+    {
+      "library": "gsap",
+      "round": 2,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6431845659600827
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 222.46955633163452,
+        "maxGapMs": 32.39107131958008,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 6.258062839508057,
+        "maxGapMs": 32.39107131958008,
+        "samples": 144
+      },
+      "targetViolationCount": 125,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 73
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 340.1961326599121,
+          "x": 75,
+          "expectedX": 85.04903316497803,
+          "allowedMinX": 77.20982930646807,
+          "allowedMaxX": 92.888237023488,
+          "errorPx": 10.049033164978027,
+          "outsidePx": 2.209829306468066
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 357.0113182067871,
+          "x": 75,
+          "expectedX": 89.25282955169678,
+          "allowedMinX": 81.41362569318682,
+          "allowedMaxX": 97.09203341020677,
+          "errorPx": 14.252829551696777,
+          "outsidePx": 6.413625693186816
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 373.6152648925781,
+          "x": 75,
+          "expectedX": 93.40381622314453,
+          "allowedMinX": 85.56461236463457,
+          "allowedMaxX": 101.24302008165452,
+          "errorPx": 18.40381622314453,
+          "outsidePx": 10.56461236463457
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1189.878225326538,
+        "x": 75,
+        "expectedX": 297.4695563316345,
+        "allowedMinX": 289.63035247312456,
+        "allowedMaxX": 305.30876019014454,
+        "errorPx": 222.46955633163452,
+        "outsidePx": 214.63035247312456
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 300.7500171661377,
+      "blockEndMs": 1200.7851600646973,
+      "finalX": 600,
+      "relativeScore": 39.5,
+      "oldRawValid": true,
+      "rawFrameCount": 198,
+      "participantPosition": 8
+    },
+    {
+      "library": "gsap",
+      "round": 3,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.7581845667798569
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 225.4650473594666,
+        "maxGapMs": 31.901121139526367,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 4.938261032104492,
+        "maxGapMs": 31.901121139526367,
+        "samples": 144
+      },
+      "targetViolationCount": 125,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 73
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 334.69104766845703,
+          "x": 75,
+          "expectedX": 83.67276191711426,
+          "allowedMinX": 75.86230805880923,
+          "allowedMaxX": 91.4832157754193,
+          "errorPx": 8.672761917114258,
+          "outsidePx": 0.8623080588092336
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 351.50814056396484,
+          "x": 75,
+          "expectedX": 87.87703514099121,
+          "allowedMinX": 80.06658128268619,
+          "allowedMaxX": 95.68748899929625,
+          "errorPx": 12.877035140991211,
+          "outsidePx": 5.066581282686187
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 368.07703971862793,
+          "x": 75,
+          "expectedX": 92.01925992965698,
+          "allowedMinX": 84.20880607135196,
+          "allowedMaxX": 99.82971378796202,
+          "errorPx": 17.019259929656982,
+          "outsidePx": 9.208806071351958
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 72,
+        "timeMs": 1201.8601894378662,
+        "x": 75,
+        "expectedX": 300.4650473594666,
+        "allowedMinX": 292.6545935011615,
+        "allowedMaxX": 308.2755012177716,
+        "errorPx": 225.4650473594666,
+        "outsidePx": 217.65459350116151
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 300.8999824523926,
+      "blockEndMs": 1200.934886932373,
+      "finalX": 600,
+      "relativeScore": 39.5,
+      "oldRawValid": true,
+      "rawFrameCount": 198,
+      "participantPosition": 7
+    },
+    {
+      "library": "gsap",
+      "round": 4,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.8231845668385029
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 223.3594536781311,
+        "maxGapMs": 31.9669246673584,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 7.066969394683866,
+        "maxGapMs": 31.9669246673584,
+        "samples": 144
+      },
+      "targetViolationCount": 125,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 73
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 343.57595443725586,
+          "x": 75,
+          "expectedX": 85.89398860931396,
+          "allowedMinX": 78.09978475102359,
+          "allowedMaxX": 93.68819246760434,
+          "errorPx": 10.893988609313965,
+          "outsidePx": 3.0997847510235914
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 360.137939453125,
+          "x": 75,
+          "expectedX": 90.03448486328126,
+          "allowedMinX": 82.24028100499088,
+          "allowedMaxX": 97.82868872157164,
+          "errorPx": 15.034484863281264,
+          "outsidePx": 7.240281004990877
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 376.7099380493164,
+          "x": 75,
+          "expectedX": 94.1774845123291,
+          "allowedMinX": 86.38328065403873,
+          "allowedMaxX": 101.97168837061949,
+          "errorPx": 19.1774845123291,
+          "outsidePx": 11.383280654038728
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1193.4378147125244,
+        "x": 75,
+        "expectedX": 298.3594536781311,
+        "allowedMinX": 290.56524981984074,
+        "allowedMaxX": 306.1536575364215,
+        "errorPx": 223.3594536781311,
+        "outsidePx": 215.56524981984074
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 300.8449077606201,
+      "blockEndMs": 1200.8700370788574,
+      "finalX": 600,
+      "relativeScore": 39.5,
+      "oldRawValid": true,
+      "rawFrameCount": 198,
+      "participantPosition": 6
+    },
+    {
+      "library": "gsap",
+      "round": 5,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.7181845665219367
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 223.38770627975464,
+        "maxGapMs": 31.893014907836914,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 7.180003643035917,
+        "maxGapMs": 31.893014907836914,
+        "samples": 144
+      },
+      "targetViolationCount": 125,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 73
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 343.48082542419434,
+          "x": 75,
+          "expectedX": 85.87020635604858,
+          "allowedMinX": 78.04975249767908,
+          "allowedMaxX": 93.6906602144181,
+          "errorPx": 10.870206356048584,
+          "outsidePx": 3.04975249767908
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 360.00990867614746,
+          "x": 75,
+          "expectedX": 90.00247716903688,
+          "allowedMinX": 82.18202331066735,
+          "allowedMaxX": 97.82293102740638,
+          "errorPx": 15.00247716903688,
+          "outsidePx": 7.182023310667347
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 376.6160011291504,
+          "x": 75,
+          "expectedX": 94.15400028228761,
+          "allowedMinX": 86.33354642391808,
+          "allowedMaxX": 101.97445414065712,
+          "errorPx": 19.154000282287612,
+          "outsidePx": 11.33354642391808
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1193.5508251190186,
+        "x": 75,
+        "expectedX": 298.38770627975464,
+        "allowedMinX": 290.56725242138515,
+        "allowedMaxX": 306.20816013812413,
+        "errorPx": 223.38770627975464,
+        "outsidePx": 215.56725242138515
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 300.6746768951416,
+      "blockEndMs": 1200.70481300354,
+      "finalX": 600,
+      "relativeScore": 38.75,
+      "oldRawValid": true,
+      "rawFrameCount": 198,
+      "participantPosition": 5
+    },
+    {
+      "library": "gsap",
+      "round": 6,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.9031845666923951
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 222.1630096435547,
+        "maxGapMs": 32.31692314147949,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 5.798773288726807,
+        "maxGapMs": 32.31692314147949,
+        "samples": 144
+      },
+      "targetViolationCount": 125,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 73
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 338.7482166290283,
+          "x": 75,
+          "expectedX": 84.6870541572571,
+          "allowedMinX": 76.9128502989302,
+          "allowedMaxX": 92.46125801558398,
+          "errorPx": 9.687054157257094,
+          "outsidePx": 1.912850298930195
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 355.1461696624756,
+          "x": 75,
+          "expectedX": 88.78654241561891,
+          "allowedMinX": 81.01233855729201,
+          "allowedMaxX": 96.5607462739458,
+          "errorPx": 13.78654241561891,
+          "outsidePx": 6.012338557292011
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 371.7081546783447,
+          "x": 75,
+          "expectedX": 92.92703866958618,
+          "allowedMinX": 85.15283481125928,
+          "allowedMaxX": 100.7012425279131,
+          "errorPx": 17.92703866958618,
+          "outsidePx": 10.152834811259282
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1188.6520385742188,
+        "x": 75,
+        "expectedX": 297.1630096435547,
+        "allowedMinX": 289.3888057852278,
+        "allowedMaxX": 304.9372135018816,
+        "errorPx": 222.1630096435547,
+        "outsidePx": 214.38880578522782
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 300.9049892425537,
+      "blockEndMs": 1200.9398937225342,
+      "finalX": 600,
+      "relativeScore": 39.5,
+      "oldRawValid": true,
+      "rawFrameCount": 198,
+      "participantPosition": 4
+    },
+    {
+      "library": "gsap",
+      "round": 7,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.7231845666554556
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 223.06846380233765,
+        "maxGapMs": 32.2718620300293,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 6.796960353851318,
+        "maxGapMs": 32.2718620300293,
+        "samples": 144
+      },
+      "targetViolationCount": 125,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 73
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 342.3600196838379,
+          "x": 75,
+          "expectedX": 85.59000492095947,
+          "allowedMinX": 77.77080106262335,
+          "allowedMaxX": 93.40920877929561,
+          "errorPx": 10.590004920959473,
+          "outsidePx": 2.770801062623349
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 359.1878414154053,
+          "x": 75,
+          "expectedX": 89.79696035385132,
+          "allowedMinX": 81.9777564955152,
+          "allowedMaxX": 97.61616421218746,
+          "errorPx": 14.796960353851318,
+          "outsidePx": 6.9777564955151945
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 375.73790550231934,
+          "x": 75,
+          "expectedX": 93.93447637557983,
+          "allowedMinX": 86.1152725172437,
+          "allowedMaxX": 101.75368023391596,
+          "errorPx": 18.934476375579834,
+          "outsidePx": 11.115272517243696
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1192.2738552093506,
+        "x": 75,
+        "expectedX": 298.06846380233765,
+        "allowedMinX": 290.24925994400155,
+        "allowedMaxX": 305.8876676606738,
+        "errorPx": 223.06846380233765,
+        "outsidePx": 215.24925994400155
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 300.6398677825928,
+      "blockEndMs": 1200.6700038909912,
+      "finalX": 600,
+      "relativeScore": 39.5,
+      "oldRawValid": true,
+      "rawFrameCount": 198,
+      "participantPosition": 3
+    },
+    {
+      "library": "gsap",
+      "round": 8,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6231845676069445
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 222.84202575683594,
+        "maxGapMs": 31.963825225830078,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 6.521515369415283,
+        "maxGapMs": 31.963825225830078,
+        "samples": 144
+      },
+      "targetViolationCount": 125,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 73
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 341.2821292877197,
+          "x": 75,
+          "expectedX": 85.32053232192993,
+          "allowedMinX": 77.47632846383166,
+          "allowedMaxX": 93.1647361800282,
+          "errorPx": 10.320532321929932,
+          "outsidePx": 2.4763284638316634
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 358.079195022583,
+          "x": 75,
+          "expectedX": 89.51979875564575,
+          "allowedMinX": 81.67559489754748,
+          "allowedMaxX": 97.36400261374402,
+          "errorPx": 14.519798755645752,
+          "outsidePx": 6.675594897547484
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 374.65620040893555,
+          "x": 75,
+          "expectedX": 93.6640501022339,
+          "allowedMinX": 85.81984624413562,
+          "allowedMaxX": 101.50825396033215,
+          "errorPx": 18.6640501022339,
+          "outsidePx": 10.819846244135618
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1191.3681030273438,
+        "x": 75,
+        "expectedX": 297.84202575683594,
+        "allowedMinX": 289.9978218987377,
+        "allowedMaxX": 305.68622961493423,
+        "errorPx": 222.84202575683594,
+        "outsidePx": 214.9978218987377
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 300.69994926452637,
+      "blockEndMs": 1200.7298469543457,
+      "finalX": 600,
+      "relativeScore": 39.5,
+      "oldRawValid": true,
+      "rawFrameCount": 198,
+      "participantPosition": 2
+    },
+    {
+      "library": "anime",
+      "round": 1,
+      "mode": "blocked",
+      "qualified": "inconclusive",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.603184565969848
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 222.33571815490723,
+        "maxGapMs": 32.03296661376953,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 7.9870147705078125,
+        "maxGapMs": 32.03296661376953,
+        "samples": 144
+      },
+      "targetViolationCount": 52,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 346.8019962310791,
+          "x": 77,
+          "expectedX": 86.70049905776979,
+          "allowedMinX": 78.85129519926224,
+          "allowedMaxX": 94.54970291627733,
+          "errorPx": 9.70049905776979,
+          "outsidePx": 1.851295199262239
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 363.6279106140137,
+          "x": 77,
+          "expectedX": 90.90697765350342,
+          "allowedMinX": 83.0577737949959,
+          "allowedMaxX": 98.75618151201095,
+          "errorPx": 13.906977653503418,
+          "outsidePx": 6.057773794995896
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 380.45287132263184,
+          "x": 77,
+          "expectedX": 95.11321783065796,
+          "allowedMinX": 87.26401397215044,
+          "allowedMaxX": 102.9624216891655,
+          "errorPx": 18.11321783065796,
+          "outsidePx": 10.264013972150437
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1197.342872619629,
+        "x": 77,
+        "expectedX": 299.3357181549072,
+        "allowedMinX": 291.4865142963997,
+        "allowedMaxX": 307.1849220134148,
+        "errorPx": 222.33571815490723,
+        "outsidePx": 214.48651429639972
+      },
+      "witnessViolationCount": 10,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 10,
+        "afterBlock": 0
+      },
+      "witnessViolations": [
+        {
+          "rawIndex": 21,
+          "timeMs": 363.6279106140137,
+          "x": 83,
+          "expectedX": 90.90697765350342,
+          "allowedMinX": 83.0577737949959,
+          "allowedMaxX": 98.75618151201095,
+          "errorPx": 7.906977653503418,
+          "outsidePx": 0.057773794995895855
+        },
+        {
+          "rawIndex": 27,
+          "timeMs": 463.9279842376709,
+          "x": 108,
+          "expectedX": 115.98199605941774,
+          "allowedMinX": 108.13279220091019,
+          "allowedMaxX": 123.83119991792528,
+          "errorPx": 7.981996059417739,
+          "outsidePx": 0.13279220091018828
+        },
+        {
+          "rawIndex": 33,
+          "timeMs": 563.6129379272461,
+          "x": 133,
+          "expectedX": 140.90323448181152,
+          "allowedMinX": 133.054030623304,
+          "allowedMaxX": 148.75243834031906,
+          "errorPx": 7.903234481811523,
+          "outsidePx": 0.05403062330398711
+        },
+        {
+          "rawIndex": 39,
+          "timeMs": 663.6018753051758,
+          "x": 158,
+          "expectedX": 165.90046882629397,
+          "allowedMinX": 158.0512649677864,
+          "allowedMaxX": 173.7496726848015,
+          "errorPx": 7.900468826293974,
+          "outsidePx": 0.05126496778640899
+        },
+        {
+          "rawIndex": 45,
+          "timeMs": 763.6430263519287,
+          "x": 183,
+          "expectedX": 190.91075658798218,
+          "allowedMinX": 183.06155272947464,
+          "allowedMaxX": 198.7599604464897,
+          "errorPx": 7.910756587982178,
+          "outsidePx": 0.06155272947464141
+        },
+        {
+          "rawIndex": 51,
+          "timeMs": 863.8160228729248,
+          "x": 208,
+          "expectedX": 215.9540057182312,
+          "allowedMinX": 208.10480185972366,
+          "allowedMaxX": 223.80320957673874,
+          "errorPx": 7.954005718231201,
+          "outsidePx": 0.10480185972366485
+        },
+        {
+          "rawIndex": 57,
+          "timeMs": 963.6080265045166,
+          "x": 233,
+          "expectedX": 240.90200662612918,
+          "allowedMinX": 233.0528027676216,
+          "allowedMaxX": 248.75121048463672,
+          "errorPx": 7.902006626129179,
+          "outsidePx": 0.052802767621614066
+        },
+        {
+          "rawIndex": 62,
+          "timeMs": 1047.407865524292,
+          "x": 254,
+          "expectedX": 261.851966381073,
+          "allowedMinX": 254.0027625225655,
+          "allowedMaxX": 269.7011702395805,
+          "errorPx": 7.851966381072998,
+          "outsidePx": 0.002762522565490144
+        },
+        {
+          "rawIndex": 63,
+          "timeMs": 1063.706874847412,
+          "x": 258,
+          "expectedX": 265.926718711853,
+          "allowedMinX": 258.0775148533455,
+          "allowedMaxX": 273.77592257036054,
+          "errorPx": 7.926718711853027,
+          "outsidePx": 0.07751485334551944
+        },
+        {
+          "rawIndex": 69,
+          "timeMs": 1163.9480590820312,
+          "x": 283,
+          "expectedX": 290.9870147705078,
+          "allowedMinX": 283.1378109120003,
+          "allowedMaxX": 298.8362186290153,
+          "errorPx": 7.9870147705078125,
+          "outsidePx": 0.1378109120003046
+        }
+      ],
+      "blockStartMs": 303.06506156921387,
+      "blockEndMs": 1203.0949592590332,
+      "finalX": 600,
+      "relativeScore": 40.99999999999999,
+      "oldRawValid": true,
+      "rawFrameCount": 147,
+      "participantPosition": 5
+    },
+    {
+      "library": "anime",
+      "round": 2,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.593184566076074
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 222.45723915100098,
+        "maxGapMs": 32.33909606933594,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 5.05922269821167,
+        "maxGapMs": 32.33909606933594,
+        "samples": 144
+      },
+      "targetViolationCount": 52,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 21,
+          "timeMs": 351.8819808959961,
+          "x": 78,
+          "expectedX": 87.97049522399902,
+          "allowedMinX": 80.11879136551804,
+          "allowedMaxX": 95.82219908248,
+          "errorPx": 9.970495223999023,
+          "outsidePx": 2.1187913655180353
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 368.58391761779785,
+          "x": 78,
+          "expectedX": 92.14597940444946,
+          "allowedMinX": 84.29427554596847,
+          "allowedMaxX": 99.99768326293044,
+          "errorPx": 14.145979404449463,
+          "outsidePx": 6.294275545968475
+        },
+        {
+          "rawIndex": 23,
+          "timeMs": 385.206937789917,
+          "x": 78,
+          "expectedX": 96.30173444747926,
+          "allowedMinX": 88.45003058899827,
+          "allowedMaxX": 104.15343830596024,
+          "errorPx": 18.301734447479262,
+          "outsidePx": 10.450030588998274
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 72,
+        "timeMs": 1201.828956604004,
+        "x": 78,
+        "expectedX": 300.457239151001,
+        "allowedMinX": 292.60553529252,
+        "allowedMaxX": 308.308943009482,
+        "errorPx": 222.45723915100098,
+        "outsidePx": 214.60553529252002
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 303.63011360168457,
+      "blockEndMs": 1203.6750316619873,
+      "finalX": 600,
+      "relativeScore": 40.99999999999999,
+      "oldRawValid": true,
+      "rawFrameCount": 148,
+      "participantPosition": 4
+    },
+    {
+      "library": "anime",
+      "round": 3,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6531845662625607
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 222.59973287582397,
+        "maxGapMs": 31.386852264404297,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 6.316725730895996,
+        "maxGapMs": 31.386852264404297,
+        "samples": 144
+      },
+      "targetViolationCount": 52,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 340.55209159851074,
+          "x": 75,
+          "expectedX": 85.1380228996277,
+          "allowedMinX": 77.30131904119332,
+          "allowedMaxX": 92.97472675806206,
+          "errorPx": 10.1380228996277,
+          "outsidePx": 2.3013190411933238
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 356.59313201904297,
+          "x": 75,
+          "expectedX": 89.14828300476076,
+          "allowedMinX": 81.31157914632638,
+          "allowedMaxX": 96.98498686319512,
+          "errorPx": 14.148283004760756,
+          "outsidePx": 6.31157914632638
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 373.86298179626465,
+          "x": 75,
+          "expectedX": 93.46574544906618,
+          "allowedMinX": 85.6290415906318,
+          "allowedMaxX": 101.30244930750054,
+          "errorPx": 18.465745449066176,
+          "outsidePx": 10.6290415906318
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1190.398931503296,
+        "x": 75,
+        "expectedX": 297.599732875824,
+        "allowedMinX": 289.7630290173896,
+        "allowedMaxX": 305.4364367342584,
+        "errorPx": 222.59973287582397,
+        "outsidePx": 214.7630290173896
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 303.7900924682617,
+      "blockEndMs": 1203.815221786499,
+      "finalX": 600,
+      "relativeScore": 39.5,
+      "oldRawValid": true,
+      "rawFrameCount": 147,
+      "participantPosition": 3
+    },
+    {
+      "library": "anime",
+      "round": 4,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6381845667124492
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 222.99148845672607,
+        "maxGapMs": 31.94880485534668,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 4.497997283935547,
+        "maxGapMs": 31.94880485534668,
+        "samples": 144
+      },
+      "targetViolationCount": 52,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 21,
+          "timeMs": 349.67613220214844,
+          "x": 77,
+          "expectedX": 87.41903305053711,
+          "allowedMinX": 79.57857919221524,
+          "allowedMaxX": 95.25948690885899,
+          "errorPx": 10.41903305053711,
+          "outsidePx": 2.578579192215244
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 366.502046585083,
+          "x": 77,
+          "expectedX": 91.62551164627075,
+          "allowedMinX": 83.78505778794887,
+          "allowedMaxX": 99.46596550459265,
+          "errorPx": 14.625511646270752,
+          "outsidePx": 6.7850577879488725
+        },
+        {
+          "rawIndex": 23,
+          "timeMs": 383.33606719970703,
+          "x": 77,
+          "expectedX": 95.83401679992676,
+          "allowedMinX": 87.99356294160489,
+          "allowedMaxX": 103.67447065824864,
+          "errorPx": 18.834016799926758,
+          "outsidePx": 10.993562941604893
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 72,
+        "timeMs": 1199.9659538269043,
+        "x": 77,
+        "expectedX": 299.9914884567261,
+        "allowedMinX": 292.15103459840424,
+        "allowedMaxX": 307.831942315048,
+        "errorPx": 222.99148845672607,
+        "outsidePx": 215.15103459840424
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 303.1797409057617,
+      "blockEndMs": 1203.2148838043213,
+      "finalX": 600,
+      "relativeScore": 40.857142857142854,
+      "oldRawValid": true,
+      "rawFrameCount": 148,
+      "participantPosition": 2
+    },
+    {
+      "library": "anime",
+      "round": 5,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.5981845668054182
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 226.21028423309326,
+        "maxGapMs": 31.065940856933594,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 5.842785358428955,
+        "maxGapMs": 31.065940856933594,
+        "samples": 144
+      },
+      "targetViolationCount": 53,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 1
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 338.2899761199951,
+          "x": 75,
+          "expectedX": 84.57249402999878,
+          "allowedMinX": 76.72204017170014,
+          "allowedMaxX": 92.42294788829743,
+          "errorPx": 9.57249402999878,
+          "outsidePx": 1.7220401717001437
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 355.13901710510254,
+          "x": 75,
+          "expectedX": 88.78475427627565,
+          "allowedMinX": 80.93430041797698,
+          "allowedMaxX": 96.63520813457428,
+          "errorPx": 13.784754276275649,
+          "outsidePx": 5.934300417976985
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 372.0870018005371,
+          "x": 75,
+          "expectedX": 93.02175045013429,
+          "allowedMinX": 85.17129659183563,
+          "allowedMaxX": 100.87220430843293,
+          "errorPx": 18.02175045013429,
+          "outsidePx": 10.171296591835628
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 72,
+        "timeMs": 1204.841136932373,
+        "x": 75,
+        "expectedX": 301.21028423309326,
+        "allowedMinX": 293.3598303747946,
+        "allowedMaxX": 309.06073809139195,
+        "errorPx": 226.21028423309326,
+        "outsidePx": 218.35983037479463
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 303.2500743865967,
+      "blockEndMs": 1203.2899856567383,
+      "finalX": 600,
+      "relativeScore": 39.5,
+      "oldRawValid": true,
+      "rawFrameCount": 148,
+      "participantPosition": 1
+    },
+    {
+      "library": "anime",
+      "round": 6,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.5981845665944437
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 222.57767915725708,
+        "maxGapMs": 31.960010528564453,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 6.24020528793335,
+        "maxGapMs": 31.960010528564453,
+        "samples": 144
+      },
+      "targetViolationCount": 52,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 339.6878242492676,
+          "x": 75,
+          "expectedX": 84.9219560623169,
+          "allowedMinX": 77.07150220396551,
+          "allowedMaxX": 92.7724099206683,
+          "errorPx": 9.921956062316895,
+          "outsidePx": 2.071502203965508
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 356.46772384643555,
+          "x": 75,
+          "expectedX": 89.11693096160889,
+          "allowedMinX": 81.2664771032575,
+          "allowedMaxX": 96.96738481996029,
+          "errorPx": 14.116930961608887,
+          "outsidePx": 6.2664771032575
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 373.40784072875977,
+          "x": 75,
+          "expectedX": 93.35196018218994,
+          "allowedMinX": 85.50150632383856,
+          "allowedMaxX": 101.20241404054134,
+          "errorPx": 18.35196018218994,
+          "outsidePx": 10.501506323838555
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1190.3107166290283,
+        "x": 75,
+        "expectedX": 297.5776791572571,
+        "allowedMinX": 289.7272252989057,
+        "allowedMaxX": 305.42813301560847,
+        "errorPx": 222.57767915725708,
+        "outsidePx": 214.7272252989057
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 304.2149543762207,
+      "blockEndMs": 1204.2548656463623,
+      "finalX": 600,
+      "relativeScore": 40,
+      "oldRawValid": true,
+      "rawFrameCount": 147,
+      "participantPosition": 8
+    },
+    {
+      "library": "anime",
+      "round": 7,
+      "mode": "blocked",
+      "qualified": "fail",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6281845669856664
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 223.03094673156738,
+        "maxGapMs": 31.180143356323242,
+        "samples": 143
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 5.925480842590346,
+        "maxGapMs": 31.180143356323242,
+        "samples": 143
+      },
+      "targetViolationCount": 52,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 21,
+          "timeMs": 355.7019233703613,
+          "x": 77,
+          "expectedX": 88.92548084259035,
+          "allowedMinX": 81.08252698433675,
+          "allowedMaxX": 96.76843470084393,
+          "errorPx": 11.925480842590346,
+          "outsidePx": 4.082526984336752
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 366.4238452911377,
+          "x": 77,
+          "expectedX": 91.60596132278442,
+          "allowedMinX": 83.76300746453083,
+          "allowedMaxX": 99.44891518103803,
+          "errorPx": 14.605961322784424,
+          "outsidePx": 6.76300746453083
+        },
+        {
+          "rawIndex": 23,
+          "timeMs": 384.2477798461914,
+          "x": 77,
+          "expectedX": 96.06194496154787,
+          "allowedMinX": 88.21899110329427,
+          "allowedMaxX": 103.90489881980145,
+          "errorPx": 19.061944961547866,
+          "outsidePx": 11.218991103294272
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 72,
+        "timeMs": 1200.1237869262695,
+        "x": 77,
+        "expectedX": 300.0309467315674,
+        "allowedMinX": 292.1879928733138,
+        "allowedMaxX": 307.87390058982095,
+        "errorPx": 223.03094673156738,
+        "outsidePx": 215.18799287331382
+      },
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 303.32493782043457,
+      "blockEndMs": 1203.354835510254,
+      "finalX": 600,
+      "relativeScore": 40.49999999999999,
+      "oldRawValid": true,
+      "rawFrameCount": 148,
+      "participantPosition": 7
+    },
+    {
+      "library": "anime",
+      "round": 8,
+      "mode": "blocked",
+      "qualified": "inconclusive",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6581845673597667
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 222.4052767753601,
+        "maxGapMs": 30.978918075561523,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 8.058743000030518,
+        "maxGapMs": 30.978918075561523,
+        "samples": 144
+      },
+      "targetViolationCount": 52,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 52,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 20,
+          "timeMs": 347.10097312927246,
+          "x": 77,
+          "expectedX": 86.77524328231813,
+          "allowedMinX": 78.93978942415805,
+          "allowedMaxX": 94.61069714047818,
+          "errorPx": 9.77524328231813,
+          "outsidePx": 1.9397894241580502
+        },
+        {
+          "rawIndex": 21,
+          "timeMs": 363.96193504333496,
+          "x": 77,
+          "expectedX": 90.99048376083374,
+          "allowedMinX": 83.15502990267369,
+          "allowedMaxX": 98.8259376189938,
+          "errorPx": 13.99048376083374,
+          "outsidePx": 6.155029902673689
+        },
+        {
+          "rawIndex": 22,
+          "timeMs": 380.526065826416,
+          "x": 77,
+          "expectedX": 95.131516456604,
+          "allowedMinX": 87.29606259844395,
+          "allowedMaxX": 102.96697031476407,
+          "errorPx": 18.131516456604004,
+          "outsidePx": 10.296062598443953
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 71,
+        "timeMs": 1197.6211071014404,
+        "x": 77,
+        "expectedX": 299.4052767753601,
+        "allowedMinX": 291.5698229172001,
+        "allowedMaxX": 307.2407306335202,
+        "errorPx": 222.4052767753601,
+        "outsidePx": 214.5698229172001
+      },
+      "witnessViolationCount": 11,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 11,
+        "afterBlock": 0
+      },
+      "witnessViolations": [
+        {
+          "rawIndex": 21,
+          "timeMs": 363.96193504333496,
+          "x": 83,
+          "expectedX": 90.99048376083374,
+          "allowedMinX": 83.15502990267369,
+          "allowedMaxX": 98.8259376189938,
+          "errorPx": 7.99048376083374,
+          "outsidePx": 0.15502990267368943
+        },
+        {
+          "rawIndex": 27,
+          "timeMs": 463.91797065734863,
+          "x": 108,
+          "expectedX": 115.97949266433717,
+          "allowedMinX": 108.1440388061771,
+          "allowedMaxX": 123.81494652249722,
+          "errorPx": 7.979492664337172,
+          "outsidePx": 0.1440388061770932
+        },
+        {
+          "rawIndex": 33,
+          "timeMs": 563.8830661773682,
+          "x": 133,
+          "expectedX": 140.97076654434204,
+          "allowedMinX": 133.135312686182,
+          "allowedMaxX": 148.8062204025021,
+          "errorPx": 7.970766544342041,
+          "outsidePx": 0.13531268618200443
+        },
+        {
+          "rawIndex": 39,
+          "timeMs": 664.0920639038086,
+          "x": 158,
+          "expectedX": 166.02301597595215,
+          "allowedMinX": 158.18756211779208,
+          "allowedMaxX": 173.8584698341122,
+          "errorPx": 8.023015975952148,
+          "outsidePx": 0.18756211779208343
+        },
+        {
+          "rawIndex": 44,
+          "timeMs": 747.3809719085693,
+          "x": 179,
+          "expectedX": 186.84524297714233,
+          "allowedMinX": 179.0097891189823,
+          "allowedMaxX": 194.6806968353024,
+          "errorPx": 7.845242977142334,
+          "outsidePx": 0.009789118982297396
+        },
+        {
+          "rawIndex": 45,
+          "timeMs": 764.0111446380615,
+          "x": 183,
+          "expectedX": 191.00278615951538,
+          "allowedMinX": 183.16733230135532,
+          "allowedMaxX": 198.83824001767545,
+          "errorPx": 8.00278615951538,
+          "outsidePx": 0.16733230135531585
+        },
+        {
+          "rawIndex": 51,
+          "timeMs": 863.8489246368408,
+          "x": 208,
+          "expectedX": 215.9622311592102,
+          "allowedMinX": 208.12677730105017,
+          "allowedMaxX": 223.79768501737027,
+          "errorPx": 7.962231159210205,
+          "outsidePx": 0.1267773010501685
+        },
+        {
+          "rawIndex": 57,
+          "timeMs": 963.886022567749,
+          "x": 233,
+          "expectedX": 240.97150564193726,
+          "allowedMinX": 233.13605178377722,
+          "allowedMaxX": 248.80695950009732,
+          "errorPx": 7.971505641937256,
+          "outsidePx": 0.13605178377721927
+        },
+        {
+          "rawIndex": 63,
+          "timeMs": 1064.234972000122,
+          "x": 258,
+          "expectedX": 266.0587430000305,
+          "allowedMinX": 258.2232891418705,
+          "allowedMaxX": 273.8941968581905,
+          "errorPx": 8.058743000030518,
+          "outsidePx": 0.2232891418705094
+        },
+        {
+          "rawIndex": 68,
+          "timeMs": 1147.5391387939453,
+          "x": 279,
+          "expectedX": 286.8847846984863,
+          "allowedMinX": 279.0493308403263,
+          "allowedMaxX": 294.7202385566464,
+          "errorPx": 7.884784698486328,
+          "outsidePx": 0.04933084032631996
+        },
+        {
+          "rawIndex": 69,
+          "timeMs": 1164.1960144042969,
+          "x": 283,
+          "expectedX": 291.0490036010742,
+          "allowedMinX": 283.2135497429142,
+          "allowedMaxX": 298.8844574592343,
+          "errorPx": 8.049003601074219,
+          "outsidePx": 0.21354974291421058
+        }
+      ],
+      "blockStartMs": 303.1449317932129,
+      "blockEndMs": 1203.1750679016113,
+      "finalX": 600,
+      "relativeScore": 40.714285714285715,
+      "oldRawValid": true,
+      "rawFrameCount": 147,
+      "participantPosition": 6
+    },
+    {
+      "library": "lab-spring",
+      "round": 1,
+      "mode": "baseline",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.598184566341475
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 19.523556036754144,
+        "maxGapMs": 17.47608184814453,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 3.442525863647461,
+        "maxGapMs": 17.47608184814453,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 309.4198703765869,
+      "blockEndMs": 1209.4550132751465,
+      "finalX": 599.992,
+      "relativeScore": 100,
+      "oldRawValid": true,
+      "rawFrameCount": 188,
+      "participantPosition": 7,
+      "witnessApparentLagMs": {
+        "median": 9.711034774780302,
+        "min": 7.649038314819334,
+        "max": 11.78595352172862,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.021025896072387695,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.021025896072387695,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.013770103454589844,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.013770103454589844,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.027601003646850586,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.027601003646850586,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.0441739559173584,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.0441739559173584,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.0606379508972168,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.0606379508972168,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 1,
+      "mode": "blocked",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.5581845667784348
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 25.247670553767676,
+        "maxGapMs": 17.679214477539062,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 3.827273845672608,
+        "maxGapMs": 17.679214477539062,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 309.4198703765869,
+      "blockEndMs": 1209.4550132751465,
+      "finalX": 600,
+      "relativeScore": 100,
+      "oldRawValid": true,
+      "rawFrameCount": 216,
+      "participantPosition": 7,
+      "witnessApparentLagMs": {
+        "median": 12.145050048828127,
+        "min": 9.999034881591818,
+        "max": 14.200942993164045,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.01487588882446289,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.01487588882446289,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.01530909538269043,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.01530909538269043,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.03022313117980957,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.03022313117980957,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.046942949295043945,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.046942949295043945,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.06328105926513672,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.06328105926513672,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 2,
+      "mode": "baseline",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.5381845664187309
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 17.259917909878652,
+        "maxGapMs": 17.37499237060547,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 3.068029880523682,
+        "maxGapMs": 17.37499237060547,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 308.1948757171631,
+      "blockEndMs": 1208.2247734069824,
+      "finalX": 599.992,
+      "relativeScore": 100,
+      "oldRawValid": true,
+      "rawFrameCount": 188,
+      "participantPosition": 6,
+      "witnessApparentLagMs": {
+        "median": 8.23002624511715,
+        "min": 6.153104782104402,
+        "max": 10.392063140869157,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.017380952835083008,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.017380952835083008,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.012272119522094727,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.012272119522094727,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.0260159969329834,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.0260159969329834,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.04285001754760742,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.04285001754760742,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.059287071228027344,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.059287071228027344,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 2,
+      "mode": "blocked",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.49818456637114183
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 21.794772559410887,
+        "maxGapMs": 17.637968063354492,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 3.621697425842285,
+        "maxGapMs": 17.637968063354492,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 308.1948757171631,
+      "blockEndMs": 1208.2247734069824,
+      "finalX": 600,
+      "relativeScore": 100,
+      "oldRawValid": true,
+      "rawFrameCount": 216,
+      "participantPosition": 6,
+      "witnessApparentLagMs": {
+        "median": 10.584425926208397,
+        "min": 8.470962524414038,
+        "max": 12.73676681518554,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.01620006561279297,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.01620006561279297,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.01448678970336914,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.01448678970336914,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.02814197540283203,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.02814197540283203,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.04510378837585449,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.04510378837585449,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.06171393394470215,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.06171393394470215,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 3,
+      "mode": "baseline",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6331845667361379
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 29.099407074468786,
+        "maxGapMs": 18.29385757446289,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 4.573464393615723,
+        "maxGapMs": 18.29385757446289,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 309.459924697876,
+      "blockEndMs": 1209.5000743865967,
+      "finalX": 599.992,
+      "relativeScore": 100,
+      "oldRawValid": true,
+      "rawFrameCount": 188,
+      "participantPosition": 5,
+      "witnessApparentLagMs": {
+        "median": 14.870825767517193,
+        "min": 12.716863632202369,
+        "max": 17.323940277099602,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.011785268783569336,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.011785268783569336,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.01829385757446289,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.01829385757446289,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.033127784729003906,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.033127784729003906,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.049185752868652344,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.049185752868652344,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.06594681739807129,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.06594681739807129,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 3,
+      "mode": "blocked",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6681845664278678
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 28.075368769178766,
+        "maxGapMs": 17.449140548706055,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 4.362285137176514,
+        "maxGapMs": 17.449140548706055,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 309.459924697876,
+      "blockEndMs": 1209.5000743865967,
+      "finalX": 600,
+      "relativeScore": 100,
+      "oldRawValid": true,
+      "rawFrameCount": 216,
+      "participantPosition": 5,
+      "witnessApparentLagMs": {
+        "median": 13.958509445190447,
+        "min": 11.964939117431683,
+        "max": 16.36802482604982,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.012483835220336914,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.012483835220336914,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.017449140548706055,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.017449140548706055,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.031620025634765625,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.031620025634765625,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.04808306694030762,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.04808306694030762,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.06464409828186035,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.06464409828186035,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 4,
+      "mode": "baseline",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6181845662729025
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 25.178610541218973,
+        "maxGapMs": 17.508983612060547,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 4.01073694229126,
+        "maxGapMs": 17.508983612060547,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 308.765172958374,
+      "blockEndMs": 1208.7950706481934,
+      "finalX": 599.992,
+      "relativeScore": 96.3,
+      "oldRawValid": true,
+      "rawFrameCount": 187,
+      "participantPosition": 4,
+      "witnessApparentLagMs": {
+        "median": 12.49992847442627,
+        "min": 10.32304573059073,
+        "max": 14.641063690185474,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.014862060546875,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.014862060546875,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.01604294776916504,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.01604294776916504,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.0299530029296875,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.0299530029296875,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.04640984535217285,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.04640984535217285,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.06331300735473633,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.06331300735473633,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 4,
+      "mode": "blocked",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6431845666350868
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 7.1832288983474655,
+        "maxGapMs": 17.88496971130371,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 3.152251243591309,
+        "maxGapMs": 17.88496971130371,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 308.765172958374,
+      "blockEndMs": 1208.7950706481934,
+      "finalX": 600,
+      "relativeScore": 96.3,
+      "oldRawValid": true,
+      "rawFrameCount": 216,
+      "participantPosition": 4,
+      "witnessApparentLagMs": {
+        "median": 2.953553199768033,
+        "min": 0.8349876403808132,
+        "max": 5.296977996826158,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.007351875305175781,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.007351875305175781,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.012609004974365234,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.012609004974365234,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.02023005485534668,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.02023005485534668,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.03771400451660156,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.03771400451660156,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.05303812026977539,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.05303812026977539,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 5,
+      "mode": "baseline",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.698184567390737
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 13.566787669588564,
+        "maxGapMs": 17.67420768737793,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 3.473758697509766,
+        "maxGapMs": 17.67420768737793,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 325.66022872924805,
+      "blockEndMs": 1225.6901264190674,
+      "finalX": 599.992,
+      "relativeScore": 100,
+      "oldRawValid": true,
+      "rawFrameCount": 188,
+      "participantPosition": 3,
+      "witnessApparentLagMs": {
+        "median": 6.215023994445818,
+        "min": 4.025981903076126,
+        "max": 8.28019905090327,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.008320808410644531,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.008320808410644531,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.013895034790039062,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.013895034790039062,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.024059057235717773,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.024059057235717773,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.04066205024719238,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.04066205024719238,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.05709505081176758,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.05709505081176758,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 5,
+      "mode": "blocked",
+      "qualified": "inconclusive",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.5981845668402949
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 40.41085260002882,
+        "maxGapMs": 37.80198097229004,
+        "samples": 143
+      },
+      "witness": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 9.45049524307251,
+        "maxGapMs": 37.80198097229004,
+        "samples": 143
+      },
+      "targetViolationCount": 15,
+      "targetViolationPhases": {
+        "beforeBlock": 15,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 1,
+          "timeMs": 37.80198097229004,
+          "x": 0,
+          "expectedX": 15.470077628513046,
+          "allowedMinX": 0.8662461063470488,
+          "allowedMaxX": 36.54777556393509,
+          "errorPx": 15.470077628513046,
+          "outsidePx": 0.8662461063470488
+        },
+        {
+          "rawIndex": 4,
+          "timeMs": 72.51095771789551,
+          "x": 26,
+          "expectedX": 51.59975397969991,
+          "allowedMinX": 26.253744957453453,
+          "allowedMaxX": 81.37197886983829,
+          "errorPx": 25.599753979699912,
+          "outsidePx": 0.2537449574534527
+        },
+        {
+          "rawIndex": 5,
+          "timeMs": 90.24810791015625,
+          "x": 44,
+          "expectedX": 75.92726546005775,
+          "allowedMinX": 46.493837049231026,
+          "allowedMaxX": 108.86040063702443,
+          "errorPx": 31.927265460057754,
+          "outsidePx": 2.4938370492310256
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 5,
+        "timeMs": 90.24810791015625,
+        "x": 44,
+        "expectedX": 75.92726546005775,
+        "allowedMinX": 46.493837049231026,
+        "allowedMaxX": 108.86040063702443,
+        "errorPx": 31.927265460057754,
+        "outsidePx": 2.4938370492310256
+      },
+      "witnessViolationCount": 1,
+      "witnessViolationPhases": {
+        "beforeBlock": 1,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [
+        {
+          "rawIndex": 1,
+          "timeMs": 37.80198097229004,
+          "x": 0,
+          "expectedX": 9.45049524307251,
+          "allowedMinX": 1.6000413847825836,
+          "allowedMaxX": 17.300949101362434,
+          "errorPx": 9.45049524307251,
+          "outsidePx": 1.6000413847825836
+        }
+      ],
+      "blockStartMs": 325.66022872924805,
+      "blockEndMs": 1225.6901264190674,
+      "finalX": 600,
+      "relativeScore": 100,
+      "oldRawValid": true,
+      "rawFrameCount": 216,
+      "participantPosition": 3,
+      "witnessApparentLagMs": {
+        "median": 21.174565315246532,
+        "min": 19.033143997192248,
+        "max": 23.51400184631347,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.022737979888916016,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.022737979888916016,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.03780198097229004,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.03780198097229004,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.04127001762390137,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.04127001762390137,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.05519700050354004,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.05519700050354004,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.07251095771789551,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.07251095771789551,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 6,
+      "mode": "baseline",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6681845672629325
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 2.4445902130724164,
+        "maxGapMs": 17.513036727905273,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 3.2290220260620117,
+        "maxGapMs": 17.513036727905273,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 321.92492485046387,
+      "blockEndMs": 1221.9698429107666,
+      "finalX": 599.992,
+      "relativeScore": 90.27777777777779,
+      "oldRawValid": true,
+      "rawFrameCount": 188,
+      "participantPosition": 2,
+      "witnessApparentLagMs": {
+        "median": 0.04301071166989967,
+        "min": -2.148057937622072,
+        "max": 2.203147888183654,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.009773015975952148,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.009773015975952148,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.012916088104248047,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.012916088104248047,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.017410993576049805,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.017410993576049805,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.03397703170776367,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.03397703170776367,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.05039405822753906,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.05039405822753906,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 6,
+      "mode": "blocked",
+      "qualified": "inconclusive",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.5881845662466604
+      },
+      "target": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 56.81502752575494,
+        "maxGapMs": 35.553932189941406,
+        "samples": 143
+      },
+      "witness": {
+        "verdict": "fail",
+        "reason": "position-outside-contract",
+        "maxErrorPx": 8.888483047485352,
+        "maxGapMs": 35.553932189941406,
+        "samples": 143
+      },
+      "targetViolationCount": 31,
+      "targetViolationPhases": {
+        "beforeBlock": 17,
+        "duringBlock": 14,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [
+        {
+          "rawIndex": 2,
+          "timeMs": 48.24709892272949,
+          "x": 3,
+          "expectedX": 24.47544567508797,
+          "allowedMinX": 6.227523579281893,
+          "allowedMaxX": 48.55478808408013,
+          "errorPx": 21.47544567508797,
+          "outsidePx": 3.2275235792818933
+        },
+        {
+          "rawIndex": 3,
+          "timeMs": 63.53402137756348,
+          "x": 12,
+          "expectedX": 40.6455721572111,
+          "allowedMinX": 17.707332143152613,
+          "allowedMaxX": 68.51512833107319,
+          "errorPx": 28.6455721572111,
+          "outsidePx": 5.7073321431526125
+        },
+        {
+          "rawIndex": 4,
+          "timeMs": 80.68704605102539,
+          "x": 26,
+          "expectedX": 62.40271423552552,
+          "allowedMinX": 35.05081016910221,
+          "allowedMaxX": 93.74772267463412,
+          "errorPx": 36.40271423552552,
+          "outsidePx": 9.050810169102213
+        }
+      ],
+      "largestTargetViolation": {
+        "rawIndex": 12,
+        "timeMs": 214.21408653259277,
+        "x": 236,
+        "expectedX": 292.81502752575494,
+        "allowedMinX": 254.4770370910053,
+        "allowedMaxX": 330.3532386434049,
+        "errorPx": 56.81502752575494,
+        "outsidePx": 18.477037091005286
+      },
+      "witnessViolationCount": 9,
+      "witnessViolationPhases": {
+        "beforeBlock": 3,
+        "duringBlock": 3,
+        "afterBlock": 3
+      },
+      "witnessViolations": [
+        {
+          "rawIndex": 1,
+          "timeMs": 35.553932189941406,
+          "x": 0,
+          "expectedX": 8.888483047485352,
+          "allowedMinX": 1.0355291890470166,
+          "allowedMaxX": 16.741436905923685,
+          "errorPx": 8.888483047485352,
+          "outsidePx": 1.0355291890470166
+        },
+        {
+          "rawIndex": 2,
+          "timeMs": 48.24709892272949,
+          "x": 4,
+          "expectedX": 12.061774730682373,
+          "allowedMinX": 4.208820872244038,
+          "allowedMaxX": 19.91472858912071,
+          "errorPx": 8.061774730682373,
+          "outsidePx": 0.2088208722440381
+        },
+        {
+          "rawIndex": 3,
+          "timeMs": 63.53402137756348,
+          "x": 8,
+          "expectedX": 15.88350534439087,
+          "allowedMinX": 8.030551485952534,
+          "allowedMaxX": 23.736459202829202,
+          "errorPx": 7.883505344390869,
+          "outsidePx": 0.030551485952534208
+        },
+        {
+          "rawIndex": 45,
+          "timeMs": 763.5009288787842,
+          "x": 183,
+          "expectedX": 190.87523221969607,
+          "allowedMinX": 183.02227836125772,
+          "allowedMaxX": 198.72818607813437,
+          "errorPx": 7.875232219696073,
+          "outsidePx": 0.02227836125771887
+        },
+        {
+          "rawIndex": 51,
+          "timeMs": 864.5269870758057,
+          "x": 208,
+          "expectedX": 216.13174676895142,
+          "allowedMinX": 208.2787929105131,
+          "allowedMaxX": 223.98470062738977,
+          "errorPx": 8.131746768951416,
+          "outsidePx": 0.27879291051308996
+        },
+        {
+          "rawIndex": 63,
+          "timeMs": 1063.4360313415527,
+          "x": 258,
+          "expectedX": 265.8590078353882,
+          "allowedMinX": 258.0060539769499,
+          "allowedMaxX": 273.7119616938265,
+          "errorPx": 7.859007835388184,
+          "outsidePx": 0.006053976949885964
+        },
+        {
+          "rawIndex": 87,
+          "timeMs": 1463.7269973754883,
+          "x": 358,
+          "expectedX": 365.93174934387207,
+          "allowedMinX": 358.0787954854338,
+          "allowedMaxX": 373.7847032023104,
+          "errorPx": 7.93174934387207,
+          "outsidePx": 0.07879548543377268
+        },
+        {
+          "rawIndex": 93,
+          "timeMs": 1563.5058879852295,
+          "x": 383,
+          "expectedX": 390.8764719963074,
+          "allowedMinX": 383.0235181378691,
+          "allowedMaxX": 398.7294258547457,
+          "errorPx": 7.876471996307373,
+          "outsidePx": 0.023518137869075417
+        },
+        {
+          "rawIndex": 129,
+          "timeMs": 2163.4600162506104,
+          "x": 533,
+          "expectedX": 540.8650040626526,
+          "allowedMinX": 533.0120502042143,
+          "allowedMaxX": 548.7179579210909,
+          "errorPx": 7.865004062652588,
+          "outsidePx": 0.012050204214347104
+        }
+      ],
+      "blockStartMs": 321.92492485046387,
+      "blockEndMs": 1221.9698429107666,
+      "finalX": 600,
+      "relativeScore": 90.27777777777779,
+      "oldRawValid": true,
+      "rawFrameCount": 216,
+      "participantPosition": 2,
+      "witnessApparentLagMs": {
+        "median": 29.50602340698233,
+        "min": 27.135084152221545,
+        "max": 32.5269870758057,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.013653039932250977,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.013653039932250977,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.035553932189941406,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.035553932189941406,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.04824709892272949,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.04824709892272949,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.06353402137756348,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.06353402137756348,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.08068704605102539,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.08068704605102539,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 7,
+      "mode": "baseline",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6431845670028226
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 22.391585112318182,
+        "maxGapMs": 17.700910568237305,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 3.3747715950012207,
+        "maxGapMs": 17.700910568237305,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 313.7049674987793,
+      "blockEndMs": 1213.7451171875,
+      "finalX": 599.992,
+      "relativeScore": 96.3,
+      "oldRawValid": true,
+      "rawFrameCount": 187,
+      "participantPosition": 1,
+      "witnessApparentLagMs": {
+        "median": 11.1095104217529,
+        "min": 8.956001281738235,
+        "max": 13.300054550170692,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.019438982009887695,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.019438982009887695,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.01199793815612793,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.01199793815612793,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.02806687355041504,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.02806687355041504,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.04549908638000488,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.04549908638000488,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.06153392791748047,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.06153392791748047,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 7,
+      "mode": "blocked",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.5931845671974995
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 18.472820892517575,
+        "maxGapMs": 19.123077392578125,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 4.780769348144531,
+        "maxGapMs": 19.123077392578125,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 313.7049674987793,
+      "blockEndMs": 1213.7451171875,
+      "finalX": 600,
+      "relativeScore": 96.3,
+      "oldRawValid": true,
+      "rawFrameCount": 216,
+      "participantPosition": 1,
+      "witnessApparentLagMs": {
+        "median": 8.756216049194354,
+        "min": 6.625173568725495,
+        "max": 10.869091033935518,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.021503925323486328,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.021503925323486328,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.019123077392578125,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.019123077392578125,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.025649070739746094,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.025649070739746094,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.04323005676269531,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.04323005676269531,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.06221318244934082,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.06221318244934082,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 8,
+      "mode": "baseline",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.7081845676839641
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 20.502382133963124,
+        "maxGapMs": 17.473936080932617,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 4.068493843078613,
+        "maxGapMs": 17.473936080932617,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 309.2999458312988,
+      "blockEndMs": 1209.3350887298584,
+      "finalX": 599.992,
+      "relativeScore": 100,
+      "oldRawValid": true,
+      "rawFrameCount": 188,
+      "participantPosition": 8,
+      "witnessApparentLagMs": {
+        "median": 9.984946250915506,
+        "min": 7.650945663452147,
+        "max": 12.104909896850536,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.017119169235229492,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.017119169235229492,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.016273975372314453,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.016273975372314453,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.027992963790893555,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.027992963790893555,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.04452800750732422,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.04452800750732422,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.0609588623046875,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.0609588623046875,
+            "x": 13
+          }
+        }
+      ]
+    },
+    {
+      "library": "lab-spring",
+      "round": 8,
+      "mode": "blocked",
+      "qualified": "pass",
+      "capture": {
+        "verdict": "pass",
+        "reason": "paired-frames-and-clock",
+        "uncertaintyMs": 0.6231845667796257
+      },
+      "target": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 15.782883409939984,
+        "maxGapMs": 17.623186111450195,
+        "samples": 144
+      },
+      "witness": {
+        "verdict": "pass",
+        "reason": "within-s5-motion-contract",
+        "maxErrorPx": 3.322780132293701,
+        "maxGapMs": 17.623186111450195,
+        "samples": 144
+      },
+      "targetViolationCount": 0,
+      "targetViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "firstTargetViolations": [],
+      "largestTargetViolation": null,
+      "witnessViolationCount": 0,
+      "witnessViolationPhases": {
+        "beforeBlock": 0,
+        "duringBlock": 0,
+        "afterBlock": 0
+      },
+      "witnessViolations": [],
+      "blockStartMs": 309.2999458312988,
+      "blockEndMs": 1209.3350887298584,
+      "finalX": 600,
+      "relativeScore": 100,
+      "oldRawValid": true,
+      "rawFrameCount": 216,
+      "participantPosition": 8,
+      "witnessApparentLagMs": {
+        "median": 7.490141868591261,
+        "min": 5.415008544921829,
+        "max": 9.682958602905245,
+        "interpretation": "Diagnostic only: timestamp minus observed linear position/speed; no re-anchoring or gate change"
+      },
+      "firstFrames": [
+        {
+          "target": {
+            "t": -0.02396702766418457,
+            "x": 0
+          },
+          "witness": {
+            "t": -0.02396702766418457,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.013291120529174805,
+            "x": 0
+          },
+          "witness": {
+            "t": 0.013291120529174805,
+            "x": 0
+          }
+        },
+        {
+          "target": {
+            "t": 0.02452397346496582,
+            "x": 3
+          },
+          "witness": {
+            "t": 0.02452397346496582,
+            "x": 4
+          }
+        },
+        {
+          "target": {
+            "t": 0.042147159576416016,
+            "x": 12
+          },
+          "witness": {
+            "t": 0.042147159576416016,
+            "x": 8
+          }
+        },
+        {
+          "target": {
+            "t": 0.05855202674865723,
+            "x": 26
+          },
+          "witness": {
+            "t": 0.05855202674865723,
+            "x": 13
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "No project JS, browser, build, or test was executed; this is independent Python arithmetic over saved observations.",
+    "The uncertainty/gate mathematics follows the exact source fingerprint; 1e-9 only compares Python and saved JS derived numbers, never affects pass/fail.",
+    "Bad witness makes target attribution inconclusive: raw does not distinguish compositor/onset/capture scheduling causes.",
+    "No PNG frames, native Animation.startTime, or startup trace are retained in this JSON; decoded coordinates cannot prove image-decoder correctness.",
+    "START proof/terminal chronology is audited separately; this script does not replay the full benchmark publication validator."
+  ]
+}

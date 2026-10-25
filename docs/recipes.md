@@ -774,7 +774,7 @@ export function mountSnapPanel(root: HTMLElement): () => void {
     input.cancel(); present(0); motion.retarget(0); close.focus();
   }, { signal: events.signal });
   close.addEventListener('click', () => {
-    input.cancel(); present(320); motion.retarget(320);
+    input.cancel(); open.focus(); present(320); motion.retarget(320);
   }, { signal: events.signal });
   return () => { events.abort(); input.destroy(); };
 }

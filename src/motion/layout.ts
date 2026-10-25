@@ -1,4 +1,4 @@
-import { FINISHED, STOPPED, MotionError, number, timing } from './model.js';
+import { FINISHED, STOPPED, failMotion, number, timing } from './model.js';
 import { program } from './program.js';
 import type { MotionEase, MotionOptions, MotionResult, MotionSpring, Playback, PlaybackState } from './types.js';
 
@@ -52,17 +52,17 @@ class LayoutRun implements Playback {
   readonly finished: Promise<MotionResult>;
   constructor(root: Element, mutate: () => void | Promise<void>, options?: LayoutOptions) {
     const config = timing(options as MotionOptions | undefined);
-    if (typeof config.ease === 'function' && !config.cssEase) throw new MotionError('layout использует CSS easing');
-    const path = program('--lab-motion-progress', { _coordinates: [0], unit: '' }, [1], false, config, [0]);
+    if (!config._cssEase) failMotion('layout использует CSS easing');
+    const path = program('--lab-motion-progress', { _coordinates: [0], _unit: '' }, [1], false, config, [0]);
     const win = root.ownerDocument.defaultView;
-    const reduced = config.reduced || win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-    this.duration = reduced ? 0 : path.duration;
+    const reduced = config._reduced || win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+    this.duration = reduced ? 0 : path._duration;
     this.finished = new Promise((yes, no) => { this._resolve = yes; this._reject = no; });
     void this.finished.catch(() => {});
     this._mutate = mutate;
     this._session = { _root: root, _document: root.ownerDocument, _effects: [], _name: `lab-motion-${++serial}`,
       _previousName: '', _previousPriority: '',
-      _delay: config.delay, _easing: path._nativeEase };
+      _delay: config._delay, _easing: path._nativeEase };
   }
   get state(): PlaybackState { return this._status; }
   private _inactive(): boolean { return this._settled || this._terminal !== undefined; }
@@ -73,17 +73,17 @@ class LayoutRun implements Playback {
     try { if (cancel) session._transition?.skipTransition(); }
     finally { clearStyles(session); }
   }
-  private _complete(failure?: { error: unknown }): void {
+  private _complete(failure?: { _error: unknown }): void {
     if (this._settled) return;
     this._settled = true; this._mutate = undefined;
-    try { this._release(Boolean(failure)); } catch (error) { failure ??= { error }; }
-    if (failure) { this._status = 'failed'; this._reject(failure.error); }
+    try { this._release(!!failure); } catch (error) { failure ??= { _error: error }; }
+    if (failure) { this._status = 'failed'; this._reject(failure._error); }
     else { const result = this._terminal ?? FINISHED; this._status = result.status; this._resolve(result); }
   }
   private _stopWith(result: MotionResult): void {
     if (this._inactive()) return;
     this._terminal = result; this._status = result.status;
-    try { this._release(true); } catch (error) { this._complete({ error }); }
+    try { this._release(true); } catch (error) { this._complete({ _error: error }); }
   }
   private _apply(): void {
     for (const effect of this._session?._effects ?? []) {
@@ -115,7 +115,7 @@ class LayoutRun implements Playback {
         return typeof pseudo === 'string' && pseudo.includes(session._name);
       });
       if (this._status === 'paused' || this._requestedTime !== undefined) this._apply();
-    } catch (error) { this._complete({ error }); }
+    } catch (error) { this._complete({ _error: error }); }
   }
   start(): void {
     const session = this._session!;
@@ -127,7 +127,7 @@ class LayoutRun implements Playback {
     const css = session._document.defaultView?.CSS;
     const supported = typeof native === 'function' && session._easing !== undefined && css?.supports('animation-timing-function', session._easing);
     if (!this.duration || !supported) {
-      void this._commit().then(() => this._complete(), error => this._complete({ error }));
+      void this._commit().then(() => this._complete(), error => this._complete({ _error: error }));
       return;
     }
     try {
@@ -138,16 +138,16 @@ class LayoutRun implements Playback {
       const transition = native.call(session._document, () => this._commit());
       session._transition = transition;
       void transition.ready.then(() => this._ready(), () => {});
-      void transition.updateCallbackDone.catch(error => this._complete({ error }));
-      void transition.finished.then(() => this._complete(), error => this._complete({ error }));
-    } catch (error) { this._complete({ error }); throw error; }
+      void transition.updateCallbackDone.catch(error => this._complete({ _error: error }));
+      void transition.finished.then(() => this._complete(), error => this._complete({ _error: error }));
+    } catch (error) { this._complete({ _error: error }); throw error; }
   }
 }
 
 /** Обновляет приложение один раз; временные снимки принадлежат браузеру. */
 export function layout(root: Element, mutate: () => void | Promise<void>, options?: LayoutOptions): Playback {
   if (!root?.ownerDocument || typeof root.getBoundingClientRect !== 'function' || !(root as HTMLElement).style)
-    throw new MotionError('layout ожидает DOM-элемент');
-  if (typeof mutate !== 'function') throw new MotionError('layout ожидает функцию изменения DOM');
+    failMotion('layout ожидает DOM-элемент');
+  if (typeof mutate !== 'function') failMotion('layout ожидает функцию изменения DOM');
   const run = new LayoutRun(root, mutate, options); run.start(); return run;
 }

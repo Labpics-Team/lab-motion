@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "revision": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+  "runId": 39935294747,
+  "runUrl": "https://github.com/Labpics-Team/lab-motion/actions/runs/39935294747",
+  "performanceJobId": 120353247099,
+  "jobUrl": "https://github.com/Labpics-Team/lab-motion/actions/runs/39935294747/job/120353247099",
+  "artifactId": 12496345399,
+  "artifactUrl": "https://github.com/Labpics-Team/lab-motion/actions/runs/39935294747/artifacts/12496345399",
+  "originalZipSha256": "b75c98ab38590b07705761b636adc81f809e40fe6982ae5f6a70584ebc5e1f55",
+  "transportGzipSha256": "ee52fa3649e0fac85c4ef17f2fd66266623f3f67ba381d82fbacbaf44316260e",
+  "transportVerification": "Integration owner verified original ZIP remotely and the transfer gzip locally; this reviewer verified extracted report bytes and the new lossless gzip.",
+  "outcome": "FAILED",
+  "publicationAdmission": false,
+  "failure": "motion conformance: lab-spring.blocked = inconclusive; capture = inconclusive",
+  "jobCompletedAtUtcReportedByIntegrationOwner": "2026-10-23T10:38:58Z",
+  "originalStepStartedAtUtcReportedByIntegrationOwner": "2026-10-23T10:06:01Z",
+  "originalStepEndedAtUtcReportedByIntegrationOwner": "2026-10-23T10:38:52Z",
+  "notTimeoutReportedByIntegrationOwner": true,
+  "report": {
+    "originalArtifactPath": "lab-motion/lab-motion/candidate/bench/compare/results/2026-10-23-3832dbd37f21-80d2ea493552.json",
+    "bytes": 12817371,
+    "sha256": "13e2f68fadc3410bb254776775f7ed3a5aedec9e4f9bbd99d8497d1b30dce952",
+    "preservedAs": "canonical-report.json.gz",
+    "storedBytes": 704342,
+    "storedSha256": "c8ec85d0a3188d455c104aefb6c4787bd7718e5eee175603bc37484881caef7a",
+    "encoding": "gzip level 9, mtime 0; decompressed bytes unchanged"
+  },
+  "canonicalMarkdown": {
+    "bytes": 22399,
+    "sha256": "3cb87f50626b87e4a001e50984fa696bfc91c23ee0e69952e65a267232764053",
+    "preservedAs": "canonical-report.md.txt",
+    "reasonForTextSuffix": "Byte-identical unadmitted canonical output; original relative .json link refers to a filename retained here only as lossless gzip."
+  },
+  "oracleSource": {
+    "repositoryPath": "bench/compare/motion-conformance.mjs",
+    "revision": "3832dbd37f21f382dd3eaaf3067ad43957896f9e",
+    "sha256": "d05f0cec91a48eb9e85ec6b12ba49f0ac3673d4489d6dd5af470aa878fbc7f28",
+    "preservedAs": "motion-conformance.mjs.txt"
+  },
+  "scopes": {
+    "allStartRoundsReportedCompleted": 20,
+    "allFreezeRoundsReportedCompleted": 8,
+    "capturePairingAndClockChecksReproduced": 128,
+    "trajectoryAndWitnessVerdictsReproduced": 256,
+    "fullPublicationValidatorReexecuted": false,
+    "startSemanticRecordsIndependentlyReproduced": 640,
+    "startCompletionCallsIndependentlyReproduced": 4240
+  },
+  "evidenceImmutable": true,
+  "optimizationBaselineRevisionFromWorkflow": "15137fba618e962ef0319bba21d49cc123ae1e2f",
+  "baselineScope": "15137 is the optimization/profile baseline and the saved baseline-size input; original S1-S5 compares the listed libraries at candidate3832, not a baseline Lab runtime participant.",
+  "independentReviews": {
+    "s5": {
+      "path": "s5-review.json",
+      "sha256": "036467b1b0c6f5c858126dec47a09286e232c47cfe89d8402f631712c718b6d7"
+    },
+    "start": {
+      "path": "start-semantic-review.json",
+      "sha256": "dabc0cd35b21afb9d5fa9e2509027a965011278afb2da32b19432248faaede77"
+    }
+  }
+}

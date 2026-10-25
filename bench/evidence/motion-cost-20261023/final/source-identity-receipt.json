@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "observedAtUtc": "2026-10-23T10:59:35.352537+00:00",
+  "baseline": "15137fba618e962ef0319bba21d49cc123ae1e2f",
+  "measuredRevision": "259ae4f6fca7e21adad83890440ec19a057ddfbf",
+  "evidenceDescendantAtObservation": "ab25f614c5636e266a5e78f01823a8bf03a0f315",
+  "sourceClosure": {
+    "encoding": "git ls-tree -r -z; omit only the evidence directory for this equivalence proof; benchmark fingerprint is unchanged",
+    "entries": 775,
+    "sha256": "4d3dd2784f07faa00dbeffef8de51c2d4774c8ccdcd9158a97291ee853e63389"
+  },
+  "aggregateDiff": {
+    "pathPrefix": "bench/evidence/motion-cost-20261023/",
+    "files": 117,
+    "runtimeBuildBenchmarkChanges": false
+  },
+  "fullRepositoryFingerprintCaveat": "Full tracked-source fingerprint changes when evidence is added. No fingerprint exclusions were added to the benchmark. Measurements remain bound to measuredRevision.",
+  "packageFilesWhitelist": [
+    "dist",
+    "docs/api.md",
+    "docs/adr/0003-color-interpolation-contract.md",
+    "docs/architecture.md",
+    "docs/behaviors.md",
+    "docs/benchmark.md",
+    "docs/bindings.md",
+    "docs/compiler.md",
+    "docs/compositor.md",
+    "docs/errors.md",
+    "docs/future-layout.md",
+    "docs/index.md",
+    "docs/getting-started.md",
+    "docs/migration.md",
+    "docs/motion-conformance.md",
+    "docs/presence.md",
+    "docs/projection.md",
+    "docs/recipes.md",
+    "docs/smart.md",
+    "docs/tokens.md",
+    "!dist/**/*.map"
+  ],
+  "requiredCi": {
+    "id": 39939985541,
+    "url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541",
+    "headSha": "259ae4f6fca7e21adad83890440ec19a057ddfbf",
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "jobs": [
+      {
+        "id": 120369339433,
+        "name": "typecheck · build · size · package",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-23T10:35:18Z",
+        "completed_at": "2026-10-23T10:36:45Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120369339433"
+      },
+      {
+        "id": 120369339436,
+        "name": "driver mutation",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-23T10:35:18Z",
+        "completed_at": "2026-10-23T10:40:49Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120369339436"
+      },
+      {
+        "id": 120369339699,
+        "name": "browser-static / webkit · 2/2",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-23T10:35:18Z",
+        "completed_at": "2026-10-23T10:37:58Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120369339699"
+      },
+      {
+        "id": 120369339712,
+        "name": "browser-static / webkit · 1/2",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-23T10:35:18Z",
+        "completed_at": "2026-10-23T10:37:00Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120369339712"
+      },
+      {
+        "id": 120369339822,
+        "name": "documentation / build and reader journeys",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-23T10:35:18Z",
+        "completed_at": "2026-10-23T10:37:06Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120369339822"
+      },
+      {
+        "id": 120369339856,
+        "name": "test · fuzz",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-23T10:35:18Z",
+        "completed_at": "2026-10-23T10:38:44Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120369339856"
+      },
+      {
+        "id": 120369339884,
+        "name": "browser-static / chromium · 1/1",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-23T10:35:18Z",
+        "completed_at": "2026-10-23T10:48:22Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120369339884"
+      },
+      {
+        "id": 120369340227,
+        "name": "browser-static / firefox · 1/1",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-23T10:35:18Z",
+        "completed_at": "2026-10-23T10:38:09Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120369340227"
+      },
+      {
+        "id": 120369340802,
+        "name": "profile-baseline",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-10-23T10:35:16Z",
+        "completed_at": "2026-10-23T10:35:16Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120369340802"
+      },
+      {
+        "id": 120369340840,
+        "name": "performance",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-10-23T10:35:16Z",
+        "completed_at": "2026-10-23T10:35:16Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120369340840"
+      },
+      {
+        "id": 120374349962,
+        "name": "CI",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-10-23T10:48:24Z",
+        "completed_at": "2026-10-23T10:48:26Z",
+        "html_url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39939985541/job/120374349962"
+      }
+    ]
+  },
+  "strictOriginalRun": {
+    "id": 39940373942,
+    "url": "https://github.com/Labpics-Team/lab-motion/actions/runs/39940373942",
+    "headSha": "259ae4f6fca7e21adad83890440ec19a057ddfbf",
+    "status": "in_progress at this observation; separate final receipt is required"
+  }
+}

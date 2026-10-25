@@ -290,11 +290,36 @@ describe('серверный PROFILE: потеря полей при CPU RLE з�
 function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapAt?: number; cancelAt?: number; rejectTiming?: boolean;
   durationMultiplier?: number; shape?: 'quadratic'; rafStepMs?: number; readCostMs?: number; timerLagMs?: number;
   initialProgress?: number; initialProgressAt?: number; onsetReadAt?: number; documentClock?: 'missing' | 'unstable' | 'unrelated';
-  documentOriginLagMs?: number; quarterAtFirstFrame?: boolean; quarterAtFrame?: number } = {}) {
+  documentOriginLagMs?: number; quarterAtFirstFrame?: boolean; quarterAtFrame?: number;
+  completion?: 'absent' | 'missing' | 'rejected' | 'never' | 'early' | 'late-early' } = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'motion-server-synthetic-'));
   const source = path.join(directory, 'adapter.js'); writeFileSync(source, '// Синтетический adapter задан VM.\n');
   let timeMs = 100, frameTimeMs = timeMs - (options.documentOriginLagMs ?? 0), frameReads = 0, frames = 0, starts = 0, cancels = 0;
   const children: any[] = [];
+  const timers = new Map<number, { at: number; callback: () => void }>();
+  let timerId = 0, pumpHandle: ReturnType<typeof setImmediate> | undefined;
+  // Таймеры — отдельные tasks: promise callbacks успевают снять watchdog.
+  const pumpTimers = () => {
+    if (pumpHandle !== undefined || timers.size === 0) return;
+    pumpHandle = setImmediate(() => {
+      pumpHandle = undefined;
+      const next = [...timers].sort((a, b) => a[1].at - b[1].at)[0];
+      if (!next) return;
+      timers.delete(next[0]);
+      for (const element of children) if (element.motion?.pendingFrame) {
+        element.motion.startedMs += options.rafStepMs ?? 16; element.motion.pendingFrame = false;
+      }
+      timeMs = Math.max(timeMs, next[1].at) + (options.timerLagMs ?? 0);
+      next[1].callback();
+      pumpTimers();
+    });
+  };
+  const scheduleTimer = (callback: () => void, delay: number) => {
+    const id = ++timerId;
+    timers.set(id, { callback, at: timeMs + Math.max(0, delay) });
+    pumpTimers();
+    return id;
+  };
   const position = (element: any) => {
     if (!element.motion) return element.x;
     if (element.motion.pendingFrame) return SERVER_PROFILE.toPx * element.motion.initialProgress;
@@ -311,12 +336,24 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
         initialProgress: starts >= (options.initialProgressAt ?? 1) ? options.initialProgress ?? 0 : 0 };
     }
     timeMs += options.startCostMs ?? 0.025;
-    return { cancel() {
+    let finishTimer: number | undefined;
+    const control = { finished() {
+      if (options.completion === 'missing') return undefined;
+      if (options.completion === 'rejected') return Promise.reject(new Error('synthetic completion rejection'));
+      if (options.completion === 'never') return new Promise(() => {});
+      if (options.completion === 'early') return Promise.resolve();
+      const endMs = startedMs + (options.rafStepMs ?? 16) +
+        duration * (options.durationMultiplier ?? 1) + gap * (elements.length - 1);
+      const settledMs = endMs - (options.completion === 'late-early' ? options.rafStepMs ?? 16 : 0);
+      return new Promise<void>((resolve) => { finishTimer = scheduleTimer(resolve, Math.max(0, settledMs - timeMs)); });
+    }, cancel() {
+      if (finishTimer !== undefined) timers.delete(finishTimer);
       cancels++;
       if (cancels === options.cancelAt) throw undefined;
       timeMs += 0.05;
       for (const element of elements) { element.x = position(element); element.motion = null; }
     } };
+    return options.completion === 'absent' ? { cancel: control.cancel } : control;
   };
   const sandbox: any = { crossOriginIsolated: true, performance: { timeOrigin: 1000, now() {
     timeMs += 0.001; return Math.floor(timeMs / 0.005) * 0.005;
@@ -330,16 +367,11 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
     const transform = String(position(element)); timeMs += options.readCostMs ?? 0;
     return { transform };
   }, DOMMatrixReadOnly: class { e: number; constructor(value: string) { this.e = Number(value); } },
-  setTimeout(callback: () => void, delay: number) {
-    // VM автоматически публикует pending animation frame во время timer wait;
-    // explicit first-frame oracle получает тот же ноль своим rAF.
-    for (const element of children) if (element.motion?.pendingFrame) {
-      element.motion.startedMs += options.rafStepMs ?? 16; element.motion.pendingFrame = false;
-    }
-    timeMs += delay + (options.timerLagMs ?? 0); queueMicrotask(callback);
-  },
+  setTimeout: scheduleTimer,
+  clearTimeout(id: number | undefined) { if (id !== undefined) timers.delete(id); },
   requestAnimationFrame(callback: (time: number) => void) {
-    timeMs += options.rafStepMs ?? 16; frameTimeMs = timeMs; frames++;
+    timeMs += options.rafStepMs ?? 16; frameTimeMs = timeMs;
+    if (children.some((element) => element.motion)) frames++;
     for (const element of children) if (element.motion) {
       if (element.motion.pendingFrame) { element.motion.startedMs = frameTimeMs; element.motion.pendingFrame = false; }
       if (frames === (options.quarterAtFirstFrame ? 1 : options.quarterAtFrame)) element.motion.initialProgress = 0.25;
@@ -356,7 +388,11 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
     } };
   const context = { newPage: async () => page, close: async () => {} };
   return { browser: { newContext: async () => context }, page, adapter: { path: source },
-    dispose: () => rmSync(directory, { recursive: true, force: true }), read: () => ({ starts, cancels, connected: children.filter((element) => element.isConnected).length }) };
+    dispose: () => {
+      if (pumpHandle !== undefined) clearImmediate(pumpHandle);
+      timers.clear();
+      rmSync(directory, { recursive: true, force: true });
+    }, read: () => ({ starts, cancels, connected: children.filter((element) => element.isConnected).length }) };
 }
 
 // Исполняем замороженную границу page.evaluate общего владельца. VM задаёт
@@ -371,6 +407,60 @@ async function syntheticSemanticControl(fake: ReturnType<typeof syntheticBrowser
 }
 
 describe('серверный PROFILE: clock/progress falsifiers', () => {
+
+  it('locked server owner сохраняет cancel-only adapter без completion API', async () => {
+    const fake = syntheticBrowser({ completion: 'absent' });
+    try {
+      const evidence = await syntheticSemanticControl(fake, SERVER_PROFILE.browserScenes[0]);
+      expect(evidence.valid).toBe(true);
+      expect(evidence).not.toHaveProperty('completion');
+      expect(evidence.terminal[0].every((value: number) => value === SERVER_PROFILE.toPx)).toBe(true);
+      expect(fake.read()).toEqual({ starts: 1, cancels: 1, connected: 0 });
+    } finally { fake.dispose(); }
+  });
+
+  it('общий semantic owner ждёт завершение и сохраняет elapsed каждого контроллера', async () => {
+    const scene = { ...SERVER_PROFILE.browserScenes[0], completionTimeoutMs: 1000 };
+    const fake = syntheticBrowser();
+    try {
+      const evidence = await syntheticSemanticControl(fake, scene);
+      expect(evidence.valid).toBe(true);
+      expect(evidence.completion.calls).toHaveLength(SERVER_PROFILE.browserSemanticCalls);
+      expect(evidence.completion.calls.every((call: any) => call.state === 'fulfilled')).toBe(true);
+      expect(evidence.completion.observedAtMs).toBeLessThanOrEqual(1000);
+      expect(evidence.completion.terminalReadStartedMs).toBeGreaterThan(evidence.completion.observedAtMs);
+      expect(evidence.terminal[0].every((value: number) => value === SERVER_PROFILE.toPx)).toBe(true);
+      expect(fake.read()).toEqual({ starts: 1, cancels: 1, connected: 0 });
+    } finally { fake.dispose(); }
+  });
+
+  it.each(['absent', 'missing', 'rejected', 'never', 'early', 'late-early'] as const)(
+    'не выдаёт завершённый сценарий при completion %s',
+    async (completion) => {
+      const scene = { ...SERVER_PROFILE.browserScenes[0], completionTimeoutMs: 1000 };
+      const fake = syntheticBrowser({ completion });
+      try {
+        const evidence = await syntheticSemanticControl(fake, scene);
+        expect(evidence.valid).toBe(false);
+        if (completion === 'late-early') {
+          // Два terminal rAF уже показывают endpoint: только связь finished
+          // с полной траекторией отличает этот преждевременный success.
+          expect(evidence.failures).toBeUndefined();
+          expect(evidence.terminal[0].every((value: number) => value === SERVER_PROFILE.toPx)).toBe(true);
+          expect(evidence.completion.calls[0].observedAtMs).toBeLessThan(
+            evidence.onset.firstFrame.frameTimestampMs + SERVER_PROFILE.durationMs,
+          );
+        }
+        if (completion === 'never') {
+          expect(evidence.failures.some((failure: any) => failure.message === 'Completion watchdog expired')).toBe(true);
+          expect(evidence.completion.calls[0].state).toBe('pending');
+        }
+        expect(fake.read()).toEqual({ starts: 1, cancels: 1, connected: 0 });
+      } finally { fake.dispose(); }
+    },
+  );
+
+
   it('stock C добавляет ровно одну whole-macro family и сохраняет per-operation47/100', () => {
     const scene = SERVER_PROFILE.engineScenes.find((scene) => scene.workload === 'stock-c')!;
     expect(serverMetricCells()).toHaveLength(11);

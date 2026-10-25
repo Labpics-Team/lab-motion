@@ -288,6 +288,11 @@ export const BESPOKE_SUBPATH_GATES = {
 export const IMPORT_COST_SCENARIOS = [
   { name: 'root animate', gate: FULL_ANIMATE_GATE_BYTES, code: `import { animate } from '%DIST%/../motion/index.js'; export { animate };` },
   { name: 'root component scope', gate: 15_700, code: `import { scope } from '%DIST%/../motion/index.js'; export { scope };` },
+  // Изолированные root-импорты не должны удерживать соседний Runtime.
+  // Факт 326f84: 7 283 / 2 305 / 884 B gzip, initial = total.
+  { name: 'root layout', gate: 7600, code: `import { layout } from '%DIST%/../motion/index.js'; export { layout };` },
+  { name: 'root playhead', gate: 2500, code: `import { playhead } from '%DIST%/../motion/index.js'; export { playhead };` },
+  { name: 'root MotionError', gate: 1000, code: `import { MotionError } from '%DIST%/../motion/index.js'; export { MotionError };` },
 
   {
     name: 'reorder-controlled',
@@ -862,6 +867,12 @@ async function runCli() {
   const { rows, totalGzBytes, totalBrBytes, hasWarnings: measuredWarnings } = measureEntries(entries, ROOT);
   let hasWarnings = measuredWarnings;
 
+  const annotateError = (message) => {
+    if (process.env.GITHUB_ACTIONS !== 'true') return;
+    const escaped = String(message).replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A');
+    console.log(`::error title=Bundle size::${escaped}`);
+  };
+
   // ─── вывод ────────────────────────────────────────────────────────────────
 
   const COL = { label: 22, files: 7, raw: 10, gz: 10, br: 10 };
@@ -883,6 +894,7 @@ async function runCli() {
   for (const row of rows) {
     if (row.error) {
       console.log(pad(row.label, COL.label) + '  ' + row.error);
+      annotateError(`entry ${row.label}: ${row.error}`);
       continue;
     }
 
@@ -894,6 +906,7 @@ async function runCli() {
     let status = 'OK';
     if (row.exceeded) {
       status = `WARN > ${(row.gate / 1024).toFixed(1)} KB gz [OPEN ITEM]`;
+      annotateError(`entry ${row.label}: gzip ${row.gzBytes} B > budget ${row.gate} B; excess ${row.gzBytes - row.gate} B`);
     }
 
     console.log(pad(row.label, COL.label) + filesFmt + rawFmt + gzFmt + brFmt + '  ' + status);
@@ -933,10 +946,17 @@ ${core.label} gz = ${(core.gzBytes / 1024).toFixed(2)} KB > порог ${(core.g
     if (m.error) {
       hasWarnings = true;
       console.log(pad(m.name, COL.label) + `  FAIL: ${m.error}`);
+      annotateError(`import ${m.name}: ${m.error}`);
       continue;
     }
     const budget = evaluateScenarioBudget(m);
     if (budget.exceeded) hasWarnings = true;
+    if (budget.initialExceeded) {
+      annotateError(`import ${m.name}: initial gzip ${m.gzBytes} B > budget ${m.gate} B; excess ${m.gzBytes - m.gate} B`);
+    }
+    if (budget.totalExceeded && (m.totalGzBytes !== m.gzBytes || m.totalGate !== m.gate)) {
+      annotateError(`import ${m.name}: total gzip ${m.totalGzBytes} B > budget ${m.totalGate} B; excess ${m.totalGzBytes - m.totalGate} B`);
+    }
     const failures = [];
     if (budget.initialExceeded) failures.push(`initial ${m.gzBytes} B > ${m.gate} B`);
     if (
