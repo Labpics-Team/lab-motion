@@ -102,40 +102,40 @@ describe('maxValueError', () => {
 
     for (const spring of springs) {
       for (const v0 of velocities) {
-        for (const scale of scales) {
-          const tuple = compileSpringExecutionArtifactTupleUnchecked(spring, v0, DEFAULT_TOLERANCE);
-          const css = tuple[0];
-          const durationSec = tuple[2] / 1000;
+        const tuple = compileSpringExecutionArtifactTupleUnchecked(spring, v0, DEFAULT_TOLERANCE);
+        const css = tuple[0];
+        const durationSec = tuple[2] / 1000;
 
-          const bound = maxValueError(css, { spring, scale, v0, durationMs: tuple[2] });
+        // Нормализованный oracle общий для обеих шкал только внутри текущего случая.
+        const stops = parseCssLinear(css);
+        let trueMaxErrorNorm = 0;
 
-          // Calculate true max error empirically by fine dense sampling (10,000 points)
-          const stops = parseCssLinear(css);
-          let trueMaxErrorNorm = 0;
+        const numSamples = 8192;
+        for (let k = 0; k <= numSamples; k++) {
+          const t = (k / numSamples) * durationSec;
+          const pct = (t / durationSec) * 100;
 
-          const numSamples = 8192;
-          for (let k = 0; k <= numSamples; k++) {
-            const t = (k / numSamples) * durationSec;
-            const pct = (t / durationSec) * 100;
-
-            // Piecewise linear value at pct
-            let pLinear = stops[stops.length - 1]!.progress;
-            if (pct <= stops[0]!.percent) {
-              pLinear = stops[0]!.progress;
-            } else {
-              for (let i = 0; i < stops.length - 1; i++) {
-                if (pct >= stops[i]!.percent && pct <= stops[i + 1]!.percent) {
-                  const frac = (pct - stops[i]!.percent) / (stops[i + 1]!.percent - stops[i]!.percent);
-                  pLinear = stops[i]!.progress + frac * (stops[i + 1]!.progress - stops[i]!.progress);
-                  break;
-                }
+          // Значение кусочно-линейной кривой в pct
+          let pLinear = stops[stops.length - 1]!.progress;
+          if (pct <= stops[0]!.percent) {
+            pLinear = stops[0]!.progress;
+          } else {
+            for (let i = 0; i < stops.length - 1; i++) {
+              if (pct >= stops[i]!.percent && pct <= stops[i + 1]!.percent) {
+                const frac = (pct - stops[i]!.percent) / (stops[i + 1]!.percent - stops[i]!.percent);
+                pLinear = stops[i]!.progress + frac * (stops[i + 1]!.progress - stops[i]!.progress);
+                break;
               }
             }
-
-            const pSpring = solveSpring(spring, t, v0).value;
-            const err = Math.abs(pSpring - pLinear);
-            if (err > trueMaxErrorNorm) trueMaxErrorNorm = err;
           }
+
+          const pSpring = solveSpring(spring, t, v0).value;
+          const err = Math.abs(pSpring - pLinear);
+          if (err > trueMaxErrorNorm) trueMaxErrorNorm = err;
+        }
+
+        for (const scale of scales) {
+          const bound = maxValueError(css, { spring, scale, v0, durationMs: tuple[2] });
 
           const trueMaxErrorPx = scale * trueMaxErrorNorm;
 
