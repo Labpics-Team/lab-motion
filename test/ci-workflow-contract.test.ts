@@ -247,7 +247,7 @@ const requiredActions = {
       }
     },
     {
-      "index": 18,
+      "index": 17,
       "name": "Setup consumer Node floor",
       "uses": "actions/setup-node@<sha>",
       "with": {
