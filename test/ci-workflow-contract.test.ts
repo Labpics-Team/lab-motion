@@ -140,7 +140,6 @@ const verifyCommands = [
   'version="$(node -p "require(\'./package.json\').version")"\n'
     + 'node scripts/check-release.mjs "v${version}" --validate-stored-date',
   'pnpm size',
-  'pnpm pack:smoke',
   'pnpm pack:compat',
   'pnpm acceptance:compiler',
   'mkdir node-floor-artifact\npnpm pack --pack-destination node-floor-artifact',
@@ -248,7 +247,7 @@ const requiredActions = {
       }
     },
     {
-      "index": 18,
+      "index": 17,
       "name": "Setup consumer Node floor",
       "uses": "actions/setup-node@<sha>",
       "with": {

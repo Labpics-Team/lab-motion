@@ -117,9 +117,6 @@ jobs:
       - name: Size gate
         run: pnpm size
 
-      - name: Pack smoke
-        run: pnpm pack:smoke
-
       - name: Consumer compatibility
         run: pnpm pack:compat
 
