@@ -363,6 +363,15 @@ function assertNativeGraph(files: Map<string, string>) {
       }
     }
   }
+  const release = workflows.get('release.yml')!;
+  const sealed = step(release.jobs.verify!, 'Upload sealed package');
+  expect(sealed.uses).toMatch(/^actions\/upload-artifact@/);
+  expect(sealed.with?.['retention-days']).toBe(30);
+  expect(sealed.if).toBeUndefined();
+  expect(sealed['continue-on-error']).toBeUndefined();
+  expect(release.jobs.publish!.environment).toBe('npm');
+  expect(step(release.jobs.publish!, 'Download sealed package by artifact ID').uses)
+    .toMatch(/^actions\/download-artifact@/);
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
   expect(ci.on).toEqual({
@@ -491,6 +500,9 @@ describe('нативный граф CI', () => {
     ['новая job вне итога', 'ci.yml', (w: Workflow) => { w.jobs.extra = { 'runs-on': 'ubuntu-latest' }; }],
     ['архив обычного CI', 'ci.yml', (w: Workflow) => {
       w.jobs.verify!.steps!.push({ name: 'Keep package', uses: 'actions/upload-artifact@0123456789012345678901234567890123456789', with: { path: 'node-floor-artifact' } });
+    }],
+    ['раннее истечение release-пакета при ожидании approval', 'release.yml', (w: Workflow) => {
+      step(w.jobs.verify!, 'Upload sealed package').with!['retention-days'] = 1;
     }],
     ['игнорирование verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!['continue-on-error'] = true; }],
     ['пропуск verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!.if = false; }],
