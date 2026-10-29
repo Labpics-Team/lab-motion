@@ -271,18 +271,6 @@ const requiredActions = {
       "with": {
         "node-version": "24"
       }
-    },
-    {
-      "index": 8,
-      "name": "Upload failure artifacts",
-      "if": "failure()",
-      "uses": "actions/upload-artifact@<sha>",
-      "with": {
-        "name": "browser-conformance-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.run_id }}",
-        "path": "test-results/\nplaywright-report/\n",
-        "if-no-files-found": "ignore",
-        "retention-days": 1
-      }
     }
   ],
   "tests": [
@@ -365,6 +353,16 @@ function assertNativeGraph(files: Map<string, string>) {
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
+  // Only the protected release pipeline transports bytes between jobs.
+  // Diagnostic archives are never a requirement or a side effect of verification.
+  for (const [name, workflow] of workflows) {
+    if (name === 'release.yml') continue;
+    for (const job of Object.values(workflow.jobs)) {
+      for (const item of job.steps ?? []) {
+        expect(item.uses ?? '').not.toMatch(/^actions\/(upload-artifact|upload-pages-artifact)@/);
+      }
+    }
+  }
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
   expect(ci.on).toEqual({

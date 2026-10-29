@@ -111,11 +111,3 @@ jobs:
           }
           NODE
 
-      - name: Опубликовать raw-артефакт
-        # Отрицательный результат сохраняется даже после отказа измерителя.
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: profile-01-raw-${{ env.PROFILE_SOURCE_SHA }}
-          path: ${{ runner.temp }}/profile-01-raw/
-          retention-days: 90

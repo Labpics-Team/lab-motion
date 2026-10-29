@@ -52,15 +52,6 @@ jobs:
       - name: Mutation gate
         run: pnpm mutation
 
-      - name: Upload mutation report
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: mutation-core-report-${{ github.run_id }}
-          path: reports/mutation/
-          if-no-files-found: ignore
-          retention-days: 14
-
   driver:
     name: critical driver semantics
     runs-on: ubuntu-latest
@@ -93,16 +84,6 @@ jobs:
       - name: Driver mutation gate
         run: pnpm exec stryker run stryker.driver.config.mjs
 
-      - name: Upload driver mutation report
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: mutation-driver-report-${{ github.run_id }}
-          path: reports/mutation/driver/
-          if-no-files-found: ignore
-          retention-days: 14
-
-  # Право записи issues существует только в job без кода репозитория и зависимостей.
   report-failure:
     name: Report scheduled mutation failure
     needs: [core, driver]
