@@ -271,18 +271,6 @@ const requiredActions = {
       "with": {
         "node-version": "24"
       }
-    },
-    {
-      "index": 8,
-      "name": "Upload failure artifacts",
-      "if": "failure()",
-      "uses": "actions/upload-artifact@<sha>",
-      "with": {
-        "name": "browser-conformance-${{ matrix.browser }}-${{ matrix.shard }}-${{ github.run_id }}",
-        "path": "test-results/\nplaywright-report/\n",
-        "if-no-files-found": "ignore",
-        "retention-days": 1
-      }
     }
   ],
   "tests": [
@@ -365,6 +353,26 @@ function assertNativeGraph(files: Map<string, string>) {
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
+  // Only the protected release pipeline transports bytes between jobs.
+  // Diagnostic archives are never a requirement or a side effect of verification.
+  for (const [name, workflow] of workflows) {
+    if (name === 'release.yml') continue;
+    for (const job of Object.values(workflow.jobs)) {
+      for (const item of job.steps ?? []) {
+        expect(item.uses ?? '').not.toMatch(/^actions\/(upload-artifact|upload-pages-artifact)@/);
+      }
+    }
+  }
+  const release = workflows.get('release.yml')!;
+  const sealed = step(release.jobs.verify!, 'Upload sealed package');
+  expect(sealed.uses).toMatch(/^actions\/upload-artifact@/);
+  expect(sealed.with?.['retention-days']).toBe(30);
+  expect(sealed.if).toBeUndefined();
+  expect(sealed['continue-on-error']).toBeUndefined();
+  expect(release.jobs.publish!.environment).toBe('npm');
+  const download = step(release.jobs.publish!, 'Download sealed package by artifact ID');
+  expect(download.uses).toMatch(/^actions\/download-artifact@/);
+  expect(download.with?.['artifact-ids']).toBe('$' + '{{ needs.verify.outputs.artifact_id }}');
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
   expect(ci.on).toEqual({
@@ -493,6 +501,12 @@ describe('нативный граф CI', () => {
     ['новая job вне итога', 'ci.yml', (w: Workflow) => { w.jobs.extra = { 'runs-on': 'ubuntu-latest' }; }],
     ['архив обычного CI', 'ci.yml', (w: Workflow) => {
       w.jobs.verify!.steps!.push({ name: 'Keep package', uses: 'actions/upload-artifact@0123456789012345678901234567890123456789', with: { path: 'node-floor-artifact' } });
+    }],
+    ['раннее истечение release-пакета при ожидании approval', 'release.yml', (w: Workflow) => {
+      step(w.jobs.verify!, 'Upload sealed package').with!['retention-days'] = 1;
+    }],
+    ['неверный artifact ID после approval', 'release.yml', (w: Workflow) => {
+      step(w.jobs.publish!, 'Download sealed package by artifact ID').with!['artifact-ids'] = 'wrong-artifact-id';
     }],
     ['игнорирование verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!['continue-on-error'] = true; }],
     ['пропуск verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!.if = false; }],

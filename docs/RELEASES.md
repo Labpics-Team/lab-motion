@@ -73,7 +73,7 @@ SLSA statement с точным source SHA и workflow.
    factual docs check, tests, fuzz, size и conformance трёх браузерных движков;
 3. один раз создаёт tgz, прогоняет на нём pack-smoke, consumer compatibility и
    точный Node 22.0 floor, затем фиксирует SHA-256 и передаёт тот же файл как
-   immutable artifact;
+   immutable artifact с хранением 30 дней, включая ожидание approval;
 4. без OIDC создаёт или переиспользует проверенный Git-тег;
 5. отдельный environment-защищённый job сверяет artifact digest, tgz digest,
    package identity, source SHA и тег, затем публикует или безопасно сверяет
