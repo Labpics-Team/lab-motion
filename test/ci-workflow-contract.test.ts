@@ -370,8 +370,9 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(sealed.if).toBeUndefined();
   expect(sealed['continue-on-error']).toBeUndefined();
   expect(release.jobs.publish!.environment).toBe('npm');
-  expect(step(release.jobs.publish!, 'Download sealed package by artifact ID').uses)
-    .toMatch(/^actions\/download-artifact@/);
+  const download = step(release.jobs.publish!, 'Download sealed package by artifact ID');
+  expect(download.uses).toMatch(/^actions\/download-artifact@/);
+  expect(download.with?.['artifact-ids']).toBe('$' + '{{ needs.verify.outputs.artifact_id }}');
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
   expect(ci.on).toEqual({
@@ -503,6 +504,9 @@ describe('нативный граф CI', () => {
     }],
     ['раннее истечение release-пакета при ожидании approval', 'release.yml', (w: Workflow) => {
       step(w.jobs.verify!, 'Upload sealed package').with!['retention-days'] = 1;
+    }],
+    ['неверный artifact ID после approval', 'release.yml', (w: Workflow) => {
+      step(w.jobs.publish!, 'Download sealed package by artifact ID').with!['artifact-ids'] = 'wrong-artifact-id';
     }],
     ['игнорирование verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!['continue-on-error'] = true; }],
     ['пропуск verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!.if = false; }],
