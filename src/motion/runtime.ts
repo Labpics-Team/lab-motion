@@ -110,6 +110,9 @@ interface Track {
   _paused: boolean;
 }
 
+function byEnd(a: Track, b: Track): number {
+  return a._program._duration - b._program._duration;
+}
 function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
 export function trackTime(track: Track, delta: number): number {
   return track._paused ? track._elapsed : Math.min(track._program._duration,
@@ -392,7 +395,7 @@ class Surface {
     };
     void finished.then(() => {
       if (this._token !== token || this._native !== effect) return;
-      const completed = [...this._tracks.values()].map(track => [track, track._owner] as const);
+      const completed = [...this._tracks.values()].sort(byEnd).map(track => [track, track._owner] as const);
       try {
         for (const [track] of completed) {
           track._elapsed = track._program._duration;
@@ -430,7 +433,8 @@ class Surface {
           this._sample(track);
         }
         this._render();
-        for (const track of selected) {
+        const retiring = action === 'finish' || action === 'seek' ? [...selected].sort(byEnd) : selected;
+        for (const track of retiring) {
           if (!owns(track)) continue;
           if (action === 'stop') this._end(track, false);
           else if (action === 'finish' || action === 'seek' && this._ended(track)) this._end(track, true);
