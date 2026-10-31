@@ -127,41 +127,62 @@ test('measures first visible displacement after a retarget', async ({page,browse
   const result = await page.evaluate(async () => {
     const {animate} = await import('/browser/.artifacts/motion-root.js');
     const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-    const latencies: number[][] = [[], []];
-    for (let round=0;round<10;round++) {
-      const rows = [0,1].map(() => {
-        const el=document.createElement('div');
-        el.style.cssText='position:absolute;left:0;top:0;width:10px;height:10px;will-change:transform';
+    const latencies: number[][] = [[], [], []];
+    let anchoredStarts = 0, deferredStarts = 0;
+    for (let round = 0; round < 10; round++) {
+      const rows = latencies.map(() => {
+        const el = document.createElement('div');
+        el.style.cssText = 'position:absolute;left:0;top:0;width:10px;height:10px;will-change:transform';
         document.body.append(el);
-        const run=animate(el,{x:[0,1000]},{duration:1000,ease:'linear'});
-        const effect=el.getAnimations()[0]!;
-        effect.pause(); effect.currentTime=250;
-        return {el,run};
+        const run = animate(el, { x: [0, 1000] }, { duration: 1000, ease: 'linear' });
+        const effect = el.getAnimations()[0]!;
+        effect.pause();
+        effect.currentTime = 250;
+        return { el, run };
       });
       await nextFrame();
-      Object.defineProperty(rows[1]!.el,'animate',{value:undefined,configurable:true});
-      const start=[0,0], done=[false,false];
-      for(const lane of round%2?[1,0]:[0,1]) {
-        const row=rows[lane]!;
-        start[lane]=performance.now();
-        row.run=animate(row.el,{x:250,y:80},{spring:{mass:1,stiffness:100,damping:20}});
+
+      // The second lane keeps the browser's pending-play start. Everything else is the same native effect.
+      const control = rows[1]!.el;
+      const create = control.animate.bind(control);
+      const getStart = Object.getOwnPropertyDescriptor(Animation.prototype, 'startTime')!.get!;
+      control.animate = (...args: Parameters<Element['animate']>) => {
+        const effect = create(...args);
+        Object.defineProperty(effect, 'startTime', {
+          get: () => getStart.call(effect),
+          set: () => { deferredStarts++; },
+        });
+        return effect;
+      };
+      Object.defineProperty(rows[2]!.el, 'animate', { value: undefined, configurable: true });
+
+      const start = [0, 0, 0], done = [false, false, false];
+      for (let i = 0; i < rows.length; i++) {
+        const lane = (round + i) % rows.length, row = rows[lane]!;
+        start[lane] = performance.now();
+        row.run = animate(row.el, { x: 250, y: 80 }, { spring: { mass: 1, stiffness: 100, damping: 20 } });
+        if (lane === 0 && typeof row.el.getAnimations()[0]?.startTime === 'number') anchoredStarts++;
       }
-      for(let frame=0;frame<12&&!done.every(Boolean);frame++) {
+      for (let frame = 0; frame < 12 && !done.every(Boolean); frame++) {
         await nextFrame();
-        for(let lane=0;lane<rows.length;lane++) if(!done[lane] && Math.abs(rows[lane]!.el.getBoundingClientRect().left-250)>1) {
-          done[lane]=true;
-          latencies[lane]!.push(performance.now()-start[lane]!);
+        for (let lane = 0; lane < rows.length; lane++) {
+          if (done[lane] || Math.abs(rows[lane]!.el.getBoundingClientRect().left - 250) <= 1) continue;
+          done[lane] = true;
+          latencies[lane]!.push(performance.now() - start[lane]!);
         }
       }
-      for(const row of rows){ row.run.finish(); row.el.remove(); }
+      for (const row of rows) { row.run.finish(); row.el.remove(); }
     }
-    return latencies.map(times => {
-      times.sort((a,b)=>a-b);
-      return {samples:times.length,medianMs:times[Math.floor(times.length/2)],p95Ms:times.at(-1)};
+    const summary = latencies.map(times => {
+      times.sort((a, b) => a - b);
+      return { samples: times.length, medianMs: times[Math.floor(times.length / 2)], p95Ms: times.at(-1) };
     });
+    return { summary, anchoredStarts, deferredStarts };
   });
-  console.log('native XY first observable frame (native, forced JS)',JSON.stringify(result));
-  expect(result.map(item=>item.samples)).toEqual([10,10]);
+  console.log('native XY first observable frame (anchored, pending play, forced JS)', JSON.stringify(result));
+  expect(result.summary.map(item => item.samples)).toEqual([10, 10, 10]);
+  expect(result.anchoredStarts).toBe(10);
+  expect(result.deferredStarts).toBe(10);
 });
 
 test('a perpendicular throw can be caught again from its rendered position', async ({page}) => {
