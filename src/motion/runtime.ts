@@ -1,3 +1,4 @@
+import { compileTranslationPath, sampleTranslationPath, type TranslationPath } from './translation-path.js';
 import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
@@ -104,6 +105,7 @@ interface Track {
   readonly _value: number[];
   readonly _velocity: number[];
   _owner: Run | undefined;
+  _translation?: TranslationPath;
   _elapsed: number;
   _rate: number;
   _paused: boolean;
@@ -252,8 +254,10 @@ class Surface {
     } finally { this._lock(false); }
   }
   _sample(track: Track): void {
-    sample(track._program, track._elapsed, track._value, track._velocity,
-      track._paused ? 0 : this._native?.playbackRate ?? track._rate);
+    const rate = track._paused ? 0 : this._native?.playbackRate ?? track._rate;
+    if (track._translation && track._elapsed < track._program._duration) {
+      sampleTranslationPath(track._translation, track._program._key as 'x' | 'y', track._elapsed, track._value, track._velocity, rate);
+    } else sample(track._program, track._elapsed, track._value, track._velocity, rate);
   }
   _ended(track: Track): boolean {
     return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
@@ -338,11 +342,24 @@ class Surface {
     const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
       active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
         track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
-    if (!canNative) { this._engine._wake(this); return; }
+    let translation: TranslationPath | undefined;
+    if (!canNative && this._key === 'transform' && active.length === 2 && first._rate > 0 &&
+        typeof this._element.animate === 'function' && this._engine._host.supports('linear')) {
+      const x = this._tracks.get('x'), y = this._tracks.get('y');
+      if (x && y && x._owner === y._owner && !x._paused && !y._paused &&
+          x._elapsed === y._elapsed && x._rate === y._rate &&
+          x._program._segments[0]!._timing._spring === y._program._segments[0]!._timing._spring &&
+          Object.keys(TRANSFORMS).every(key => key === 'x' || key === 'y' || this._transforms[key] === TRANSFORMS[key])) {
+        translation = x._translation && x._translation === y._translation ? x._translation :
+          x._elapsed === 0 && !x._translation && !y._translation ? compileTranslationPath(x._program, y._program) : undefined;
+        if (translation) x._translation = y._translation = translation;
+      }
+    }
+    if (!canNative && !translation) { this._engine._wake(this); return; }
     try {
       this._lock(true);
-      const effect = this._element.animate([{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
-        duration: seg._end - seg._at, delay: seg._at, easing: _nativeEase, fill: 'both',
+      const effect = this._element.animate(translation?.frames ?? [{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
+        duration: translation?.duration ?? seg._end - seg._at, delay: translation ? 0 : seg._at, easing: translation ? 'linear' : _nativeEase!, fill: 'both',
       });
       this._native = effect; this._nativeTime = first._elapsed;
       this._watch();

@@ -6,6 +6,7 @@ import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
 import { failMotion, number, type Timing } from './model.js';
 import type { MotionScalar } from './types.js';
 
+export const SPRING_POSITION_TOLERANCE = 0.05;
 export const TRANSFORMS: Readonly<Record<string, number>> = { x: 0, y: 0, rotate: 0, skewX: 0, skewY: 0, scaleX: 1, scaleY: 1 };
 export const isTransform = (key: string): boolean => Object.hasOwn(TRANSFORMS, key);
 const PIXELS = /^(?:width|height|min-width|max-width|min-height|max-height|top|right|bottom|left|margin(?:-.+)?|padding(?:-.+)?|gap|row-gap|column-gap|border(?:-.+)?-width|border(?:-(?:top|bottom)-(?:left|right)|-(?:start|end)-(?:start|end))?-radius|font-size|letter-spacing|outline-width|outline-offset)$/;
@@ -76,7 +77,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
   let artifact: SpringExecutionArtifactTuple | undefined;
   let length = duration ?? timing._duration ?? 0;
   if (timing._spring) {
-    if (aligned && Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, 0.05 / extent));
+    if (aligned && Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, SPRING_POSITION_TOLERANCE / extent));
     const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
     length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, energy) * 1000;
   }
