@@ -99,6 +99,29 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Compare root emitter configurations
+        shell: bash
+        run: |
+          set -eu
+          cp dist/motion/index.js "$RUNNER_TEMP/original.mjs"
+          cp dist/motion/index.cjs "$RUNNER_TEMP/original.cjs"
+          for mode in syntax private direct; do
+            MODE="$mode" node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          let s=fs.readFileSync('tsup.config.ts','utf8').replace('entry: entriesFromPackageExports(),', "entry: { 'motion/index': 'src/motion/index.ts' },").replace('clean: true','clean: false');
+          if(process.env.MODE==='direct') s=s.replace('treeshake: true','treeshake: false');
+          else s=s.replace('esbuildPlugins: [sharedFramePlugin]', 'esbuildOptions(options) { options.minifySyntax = true; '+(process.env.MODE==='private'?'options.mangleProps = /^_/;':'')+' }, esbuildPlugins: [sharedFramePlugin]');
+          fs.writeFileSync('tsup.probe.config.ts',s);
+          NODE
+            pnpm exec tsup --config tsup.probe.config.ts >/dev/null
+            node scripts/size-gate.mjs > "$RUNNER_TEMP/comparison" || true
+            echo "ROOT EMITTER $mode"
+            grep -E '^(motion API |root component scope |root animate )' "$RUNNER_TEMP/comparison"
+          done
+          mv "$RUNNER_TEMP/original.mjs" dist/motion/index.js
+          mv "$RUNNER_TEMP/original.cjs" dist/motion/index.cjs
+          rm tsup.probe.config.ts
+
       - name: Factual documentation drift
         run: node scripts/check-docs-facts.mjs
 
