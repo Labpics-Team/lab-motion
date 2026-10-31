@@ -48,19 +48,19 @@ test('the rendered turn advances while the renderer main thread is blocked', asy
   expect(busy.length).toBeGreaterThanOrEqual(3);
   const pixels=await page.evaluate(async pngs => {
     const canvas=document.createElement('canvas'), ctx=canvas.getContext('2d',{willReadFrequently:true})!;
-    const positions: {red:number; blue:number; green:number}[]=[];
+    const positions: {red:number; redX:number; blue:number; green:number}[]=[];
     for (const png of pngs) {
       const img=new Image(); img.src='data:image/png;base64,'+png; await img.decode();
       canvas.width=img.naturalWidth; canvas.height=img.naturalHeight; ctx.drawImage(img,0,0);
       const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
-      let red=Infinity,blue=Infinity,green=Infinity;
+      let red=Infinity,redX=Infinity,blue=Infinity,green=Infinity;
       for(let y=0;y<canvas.height;y++) for(let x=0;x<canvas.width;x++) {
         const i=4*(y*canvas.width+x), r=data[i]!,g=data[i+1]!,b=data[i+2]!;
-        if(r>200&&g<40&&b<40) red=Math.min(red,y);
+        if(r>200&&g<40&&b<40) { red=Math.min(red,y); redX=Math.min(redX,x); }
         if(b>200&&r<40&&g<40) blue=Math.min(blue,x);
         if(g>200&&r<40&&b<40) green=Math.min(green,x);
       }
-      positions.push({red,blue,green});
+      positions.push({red,redX,blue,green});
     }
     return positions;
   }, busy.map(f=>f.png));
@@ -70,6 +70,7 @@ test('the rendered turn advances while the renderer main thread is blocked', asy
   expect(travel('blue')).toBeGreaterThan(10);
   expect(travel('green')).toBe(0);
   expect(travel('red')).toBeGreaterThan(4);
+  expect(Math.max(...pixels.map(p=>p.redX)) - 80).toBeGreaterThan(8);
 });
 
 test('reports the cost of accepting repeated curved retargets from the packed root', async ({ page, browserName }) => {
@@ -92,11 +93,13 @@ test('reports the cost of accepting repeated curved retargets from the packed ro
       const target = { x: i === 0 ? 240 : i%2 ? -80 : 140, y: [100, -30, 65][i%3]! };
       for (const n of i%2 ? [1,0] : [0,1]) {
         if (i) runs[n]!.seek(20);
+        const previous = elements[n]!.getAnimations()[0];
         const start = performance.now();
         runs[n] = animate(elements[n]!, target, { spring });
         const elapsed = performance.now() - start;
         if (i >= 4) costs[n]!.push(elapsed);
-        nativeCounts[n]! += Number(elements[n]!.getAnimations().length > 0);
+        const effects = elements[n]!.getAnimations();
+        nativeCounts[n]! += Number(effects.length === 1 && effects[0] !== previous);
       }
     }
     for (const run of runs) run.finish();

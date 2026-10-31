@@ -1,6 +1,5 @@
 import { BASE_GRID_MAX } from '../compositor/segmenter.js';
-import { emitArtifact } from '../compositor/curve.js';
-import { motionSpringNodes } from './spring-artifact.js';
+import { motionSpringCurve } from './spring-artifact.js';
 import { sample, SPRING_POSITION_TOLERANCE, type Program } from './program.js';
 
 export interface TranslationPath {
@@ -12,14 +11,15 @@ export interface TranslationPath {
 
 function prepare(axis: Program): Program | undefined {
   const seg = axis._segments[0]!, physics = seg._timing._spring;
-  if (axis._segments.length !== 1 || !physics || seg._end !== axis._duration) return;
-  if (Math.max(Math.abs(seg._from[0]!), Math.abs(seg._to[0]!)) * Number.EPSILON > SPRING_POSITION_TOLERANCE / 8) return;
+  if (axis._segments.length !== 1 || !physics || seg._at !== 0 || seg._end !== axis._duration) return;
+  const extent = Math.abs(seg._to[0]!) + Math.hypot(seg._to[0]! - seg._from[0]!, seg._velocity[0]! / Math.sqrt(physics.stiffness / physics.mass));
+  // Keep translations inside a range where a single-precision compositor coordinate fits the budget.
+  if (extent * 2**-23 > SPRING_POSITION_TOLERANCE) return;
   if (seg._artifact || seg._impulse) return axis;
   const speed = seg._velocity[0]!, length = seg._end - seg._at;
   if (!speed || seg._from[0] !== seg._to[0]) return;
-  const nodes = motionSpringNodes(physics, 0, speed, length/1000, SPRING_POSITION_TOLERANCE);
-  if (!nodes) return;
-  const impulse = emitArtifact(nodes, SPRING_POSITION_TOLERANCE, length)[1];
+  const impulse = motionSpringCurve(physics, 0, speed, length / 1000, SPRING_POSITION_TOLERANCE);
+  if (!impulse) return;
   return { ...axis, _segments: [{ ...seg, _impulse: impulse }] };
 }
 
