@@ -244,7 +244,7 @@ class Surface {
   _clock(now: number): number {
     if (!this._native) return Math.max(now, this._stamp);
     const time = this._native.currentTime;
-    return typeof time === 'number' && Number.isFinite(time) ? time : this._nativeTime;
+    return typeof time === 'number' && Number.isFinite(time) ? Math.max(0, time) : this._nativeTime;
   }
   _delta(clock: number): number {
     return clock - (this._native ? this._nativeTime : this._stamp);
@@ -378,6 +378,14 @@ class Surface {
       // Новый effect ещё не передан потребителю; сначала скорость, затем точная поза.
       if (first._rate !== 1) effect.playbackRate = first._rate;
       if (first._elapsed !== 0) effect.currentTime = first._elapsed;
+      else if (translation) {
+        const doc = this._element.ownerDocument;
+        if (doc?.defaultView && effect.timeline === doc.timeline && typeof doc.timeline?.currentTime === 'number') {
+          // The default timeline and this window share an origin. A task may outlast its last frame.
+          const accepted = doc.defaultView.performance.now();
+          if (Number.isFinite(accepted)) effect.startTime = accepted;
+        }
+      }
       this._lock(false);
       this._engine._idle(this);
     } catch (error) { this._lock(false); this._fail(error); throw error; }
