@@ -33,7 +33,7 @@
 
 import { MotionParamError } from '../errors.js';
 import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
-import { makeSpringValueSampler, sampleSpringBasisUnchecked } from '../internal/solver.js';
+import { makeSpringValueSampler } from '../internal/solver.js';
 import {
   settleTimeUpperBound,
   type SpringParams,
@@ -292,8 +292,7 @@ function buildSpringNodesAtHorizon(
 export function impulseSamples(physics: SpringParams, speed: number, duration: number, tolerance: number): Float64Array | undefined {
   const count = requiredGridSize(physics, duration, tolerance, speed);
   if (!(count <= BASE_GRID_MAX)) return;
-  const basis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
-  const position = (time: number): number => speed * sampleSpringBasisUnchecked(physics, time, basis)._valueV0;
+  const position = makeSpringValueSampler(physics, speed, 0);
   if (!(Math.abs(position(duration)) <= tolerance / 16)) return;
   const knots = sampleGrid(position, speed, tolerance, duration, count, 0);
   const samples = new Float64Array(2 * knots.length);

@@ -38,7 +38,7 @@ it('a separately adopted axis settles at its own deadline', async () => {
   const {h, run, effect, target, shortEnd} = turn();
   effect.currentTime = 10;
   const adopted = h.runtime.animate(h.element, target, { spring });
-  h.step(shortEnd);
+  h.step((shortEnd + run.duration) / 2 - 10);
   expect(adopted.state).toBe('finished');
   expect(run.state).toBe('running');
   await expect(adopted.finished).resolves.toEqual({status:'finished'});

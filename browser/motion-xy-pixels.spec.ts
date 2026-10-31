@@ -114,3 +114,45 @@ test('reports the cost of accepting repeated curved retargets from the packed ro
   expect(result.nativeCounts[0]).toBeGreaterThan(24);
   expect(result.nativeCounts[1]).toBe(0);
 });
+
+test('measures first visible displacement after a retarget', async ({page,browserName}) => {
+  test.skip(browserName !== 'chromium', 'paired latency observations use the same browser and screen');
+  const result = await page.evaluate(async () => {
+    const {animate} = await import('/browser/.artifacts/motion-root.js');
+    const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    const latencies: number[][] = [[], []];
+    for (let round=0;round<10;round++) {
+      const rows = [0,1].map(() => {
+        const el=document.createElement('div');
+        el.style.cssText='position:absolute;left:0;top:0;width:10px;height:10px;will-change:transform';
+        document.body.append(el);
+        const run=animate(el,{x:[0,1000]},{duration:1000,ease:'linear'});
+        const effect=el.getAnimations()[0]!;
+        effect.pause(); effect.currentTime=250;
+        return {el,run};
+      });
+      await nextFrame();
+      Object.defineProperty(rows[1]!.el,'animate',{value:undefined,configurable:true});
+      const start=[0,0], done=[false,false];
+      for(const lane of round%2?[1,0]:[0,1]) {
+        const row=rows[lane]!;
+        start[lane]=performance.now();
+        row.run=animate(row.el,{x:250,y:80},{spring:{mass:1,stiffness:100,damping:20}});
+      }
+      for(let frame=0;frame<12&&!done.every(Boolean);frame++) {
+        await nextFrame();
+        for(let lane=0;lane<rows.length;lane++) if(!done[lane] && Math.abs(rows[lane]!.el.getBoundingClientRect().left-250)>1) {
+          done[lane]=true;
+          latencies[lane]!.push(performance.now()-start[lane]!);
+        }
+      }
+      for(const row of rows){ row.run.finish(); row.el.remove(); }
+    }
+    return latencies.map(times => {
+      times.sort((a,b)=>a-b);
+      return {samples:times.length,medianMs:times[Math.floor(times.length/2)],p95Ms:times.at(-1)};
+    });
+  });
+  console.log('native XY first observable frame (native, forced JS)',JSON.stringify(result));
+  expect(result.map(item=>item.samples)).toEqual([10,10]);
+});
