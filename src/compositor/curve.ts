@@ -79,7 +79,7 @@ export function validateTolerance(tolerance: number): void {
   }
 }
 
-function emitArtifact(
+export function emitArtifact(
   nodes: readonly SpringNode[],
   tolerance: number,
   durationMs: number,

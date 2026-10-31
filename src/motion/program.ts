@@ -1,7 +1,8 @@
 import { tryParseValue } from '../value/parse.js';
 import { settleTimeUpperBound } from '../spring.js';
 import { sampleSpringBasisUnchecked, type MutableSpringBasis } from '../internal/solver.js';
-import { tryCompileSpringExecutionArtifactTupleUnchecked, type SpringExecutionArtifactTuple } from '../compositor/curve.js';
+import type { SpringExecutionArtifactTuple } from '../compositor/curve.js';
+import { tryMotionSpring } from './spring-artifact.js';
 import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
 import { failMotion, number, type Timing } from './model.js';
 import type { MotionScalar } from './types.js';
@@ -77,7 +78,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
   let artifact: SpringExecutionArtifactTuple | undefined;
   let length = duration ?? timing._duration ?? 0;
   if (timing._spring) {
-    if (aligned && Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, SPRING_POSITION_TOLERANCE / extent));
+    if (aligned && Number.isFinite(normalized ?? 0)) artifact = tryMotionSpring(timing._spring, normalized ?? 0, Math.min(0.001, SPRING_POSITION_TOLERANCE / extent));
     const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
     length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, energy) * 1000;
   }

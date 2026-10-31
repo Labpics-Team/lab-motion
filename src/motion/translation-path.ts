@@ -1,6 +1,6 @@
 import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
 import { BASE_GRID_MAX } from '../compositor/segmenter.js';
-import { sampleSpringBasisUnchecked } from '../internal/solver.js';
+import { motionSpringNodes } from './spring-artifact.js';
 import { sample, SPRING_POSITION_TOLERANCE, type Program } from './program.js';
 
 export interface TranslationPath {
@@ -9,7 +9,6 @@ export interface TranslationPath {
   x: Float64Array;
   y: Float64Array;
 }
-const basis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const sampled = { value: 0, velocity: 0 };
 
 function axisStops(program: Program, times: Set<number>): number | undefined {
@@ -24,23 +23,11 @@ function axisStops(program: Program, times: Set<number>): number | undefined {
     return seg._at;
   }
   if (start !== end || speed === 0) return;
-  const omega = Math.sqrt(spring.stiffness / spring.mass);
-  const acceleration = Math.hypot(omega, spring.damping / spring.mass);
-  let t = seg._at, tangent = t;
-  for (;;) {
-    sampleSpringBasisUnchecked(spring, (t - seg._at) / 1000, basis);
-    const displacement = speed * basis._valueV0;
-    if (t === seg._end) return Math.abs(displacement) <= SPRING_POSITION_TOLERANCE / 4 ? tangent : undefined;
-    // Energy decreases throughout the remaining interval, so this bounds |x''| even between samples.
-    const bound = acceleration * Math.hypot(omega * displacement, speed * basis._velocityV0);
-    const first = t === seg._at;
-    const step = 1000 * Math.sqrt((first ? .5 : 4) * SPRING_POSITION_TOLERANCE / bound);
-    const next = Math.min(seg._end, t + step);
-    if (!(next > t) || times.size >= BASE_GRID_MAX) return;
-    if (first) tangent = next;
-    times.add(next);
-    t = next;
-  }
+  const length = seg._end - seg._at;
+  const nodes = motionSpringNodes(spring, 0, speed, length/1000, SPRING_POSITION_TOLERANCE);
+  if (!nodes) return;
+  for (const node of nodes) times.add(seg._at + node.percent/100 * length);
+  return seg._at + nodes[1]!.percent/100 * length;
 }
 export function compileTranslationPath(x: Program, y: Program): TranslationPath | undefined {
   const duration = Math.max(x._duration,y._duration), times = new Set([0,duration]);

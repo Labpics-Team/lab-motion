@@ -74,7 +74,7 @@ export const BASE_GRID_MAX = 4096;
  * Любой authoring-допуск резервирует 1/16 под terminal snap. Один effective
  * tolerance обязан давать один artifact независимо от формы authoring-входа.
  */
-function springCompileHorizon(
+export function springCompileHorizon(
   params: SpringParams,
   v0: number,
   tolerance: number,
