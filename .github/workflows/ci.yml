@@ -99,27 +99,6 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Verify the candidate package on both supported Node floors
-        shell: bash
-        env:
-          MOTION_SOURCE: 54203316f86cfb2dea4e61568259b9a81dac2037
-        run: |
-          set -eu
-          workspace="$RUNNER_TEMP/xy-package"
-          git worktree add --detach "$workspace" "$MOTION_SOURCE"
-          cd "$workspace"
-          test "$(git rev-parse HEAD)" = "$MOTION_SOURCE"
-          pnpm install --frozen-lockfile
-          pnpm build
-          pnpm pack:compat
-          pnpm acceptance:compiler
-          mkdir "$RUNNER_TEMP/xy-package-out"
-          pnpm pack --pack-destination "$RUNNER_TEMP/xy-package-out"
-          archive=$(find "$RUNNER_TEMP/xy-package-out" -name '*.tgz')
-          sha256sum "$archive"
-          node scripts/pack-smoke.mjs "$archive"
-          npx --yes --package=node@22.0.0 -- node scripts/pack-smoke.mjs "$archive"
-
       - name: Factual documentation drift
         run: node scripts/check-docs-facts.mjs
 

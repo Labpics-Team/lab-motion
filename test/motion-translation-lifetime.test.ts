@@ -45,3 +45,17 @@ it('a separately adopted axis settles at its own deadline', async () => {
   run.finish();
   await expect(run.finished).resolves.toEqual({status:'stopped'});
 });
+
+it.each(['native', 'finish', 'seek'] as const)('finishes at the longest owned phase with the short axis declared last (%s)', async mode => {
+  const { target } = turn();
+  const h = launch();
+  const props = 'x' in target ? { y: 100, x: 250 } : { x: 250, y: 100 };
+  const run = playhead(h.runtime.animate(h.element, props, {spring}));
+  const effect = h.effects.at(-1)!;
+  expect(effect.keys.length).toBeGreaterThan(2);
+  if (mode === 'native') effect.complete();
+  else if (mode === 'finish') run.finish();
+  else run.seek(run.duration);
+  await expect(run.finished).resolves.toEqual({status:'finished'});
+  expect(run.time).toBe(run.duration);
+});

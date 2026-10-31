@@ -140,7 +140,6 @@ export function sampleSpringBasisUnchecked(
 export function makeSpringValueSampler(
   params: SpringParams,
   v0: number,
-  goal = 1,
 ): (t: number) => number {
   const { mass: m, stiffness: k, damping: c } = params;
   const omega0 = Math.sqrt(k / m);
@@ -149,13 +148,13 @@ export function makeSpringValueSampler(
   if (zeta < 1) {
     const omegaD = omega0 * Math.sqrt(1 - zeta * zeta);
     const zw = zeta * omega0;
-    const B = (v0 - goal * zw) / omegaD;
+    const B = (v0 - zw) / omegaD;
     return (t) =>
-      t <= 0 ? 0 : goal + Math.exp(-zw * t) * (-goal * Math.cos(omegaD * t) + B * Math.sin(omegaD * t));
+      t <= 0 ? 0 : 1 + Math.exp(-zw * t) * (-Math.cos(omegaD * t) + B * Math.sin(omegaD * t));
   }
   if (zeta === 1) {
-    const B = v0 - goal * omega0;
-    return (t) => (t <= 0 ? 0 : goal + (-goal + B * t) * Math.exp(-omega0 * t));
+    const B = v0 - omega0;
+    return (t) => (t <= 0 ? 0 : 1 + (-1 + B * t) * Math.exp(-omega0 * t));
   }
   // Вывод медленного полюса и граница домена — те же, что в solveSpring.
   const sqrtTerm = Math.sqrt(zeta * zeta - 1);
@@ -166,6 +165,6 @@ export function makeSpringValueSampler(
     if (t <= 0) return 0;
     const e1 = Math.exp(r1 * t);
     const valueV0 = (-e1 * Math.expm1(-denominator * t)) / denominator;
-    return -goal * Math.expm1(r2 * t) + (goal * r2 + v0) * valueV0;
+    return -Math.expm1(r2 * t) + (r2 + v0) * valueV0;
   };
 }

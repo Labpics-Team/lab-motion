@@ -29,6 +29,9 @@ test('the rendered turn advances while the renderer main thread is blocked', asy
     const active=moving.getAnimations();
     if (active.length!==1 || active[0]===first) throw new Error('missing native turn');
     await active[0]!.ready;
+    let inlineWrites = 0;
+    const observer = new MutationObserver(records => { inlineWrites += records.length; });
+    observer.observe(moving, {attributes:true, attributeFilter:['style']});
     const ref = raw.animate([{transform:'translateX(0px)'},{transform:'translateX(300px)'}],{duration:1000,fill:'both'});
     await ref.ready;
     let count=0, handle=0;
@@ -40,8 +43,10 @@ test('the rendered turn advances while the renderer main thread is blocked', asy
     const t1=performance.timeOrigin+performance.now();
     cancelAnimationFrame(handle);
     await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+    inlineWrites += observer.takeRecords().length;
+    observer.disconnect();
     turn.finish(); ref.cancel(); await Promise.all([lead.finished,turn.finished]);
-    return {t0,t1,setup};
+    return {t0,t1,setup,inlineWrites};
   });
   await cdp.send('Page.stopScreencast'); await cdp.detach();
   const busy=frames.filter(f=>f.time>scene.t0+35 && f.time<scene.t1-35);
@@ -65,12 +70,14 @@ test('the rendered turn advances while the renderer main thread is blocked', asy
     return positions;
   }, busy.map(f=>f.png));
   expect(pixels.every(p=>Object.values(p).every(Number.isFinite))).toBe(true);
-  const travel=(k:'red'|'blue'|'green')=>Math.max(...pixels.map(p=>p[k]))-Math.min(...pixels.map(p=>p[k]));
-  console.log('native XY busy-window', {frames:pixels.length, motionPx:travel('red'), nativeControlPx:travel('blue'), jsControlPx:travel('green'), setupMs:scene.setup});
+  const travel=(k:'red'|'redX'|'blue'|'green')=>Math.max(...pixels.map(p=>p[k]))-Math.min(...pixels.map(p=>p[k]));
+  console.log('native XY busy-window', {frames:pixels.length, motionPx:travel('red'), horizontalPx:travel('redX'), peakHorizontalPx:Math.max(...pixels.map(p=>p.redX))-80, nativeControlPx:travel('blue'), jsControlPx:travel('green'), setupMs:scene.setup});
+  expect(scene.inlineWrites).toBe(0);
   expect(travel('blue')).toBeGreaterThan(10);
   expect(travel('green')).toBe(0);
   expect(travel('red')).toBeGreaterThan(4);
   expect(Math.max(...pixels.map(p=>p.redX)) - 80).toBeGreaterThan(8);
+  expect(travel('redX')).toBeGreaterThan(3);
 });
 
 test('reports the cost of accepting repeated curved retargets from the packed root', async ({ page, browserName }) => {
@@ -155,4 +162,38 @@ test('measures first visible displacement after a retarget', async ({page,browse
   });
   console.log('native XY first observable frame (native, forced JS)',JSON.stringify(result));
   expect(result.map(item=>item.samples)).toEqual([10,10]);
+});
+
+test('a perpendicular throw can be caught again from its rendered position', async ({page}) => {
+  const data = await page.evaluate(async () => {
+    const {animate} = await import('/browser/.artifacts/motion-root.js');
+    const el = document.createElement('div');
+    document.body.append(el);
+    const spring = {mass:1, stiffness:100, damping:20};
+    const first = animate(el, {x:[0,1000]}, {duration:1000, ease:'linear'});
+    const launch = el.getAnimations()[0]!;
+    await launch.ready;
+    launch.pause(); launch.currentTime=250;
+    const turn = animate(el, {x:250,y:100}, {spring});
+    const effects=el.getAnimations();
+    if (effects.length !== 1 || effects[0] === launch) throw new Error('No replacement XY effect');
+    const effect=effects[0]!;
+    await effect.ready;
+    effect.pause(); effect.currentTime=55;
+    const matrix=()=>new DOMMatrixReadOnly(getComputedStyle(el).transform);
+    const displayed=matrix();
+    const next=animate(el,{x:200,y:130},{spring});
+    next.pause();
+    const pickup=matrix();
+    next.finish();
+    const states=await Promise.all([first.finished,turn.finished,next.finished]);
+    el.remove();
+    return {displayed:[displayed.e,displayed.f],pickup:[pickup.e,pickup.f],states:states.map(s=>s.status)};
+  });
+  const decay=Math.exp(-.55);
+  expect(Math.abs(data.displayed[0]!-(250+55*decay))).toBeLessThan(.25);
+  expect(Math.abs(data.displayed[1]!-(100-155*decay))).toBeLessThan(.25);
+  expect(data.pickup[0]).toBeCloseTo(data.displayed[0]!,1);
+  expect(data.pickup[1]).toBeCloseTo(data.displayed[1]!,1);
+  expect(data.states).toEqual(['stopped','stopped','finished']);
 });
