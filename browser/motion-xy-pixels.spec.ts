@@ -29,6 +29,9 @@ test('the rendered turn advances while the renderer main thread is blocked', asy
     const active=moving.getAnimations();
     if (active.length!==1 || active[0]===first) throw new Error('missing native turn');
     await active[0]!.ready;
+    let inlineWrites = 0;
+    const observer = new MutationObserver(records => { inlineWrites += records.length; });
+    observer.observe(moving, {attributes:true, attributeFilter:['style']});
     const ref = raw.animate([{transform:'translateX(0px)'},{transform:'translateX(300px)'}],{duration:1000,fill:'both'});
     await ref.ready;
     let count=0, handle=0;
@@ -40,8 +43,10 @@ test('the rendered turn advances while the renderer main thread is blocked', asy
     const t1=performance.timeOrigin+performance.now();
     cancelAnimationFrame(handle);
     await new Promise<void>(resolve=>requestAnimationFrame(()=>resolve()));
+    inlineWrites += observer.takeRecords().length;
+    observer.disconnect();
     turn.finish(); ref.cancel(); await Promise.all([lead.finished,turn.finished]);
-    return {t0,t1,setup};
+    return {t0,t1,setup,inlineWrites};
   });
   await cdp.send('Page.stopScreencast'); await cdp.detach();
   const busy=frames.filter(f=>f.time>scene.t0+35 && f.time<scene.t1-35);
@@ -65,12 +70,14 @@ test('the rendered turn advances while the renderer main thread is blocked', asy
     return positions;
   }, busy.map(f=>f.png));
   expect(pixels.every(p=>Object.values(p).every(Number.isFinite))).toBe(true);
-  const travel=(k:'red'|'blue'|'green')=>Math.max(...pixels.map(p=>p[k]))-Math.min(...pixels.map(p=>p[k]));
-  console.log('native XY busy-window', {frames:pixels.length, motionPx:travel('red'), nativeControlPx:travel('blue'), jsControlPx:travel('green'), setupMs:scene.setup});
+  const travel=(k:'red'|'redX'|'blue'|'green')=>Math.max(...pixels.map(p=>p[k]))-Math.min(...pixels.map(p=>p[k]));
+  console.log('native XY busy-window', {frames:pixels.length, motionPx:travel('red'), horizontalPx:travel('redX'), peakHorizontalPx:Math.max(...pixels.map(p=>p.redX))-80, nativeControlPx:travel('blue'), jsControlPx:travel('green'), setupMs:scene.setup});
+  expect(scene.inlineWrites).toBe(0);
   expect(travel('blue')).toBeGreaterThan(10);
   expect(travel('green')).toBe(0);
   expect(travel('red')).toBeGreaterThan(4);
   expect(Math.max(...pixels.map(p=>p.redX)) - 80).toBeGreaterThan(8);
+  expect(travel('redX')).toBeGreaterThan(3);
 });
 
 test('reports the cost of accepting repeated curved retargets from the packed root', async ({ page, browserName }) => {
