@@ -378,6 +378,10 @@ class Surface {
       // Новый effect ещё не передан потребителю; сначала скорость, затем точная поза.
       if (first._rate !== 1) effect.playbackRate = first._rate;
       if (first._elapsed !== 0) effect.currentTime = first._elapsed;
+      else if (translation) {
+        const accepted = effect.timeline?.currentTime;
+        if (typeof accepted === 'number' && Number.isFinite(accepted)) effect.startTime = accepted;
+      }
       this._lock(false);
       this._engine._idle(this);
     } catch (error) { this._lock(false); this._fail(error); throw error; }
