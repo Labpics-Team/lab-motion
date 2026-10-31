@@ -33,7 +33,7 @@
 
 import { MotionParamError } from '../errors.js';
 import { CONVERGENCE_THRESHOLD } from '../internal/constants.js';
-import { makeSpringValueSampler } from '../internal/solver.js';
+import { makeSpringValueSampler, sampleSpringBasisUnchecked } from '../internal/solver.js';
 import {
   settleTimeUpperBound,
   type SpringParams,
@@ -285,6 +285,27 @@ function buildSpringNodesAtHorizon(
   settle: number,
   intervals: number,
 ): SpringNode[] {
+  return sampleGrid(makeSpringValueSampler(params, v0), v0, tolerance, settle, intervals, 1);
+}
+
+/** A zero-displacement axis keeps its physical velocity and returns to its starting point. */
+export function impulseSamples(physics: SpringParams, speed: number, duration: number, tolerance: number): Float64Array | undefined {
+  const count = requiredGridSize(physics, duration, tolerance, speed);
+  if (!(count <= BASE_GRID_MAX)) return;
+  const basis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
+  const position = (time: number): number => speed * sampleSpringBasisUnchecked(physics, time, basis)._valueV0;
+  if (!(Math.abs(position(duration)) <= tolerance / 16)) return;
+  const knots = sampleGrid(position, speed, tolerance, duration, count, 0);
+  const samples = new Float64Array(2 * knots.length);
+  for (let i = 0; i < knots.length; i++) {
+    samples[2*i] = knots[i]!.percent;
+    samples[2*i+1] = knots[i]!.progress;
+  }
+  return samples;
+}
+
+function sampleGrid(sampleValue: (time: number) => number, v0: number, tolerance: number,
+  settle: number, intervals: number, target: number): SpringNode[] {
   // Валидный набор params всегда оседает в бюджет (гарантия validateSpringForFrameLoop),
   // так что settle конечно; на всякий случай — деградация к малой ненулевой шкале.
   const T = Number.isFinite(settle) && settle > 0 ? settle : 1;
@@ -299,7 +320,6 @@ function buildSpringNodesAtHorizon(
   // Инварианты пружины (omega0/zeta/omegaD/A/B) петле-инвариантны на всей сетке
   // (params/v0 фиксированы) → считаем их ОДИН раз фабрикой, а не на каждый узел.
   // Значение бит-в-бит равно solveSpring(...).value (см. makeSpringValueSampler).
-  const sampleValue = makeSpringValueSampler(params, v0);
   xs[0] = ys[0] = 0;
   const tangentTau = 0.5 / intervals;
   xs[1] = tangentTau;
@@ -315,14 +335,14 @@ function buildSpringNodesAtHorizon(
     // не NaN/∞») заинлайнен в цикл — минус кадр вызова на КАЖДЫЙ узел сетки
     // (доминирующий путь cold-compile). Тот же Number.isFinite(v)?v:1, бит-в-бит.
     const v = sampleValue(tau * T);
-    ys[index] = Number.isFinite(v) ? v : 1;
+    ys[index] = Number.isFinite(v) ? v : target;
   }
 
   // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
   // (baseGridSize её и гарантирует ≤ tol/2) ⇒ суммарная реконструкция ≤ tolerance.
   const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);
   return kept.map((k, n): SpringNode => ({
-    progress: n === kept.length - 1 ? 1 : ys[k]!,
+    progress: n === kept.length - 1 ? target : ys[k]!,
     percent: xs[k]! * 100,
   }));
 }
