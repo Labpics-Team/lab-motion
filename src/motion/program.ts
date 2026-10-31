@@ -49,6 +49,7 @@ export interface Segment {
   readonly _velocity: readonly number[];
   readonly _timing: Timing;
   readonly _artifact: SpringExecutionArtifactTuple | undefined;
+  readonly _impulse?: Float64Array;
 }
 export interface Program {
   readonly _key: string;
@@ -131,8 +132,9 @@ export function sample(program: Program, time: number, value: number[], velocity
     return;
   }
   let p = duration === 0 ? 1 : Math.min(1, _elapsed / duration), dp = 0;
-  if (segment._artifact) {
-    sampleSerializedSpringIntoUnchecked(segment._artifact[1], duration, _elapsed, 0, springSample);
+  const samples = segment._artifact?.[1] ?? segment._impulse;
+  if (samples) {
+    sampleSerializedSpringIntoUnchecked(samples, duration, _elapsed, 0, springSample);
     p = springSample.value; dp = springSample.velocity;
   } else if (segment._timing._spring) {
     sampleSpringBasisUnchecked(segment._timing._spring, _elapsed / 1000, basis);
@@ -144,9 +146,9 @@ export function sample(program: Program, time: number, value: number[], velocity
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
   for (let i = 0; i < segment._from.length; i++) {
-    const a = segment._from[i]!, distance = segment._to[i]! - a;
+    const a = segment._from[i]!, distance = segment._impulse ? 1 : segment._to[i]! - a;
     if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
-    else if (segment._timing._spring && !segment._artifact) {
+    else if (segment._timing._spring && !samples) {
       value[i] = a + distance * basis._value + (segment._velocity[i] ?? 0) * basis._valueV0;
       velocity[i] = distance * basis._velocity + (segment._velocity[i] ?? 0) * basis._velocityV0;
     } else { value[i] = a + distance * p; velocity[i] = distance * dp; }

@@ -1,4 +1,4 @@
-import { compileTranslationPath, sampleTranslationPath, type TranslationPath } from './translation-path.js';
+import { compileTranslationPath, type TranslationPath } from './translation-path.js';
 import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
@@ -100,12 +100,11 @@ type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | ControlOper
 
 export interface Draft { readonly _element: Element; readonly _key: string; readonly _program: Program; readonly _reduced: boolean }
 interface Track {
-  readonly _program: Program;
+  _program: Program;
   readonly _group: Surface;
   readonly _value: number[];
   readonly _velocity: number[];
   _owner: Run | undefined;
-  _translation?: TranslationPath;
   _elapsed: number;
   _rate: number;
   _paused: boolean;
@@ -254,10 +253,8 @@ class Surface {
     } finally { this._lock(false); }
   }
   _sample(track: Track): void {
-    const rate = track._paused ? 0 : this._native?.playbackRate ?? track._rate;
-    if (track._translation && track._elapsed < track._program._duration) {
-      sampleTranslationPath(track._translation, track._program._key as 'x' | 'y', track._elapsed, track._value, track._velocity, rate);
-    } else sample(track._program, track._elapsed, track._value, track._velocity, rate);
+    sample(track._program, track._elapsed, track._value, track._velocity,
+      track._paused ? 0 : this._native?.playbackRate ?? track._rate);
   }
   _ended(track: Track): boolean {
     return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
@@ -350,9 +347,8 @@ class Surface {
           x._elapsed === y._elapsed && x._rate === y._rate &&
           x._program._segments[0]!._timing._spring === y._program._segments[0]!._timing._spring &&
           Object.keys(TRANSFORMS).every(key => key === 'x' || key === 'y' || this._transforms[key] === TRANSFORMS[key])) {
-        translation = x._translation && x._translation === y._translation ? x._translation :
-          x._elapsed === 0 && !x._translation && !y._translation ? compileTranslationPath(x._program, y._program) : undefined;
-        if (translation) x._translation = y._translation = translation;
+        translation = compileTranslationPath(x._program, y._program);
+        if (translation) { x._program = translation.x; y._program = translation.y; }
       }
     }
     if (!canNative && !translation) { this._engine._wake(this); return; }

@@ -71,3 +71,43 @@ test('the rendered turn advances while the renderer main thread is blocked', asy
   expect(travel('green')).toBe(0);
   expect(travel('red')).toBeGreaterThan(4);
 });
+
+test('reports the cost of accepting repeated curved retargets from the packed root', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'performance comparison uses the same Chromium main thread');
+  const result = await page.evaluate(async () => {
+    const { animate } = await import('/browser/.artifacts/motion-root.js');
+    const spring = { mass: 1, stiffness: 100, damping: 20 };
+    const elements = [document.createElement('div'), document.createElement('div')];
+    document.body.append(...elements);
+    const runs = elements.map(el => {
+      const lead = animate(el, { x: [0, 1000] }, { duration: 1000, ease: 'linear' });
+      const native = el.getAnimations()[0]!;
+      native.pause(); native.currentTime = 240;
+      return lead;
+    });
+    // Force only the renderer selection in the control lane, after the same initial throw.
+    Object.defineProperty(elements[1]!, 'animate', { value: undefined, configurable: true });
+    const costs: number[][] = [[], []], nativeCounts = [0, 0];
+    for (let i = 0; i < 36; i++) {
+      const target = { x: i === 0 ? 240 : i%2 ? -80 : 140, y: [100, -30, 65][i%3]! };
+      for (const n of i%2 ? [1,0] : [0,1]) {
+        if (i) runs[n]!.seek(20);
+        const start = performance.now();
+        runs[n] = animate(elements[n]!, target, { spring });
+        const elapsed = performance.now() - start;
+        if (i >= 4) costs[n]!.push(elapsed);
+        nativeCounts[n]! += Number(elements[n]!.getAnimations().length > 0);
+      }
+    }
+    for (const run of runs) run.finish();
+    await Promise.all(runs.map(run => run.finished));
+    const summary = costs.map(values => {
+      values.sort((a,b)=>a-b);
+      return { n: values.length, medianMs: values[Math.floor(values.length/2)], p95Ms: values[Math.ceil(values.length*.95)-1] };
+    });
+    return { summary, nativeCounts };
+  });
+  console.log('native XY rapid retarget (native, forced JS)', JSON.stringify(result));
+  expect(result.nativeCounts[0]).toBeGreaterThan(24);
+  expect(result.nativeCounts[1]).toBe(0);
+});
