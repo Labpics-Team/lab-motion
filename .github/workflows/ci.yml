@@ -99,28 +99,26 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Compare root emitter configurations
+      - name: Verify the candidate package on both supported Node floors
         shell: bash
+        env:
+          MOTION_SOURCE: 54203316f86cfb2dea4e61568259b9a81dac2037
         run: |
           set -eu
-          cp dist/motion/index.js "$RUNNER_TEMP/original.mjs"
-          cp dist/motion/index.cjs "$RUNNER_TEMP/original.cjs"
-          for mode in syntax private direct; do
-            MODE="$mode" node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          let s=fs.readFileSync('tsup.config.ts','utf8').replace('entry: entriesFromPackageExports(),', "entry: { 'motion/index': 'src/motion/index.ts' },").replace('clean: true','clean: false');
-          if(process.env.MODE==='direct') s=s.replace('treeshake: true','treeshake: false');
-          else s=s.replace('esbuildPlugins: [sharedFramePlugin]', 'esbuildOptions(options) { options.minifySyntax = true; '+(process.env.MODE==='private'?'options.mangleProps = /^_/;':'')+' }, esbuildPlugins: [sharedFramePlugin]');
-          fs.writeFileSync('tsup.probe.config.ts',s);
-          NODE
-            pnpm exec tsup --config tsup.probe.config.ts >/dev/null
-            node scripts/size-gate.mjs > "$RUNNER_TEMP/comparison" || true
-            echo "ROOT EMITTER $mode"
-            grep -E '^(motion API |root component scope |root animate )' "$RUNNER_TEMP/comparison"
-          done
-          mv "$RUNNER_TEMP/original.mjs" dist/motion/index.js
-          mv "$RUNNER_TEMP/original.cjs" dist/motion/index.cjs
-          rm tsup.probe.config.ts
+          workspace="$RUNNER_TEMP/xy-package"
+          git worktree add --detach "$workspace" "$MOTION_SOURCE"
+          cd "$workspace"
+          test "$(git rev-parse HEAD)" = "$MOTION_SOURCE"
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm pack:compat
+          pnpm acceptance:compiler
+          mkdir "$RUNNER_TEMP/xy-package-out"
+          pnpm pack --pack-destination "$RUNNER_TEMP/xy-package-out"
+          archive=$(find "$RUNNER_TEMP/xy-package-out" -name '*.tgz')
+          sha256sum "$archive"
+          node scripts/pack-smoke.mjs "$archive"
+          npx --yes --package=node@22.0.0 -- node scripts/pack-smoke.mjs "$archive"
 
       - name: Factual documentation drift
         run: node scripts/check-docs-facts.mjs
