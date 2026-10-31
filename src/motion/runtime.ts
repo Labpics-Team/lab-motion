@@ -111,6 +111,10 @@ interface Track {
 }
 
 function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
+export function trackTime(track: Track, delta: number): number {
+  return track._paused ? track._elapsed : Math.min(track._program._duration,
+    Math.max(0, track._elapsed + delta * (track._group._native ? 1 : track._rate)));
+}
 
 export class Run implements Playback {
   readonly _tracks: Set<Track> = new Set();
@@ -234,21 +238,24 @@ class Surface {
     }
     return { ...initial, _velocity: initial._coordinates.map(() => 0) };
   }
+  _clock(now: number): number {
+    if (!this._native) return Math.max(now, this._stamp);
+    const time = this._native.currentTime;
+    return typeof time === 'number' && Number.isFinite(time) ? time : this._nativeTime;
+  }
+  _delta(clock: number): number {
+    return clock - (this._native ? this._nativeTime : this._stamp);
+  }
   _sync(): void {
     if (this._busy) failMotion('easing: повторный вход');
     this._lock(true);
     try {
       const now = number(this._engine._host.now(), 'clock');
-      let delta = Math.max(0, now - this._stamp);
-      if (this._native) {
-        const local = this._native.currentTime;
-        const current = typeof local === 'number' && Number.isFinite(local) ? local : this._nativeTime;
-        delta = current - this._nativeTime; this._nativeTime = current;
-      }
+      const clock = this._clock(now), delta = this._delta(clock);
+      if (this._native) this._nativeTime = clock;
       this._stamp = Math.max(this._stamp, now);
       for (const track of this._tracks.values()) {
-        if (!track._paused && (this._native || track._rate !== 0))
-          track._elapsed = Math.min(track._program._duration, Math.max(0, track._elapsed + (this._native ? delta : delta * track._rate)));
+        track._elapsed = trackTime(track, delta);
         this._sample(track);
         if (this._native && track._elapsed === track._program._duration && track._elapsed < this._nativeEnd)
           this._end(track, true);
@@ -269,19 +276,20 @@ class Surface {
         const value = (at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value)[0]!;
         state[track._program._key] = value;
       }
-      let identity = !at, translationOnly = !!at;
-      for (const key in TRANSFORMS) {
-        const neutral = state[key] === TRANSFORMS[key];
-        identity &&= neutral;
-        if (key !== 'x' && key !== 'y') translationOnly &&= neutral && !this._tracks.has(key);
-      }
-      return identity ? 'none' : transform(state, translationOnly);
+      if (at) return transform(state, this._translationOnly());
+      for (const key in TRANSFORMS) if (state[key] !== TRANSFORMS[key]) return transform(state);
+      return 'none';
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {
       const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
     return format(track._program._key, at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value, track._program._unit);
+  }
+  private _translationOnly(): boolean {
+    for (const key in TRANSFORMS) if (key !== 'x' && key !== 'y' &&
+      (this._tracks.has(key) || this._transforms[key] !== TRANSFORMS[key])) return false;
+    return true;
   }
   _render(): void {
     if (this._busy) failMotion('style: повторная запись');
@@ -339,28 +347,30 @@ class Surface {
     if (!active.some(moving)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
-    const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
-        track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
+    const synchronized = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') &&
+      typeof this._element.animate === 'function' && active.every(track =>
+        !track._paused && track._rate === first._rate && track._elapsed === first._elapsed &&
+        track._program._segments.length === 1 && track._program._segments[0]!._at === seg._at);
+    const simple = synchronized && _nativeEase !== undefined && this._engine._host.supports(_nativeEase) &&
+      active.every(track => track._program._nativeEase === _nativeEase && track._program._duration === first._program._duration);
     let translation: TranslationPath | undefined;
-    if (!canNative && this._key === 'transform' && active.length === 2 && first._rate > 0 &&
-        typeof this._element.animate === 'function' && this._engine._host.supports('linear')) {
-      const x = this._tracks.get('x'), y = this._tracks.get('y');
-      if (x && y && x._owner === y._owner && !x._paused && !y._paused &&
-          x._elapsed === y._elapsed && x._rate === y._rate &&
-          x._program._segments[0]!._timing._spring === y._program._segments[0]!._timing._spring &&
-          Object.keys(TRANSFORMS).every(key => key === 'x' || key === 'y' || this._transforms[key] === TRANSFORMS[key])) {
-        translation = compileTranslationPath(x._program, y._program);
-        if (translation) { x._program = translation.x; y._program = translation.y; }
+    if (!simple) {
+      if (synchronized && active.length === 2 && this._translationOnly() && this._engine._host.supports('linear')) {
+        const x = this._tracks.get('x'), y = this._tracks.get('y');
+        if (x && y && x._owner === y._owner && x._program._identity && y._program._identity) {
+          translation = compileTranslationPath(x._program, y._program);
+          if (translation) { x._program = translation.x; y._program = translation.y; }
+        }
       }
+      if (!translation) { this._engine._wake(this); return; }
     }
-    if (!canNative && !translation) { this._engine._wake(this); return; }
+    const end = translation?.duration ?? seg._end;
     try {
       this._lock(true);
       const effect = this._element.animate(translation?.frames ?? [{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
-        duration: translation?.duration ?? seg._end - seg._at, delay: translation ? 0 : seg._at, easing: translation ? 'linear' : _nativeEase!, fill: 'both',
+        duration: end - seg._at, delay: seg._at, easing: translation ? 'linear' : _nativeEase!, fill: 'both',
       });
-      this._native = effect; this._nativeTime = first._elapsed; this._nativeEnd = translation?.duration ?? first._program._duration;
+      this._native = effect; this._nativeTime = first._elapsed; this._nativeEnd = end;
       this._watch();
       // Новый effect ещё не передан потребителю; сначала скорость, затем точная поза.
       if (first._rate !== 1) effect.playbackRate = first._rate;

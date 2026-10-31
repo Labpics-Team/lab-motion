@@ -1,6 +1,6 @@
 import { stoppedMotion } from './stopped.js';
 import { failMotion, number } from './model.js';
-import { Run, type ControlOperation } from './runtime.js';
+import { Run, trackTime, type ControlOperation } from './runtime.js';
 import type { MotionPlayback, Playback } from './types.js';
 
 let stoppedView: MotionPlayback | undefined;
@@ -25,11 +25,8 @@ export function playhead(playback: Playback): MotionPlayback {
       let now: number | undefined, position: number | undefined;
       for (const track of run._tracks) {
         now ??= number(track._group._engine._host.now(), 'clock');
-        const group = track._group, native = group._native, local = native?.currentTime;
-        const delta = group._busy || track._paused ? 0 : native
-          ? typeof local === 'number' && Number.isFinite(local) ? local - group._nativeTime : 0
-          : Math.max(0, now - group._stamp) * track._rate;
-        const current = Math.min(track._program._duration, Math.max(0, track._elapsed + delta));
+        const group = track._group, native = group._native;
+        const current = group._busy ? track._elapsed : trackTime(track, group._delta(group._clock(now)));
         if (native && current === track._program._duration && current < group._nativeEnd) continue;
         if (position !== undefined && position !== current) return undefined;
         position = current;

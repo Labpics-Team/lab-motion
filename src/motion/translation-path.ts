@@ -1,5 +1,4 @@
-import { BASE_GRID_MAX } from '../compositor/segmenter.js';
-import { motionSpringCurve } from './spring-artifact.js';
+import { BASE_GRID_MAX, impulseSamples } from '../compositor/segmenter.js';
 import { sample, SPRING_POSITION_TOLERANCE, type Program } from './program.js';
 
 export interface TranslationPath {
@@ -18,7 +17,7 @@ function prepare(axis: Program): Program | undefined {
   if (seg._artifact || seg._impulse) return axis;
   const speed = seg._velocity[0]!, length = seg._end - seg._at;
   if (!speed || seg._from[0] !== seg._to[0]) return;
-  const impulse = motionSpringCurve(physics, 0, speed, length / 1000, SPRING_POSITION_TOLERANCE);
+  const impulse = impulseSamples(physics, speed, length / 1000, SPRING_POSITION_TOLERANCE);
   if (!impulse) return;
   return { ...axis, _segments: [{ ...seg, _impulse: impulse }] };
 }
