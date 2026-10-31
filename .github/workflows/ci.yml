@@ -99,6 +99,24 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Measure modern syntax on the root entry
+        shell: bash
+        run: |
+          set -eu
+          cp dist/motion/index.js "$RUNNER_TEMP/original.mjs"
+          cp dist/motion/index.cjs "$RUNNER_TEMP/original.cjs"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const source = fs.readFileSync('tsup.config.ts','utf8').replace('entry: entriesFromPackageExports(),', "entry: { 'motion/index': 'src/motion/index.ts' },").replace('clean: true','clean: false').replace('terserOptions: {','terserOptions: { ecma: 2022,');
+          fs.writeFileSync('tsup.modern.config.ts',source);
+          NODE
+          pnpm exec tsup --config tsup.modern.config.ts >/dev/null
+          node scripts/size-gate.mjs > "$RUNNER_TEMP/modern-size" || true
+          grep -E '^(motion API |root component scope |root animate |root layout )' "$RUNNER_TEMP/modern-size"
+          mv "$RUNNER_TEMP/original.mjs" dist/motion/index.js
+          mv "$RUNNER_TEMP/original.cjs" dist/motion/index.cjs
+          rm tsup.modern.config.ts
+
       - name: Factual documentation drift
         run: node scripts/check-docs-facts.mjs
 
