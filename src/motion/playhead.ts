@@ -30,6 +30,7 @@ export function playhead(playback: Playback): MotionPlayback {
           ? typeof local === 'number' && Number.isFinite(local) ? local - group._nativeTime : 0
           : Math.max(0, now - group._stamp) * track._rate;
         const current = Math.min(track._program._duration, Math.max(0, track._elapsed + delta));
+        if (native && current === track._program._duration && current < group._nativeEnd) continue;
         if (position !== undefined && position !== current) return undefined;
         position = current;
       }

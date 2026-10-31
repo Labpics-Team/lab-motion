@@ -1,4 +1,4 @@
-import { compileTranslationPath, sampleTranslationPath, type TranslationPath } from './translation-path.js';
+import { compileTranslationPath, type TranslationPath } from './translation-path.js';
 import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
@@ -100,12 +100,11 @@ type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | ControlOper
 
 export interface Draft { readonly _element: Element; readonly _key: string; readonly _program: Program; readonly _reduced: boolean }
 interface Track {
-  readonly _program: Program;
+  _program: Program;
   readonly _group: Surface;
   readonly _value: number[];
   readonly _velocity: number[];
   _owner: Run | undefined;
-  _translation?: TranslationPath;
   _elapsed: number;
   _rate: number;
   _paused: boolean;
@@ -207,6 +206,7 @@ class Surface {
   _busy = false;
   _native: Animation | undefined;
   _nativeTime = 0;
+  _nativeEnd = 0;
   private _written: string | undefined;
   private _token: Promise<Animation> | undefined;
   constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string) {
@@ -226,7 +226,7 @@ class Surface {
   _read(key: string): Point & { readonly _velocity: readonly number[] } {
     const track = this._tracks.get(key);
     if (track) return { _coordinates: [...track._value], _unit: track._program._unit, _velocity: [...track._velocity] };
-    if (isTransform(key)) return { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], _unit: '', _velocity: [0] };
+    if (isTransform(key)) return { _coordinates: [this._transforms[key]!], _unit: '', _velocity: [0] };
     let initial = this._rest;
     if (!initial) {
       const text = this._engine._host.styles(this._element).getPropertyValue(key);
@@ -250,14 +250,14 @@ class Surface {
         if (!track._paused && (this._native || track._rate !== 0))
           track._elapsed = Math.min(track._program._duration, Math.max(0, track._elapsed + (this._native ? delta : delta * track._rate)));
         this._sample(track);
+        if (this._native && track._elapsed === track._program._duration && track._elapsed < this._nativeEnd)
+          this._end(track, true);
       }
     } finally { this._lock(false); }
   }
   _sample(track: Track): void {
-    const rate = track._paused ? 0 : this._native?.playbackRate ?? track._rate;
-    if (track._translation && track._elapsed < track._program._duration) {
-      sampleTranslationPath(track._translation, track._program._key as 'x' | 'y', track._elapsed, track._value, track._velocity, rate);
-    } else sample(track._program, track._elapsed, track._value, track._velocity, rate);
+    sample(track._program, track._elapsed, track._value, track._velocity,
+      track._paused ? 0 : this._native?.playbackRate ?? track._rate);
   }
   _ended(track: Track): boolean {
     return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
@@ -350,9 +350,8 @@ class Surface {
           x._elapsed === y._elapsed && x._rate === y._rate &&
           x._program._segments[0]!._timing._spring === y._program._segments[0]!._timing._spring &&
           Object.keys(TRANSFORMS).every(key => key === 'x' || key === 'y' || this._transforms[key] === TRANSFORMS[key])) {
-        translation = x._translation && x._translation === y._translation ? x._translation :
-          x._elapsed === 0 && !x._translation && !y._translation ? compileTranslationPath(x._program, y._program) : undefined;
-        if (translation) x._translation = y._translation = translation;
+        translation = compileTranslationPath(x._program, y._program);
+        if (translation) { x._program = translation.x; y._program = translation.y; }
       }
     }
     if (!canNative && !translation) { this._engine._wake(this); return; }
@@ -361,7 +360,7 @@ class Surface {
       const effect = this._element.animate(translation?.frames ?? [{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
         duration: translation?.duration ?? seg._end - seg._at, delay: translation ? 0 : seg._at, easing: translation ? 'linear' : _nativeEase!, fill: 'both',
       });
-      this._native = effect; this._nativeTime = first._elapsed;
+      this._native = effect; this._nativeTime = first._elapsed; this._nativeEnd = translation?.duration ?? first._program._duration;
       this._watch();
       // Новый effect ещё не передан потребителю; сначала скорость, затем точная поза.
       if (first._rate !== 1) effect.playbackRate = first._rate;
@@ -580,8 +579,12 @@ export class Runtime {
         const existing = group._tracks.get(draft._key);
         const equal = !draft._reduced && draft._program._identity && existing?._program._identity &&
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
-        if (equal) { run._own(existing!); continue; }
-        if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
+        if (equal) {
+          run._own(existing!);
+          if (group._native && group._tracks.size > 1) touched.add(group);
+          continue;
+        }
+        if (!touched.has(group) || group._native) { group._sync(); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!._from;
         const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: first.map(() => 0),
           _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _rate: 1, _paused: false };
@@ -589,6 +592,12 @@ export class Runtime {
         run._own(track, draft._reduced); group._attach(track);
       }
       for (const group of touched) {
+        // Two distinct owners need their own completion when their deadlines differ.
+        if (group._native) {
+          const x = group._tracks.get('x'), y = group._tracks.get('y');
+          if (!x || !y || x._owner === y._owner || x._program._duration === y._program._duration) continue;
+          group._sync(); group._detach();
+        }
         group._render();
         for (const track of [...group._tracks.values()]) if (track._elapsed >= track._program._duration) group._end(track, true);
         group._reconcile();

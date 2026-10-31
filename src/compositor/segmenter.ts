@@ -123,14 +123,14 @@ export function baseGridSize(
  * Чистый O(1)-предикат нужен фасаду ДО supersede: небезопасный подхват сразу
  * остаётся на общем живом frame-loop и не обрывает предыдущего владельца рано.
  */
-export function fitsSpringCurveBudget(
-  params: SpringParams,
-  v0: number,
-  tolerance: number,
-): boolean {
+export function springHorizonInBudget(params: SpringParams, v0: number, tolerance: number): number | undefined {
   const settle = springCompileHorizon(params, v0, tolerance);
   const required = requiredGridSize(params, settle, tolerance, v0);
-  return Number.isSafeInteger(required) && required <= BASE_GRID_MAX;
+  return Number.isSafeInteger(required) && required <= BASE_GRID_MAX ? settle : undefined;
+}
+
+export function fitsSpringCurveBudget(params: SpringParams, v0: number, tolerance: number): boolean {
+  return springHorizonInBudget(params, v0, tolerance) !== undefined;
 }
 
 /** Fail-fast версия того же preflight с каноническим MotionParamError. */

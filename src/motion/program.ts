@@ -1,7 +1,8 @@
 import { tryParseValue } from '../value/parse.js';
 import { settleTimeUpperBound } from '../spring.js';
 import { sampleSpringBasisUnchecked, type MutableSpringBasis } from '../internal/solver.js';
-import { tryCompileSpringExecutionArtifactTupleUnchecked, type SpringExecutionArtifactTuple } from '../compositor/curve.js';
+import type { SpringExecutionArtifactTuple } from '../compositor/curve.js';
+import { tryMotionSpring } from './spring-artifact.js';
 import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
 import { failMotion, number, type Timing } from './model.js';
 import type { MotionScalar } from './types.js';
@@ -34,10 +35,11 @@ export function format(key: string, value: readonly number[], unit: string): str
   const n = key === 'opacity' ? Math.max(0, Math.min(1, value[0]!)) : value[0]!;
   return `${n}${unit}`;
 }
+/** Receives the complete state initialized by initialTransforms, including resting axes. */
 export function transform(values: Readonly<Record<string, number>>, translationOnly = false): string {
-  const translation = `translate(${values.x ?? 0}px,${values.y ?? 0}px)`;
+  const translation = `translate(${values.x}px,${values.y}px)`;
   // Полная топология сохраняется для любой активной оси помимо x/y.
-  return translationOnly ? translation : `${translation} rotate(${values.rotate ?? 0}deg) skew(${values.skewX ?? 0}deg,${values.skewY ?? 0}deg) scale(${values.scaleX ?? 1},${values.scaleY ?? 1})`;
+  return translationOnly ? translation : `${translation} rotate(${values.rotate}deg) skew(${values.skewX}deg,${values.skewY}deg) scale(${values.scaleX},${values.scaleY})`;
 }
 
 export interface Segment {
@@ -48,6 +50,7 @@ export interface Segment {
   readonly _velocity: readonly number[];
   readonly _timing: Timing;
   readonly _artifact: SpringExecutionArtifactTuple | undefined;
+  readonly _impulse?: Float64Array;
 }
 export interface Program {
   readonly _key: string;
@@ -77,7 +80,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
   let artifact: SpringExecutionArtifactTuple | undefined;
   let length = duration ?? timing._duration ?? 0;
   if (timing._spring) {
-    if (aligned && Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, SPRING_POSITION_TOLERANCE / extent));
+    if (aligned && Number.isFinite(normalized ?? 0)) artifact = tryMotionSpring(timing._spring, normalized ?? 0, Math.min(0.001, SPRING_POSITION_TOLERANCE / extent));
     const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
     length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, energy) * 1000;
   }
@@ -130,8 +133,9 @@ export function sample(program: Program, time: number, value: number[], velocity
     return;
   }
   let p = duration === 0 ? 1 : Math.min(1, _elapsed / duration), dp = 0;
-  if (segment._artifact) {
-    sampleSerializedSpringIntoUnchecked(segment._artifact[1], duration, _elapsed, 0, springSample);
+  const samples = segment._artifact?.[1] ?? segment._impulse;
+  if (samples) {
+    sampleSerializedSpringIntoUnchecked(samples, duration, _elapsed, 0, springSample);
     p = springSample.value; dp = springSample.velocity;
   } else if (segment._timing._spring) {
     sampleSpringBasisUnchecked(segment._timing._spring, _elapsed / 1000, basis);
@@ -143,9 +147,9 @@ export function sample(program: Program, time: number, value: number[], velocity
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
   for (let i = 0; i < segment._from.length; i++) {
-    const a = segment._from[i]!, distance = segment._to[i]! - a;
+    const a = segment._from[i]!, distance = segment._impulse ? 1 : segment._to[i]! - a;
     if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
-    else if (segment._timing._spring && !segment._artifact) {
+    else if (segment._timing._spring && !samples) {
       value[i] = a + distance * basis._value + (segment._velocity[i] ?? 0) * basis._valueV0;
       velocity[i] = distance * basis._velocity + (segment._velocity[i] ?? 0) * basis._velocityV0;
     } else { value[i] = a + distance * p; velocity[i] = distance * dp; }
