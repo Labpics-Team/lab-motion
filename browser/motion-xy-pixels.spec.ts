@@ -156,3 +156,37 @@ test('measures first visible displacement after a retarget', async ({page,browse
   console.log('native XY first observable frame (native, forced JS)',JSON.stringify(result));
   expect(result.map(item=>item.samples)).toEqual([10,10]);
 });
+
+test('a perpendicular throw can be caught again from its rendered position', async ({page}) => {
+  const data = await page.evaluate(async () => {
+    const {animate} = await import('/browser/.artifacts/motion-root.js');
+    const el = document.createElement('div');
+    document.body.append(el);
+    const spring = {mass:1, stiffness:100, damping:20};
+    const first = animate(el, {x:[0,1000]}, {duration:1000, ease:'linear'});
+    const launch = el.getAnimations()[0]!;
+    await launch.ready;
+    launch.pause(); launch.currentTime=250;
+    const turn = animate(el, {x:250,y:100}, {spring});
+    const effects=el.getAnimations();
+    if (effects.length !== 1 || effects[0] === launch) throw new Error('No replacement XY effect');
+    const effect=effects[0]!;
+    await effect.ready;
+    effect.pause(); effect.currentTime=55;
+    const matrix=()=>new DOMMatrixReadOnly(getComputedStyle(el).transform);
+    const displayed=matrix();
+    const next=animate(el,{x:200,y:130},{spring});
+    next.pause();
+    const pickup=matrix();
+    next.finish();
+    const states=await Promise.all([first.finished,turn.finished,next.finished]);
+    el.remove();
+    return {displayed:[displayed.e,displayed.f],pickup:[pickup.e,pickup.f],states:states.map(s=>s.status)};
+  });
+  const decay=Math.exp(-.55);
+  expect(Math.abs(data.displayed[0]!-(250+55*decay))).toBeLessThan(.25);
+  expect(Math.abs(data.displayed[1]!-(100-155*decay))).toBeLessThan(.25);
+  expect(data.pickup[0]).toBeCloseTo(data.displayed[0]!,1);
+  expect(data.pickup[1]).toBeCloseTo(data.displayed[1]!,1);
+  expect(data.states).toEqual(['stopped','stopped','finished']);
+});
