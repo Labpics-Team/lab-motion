@@ -433,7 +433,9 @@ class Surface {
           this._sample(track);
         }
         this._render();
-        const retiring = action === 'finish' || action === 'seek' ? [...selected].sort(byEnd) : selected;
+        const allEnding = selected.length > 1 && (action === 'finish' ||
+          action === 'seek' && selected.every(track => this._ended(track)));
+        const retiring = allEnding ? [...selected].sort(byEnd) : selected;
         for (const track of retiring) {
           if (!owns(track)) continue;
           if (action === 'stop') this._end(track, false);
