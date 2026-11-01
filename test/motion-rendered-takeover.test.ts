@@ -70,6 +70,29 @@ describe('fallback takeover сохраняет последнюю успешну
     expect(h.updates.size + h.renders.size).toBe(0);
   });
 
+  it('spring продолжает скорость последнего paint, а не скрытую скорость модели', async () => {
+    const h = harness();
+    const first = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000, ease: t => t * t });
+    h.step(250);
+    expect(h.x()).toBe(6.25);
+    const before = h.values.get('transform');
+    // На paint скорость была 50 units/s; более поздний clock даёт модели 100.
+    h.setClock(500);
+    const next = h.runtime.animate(h.element, { x: 0 }, { spring: { mass: 1, stiffness: 100, damping: 20 } });
+    expect(h.values.get('transform')).toBe(before);
+    h.step(510);
+    // Независимое решение x'' + 20x' + 100x = 0 при x(0)=6.25, x'(0)=50.
+    const seconds = 0.01;
+    const expected = Math.exp(-10 * seconds) * (6.25 + (50 + 10 * 6.25) * seconds);
+    // Бюджет serialized spring здесь ≤6.25×0.001; ошибка live-velocity ≈0.452.
+    expect(Math.abs(h.x() - expected)).toBeLessThan(0.01);
+    next.finish();
+    expect(h.x()).toBe(0);
+    expect(await first.finished).toEqual({ status: 'stopped' });
+    expect(await next.finished).toEqual({ status: 'finished' });
+    expect(h.updates.size + h.renders.size).toBe(0);
+  });
+
   it('явное начало X не материализует скрытое продвижение Y общей поверхности', async () => {
     const h = harness();
     const first = h.runtime.animate(h.element, { x: [0, 6], y: [0, 8] }, linear);
