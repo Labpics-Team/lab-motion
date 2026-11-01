@@ -44,7 +44,7 @@ jobs:
 
   verify:
     name: typecheck · build · size · package
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 60
 
     steps:
@@ -162,7 +162,7 @@ jobs:
   # каждый suite проверяет dist собственного exact checkout, без result cache.
   tests:
     name: test · fuzz
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -209,7 +209,7 @@ jobs:
 
   mutation:
     name: driver mutation
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 60
     steps:
       - name: Checkout
@@ -240,7 +240,7 @@ jobs:
         run: pnpm exec stryker run stryker.driver.config.mjs
 
   security:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - name: Checkout

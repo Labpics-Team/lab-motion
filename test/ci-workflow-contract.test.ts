@@ -63,6 +63,8 @@ const events = (value: unknown): string[] => {
 const bash = process.platform === 'win32'
   ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git/bin/bash.exe') : 'bash';
 const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation', 'security'];
+// r16 требует self-hosted для доверенного кода; внешний fork сохраняет изоляцию.
+const trustedRunner = "${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('[\"self-hosted\",\"Linux\",\"X64\"]') || 'ubuntu-latest' }}";
 const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
@@ -399,9 +401,10 @@ function assertNativeGraph(files: Map<string, string>) {
   const performance = workflows.get('performance.yml')!;
   expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true } } } });
   expect(performance.permissions).toEqual({ contents: 'read' });
-  expect(performance.jobs.compare!['runs-on']).toBe('ubuntu-latest');
+  expect(performance.jobs.compare!['runs-on']).toBe(trustedRunner);
   expect(performance.jobs.compare!['continue-on-error']).toBeUndefined();
   expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
+  expect(workflows.get('profile-01.yml')!.jobs.probe!['runs-on']).toBe(trustedRunner);
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);
   for (const document of [ci, browser]) {
     expect(document.permissions).toEqual({ contents: 'read' });
@@ -417,14 +420,14 @@ function assertNativeGraph(files: Map<string, string>) {
   const security = ci.jobs.security!;
   const conformance = browser.jobs.conformance!;
   for (const job of [verify, tests, mutation, security, conformance]) {
-    expect(job['runs-on']).toBe('ubuntu-latest');
+    expect(job['runs-on']).toBe(trustedRunner);
     expect(job.if).toBeUndefined();
   }
   expect(ci.jobs['browser-static']).toEqual({ uses: './.github/workflows/browser.yml' });
   expect(ci.jobs.documentation).toEqual({ uses: './.github/workflows/docs.yml' });
   expect(workflows.get('docs.yml')!.on).toEqual({ workflow_call: null });
   const reader = workflows.get('docs.yml')!.jobs.reader!;
-  expect(reader['runs-on']).toBe('ubuntu-latest');
+  expect(reader['runs-on']).toBe(trustedRunner);
   assertCommands(reader, [activatePnpm, 'pnpm install --frozen-lockfile', 'pnpm docs:build',
     'pnpm exec playwright install --with-deps chromium firefox webkit', 'pnpm docs:test']);
   // Нет ложных последовательных зависимостей: всё сходится только в CI.

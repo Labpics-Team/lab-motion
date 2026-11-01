@@ -15,7 +15,7 @@ env:
 
 jobs:
   probe:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 45
     steps:
       - name: Получить точный источник измерителя
