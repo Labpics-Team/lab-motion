@@ -266,12 +266,12 @@ class Surface {
   _ended(track: Track): boolean {
     return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
   }
-  private _text(at: 0 | 1 | 2 = 0, rendered = false, selected?: ReadonlySet<Track>): string {
+  private _text(at: 0 | 1 | 2 = 0, rendered = false, selected?: readonly Track[]): string {
     if (this._key === 'transform') {
       const state = this._transforms;
       for (const track of this._tracks.values()) {
         const value = (at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to
-          : rendered && track._renderedElapsed !== undefined && !selected?.has(track) ? track._rendered : track._value)[0]!;
+          : rendered && track._renderedElapsed !== undefined && !selected?.includes(track) ? track._rendered : track._value)[0]!;
         state[track._program._key] = value;
       }
       let identity = !at, translationOnly = !!at;
@@ -287,19 +287,19 @@ class Surface {
       const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
     return format(track._program._key, at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to
-      : rendered && track._renderedElapsed !== undefined && !selected?.has(track) ? track._rendered : track._value, track._program._unit);
+      : rendered && track._renderedElapsed !== undefined && !selected?.includes(track) ? track._rendered : track._value, track._program._unit);
   }
   _render(rendered = false, selected?: readonly Track[]): void {
     if (this._busy) failMotion('style: повторная запись');
     this._lock(true);
     try {
-      const current = selected ? new Set(selected) : undefined;
-      const text = this._text(0, rendered, current);
+      // У transform-поверхности семь каналов, у остальных один; временный Set не нужен.
+      const text = this._text(0, rendered, selected);
       (this._element as HTMLElement).style.setProperty(this._key, text);
       this._written = text;
       // Снимок обновляется только после успешной записи, без повторного easing.
       for (const track of this._tracks.values()) {
-        if (rendered && track._renderedElapsed !== undefined && !current?.has(track)) continue;
+        if (rendered && track._renderedElapsed !== undefined && !selected?.includes(track)) continue;
         for (let i = 0; i < track._value.length; i++) {
           track._rendered[i] = track._value[i]!;
           track._renderedVelocity[i] = track._velocity[i]!;
