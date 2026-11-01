@@ -210,6 +210,7 @@ class Surface {
   _nativeTime = 0;
   private _written: string | undefined;
   private _token: Promise<Animation> | undefined;
+  private _nativePending = false;
   constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string) {
     this._transforms = _key === 'transform' ? initialTransforms(_engine._host.styles(_element)) : {};
     this._stamp = number(_engine._host.now(), 'clock');
@@ -351,6 +352,7 @@ class Surface {
     }
   }
   _reconcile(): void {
+    this._nativePending = false;
     if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
     const active = [...this._tracks.values()];
     if (!active.some(moving)) { this._engine._idle(this); return; }
@@ -360,6 +362,10 @@ class Surface {
       active.every(track => !track._paused && !this._ended(track) && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
         track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
+    // Compositor не должен материализовать фазу, которую JS ещё не записал.
+    if (active.some(track => track._renderedElapsed !== track._elapsed)) {
+      this._nativePending = true; this._engine._wake(this); return;
+    }
     try {
       this._lock(true);
       const effect = this._element.animate([{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
@@ -450,6 +456,7 @@ class Surface {
       for (const track of [...this._tracks.values()]) {
         if (moving(track) && this._ended(track)) this._end(track, true);
       }
+      if (this._nativePending) { this._reconcile(); return; }
       for (const track of this._tracks.values()) if (moving(track)) return;
       this._engine._idle(this);
     } catch (error) { this._fail(error); }
