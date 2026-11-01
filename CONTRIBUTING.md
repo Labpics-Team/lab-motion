@@ -116,6 +116,22 @@ pnpm mutation
 Каденцию и break-порог планового mutation-прогона держат
 `.github/workflows/mutation.yml` и `stryker.config.mjs` — не документация.
 
+Сборка, тесты и измерения доверенного исходника выполняются на self-hosted
+Linux/X64. PR из внешнего fork использует hosted runner. Отдельный hosted
+publish сохраняет защищённое окружение npm и provenance; он получает уже
+проверенный архив. Маршруты задают workflow, полноту проверяет
+`test/ci-workflow-contract.test.ts`.
+
+Версию pnpm задаёт `packageManager` извлечённого исходника.
+Закреплённый [pnpm/action-setup](https://github.com/pnpm/action-setup/tree/0ebf47130e4866e96fce0953f49152a61190b271)
+устанавливает её в `${{ runner.temp }}/setup-pnpm` после checkout и Setup Node.
+Для парного benchmark читается `candidate/package.json` — оба дерева извлечены
+в подкаталоги. Выбор job-local каталога сохраняет работу с неизменяемыми
+подготовленными инструментами раннера: [Corepack создаёт shims рядом со своим
+binary](https://github.com/nodejs/corepack/blob/d4dcb1f89741603e776bba9d457425750fa26987/README.md#corepack-enable--name)
+и отказывает при read-only filesystem. Установка инструмента в temp не требует
+изменения образа или общего toolcache.
+
 ## Требования к PR
 
 В описании должны быть:

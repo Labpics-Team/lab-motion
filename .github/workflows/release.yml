@@ -95,7 +95,7 @@ jobs:
     if: >-
       github.repository == 'Labpics-Team/lab-motion' && !cancelled() &&
       needs.resolve.result == 'success'
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 45
     permissions:
       contents: read
@@ -145,9 +145,9 @@ jobs:
           package-manager-cache: false
 
       - name: Activate pinned pnpm
-        run: |
-          corepack enable
-          corepack install --global pnpm@11.11.0
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

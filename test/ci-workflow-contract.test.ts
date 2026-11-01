@@ -65,7 +65,16 @@ const bash = process.platform === 'win32'
 const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation', 'security'];
 // r16 требует self-hosted для доверенного кода; внешний fork сохраняет изоляцию.
 const trustedRunner = "${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('[\"self-hosted\",\"Linux\",\"X64\"]') || 'ubuntu-latest' }}";
-const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
+const checkedJobs = [
+  ['ci.yml', 'verify'], ['ci.yml', 'tests'], ['ci.yml', 'mutation'], ['ci.yml', 'security'],
+  ['browser.yml', 'conformance'], ['docs.yml', 'reader'], ['performance.yml', 'compare'],
+  ['profile-01.yml', 'probe'], ['mutation.yml', 'core'], ['mutation.yml', 'driver'],
+  ['release.yml', 'verify'],
+] as const;
+const pnpmSetup = {
+  name: 'Activate pinned pnpm', uses: 'pnpm/action-setup@<sha>',
+  with: { dest: '${{ runner.temp }}/setup-pnpm' },
+};
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
   + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
@@ -131,7 +140,6 @@ const floorMinimumCommand = 'test "$(node --version)" = v22.0.0\n' + floorComman
 
 const verifyCommands = [
   actionlintCommand,
-  activatePnpm,
   'pnpm install --frozen-lockfile',
   'pnpm check:static',
   'pnpm typecheck:native',
@@ -149,7 +157,6 @@ const verifyCommands = [
   floorMinimumCommand,
 ];
 const testCommands = [
-  activatePnpm,
   'pnpm install --frozen-lockfile',
   'pnpm build',
   vitestCommand,
@@ -157,13 +164,11 @@ const testCommands = [
 ];
 const securityCommands = [securityCommand];
 const mutationCommands = [
-  activatePnpm,
   'pnpm install --frozen-lockfile',
   'pnpm build',
   'pnpm exec stryker run stryker.driver.config.mjs',
 ];
 const browserCommands = [
-  activatePnpm,
   'pnpm install --frozen-lockfile',
   'pnpm exec playwright install --dry-run ${{ matrix.browser }}',
   'pnpm typecheck:browser',
@@ -176,6 +181,7 @@ const browserCommands = [
 // Dependabot, поэтому контракт требует полный SHA разрешённого репозитория, а не конкретный.
 const allowedActions = new Set([
   'actions/checkout', 'actions/setup-node', 'actions/upload-artifact', 'actions/download-artifact',
+  'pnpm/action-setup',
 ]);
 const externalAction = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$/;
 const localWorkflow = /^\.\/\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/;
@@ -248,6 +254,7 @@ const requiredActions = {
         "node-version": "24"
       }
     },
+    { index: 3, ...pnpmSetup },
     {
       "index": 17,
       "name": "Setup consumer Node floor",
@@ -273,7 +280,8 @@ const requiredActions = {
       "with": {
         "node-version": "24"
       }
-    }
+    },
+    { index: 2, ...pnpmSetup }
   ],
   "tests": [
     {
@@ -293,6 +301,7 @@ const requiredActions = {
         "node-version": "24"
       }
     },
+    { index: 2, ...pnpmSetup },
     {
       "index": 6,
       "name": "Setup registered native-clock Node",
@@ -318,7 +327,8 @@ const requiredActions = {
       "with": {
         "node-version": "24"
       }
-    }
+    },
+    { index: 2, ...pnpmSetup }
   ],
   "security": [
     {
@@ -349,9 +359,41 @@ function assertCommands(job: Job, commands: string[]) {
   }
 }
 
+function assertCheckExecution(workflows: Map<string, Workflow>) {
+  // Полный список включает scheduled mutation и release verify: один закон
+  // размещения не должен зависеть от способа запуска проверки.
+  for (const [file, jobId] of checkedJobs) {
+    const job = workflows.get(file)?.jobs[jobId];
+    expect(job, `${file}/${jobId}: отсутствует проверка`).toBeDefined();
+    expect(job!['runs-on'], `${file}/${jobId}`).toBe(trustedRunner);
+    if (file === 'ci.yml' && jobId === 'security') continue;
+    const steps = job!.steps ?? [];
+    const setup = steps.filter(item => item.uses?.startsWith('pnpm/action-setup@'));
+    expect(setup, `${file}/${jobId}: нужен один setup pnpm`).toHaveLength(1);
+    const activation = setup[0]!;
+    const setupIndex = steps.indexOf(activation);
+    const checkoutIndex = steps.findIndex(item => item.uses?.startsWith('actions/checkout@'));
+    const nodeIndex = steps.findIndex(item => item.uses?.startsWith('actions/setup-node@'));
+    expect(checkoutIndex).toBeGreaterThanOrEqual(0);
+    expect(nodeIndex).toBeGreaterThan(checkoutIndex);
+    expect(setupIndex).toBeGreaterThan(nodeIndex);
+    const checkoutPath = steps[checkoutIndex]!.with?.path;
+    expect({ ...activation, uses: unpin(activation.uses!) }).toEqual({
+      ...pnpmSetup, name: activation.name,
+      with: { ...pnpmSetup.with,
+        ...(checkoutPath ? { package_json_file: `${checkoutPath}/package.json` } : {}),
+      },
+    });
+    expect(steps.some(item => item.run?.includes('corepack enable'))).toBe(false);
+  }
+  // Hosted publish сохраняет отдельные provenance и privilege-границы.
+  expect(workflows.get('release.yml')!.jobs.publish!['runs-on']).toBe('ubuntu-latest');
+}
+
 function assertNativeGraph(files: Map<string, string>) {
   assertPinned(files);
   const workflows = new Map([...files].map(([name, source]) => [name, parse(source) as Workflow]));
+  assertCheckExecution(workflows);
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
@@ -401,10 +443,8 @@ function assertNativeGraph(files: Map<string, string>) {
   const performance = workflows.get('performance.yml')!;
   expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true } } } });
   expect(performance.permissions).toEqual({ contents: 'read' });
-  expect(performance.jobs.compare!['runs-on']).toBe(trustedRunner);
   expect(performance.jobs.compare!['continue-on-error']).toBeUndefined();
   expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
-  expect(workflows.get('profile-01.yml')!.jobs.probe!['runs-on']).toBe(trustedRunner);
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);
   for (const document of [ci, browser]) {
     expect(document.permissions).toEqual({ contents: 'read' });
@@ -420,15 +460,13 @@ function assertNativeGraph(files: Map<string, string>) {
   const security = ci.jobs.security!;
   const conformance = browser.jobs.conformance!;
   for (const job of [verify, tests, mutation, security, conformance]) {
-    expect(job['runs-on']).toBe(trustedRunner);
     expect(job.if).toBeUndefined();
   }
   expect(ci.jobs['browser-static']).toEqual({ uses: './.github/workflows/browser.yml' });
   expect(ci.jobs.documentation).toEqual({ uses: './.github/workflows/docs.yml' });
   expect(workflows.get('docs.yml')!.on).toEqual({ workflow_call: null });
   const reader = workflows.get('docs.yml')!.jobs.reader!;
-  expect(reader['runs-on']).toBe(trustedRunner);
-  assertCommands(reader, [activatePnpm, 'pnpm install --frozen-lockfile', 'pnpm docs:build',
+  assertCommands(reader, ['pnpm install --frozen-lockfile', 'pnpm docs:build',
     'pnpm exec playwright install --with-deps chromium firefox webkit', 'pnpm docs:test']);
   // Нет ложных последовательных зависимостей: всё сходится только в CI.
   for (const job of [verify, tests, mutation, security]) expect(job.needs).toBeUndefined();
@@ -491,6 +529,41 @@ function assertNativeGraph(files: Map<string, string>) {
 
 describe('нативный граф CI', () => {
   it('проверяет любой PR через явные обязательные jobs', () => assertNativeGraph(sources()));
+
+  it.each(checkedJobs)('%s/%s сохраняет trusted self-hosted и изоляцию fork', (file, jobId) => {
+    const original = sources();
+    assertNativeGraph(original);
+    for (const runner of ['ubuntu-latest', '${{ fromJSON(\'["self-hosted","Linux","X64"]\') }}']) {
+      const files = new Map(original);
+      const workflow = parse(files.get(file)!) as Workflow;
+      workflow.jobs[jobId]!['runs-on'] = runner;
+      files.set(file, stringify(workflow));
+      expect(() => assertNativeGraph(files), `${file}/${jobId}: ${runner}`).toThrow();
+    }
+  });
+
+  it.each(checkedJobs.filter(([file, jobId]) => file !== 'ci.yml' || jobId !== 'security'))(
+    '%s/%s сохраняет локальный setup и единственный источник версии pnpm', (file, jobId) => {
+      const original = sources();
+      assertNativeGraph(original);
+      for (const mutation of ['remove', 'dest', 'version', 'run_install', 'if', 'order', 'package_json_file'] as const) {
+        const files = new Map(original);
+        const workflow = parse(files.get(file)!) as Workflow;
+        const steps = workflow.jobs[jobId]!.steps!;
+        const index = steps.findIndex(item => item.uses?.startsWith('pnpm/action-setup@'));
+        const activation = steps[index]!;
+        if (mutation === 'remove') steps.splice(index, 1);
+        else if (mutation === 'dest') activation.with!.dest = '/opt/hostedtoolcache/setup-pnpm';
+        else if (mutation === 'version') activation.with!.version = '11.11.0';
+        else if (mutation === 'run_install') activation.with!.run_install = true;
+        else if (mutation === 'if') activation.if = false;
+        else if (mutation === 'package_json_file') activation.with!.package_json_file = 'wrong/package.json';
+        else { steps.splice(index, 1); steps.unshift(activation); }
+        files.set(file, stringify(workflow));
+        expect(() => assertNativeGraph(files), `${file}/${jobId}: ${mutation}`).toThrow();
+      }
+    },
+  );
 
   it.each([
     ['PR base filter', 'ci.yml', (w: Workflow) => { w.on.pull_request = { branches: ['main'] }; }],
