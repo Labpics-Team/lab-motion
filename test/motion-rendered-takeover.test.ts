@@ -164,6 +164,42 @@ describe('fallback takeover сохраняет последнюю успешну
     expect(h.updates.size + h.renders.size).toBe(0);
   });
 
+  it.each(['stop', 'finish', 'seek'] as const)('%s не передаёт скрытую фазу нетронутого Y в native до paint', async action => {
+    const h = harness(true);
+    const x = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000, ease: 'linear' });
+    const initial = h.effects[0]!;
+    // Разные длительности X/Y переводят общую поверхность из native в JS.
+    const y = h.runtime.animate(h.element, { y: [0, 200] }, { duration: 2000, ease: 'linear' });
+    expect(initial.cancelled).toBe(true);
+    h.step(200);
+    expect(h.x()).toBe(20); expect(h.y()).toBe(20);
+    const effects = h.effects.length;
+    h.setClock(300);
+    if (action === 'seek') x.seek(1000); else x[action]();
+    const heldX = action === 'stop' ? 20 : 100;
+    expect(h.x()).toBe(heldX); expect(h.y()).toBe(20);
+    expect(h.effects).toHaveLength(effects);
+    expect(y.state).toBe('running');
+    h.step(400);
+    expect(h.x()).toBe(heldX); expect(h.y()).toBe(40);
+    expect(h.effects).toHaveLength(effects + 1);
+    const promoted = h.effects.at(-1)!;
+    expect(promoted.cancelled).toBe(false);
+    expect(promoted.currentTime).toBe(400);
+    expect(promoted.timing.duration).toBe(2000);
+    expect(promoted.timing.easing).toBe('linear');
+    expect(promoted.keys.map(frame => Number(/translate\(([^p]+)px/.exec(String(frame.transform))?.[1]))).toEqual([heldX, heldX]);
+    expect(promoted.keys.map(frame => Number(/translate\([^,]+,([^p]+)px/.exec(String(frame.transform))?.[1]))).toEqual([0, 200]);
+    // Независимая линейная Y-шкала совпадает с последней CSS-позой при передаче.
+    expect(200 * Number(promoted.currentTime) / 2000).toBe(h.y());
+    promoted.currentTime = 2000; promoted.complete();
+    expect(await x.finished).toEqual({ status: action === 'stop' ? 'stopped' : 'finished' });
+    expect(await y.finished).toEqual({ status: 'finished' });
+    expect(h.x()).toBe(heldX); expect(h.y()).toBe(200);
+    expect(h.effects.every(effect => effect.cancelled)).toBe(true);
+    expect(h.updates.size + h.renders.size).toBe(0);
+  });
+
   it('явное начало X не материализует скрытое продвижение Y общей поверхности', async () => {
     const h = harness();
     const first = h.runtime.animate(h.element, { x: [0, 6], y: [0, 8] }, linear);
