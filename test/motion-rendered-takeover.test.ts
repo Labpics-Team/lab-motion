@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { harness } from './fixtures/motion-runtime.js';
-import type { MotionResult } from '../src/motion/types.js';
+import { playhead } from '../src/motion/playhead.js';
+import type { MotionPlayback, MotionResult } from '../src/motion/types.js';
 
 const linear = { duration: 1200, ease: 'linear' } as const;
 type Harness = ReturnType<typeof harness>;
@@ -8,6 +9,15 @@ type Harness = ReturnType<typeof harness>;
 function rotate(h: Harness): number {
   return Number(/rotate\(([^d]+)deg\)/.exec(h.values.get('transform') ?? '')?.[1] ?? 0);
 }
+
+const controls = [
+  { name: 'pause', apply: (run: MotionPlayback) => run.pause(), after: 20, nativeRetained: false },
+  { name: 'stop', apply: (run: MotionPlayback) => run.stop(), after: 20, nativeRetained: false },
+  { name: 'reverse', apply: (run: MotionPlayback) => run.reverse(), after: 15, nativeRetained: false },
+  { name: 'timeScale=0', apply: (run: MotionPlayback) => { run.timeScale = 0; }, after: 20, nativeRetained: true },
+  { name: 'timeScale=2', apply: (run: MotionPlayback) => { run.timeScale = 2; }, after: 30, nativeRetained: true },
+  { name: 'timeScale=-2', apply: (run: MotionPlayback) => { run.timeScale = -2; }, after: 10, nativeRetained: false },
+] as const;
 
 describe('fallback takeover сохраняет последнюю успешную CSS-позу', () => {
   it.each([
@@ -90,6 +100,67 @@ describe('fallback takeover сохраняет последнюю успешну
     expect(h.x()).toBe(0);
     expect(await first.finished).toEqual({ status: 'stopped' });
     expect(await next.finished).toEqual({ status: 'finished' });
+    expect(h.updates.size + h.renders.size).toBe(0);
+  });
+
+  for (const phase of ['clock', 'update-before-paint'] as const) {
+    it.each(controls)('$name удерживает CSS-позу между кадрами: ' + phase, async ({ name, apply, after }) => {
+      const h = harness();
+      const run = playhead(h.runtime.animate(h.element, { x: [0, 100], y: [0, 200] }, { duration: 1000, ease: 'linear' }));
+      h.step(200);
+      expect(h.x()).toBe(20); expect(h.y()).toBe(40);
+      const before = h.values.get('transform');
+      if (phase === 'clock') h.setClock(300); else h.update(300);
+      apply(run);
+      expect(h.values.get('transform')).toBe(before);
+      expect(run.time).toBe(200);
+      h.step(350);
+      expect(h.x()).toBe(after); expect(h.y()).toBe(after * 2);
+      run.finish();
+      expect(await run.finished).toEqual({ status: name === 'stop' ? 'stopped' : 'finished' });
+      expect(h.updates.size + h.renders.size).toBe(0);
+    });
+  }
+
+  it.each(controls)('native $name читает compositor currentTime вместо последней CSS-записи', async ({ name, apply, nativeRetained }) => {
+    const h = harness(true);
+    const run = playhead(h.runtime.animate(h.element, { x: [0, 100], y: [0, 200] }, { duration: 1000, ease: 'linear' }));
+    const effect = h.effects[0]!;
+    expect(h.x()).toBe(0); expect(h.y()).toBe(0);
+    effect.currentTime = 200;
+    h.setClock(300);
+    apply(run);
+    expect(run.time).toBe(200);
+    expect(effect.cancelled).toBe(!nativeRetained);
+    if (nativeRetained) {
+      expect(h.effects).toHaveLength(1);
+      expect(effect.playbackRate).toBe(name === 'timeScale=0' ? 0 : 2);
+    } else {
+      expect(h.x()).toBe(20); expect(h.y()).toBe(40);
+    }
+    run.finish();
+    expect(await run.finished).toEqual({ status: name === 'stop' ? 'stopped' : 'finished' });
+    expect(h.effects.every(item => item.cancelled)).toBe(true);
+    expect(h.updates.size + h.renders.size).toBe(0);
+  });
+
+  it.each(['seek', 'finish'] as const)('%s перемещает X, удерживая CSS и исходную шкалу нетронутого Y', async action => {
+    const h = harness();
+    const x = h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000, ease: 'linear' });
+    const y = h.runtime.animate(h.element, { y: [0, 200] }, { duration: 1000, ease: 'linear' });
+    h.step(200);
+    expect(h.x()).toBe(20); expect(h.y()).toBe(40);
+    h.setClock(300);
+    if (action === 'seek') x.seek(500); else x.finish();
+    expect(h.x()).toBe(action === 'seek' ? 50 : 100);
+    expect(h.y()).toBe(40);
+    expect(y.state).toBe('running');
+    h.step(400);
+    expect(h.x()).toBe(action === 'seek' ? 60 : 100);
+    expect(h.y()).toBe(80);
+    x.finish(); y.finish();
+    expect(await x.finished).toEqual({ status: 'finished' });
+    expect(await y.finished).toEqual({ status: 'finished' });
     expect(h.updates.size + h.renders.size).toBe(0);
   });
 
