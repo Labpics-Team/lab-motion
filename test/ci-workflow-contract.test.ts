@@ -1,11 +1,12 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { isMap, isScalar, isSeq, parse, parseDocument, stringify } from 'yaml';
 import vitestConfig from '../vitest.config.js';
+import { setupPnpm } from '../scripts/setup-pnpm.mjs';
 
 type Step = {
   uses?: string;
@@ -72,8 +73,7 @@ const checkedJobs = [
   ['release.yml', 'verify'],
 ] as const;
 const pnpmSetup = {
-  name: 'Activate pinned pnpm', uses: 'pnpm/action-setup@<sha>',
-  with: { dest: '${{ runner.temp }}/setup-pnpm' },
+  name: 'Activate pinned pnpm', run: 'node scripts/setup-pnpm.mjs',
 };
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
@@ -140,6 +140,7 @@ const floorMinimumCommand = 'test "$(node --version)" = v22.0.0\n' + floorComman
 
 const verifyCommands = [
   actionlintCommand,
+  pnpmSetup.run,
   'pnpm install --frozen-lockfile',
   'pnpm check:static',
   'pnpm typecheck:native',
@@ -157,6 +158,7 @@ const verifyCommands = [
   floorMinimumCommand,
 ];
 const testCommands = [
+  pnpmSetup.run,
   'pnpm install --frozen-lockfile',
   'pnpm build',
   vitestCommand,
@@ -164,11 +166,13 @@ const testCommands = [
 ];
 const securityCommands = [securityCommand];
 const mutationCommands = [
+  pnpmSetup.run,
   'pnpm install --frozen-lockfile',
   'pnpm build',
   'pnpm exec stryker run stryker.driver.config.mjs',
 ];
 const browserCommands = [
+  pnpmSetup.run,
   'pnpm install --frozen-lockfile',
   'pnpm exec playwright install --dry-run ${{ matrix.browser }}',
   'pnpm typecheck:browser',
@@ -181,7 +185,6 @@ const browserCommands = [
 // Dependabot, поэтому контракт требует полный SHA разрешённого репозитория, а не конкретный.
 const allowedActions = new Set([
   'actions/checkout', 'actions/setup-node', 'actions/upload-artifact', 'actions/download-artifact',
-  'pnpm/action-setup',
 ]);
 const externalAction = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$/;
 const localWorkflow = /^\.\/\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/;
@@ -254,7 +257,6 @@ const requiredActions = {
         "node-version": "24"
       }
     },
-    { index: 3, ...pnpmSetup },
     {
       "index": 17,
       "name": "Setup consumer Node floor",
@@ -281,7 +283,6 @@ const requiredActions = {
         "node-version": "24"
       }
     },
-    { index: 2, ...pnpmSetup }
   ],
   "tests": [
     {
@@ -301,7 +302,6 @@ const requiredActions = {
         "node-version": "24"
       }
     },
-    { index: 2, ...pnpmSetup },
     {
       "index": 6,
       "name": "Setup registered native-clock Node",
@@ -328,7 +328,6 @@ const requiredActions = {
         "node-version": "24"
       }
     },
-    { index: 2, ...pnpmSetup }
   ],
   "security": [
     {
@@ -368,7 +367,7 @@ function assertCheckExecution(workflows: Map<string, Workflow>) {
     expect(job!['runs-on'], `${file}/${jobId}`).toBe(trustedRunner);
     if (file === 'ci.yml' && jobId === 'security') continue;
     const steps = job!.steps ?? [];
-    const setup = steps.filter(item => item.uses?.startsWith('pnpm/action-setup@'));
+    const setup = steps.filter(item => item.run?.includes('scripts/setup-pnpm.mjs'));
     expect(setup, `${file}/${jobId}: нужен один setup pnpm`).toHaveLength(1);
     const activation = setup[0]!;
     const setupIndex = steps.indexOf(activation);
@@ -378,12 +377,13 @@ function assertCheckExecution(workflows: Map<string, Workflow>) {
     expect(nodeIndex).toBeGreaterThan(checkoutIndex);
     expect(setupIndex).toBeGreaterThan(nodeIndex);
     const checkoutPath = steps[checkoutIndex]!.with?.path;
-    expect({ ...activation, uses: unpin(activation.uses!) }).toEqual({
+    expect(activation).toEqual({
       ...pnpmSetup, name: activation.name,
-      with: { ...pnpmSetup.with,
-        ...(checkoutPath ? { package_json_file: `${checkoutPath}/package.json` } : {}),
-      },
+      run: checkoutPath
+        ? `node ${checkoutPath}/scripts/setup-pnpm.mjs ${checkoutPath}/package.json` : pnpmSetup.run,
+      ...(file === 'browser.yml' ? { shell: 'bash' } : {}),
     });
+    expect(steps.slice(0, setupIndex).some(item => /\bpnpm\s/.test(item.run ?? ''))).toBe(false);
     expect(steps.some(item => item.run?.includes('corepack enable'))).toBe(false);
   }
   // Hosted publish сохраняет отдельные provenance и privilege-границы.
@@ -466,7 +466,7 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(ci.jobs.documentation).toEqual({ uses: './.github/workflows/docs.yml' });
   expect(workflows.get('docs.yml')!.on).toEqual({ workflow_call: null });
   const reader = workflows.get('docs.yml')!.jobs.reader!;
-  assertCommands(reader, ['pnpm install --frozen-lockfile', 'pnpm docs:build',
+  assertCommands(reader, [pnpmSetup.run, 'pnpm install --frozen-lockfile', 'pnpm docs:build',
     'pnpm exec playwright install --with-deps chromium firefox webkit', 'pnpm docs:test']);
   // Нет ложных последовательных зависимостей: всё сходится только в CI.
   for (const job of [verify, tests, mutation, security]) expect(job.needs).toBeUndefined();
@@ -527,6 +527,85 @@ function assertNativeGraph(files: Map<string, string>) {
   }]);
 }
 
+function withPnpmFixture(check: (manifest: string, env: NodeJS.ProcessEnv) => void) {
+  const directory = mkdtempSync(join(tmpdir(), 'motion-pnpm-'));
+  const manifest = join(directory, 'package.json');
+  const env = { ...process.env, RUNNER_TEMP: directory, GITHUB_PATH: join(directory, 'github-path') };
+  writeFileSync(manifest, JSON.stringify({ packageManager: 'pnpm@7.19.0' }));
+  writeFileSync(env.GITHUB_PATH, 'existing-path\n');
+  try { check(manifest, env); } finally { rmSync(directory, { recursive: true, force: true }); }
+}
+
+describe('установка pnpm перед проверками', () => {
+  it('читает pin исходника, изолирует prefix/cache и публикует PATH после проверки CLI', () => {
+    withPnpmFixture((manifest, env) => {
+      const prefixes: string[] = [];
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const calls: string[] = [];
+        const installed = setupPnpm(manifest, env, (command: string, args: string[], options: Record<string, unknown>) => {
+          expect(readFileSync(env.GITHUB_PATH!, 'utf8')).toBe('existing-path\n' + prefixes.map(prefix => `${join(prefix, 'bin')}\n`).join(''));
+          calls.push(command);
+          expect(options.env).toBe(env);
+          if (command === 'npm') {
+            const prefix = options.cwd as string;
+            expect(dirname(prefix)).toBe(env.RUNNER_TEMP);
+            expect(prefixes).not.toContain(prefix);
+            expect(args).toEqual(['install', '--global', '--prefix', prefix, '--cache', join(prefix, 'cache'),
+              '--ignore-scripts', '--no-audit', '--no-fund', 'pnpm@7.19.0']);
+            expect(options.stdio).toBe('inherit');
+            return '';
+          }
+          expect(command).toBe(join(options.cwd as string, 'bin', 'pnpm'));
+          expect(args).toEqual(['--version']);
+          expect(options.encoding).toBe('utf8');
+          return '7.19.0\n';
+        });
+        expect(calls).toEqual(['npm', join(installed.bin, 'pnpm')]);
+        prefixes.push(installed.prefix);
+        expect(readFileSync(env.GITHUB_PATH!, 'utf8')).toBe('existing-path\n' + prefixes.map(prefix => `${join(prefix, 'bin')}\n`).join(''));
+      }
+    });
+  });
+
+  it.each([undefined, null, {}, ['pnpm@7.19.0'], 'npm@7.19.0', 'pnpm@latest', 'pnpm@^7.19.0',
+    'pnpm@7.19', 'pnpm@07.19.0', 'pnpm@7.19.0 extra', 'pnpm@https://example.com/pnpm.tgz', 'pnpm@7.19.0\n']
+    .map(packageManager => ({ packageManager })))
+    ('отвергает неточный packageManager до установки: %j', ({ packageManager }) => {
+      withPnpmFixture((manifest, env) => {
+        writeFileSync(manifest, JSON.stringify({ packageManager }));
+        let calls = 0;
+        expect(() => setupPnpm(manifest, env, () => { calls++; return ''; })).toThrow(/точную версию/);
+        expect(calls).toBe(0);
+        expect(readFileSync(env.GITHUB_PATH!, 'utf8')).toBe('existing-path\n');
+        expect(readdirSync(env.RUNNER_TEMP!).sort()).toEqual(['github-path', 'package.json']);
+      });
+    });
+
+  it.each(['install', 'probe', 'version'] as const)('сбой %s не активирует частично установленный CLI', (failure) => {
+    withPnpmFixture((manifest, env) => {
+      const calls: string[] = [];
+      expect(() => setupPnpm(manifest, env, (command: string) => {
+        calls.push(command);
+        if (failure === 'install' || failure === 'probe' && command !== 'npm') throw new Error('test failure');
+        return command === 'npm' ? '' : '0.0.0\n';
+      })).toThrow();
+      expect(calls).toHaveLength(failure === 'install' ? 1 : 2);
+      expect(readFileSync(env.GITHUB_PATH!, 'utf8')).toBe('existing-path\n');
+    });
+  });
+
+  it.each(['RUNNER_TEMP', 'GITHUB_PATH'])('отсутствующий или некорректный %s не запускает установку', (key) => {
+    withPnpmFixture((manifest, env) => {
+      for (const value of [undefined, 'relative-path', env[key] + '\nextra-path']) {
+        let calls = 0;
+        expect(() => setupPnpm(manifest, { ...env, [key]: value }, () => { calls++; return ''; })).toThrow(key);
+        expect(calls).toBe(0);
+        expect(readFileSync(env.GITHUB_PATH!, 'utf8')).toBe('existing-path\n');
+      }
+    });
+  });
+});
+
 describe('нативный граф CI', () => {
   it('проверяет любой PR через явные обязательные jobs', () => assertNativeGraph(sources()));
 
@@ -546,18 +625,20 @@ describe('нативный граф CI', () => {
     '%s/%s сохраняет локальный setup и единственный источник версии pnpm', (file, jobId) => {
       const original = sources();
       assertNativeGraph(original);
-      for (const mutation of ['remove', 'dest', 'version', 'run_install', 'if', 'order', 'package_json_file'] as const) {
+      for (const mutation of ['remove', 'remote-action', 'version', 'install', 'if', 'order', 'late', 'manifest', 'env'] as const) {
         const files = new Map(original);
         const workflow = parse(files.get(file)!) as Workflow;
         const steps = workflow.jobs[jobId]!.steps!;
-        const index = steps.findIndex(item => item.uses?.startsWith('pnpm/action-setup@'));
+        const index = steps.findIndex(item => item.run?.includes('scripts/setup-pnpm.mjs'));
         const activation = steps[index]!;
         if (mutation === 'remove') steps.splice(index, 1);
-        else if (mutation === 'dest') activation.with!.dest = '/opt/hostedtoolcache/setup-pnpm';
-        else if (mutation === 'version') activation.with!.version = '11.11.0';
-        else if (mutation === 'run_install') activation.with!.run_install = true;
+        else if (mutation === 'remote-action') { delete activation.run; activation.uses = `pnpm/action-setup@${'a'.repeat(40)}`; }
+        else if (mutation === 'version') activation.run += ' pnpm@11.11.0';
+        else if (mutation === 'install') activation.run += '\npnpm install';
         else if (mutation === 'if') activation.if = false;
-        else if (mutation === 'package_json_file') activation.with!.package_json_file = 'wrong/package.json';
+        else if (mutation === 'manifest') activation.run += ' wrong/package.json';
+        else if (mutation === 'env') activation.env = { RUNNER_TEMP: '/opt/hostedtoolcache' };
+        else if (mutation === 'late') { steps.splice(index, 1); steps.push(activation); }
         else { steps.splice(index, 1); steps.unshift(activation); }
         files.set(file, stringify(workflow));
         expect(() => assertNativeGraph(files), `${file}/${jobId}: ${mutation}`).toThrow();
@@ -812,6 +893,7 @@ const pinMutants: ReadonlyArray<readonly [string, (source: string) => string]> =
   ['изменяемая ветка вместо SHA', (source) => source.replace(/(actions\/checkout@)[0-9a-f]{40}/, '$1main')],
   ['сокращённый SHA', (source) => source.replace(/(actions\/checkout@)[0-9a-f]{40}/, (_, prefix: string) => `${prefix}3d3c42e`)],
   ['чужой владелец action', (source) => source.replace('actions/checkout@', 'someone/checkout@')],
+  ['запрещённый pnpm action с полным SHA', (source) => source.replace('actions/checkout@', 'pnpm/action-setup@')],
   ['тег в записи `uses :` с пробелом перед двоеточием', (source) => source.replace(checkoutPin, 'uses : actions/checkout@v7')],
   ['нет комментария версии', (source) => source.replace(/(actions\/checkout@[0-9a-f]{40})[ \t]+#.*/, '$1')],
   ['комментарий без патча', (source) => source.replace(/(actions\/checkout@[0-9a-f]{40}[ \t]+# v\d+)\.\d+\.\d+/, '$1')],

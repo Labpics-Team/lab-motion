@@ -48,10 +48,7 @@ jobs:
           node-version: '24.19.0'
 
       - name: Активировать pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-        with:
-          dest: ${{ runner.temp }}/setup-pnpm
-          package_json_file: candidate/package.json
+        run: node candidate/scripts/setup-pnpm.mjs candidate/package.json
 
       - name: Собрать обе версии
         id: build

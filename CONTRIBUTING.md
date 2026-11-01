@@ -1,5 +1,7 @@
 # Вклад в @labpics/motion
 
+**Diátaxis:** how-to
+
 ## Цель изменений
 
 Каждое изменение должно улучшать наблюдаемое поведение потребителя и сохранять инварианты движка. GitHub Issues описывают задачи и их статус. Планы выполнения, handoff и отчёты рабочих сессий хранятся вне продуктового репозитория. Документация описывает действующие контракты.
@@ -123,14 +125,16 @@ publish сохраняет защищённое окружение npm и proven
 `test/ci-workflow-contract.test.ts`.
 
 Версию pnpm задаёт `packageManager` извлечённого исходника.
-Закреплённый [pnpm/action-setup](https://github.com/pnpm/action-setup/tree/0ebf47130e4866e96fce0953f49152a61190b271)
-устанавливает её в `${{ runner.temp }}/setup-pnpm` после checkout и Setup Node.
+После checkout и Setup Node `scripts/setup-pnpm.mjs` устанавливает точную версию
+через npm в уникальный каталог внутри `RUNNER_TEMP`, с отдельным cache и без
+lifecycle scripts. Сам CLI проверяется до добавления его bin в `GITHUB_PATH`.
 Для парного benchmark читается `candidate/package.json` — оба дерева извлечены
-в подкаталоги. Выбор job-local каталога сохраняет работу с неизменяемыми
-подготовленными инструментами раннера: [Corepack создаёт shims рядом со своим
-binary](https://github.com/nodejs/corepack/blob/d4dcb1f89741603e776bba9d457425750fa26987/README.md#corepack-enable--name)
-и отказывает при read-only filesystem. Установка инструмента в temp не требует
-изменения образа или общего toolcache.
+в подкаталоги. [pnpm поддерживает установку через npm](https://pnpm.io/installation);
+[`--prefix` задаёт каталог глобальной установки](https://docs.npmjs.com/cli/v11/configuring-npm/folders).
+Такой путь сохраняет неизменяемые инструменты раннера и не требует стороннего
+setup-action. Corepack тоже позволяет создавать shims в отдельном каталоге через
+[`--install-directory`](https://github.com/nodejs/corepack/blob/d4dcb1f89741603e776bba9d457425750fa26987/README.md#corepack-enable--name),
+но прямая установка pnpm обходится без дополнительного посредника выбора версии.
 
 ## Требования к PR
 

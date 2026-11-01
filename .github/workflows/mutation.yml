@@ -39,9 +39,7 @@ jobs:
           node-version: "24"
 
       - name: Activate pinned pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-        with:
-          dest: ${{ runner.temp }}/setup-pnpm
+        run: node scripts/setup-pnpm.mjs
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -71,9 +69,7 @@ jobs:
           node-version: "24"
 
       - name: Activate pinned pnpm
-        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
-        with:
-          dest: ${{ runner.temp }}/setup-pnpm
+        run: node scripts/setup-pnpm.mjs
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
