@@ -136,6 +136,14 @@ setup-action. Corepack тоже позволяет создавать shims в �
 [`--install-directory`](https://github.com/nodejs/corepack/blob/d4dcb1f89741603e776bba9d457425750fa26987/README.md#corepack-enable--name),
 но прямая установка pnpm обходится без дополнительного посредника выбора версии.
 
+При release replay старый исходник может предшествовать установщику. Поэтому
+release-job извлекает только его Git blob из неизменяемого
+[`github.workflow_sha`](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#github-context)
+в отдельный временный файл, а pin читает из `package.json` проверяемого релиза.
+Отсутствующий SHA или установщик завершает job до установки; другой ref вместо
+ревизии workflow не используется. Существующие checkout с `fetch-depth: 0` и
+`git fetch origin main` предоставляют историю; второе рабочее дерево не требуется.
+
 ## Требования к PR
 
 В описании должны быть:

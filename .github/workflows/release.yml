@@ -145,7 +145,21 @@ jobs:
           package-manager-cache: false
 
       - name: Activate pinned pnpm
-        run: node scripts/setup-pnpm.mjs
+        shell: bash
+        env:
+          WORKFLOW_SHA: ${{ github.workflow_sha }}
+        run: |
+          set -euo pipefail
+          [[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] \
+            || { echo "::error::workflow_sha должен быть полным SHA"; exit 1; }
+          [[ "$(git cat-file -t "$WORKFLOW_SHA")" == commit ]] \
+            || { echo "::error::ревизия workflow недоступна или не commit"; exit 1; }
+          [[ "$(git cat-file -t "$WORKFLOW_SHA:scripts/setup-pnpm.mjs")" == blob ]] \
+            || { echo "::error::установщик отсутствует в ревизии workflow"; exit 1; }
+          installer=$(mktemp --suffix=.mjs "$RUNNER_TEMP/setup-pnpm.XXXXXXXX")
+          trap 'rm -f -- "$installer"' EXIT
+          git show "$WORKFLOW_SHA:scripts/setup-pnpm.mjs" > "$installer"
+          node "$installer" package.json
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile

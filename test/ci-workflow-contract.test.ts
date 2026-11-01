@@ -75,6 +75,19 @@ const checkedJobs = [
 const pnpmSetup = {
   name: 'Activate pinned pnpm', run: 'node scripts/setup-pnpm.mjs',
 };
+const releasePnpmCommand = [
+  'set -euo pipefail',
+  '[[ "$WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]] \\',
+  '  || { echo "::error::workflow_sha должен быть полным SHA"; exit 1; }',
+  '[[ "$(git cat-file -t "$WORKFLOW_SHA")" == commit ]] \\',
+  '  || { echo "::error::ревизия workflow недоступна или не commit"; exit 1; }',
+  '[[ "$(git cat-file -t "$WORKFLOW_SHA:scripts/setup-pnpm.mjs")" == blob ]] \\',
+  '  || { echo "::error::установщик отсутствует в ревизии workflow"; exit 1; }',
+  'installer=$(mktemp --suffix=.mjs "$RUNNER_TEMP/setup-pnpm.XXXXXXXX")',
+  String.raw`trap 'rm -f -- "$installer"' EXIT`,
+  'git show "$WORKFLOW_SHA:scripts/setup-pnpm.mjs" > "$installer"',
+  'node "$installer" package.json',
+].join('\n');
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
   + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
@@ -377,7 +390,11 @@ function assertCheckExecution(workflows: Map<string, Workflow>) {
     expect(nodeIndex).toBeGreaterThan(checkoutIndex);
     expect(setupIndex).toBeGreaterThan(nodeIndex);
     const checkoutPath = steps[checkoutIndex]!.with?.path;
-    expect(activation).toEqual({
+    expect(activation).toEqual(file === 'release.yml' ? {
+      name: pnpmSetup.name, shell: 'bash',
+      env: { WORKFLOW_SHA: '${{ github.workflow_sha }}' },
+      run: `${releasePnpmCommand}\n`,
+    } : {
       ...pnpmSetup, name: activation.name,
       run: checkoutPath
         ? `node ${checkoutPath}/scripts/setup-pnpm.mjs ${checkoutPath}/package.json` : pnpmSetup.run,
@@ -643,6 +660,30 @@ describe('нативный граф CI', () => {
         files.set(file, stringify(workflow));
         expect(() => assertNativeGraph(files), `${file}/${jobId}: ${mutation}`).toThrow();
       }
+    },
+  );
+
+  it.each(['${{ needs.resolve.outputs.source_sha }}', '${{ github.sha }}', 'main', undefined])(
+    'release привязывает установщик к ревизии workflow, отвергая %s', (sha) => {
+      const files = sources();
+      const release = parse(files.get('release.yml')!) as Workflow;
+      step(release.jobs.verify!, pnpmSetup.name).env!.WORKFLOW_SHA = sha!;
+      files.set('release.yml', stringify(release));
+      expect(() => assertNativeGraph(files)).toThrow();
+    },
+  );
+
+  it.each(['helper-ref', 'source-ref', 'fallback', 'execute-before-binding'] as const)(
+    'release отвергает нарушение происхождения установщика: %s', (mutation) => {
+      const files = sources();
+      const release = parse(files.get('release.yml')!) as Workflow;
+      const activation = step(release.jobs.verify!, pnpmSetup.name);
+      if (mutation === 'helper-ref') activation.run = activation.run!.replaceAll('scripts/setup-pnpm.mjs', 'scripts/missing-pnpm.mjs');
+      else if (mutation === 'source-ref') activation.run = activation.run!.replaceAll('$WORKFLOW_SHA', '$EXPECTED_SOURCE_SHA');
+      else if (mutation === 'fallback') activation.run += '\nnode scripts/setup-pnpm.mjs';
+      else activation.run = `node "$installer" package.json\n${activation.run}`;
+      files.set('release.yml', stringify(release));
+      expect(() => assertNativeGraph(files)).toThrow();
     },
   );
 
