@@ -1,5 +1,7 @@
 # API
 
+**Diátaxis:** reference.
+
 Обычная работа использует один импорт:
 
 ```typescript
