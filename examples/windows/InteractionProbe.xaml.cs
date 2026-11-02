@@ -38,7 +38,7 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
     private readonly InteractionTrace trace = new();
     private readonly List<CompositionObject> resources = [];
     private readonly List<(RoutedEvent Event, PointerEventHandler Handler)> inputHandlers = [];
-    private readonly TaskCompletionSource<bool> initialIdle = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly TaskCompletionSource<bool> initialPosition = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private InteractionTracker? tracker;
     private VisualInteractionSource? source;
     private string axis = "";
@@ -84,11 +84,11 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
             initialRequest = tracker!.TryUpdatePosition(Coordinates(InitialCoordinate));
             trace.Add("initialRequested", new { requestId = initialRequest, position = Vector(Coordinates(InitialCoordinate)) });
             trace.Flush();
-            await initialIdle.Task.WaitAsync(TimeSpan.FromSeconds(8));
+            await initialPosition.Task.WaitAsync(TimeSpan.FromSeconds(8));
             if (detached) return;
             var position = tracker.Position;
             if (Vector3.Distance(position, Coordinates(InitialCoordinate)) > .001f)
-                throw new InvalidOperationException("После начального Idle readback не равен 500.");
+                throw new InvalidOperationException("После подтверждения начальной позиции readback не равен 500.");
             CheckGeometry();
             ready = true;
             Status.Text = "Ready";
@@ -205,7 +205,7 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
             });
             trace.Flush();
             if (name != "pointerPressed" || args.Pointer.PointerDeviceType != PointerDeviceType.Touch) return;
-            if (!ready) throw new InvalidOperationException("Touch пришёл до начального Idle.");
+            if (!ready) throw new InvalidOperationException("Touch пришёл до подтверждения начальной позиции.");
             try
             {
                 source!.TryRedirectForManipulation(args.GetCurrentPoint(null));
@@ -248,7 +248,14 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
     }
 
     public void ValuesChanged(InteractionTracker sender, InteractionTrackerValuesChangedArgs args)
-        => Observe(sender, "value", args.RequestId, args.Position);
+    {
+        Observe(sender, "value", args.RequestId, args.Position);
+        // TryUpdatePosition из Idle меняет значение без повторного входа в Idle.
+        if (!detached && args.RequestId == initialRequest &&
+            Vector3.Distance(args.Position, Coordinates(InitialCoordinate)) <= .001f &&
+            Vector3.Distance(sender.Position, Coordinates(InitialCoordinate)) <= .001f)
+            initialPosition.TrySetResult(true);
+    }
     public void InertiaStateEntered(InteractionTracker sender, InteractionTrackerInertiaStateEnteredArgs args)
         => Observe(sender, "inertia", args.RequestId, velocity: args.PositionVelocityInPixelsPerSecond);
     public void InteractingStateEntered(InteractionTracker sender, InteractionTrackerInteractingStateEnteredArgs args)
@@ -256,16 +263,12 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
     public void CustomAnimationStateEntered(InteractionTracker sender, InteractionTrackerCustomAnimationStateEnteredArgs args)
         => Observe(sender, "customAnimation", args.RequestId);
     public void IdleStateEntered(InteractionTracker sender, InteractionTrackerIdleStateEnteredArgs args)
-    {
-        Observe(sender, "idle", args.RequestId);
-        if (!detached && args.RequestId == initialRequest && Vector3.Distance(sender.Position, Coordinates(InitialCoordinate)) <= .001f)
-            initialIdle.TrySetResult(true);
-    }
+        => Observe(sender, "idle", args.RequestId);
     public void RequestIgnored(InteractionTracker sender, InteractionTrackerRequestIgnoredArgs args)
     {
         Observe(sender, "ignored", args.RequestId);
         if (args.RequestId == initialRequest)
-            initialIdle.TrySetException(new InvalidOperationException("Нативный исполнитель отклонил начальную позицию."));
+            initialPosition.TrySetException(new InvalidOperationException("Нативный исполнитель отклонил начальную позицию."));
     }
 
     private void Fail(string phase, Exception error)
@@ -284,7 +287,7 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
         if (detached) return;
         detached = true;
         ready = false;
-        initialIdle.TrySetCanceled();
+        initialPosition.TrySetCanceled();
         foreach (var (routedEvent, handler) in inputHandlers) TouchStage.RemoveHandler(routedEvent, handler);
         inputHandlers.Clear();
         ElementCompositionPreview.SetElementChildVisual(TouchStage, null);

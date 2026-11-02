@@ -79,8 +79,9 @@ function evaluate(events, scenario) {
   require(metadata.sequence < ready.sequence && Number.isSafeInteger(r.requestId) && r.requestId > 0 && vector(r.position) && near(r.progress, .5) &&
     near(r.position[axis], 500, 1) && otherAxes.every(other => Math.abs(r.position[other]) <= 1) &&
     r.width === m.width && r.height === m.height && r.scale === m.scale && near(r.gain, m.gain, .0001), 'Ready не подтверждает начальную позицию и геометрию.');
-  require(motions.some(event => event.sequence < ready.sequence && event.data.phase === 'idle' &&
-    event.data.requestId === r.requestId && near(event.data.progress, .5) && near(event.data.readbackProgress, .5)), 'Нет начального native Idle с readback до Ready.');
+  require(motions.some(event => event.sequence < ready.sequence && event.data.phase === 'value' &&
+    event.data.requestId === r.requestId && near(event.data.progress, .5) && near(event.data.readbackProgress, .5)), 'Нет начального native ValuesChanged с readback до Ready.');
+  require(motions.filter(event => event.sequence < ready.sequence).every(event => ['value', 'idle'].includes(event.data.phase)), 'До Ready началось непредусмотренное движение.');
   const pressed = select('input', data => data.event === 'pointerPressed' && data.device === 'Touch');
   if (pressed.length === 0) return { name: scenario.name, status: 'INCOMPLETE', reason: 'Touch PointerPressed не доставлен приложению; результат CLI этого не заменяет.' };
   require(pressed.length === 1, 'Доставлено больше одного touch-нажатия.');

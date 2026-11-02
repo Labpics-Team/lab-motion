@@ -84,6 +84,12 @@ test('mouse и успешный CLI не заменяют Touch PointerPressed',
   assert.equal(verdict(f).status, 'INCOMPLETE');
 });
 
+test('TryUpdatePosition из Idle подтверждается value без повторного Idle callback', () => {
+  const f = fixture();
+  f.events = renumber(f.events.filter(event => !(event.kind === 'motion' && event.data.phase === 'idle' && event.data.requestId === 1)));
+  assert.equal(verdict(f).status, 'PASS');
+});
+
 test('нулевая native release velocity обнаруживается при правильном финале', () => {
   for (const name of names) {
     const f = fixture(name);
@@ -172,10 +178,10 @@ test('геометрический leak обнаруживается незав�
   rejected(f, /неактивную ось/);
 });
 
-test('Ready без начального native Idle недостаточен', () => {
+test('Ready без начального native ValuesChanged недостаточен', () => {
   const f = fixture();
-  f.events = renumber(f.events.filter(event => !(event.kind === 'motion' && event.data.phase === 'idle' && event.data.requestId === 1)));
-  rejected(f, /native Idle с readback до Ready/);
+  f.events = renumber(f.events.filter(event => !(event.kind === 'motion' && event.data.phase === 'value' && event.data.requestId === 1)));
+  rejected(f, /native ValuesChanged с readback до Ready/);
 });
 
 test('совпадение цели в summary при неверном readback не считается покоем', () => {

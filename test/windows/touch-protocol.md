@@ -49,8 +49,9 @@ Y source использует EnabledWithInertia; другая ось получ
 
 Принятие требует всех следующих наблюдений:
 
-- До Ready получен native Idle с положительным requestId и фактической позицией
-  q = 0.5. Metadata и Ready совпадают со сценарием и фактическим масштабом.
+- До Ready получен native ValuesChanged начального запроса с положительным
+  requestId, event position и readback q = 0.5. Metadata и Ready совпадают
+  со сценарием и фактическим масштабом; другого движения до Ready нет.
 - После Ready доставлен ровно один Touch PointerPressed; TryRedirectForManipulation
   вернулся для того же pointerId. Exit 0 CLI не заменяет доставку.
 - Затем получены Interacting, как минимум два разных ValuesChanged и Inertia
@@ -88,3 +89,11 @@ PTP, mouse drag, горизонтальный ввод, смена DPI/разм�
 PullToRefresh](https://github.com/microsoft/WindowsAppSDK-Samples/blob/f1be017f26a0feae4c8dc805748eab0a1f7b4fc6/Samples/SceneGraph/SampleGalleryApp/Samples/PullToRefresh/PullToRefresh.xaml.cs#L138)
 показывает same-axis scaling с EnabledWithInertia. Ни один источник не заменяет
 проверку cross-axis release.
+
+Уточнение готовности после прогона `41506273050` на `49bc2c4`: все четыре
+запуска подтвердили позицию 500 через ValuesChanged, но исходная проверка
+ошибочно требовала повторного IdleStateEntered. [Таблица TryUpdatePosition](https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.ui.composition.interactions.interactiontracker.tryupdateposition?view=windows-app-sdk-2.0)
+прямо указывает, что из Idle обновляется значение без смены состояния.
+Начальная готовность поэтому требует подтверждения позиции; проверка Idle
+после Inertia и все допуски жеста/скорости сохранены. Первый прогон завершился
+до ввода и не сообщает ничего о переносе скорости между осями.
