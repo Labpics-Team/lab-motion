@@ -7,8 +7,9 @@
     <TextBlock Text="Нажатие мышью, касанием или пробелом" TextWrapping="Wrap" />
     <Button x:Name="Press" AutomationProperties.AutomationId="Press" HorizontalAlignment="Left" Padding="0">
       <Grid MinWidth="240" MinHeight="64">
+        <!-- Непрозрачностью владеет Composition-привязка; XAML не задаёт её. -->
         <Border x:Name="Highlight" Background="{ThemeResource SystemControlHighlightAccentBrush}"
-                Opacity="0" CornerRadius="4" />
+                CornerRadius="4" />
         <TextBlock Text="Удерживайте кнопку" Margin="20" HorizontalAlignment="Center"
                    VerticalAlignment="Center" IsHitTestVisible="False" />
       </Grid>

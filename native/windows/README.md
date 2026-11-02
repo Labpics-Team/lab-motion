@@ -32,6 +32,10 @@ await motion.AnimateTo(1, new Spring(350, 0));
 Другие свойства не затрагиваются. Handle и канал освобождаются на потоке
 владельца. Перед прямой записью свойства или запуском чужой Composition-анимации
 освободите его привязку LabMotion: произвольную внешнюю замену адаптер не отслеживает.
+Для visual из `ElementCompositionPreview.GetElementVisual` это относится и к XAML:
+он может записать локальное значение свойства при следующем layout tick и снять
+анимацию. В примере Opacity оставлена в XAML по умолчанию, начальную прозрачность
+задаёт канал прогресса. См. [правила совместного владения visual](https://github.com/microsoft/WindowsCompositionSamples/wiki/XAML-Composition-Interop-Behavior-Changes).
 
 Один экземпляр принадлежит потоку с `DispatcherQueue`. `AnimateTo` заменяет
 предыдущую операцию с результатом `Stopped/replaced`. При retarget из Inertia
