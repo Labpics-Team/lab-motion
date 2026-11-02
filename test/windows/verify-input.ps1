@@ -59,7 +59,14 @@ function Read-Trace {
     if (!(Test-Path -LiteralPath $trace)) { return @() }
     # Flush ненадолго владеет записью; повторяем лишь гонку совместного чтения.
     for ($attempt = 0; $attempt -lt 10; $attempt++) {
-        try { $lines = [IO.File]::ReadAllLines($trace); break }
+        try {
+            $stream = [IO.FileStream]::new($trace, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+            $reader = [IO.StreamReader]::new($stream)
+            try { $text = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            # Последняя строка могла ещё записываться; следующая выборка её увидит.
+            $lines = $text.Split("`n") | Select-Object -SkipLast 1
+            break
+        }
         catch [IO.IOException] { if ($attempt -eq 9) { throw }; Start-Sleep -Milliseconds 20 }
     }
     return @($lines | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json })
