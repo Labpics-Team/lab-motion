@@ -5,33 +5,33 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { verifyTouchTrace, verifyTouch } from './assert-touch.mjs';
 
-const names = ['x-down', 'y-down', 'x-up', 'y-up'];
+const names = ['y-down', 'y-up'];
 const renumber = events => events.map((event, index) => ({ ...event, sequence: index + 1 }));
 
-function fixture(name = 'x-down', scale = 1) {
+function fixture(name = 'y-down', scale = 1) {
   const [axis, directionName] = name.split('-');
   const direction = directionName === 'down' ? 1 : -1;
   const target = direction > 0 ? 1 : 0;
   const start = { x: 240, y: 160 - 40 * direction };
   const end = { x: 240, y: 160 + 40 * direction };
-  const scenario = { schema: 1, name, axis, direction, gesture: 'swipe', durationMs: 300,
+  const scenario = { schema: 2, coordinates: 'native', name, axis, direction, gesture: 'swipe', durationMs: 300,
     coordinateSpace: 'viewport-dip', start, end, viewport: { width: 480, height: 320, scale },
     injection: { coordinateSpace: 'screen-pixel', start: { x: 400, y: 300 },
       end: { x: 400, y: 300 + 80 * direction * scale }, exitCode: 0 } };
-  const position = q => ({ x: axis === 'x' ? q * 1000 : 0, y: axis === 'y' ? q * 1000 : 0, z: 0 });
+  const position = q => ({ x: 0, y: -q * 320, z: 0 });
   const motion = (seconds, phase, progress, requestId = 0, velocity = null) => ({ seconds, kind: 'motion', data: {
     phase, requestId, position: position(progress), readbackPosition: position(progress), progress, readbackProgress: progress,
     positionOrigin: phase === 'value' ? 'event' : 'readback',
     nativeVelocity: velocity === null ? null : position(velocity), progressVelocity: velocity,
   } });
   const events = [
-    { seconds: 0, kind: 'metadata', data: { axis, direction, width: 480, height: 320, scale, gain: -3.125,
-      minimum: 0, maximum: 1000, initial: 500, target: target * 1000, responseMilliseconds: 350,
+    { seconds: 0, kind: 'metadata', data: { axis, direction, coordinates: 'native', width: 480, height: 320, scale, unitsPerProgress: -320,
+      minimum: -320, maximum: 0, initial: -160, target: -target * 320, responseMilliseconds: 350,
       bounce: 0, positionYSourceMode: 'EnabledWithInertia' } },
     motion(.01, 'value', .5, 1),
     motion(.02, 'idle', .5, 1),
     { seconds: .03, kind: 'ready', data: { requestId: 1, position: position(.5), progress: .5,
-      width: 480, height: 320, scale, gain: -3.125 } },
+      width: 480, height: 320, scale, unitsPerProgress: -320 } },
     { seconds: .04, kind: 'input', data: { event: 'pointerPressed', device: 'Touch', pointerId: 7,
       ...start, pointerTimestamp: 40000, ready: true } },
     { seconds: .05, kind: 'redirect', data: { pointerId: 7, result: 'returned' } },
@@ -111,10 +111,10 @@ test('неверный знак и крупная ошибка масштаба 
   }
 });
 
-test('velocity на исходной Y не выдаётся за transfer в X', () => {
+test('velocity в X не выдаётся за движение native Y', () => {
   const f = fixture();
   change(f, phase('inertia'), event => {
-    event.data.nativeVelocity = { x: 0, y: 833, z: 0 };
+    event.data.nativeVelocity = { x: -267, y: 0, z: 0 };
     event.data.progressVelocity = 0;
   });
   rejected(f, /неактивной оси/);
@@ -148,7 +148,7 @@ test('потеря или чужой pointerId redirect обнаруживают
 });
 
 test('неверная физическая дистанция не проходит как другая DPI', () => {
-  const f = fixture('x-down', 2);
+  const f = fixture('y-down', 2);
   f.scenario.injection.end.y = 380;
   rejected(f, /расстояние или DPI/);
 });
@@ -174,7 +174,7 @@ test('неверный масштаб или знак drag не скрывает
 
 test('геометрический leak обнаруживается независимо от summary progress', () => {
   const f = fixture();
-  change(f, event => event.seconds === .2, event => { event.data.position.y = 2; });
+  change(f, event => event.seconds === .2, event => { event.data.position.x = 2; });
   rejected(f, /неактивную ось/);
 });
 
@@ -260,7 +260,6 @@ test('полный каталог обязателен; обе недостав�
     const result = verifyTouch(directory);
     assert.equal(result.status, 'PASS');
     assert.deepEqual(result.scenarios.map(value => value.name), names);
-    assert.deepEqual(result.pairs.map(value => value.velocityRatioXToY), [1, 1]);
   } finally {
     assert.equal(dirname(directory), temporaryRoot);
     rmSync(directory, { recursive: true });

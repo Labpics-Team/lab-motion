@@ -19,7 +19,7 @@ if ($executables.Count -ne 1) { throw 'Ожидался проверенный w
 $cli = $executables[0].FullName
 $saved = @{}
 foreach ($name in @('LAB_MOTION_PROBE_OUTPUT', 'LAB_MOTION_PRESS_TRACE', 'LAB_MOTION_INTERACTION_OUTPUT',
-    'LAB_MOTION_INTERACTION_AXIS', 'LAB_MOTION_INTERACTION_DIRECTION', 'WINAPP_UI_WORKFLOW_ID',
+    'LAB_MOTION_INTERACTION_DIRECTION', 'WINAPP_UI_WORKFLOW_ID',
     'WINAPP_CLI_TELEMETRY_OPTOUT', 'WINAPP_CLI_UPDATE_CHECK')) {
     $saved[$name] = [Environment]::GetEnvironmentVariable($name)
 }
@@ -99,70 +99,68 @@ try {
     $env:WINAPP_CLI_TELEMETRY_OPTOUT = '1'
     $env:WINAPP_CLI_UPDATE_CHECK = '0'
     foreach ($direction in @(1, -1)) {
-        foreach ($axis in @('x', 'y')) {
-            $name = $axis + $(if ($direction -eq 1) { '-down' } else { '-up' })
-            $script:case = (New-Item -ItemType Directory -Path (Join-Path $output $name)).FullName
-            $script:trace = Join-Path $case 'trace.jsonl'
-            $script:process = $null
-            try {
-                $env:LAB_MOTION_INTERACTION_OUTPUT = $trace
-                $env:LAB_MOTION_INTERACTION_AXIS = $axis
-                $env:LAB_MOTION_INTERACTION_DIRECTION = [string]$direction
-                $env:WINAPP_UI_WORKFLOW_ID = [guid]::NewGuid().ToString()
-                $script:process = Start-Process -FilePath $app -WorkingDirectory $ApplicationDirectory -WindowStyle Hidden -PassThru
-                $ready = Wait-Trace 'ready'
-                $process.Refresh()
-                if ($process.MainWindowHandle -eq 0) { throw 'Нет окна собственного процесса.' }
-                $script:window = $process.MainWindowHandle.ToInt64().ToString()
-                @{ pid = $process.Id; window = $window; source = (git -C $PSScriptRoot rev-parse HEAD);
-                    os = [Environment]::OSVersion.VersionString; appSha256 = (Get-FileHash $app).Hash;
-                    librarySha256 = (Get-FileHash (Join-Path $ApplicationDirectory 'LabMotion.WinUI.dll')).Hash;
-                    cliSha256 = (Get-FileHash $cli).Hash; cliVersion = '0.7.1' } |
-                    ConvertTo-Json | Set-Content (Join-Path $case 'identity.json')
-                $inspect = Invoke-Ui 'inspect' @('inspect', '--depth', '8')
-                $windows = @($inspect.windows | Where-Object { [string]$_.hwnd -eq $window })
-                if ($windows.Count -ne 1 -or $windows[0].coordinateSpace -ne 'physical-screen-pixels') { throw 'Не подтверждены координаты окна.' }
-                $stages = @(Find-Stage $windows[0].elements)
-                if ($stages.Count -ne 1 -or $stages[0].isOffscreen) { throw 'Не найден видимый TouchStage.' }
-                $stage = $stages[0]
-                $width = [double]$ready.data.width
-                $height = [double]$ready.data.height
-                $scale = [double]$ready.data.scale
-                if ($scale -le 0 -or [Math]::Abs($stage.width - $width * $scale) -gt 2 -or
-                    [Math]::Abs($stage.height - $height * $scale) -gt 2 -or
-                    [Math]::Abs($windows[0].scale - $scale) -gt 0.001) { throw 'UIA и native viewport расходятся.' }
-                $start = @{ x = $width / 2; y = $height / 2 - $direction * 40 }
-                $end = @{ x = $width / 2; y = $height / 2 + $direction * 40 }
-                $screenStart = @{ x = [int][Math]::Round($stage.x + $start.x * $scale); y = [int][Math]::Round($stage.y + $start.y * $scale) }
-                $screenEnd = @{ x = [int][Math]::Round($stage.x + $end.x * $scale); y = [int][Math]::Round($stage.y + $end.y * $scale) }
-                $scenario = @{ schema = 1; name = $name; axis = $axis; direction = $direction; gesture = 'swipe'; durationMs = 300;
-                    start = $start; end = $end; coordinateSpace = 'viewport-dip'; viewport = @{ width = $width; height = $height; scale = $scale };
-                    injection = @{ start = $screenStart; end = $screenEnd; coordinateSpace = 'screen-pixel'; exitCode = $null } }
-                $scenario | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $case 'scenario.json')
-                Invoke-Ui 'before' @('screenshot', '--output', (Join-Path $case 'before.png')) | Out-Null
-                Invoke-Ui 'swipe' @('touch', '--at', "$($screenStart.x),$($screenStart.y)", '--gesture', 'swipe',
-                    '--to-point', "$($screenEnd.x),$($screenEnd.y)", '--duration-ms', '300') | Out-Null
-                $scenario.injection.exitCode = 0
-                $scenario | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $case 'scenario.json')
-                Wait-Trace 'idle' | Out-Null
-                Invoke-Ui 'after' @('screenshot', '--output', (Join-Path $case 'after.png')) | Out-Null
-            } catch {
-                $failures.Add($name)
-                $_ | Out-String | Set-Content (Join-Path $case 'failure.txt')
-            } finally {
-                if ($process) {
-                    try {
-                        $forced = $false
-                        if (!$process.HasExited) {
-                            $null = $process.CloseMainWindow()
-                            if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
-                        }
-                        $process.Refresh()
-                        if ($forced -or $process.ExitCode -ne 0) { $failures.Add("$name-close") }
-                        @{ exited = $process.HasExited; forced = $forced; exitCode = $process.ExitCode } |
-                            ConvertTo-Json | Set-Content (Join-Path $case 'close.json')
-                    } finally { $process.Dispose() }
-                }
+        $axis = 'y'
+        $name = $axis + $(if ($direction -eq 1) { '-down' } else { '-up' })
+        $script:case = (New-Item -ItemType Directory -Path (Join-Path $output $name)).FullName
+        $script:trace = Join-Path $case 'trace.jsonl'
+        $script:process = $null
+        try {
+            $env:LAB_MOTION_INTERACTION_OUTPUT = $trace
+            $env:LAB_MOTION_INTERACTION_DIRECTION = [string]$direction
+            $env:WINAPP_UI_WORKFLOW_ID = [guid]::NewGuid().ToString()
+            $script:process = Start-Process -FilePath $app -WorkingDirectory $ApplicationDirectory -WindowStyle Hidden -PassThru
+            $ready = Wait-Trace 'ready'
+            $process.Refresh()
+            if ($process.MainWindowHandle -eq 0) { throw 'Нет окна собственного процесса.' }
+            $script:window = $process.MainWindowHandle.ToInt64().ToString()
+            @{ pid = $process.Id; window = $window; source = (git -C $PSScriptRoot rev-parse HEAD);
+                os = [Environment]::OSVersion.VersionString; appSha256 = (Get-FileHash $app).Hash;
+                librarySha256 = (Get-FileHash (Join-Path $ApplicationDirectory 'LabMotion.WinUI.dll')).Hash;
+                cliSha256 = (Get-FileHash $cli).Hash; cliVersion = '0.7.1' } |
+                ConvertTo-Json | Set-Content (Join-Path $case 'identity.json')
+            $inspect = Invoke-Ui 'inspect' @('inspect', '--depth', '8')
+            $windows = @($inspect.windows | Where-Object { [string]$_.hwnd -eq $window })
+            if ($windows.Count -ne 1 -or $windows[0].coordinateSpace -ne 'physical-screen-pixels') { throw 'Не подтверждены координаты окна.' }
+            $stages = @(Find-Stage $windows[0].elements)
+            if ($stages.Count -ne 1 -or $stages[0].isOffscreen) { throw 'Не найден видимый TouchStage.' }
+            $stage = $stages[0]
+            $width = [double]$ready.data.width
+            $height = [double]$ready.data.height
+            $scale = [double]$ready.data.scale
+            if ($scale -le 0 -or [Math]::Abs($stage.width - $width * $scale) -gt 2 -or
+                [Math]::Abs($stage.height - $height * $scale) -gt 2 -or
+                [Math]::Abs($windows[0].scale - $scale) -gt 0.001) { throw 'UIA и native viewport расходятся.' }
+            $start = @{ x = $width / 2; y = $height / 2 - $direction * 40 }
+            $end = @{ x = $width / 2; y = $height / 2 + $direction * 40 }
+            $screenStart = @{ x = [int][Math]::Round($stage.x + $start.x * $scale); y = [int][Math]::Round($stage.y + $start.y * $scale) }
+            $screenEnd = @{ x = [int][Math]::Round($stage.x + $end.x * $scale); y = [int][Math]::Round($stage.y + $end.y * $scale) }
+            $scenario = @{ schema = 2; coordinates = 'native'; name = $name; axis = $axis; direction = $direction; gesture = 'swipe'; durationMs = 300;
+                start = $start; end = $end; coordinateSpace = 'viewport-dip'; viewport = @{ width = $width; height = $height; scale = $scale };
+                injection = @{ start = $screenStart; end = $screenEnd; coordinateSpace = 'screen-pixel'; exitCode = $null } }
+            $scenario | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $case 'scenario.json')
+            Invoke-Ui 'before' @('screenshot', '--output', (Join-Path $case 'before.png')) | Out-Null
+            Invoke-Ui 'swipe' @('touch', '--at', "$($screenStart.x),$($screenStart.y)", '--gesture', 'swipe',
+                '--to-point', "$($screenEnd.x),$($screenEnd.y)", '--duration-ms', '300') | Out-Null
+            $scenario.injection.exitCode = 0
+            $scenario | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $case 'scenario.json')
+            Wait-Trace 'idle' | Out-Null
+            Invoke-Ui 'after' @('screenshot', '--output', (Join-Path $case 'after.png')) | Out-Null
+        } catch {
+            $failures.Add($name)
+            $_ | Out-String | Set-Content (Join-Path $case 'failure.txt')
+        } finally {
+            if ($process) {
+                try {
+                    $forced = $false
+                    if (!$process.HasExited) {
+                        $null = $process.CloseMainWindow()
+                        if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
+                    }
+                    $process.Refresh()
+                    if ($forced -or $process.ExitCode -ne 0) { $failures.Add("$name-close") }
+                    @{ exited = $process.HasExited; forced = $forced; exitCode = $process.ExitCode } |
+                        ConvertTo-Json | Set-Content (Join-Path $case 'close.json')
+                } finally { $process.Dispose() }
             }
         }
     }

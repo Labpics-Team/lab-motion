@@ -29,11 +29,9 @@ public sealed class InteractionViewport : Grid
     }
 }
 
-// Изолированный опыт переноса координаты ввода; не API движения и не компонент LabUI.
+// Изолированный опыт нативной координаты Y; не API движения и не компонент LabUI.
 public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
 {
-    private const float CoordinateRange = 1000;
-    private const float InitialCoordinate = 500;
     private const float ResponseMilliseconds = 350;
     private readonly InteractionTrace trace = new();
     private readonly List<CompositionObject> resources = [];
@@ -41,12 +39,10 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
     private readonly TaskCompletionSource<bool> initialPosition = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private InteractionTracker? tracker;
     private VisualInteractionSource? source;
-    private string axis = "";
     private int direction;
     private int initialRequest;
     private float width;
     private float height;
-    private float gain;
     private double scale;
     private bool ready;
     private bool detached;
@@ -63,11 +59,6 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
         Loaded -= Attach;
         try
         {
-            axis = Environment.GetEnvironmentVariable("LAB_MOTION_INTERACTION_AXIS") switch
-            {
-                "x" => "X", "y" => "Y",
-                _ => throw new InvalidOperationException("LAB_MOTION_INTERACTION_AXIS должен быть x или y."),
-            };
             direction = Environment.GetEnvironmentVariable("LAB_MOTION_INTERACTION_DIRECTION") switch
             {
                 "1" => 1, "-1" => -1,
@@ -78,25 +69,24 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
             scale = XamlRoot.RasterizationScale;
             if (!float.IsFinite(width) || !float.IsFinite(height) || width <= 0 || height <= 0)
                 throw new InvalidOperationException("Область ввода должна иметь ненулевой размер в DIP.");
-            gain = -CoordinateRange / height;
             Configure();
             AttachInput();
-            initialRequest = tracker!.TryUpdatePosition(Coordinates(InitialCoordinate));
-            trace.Add("initialRequested", new { requestId = initialRequest, position = Vector(Coordinates(InitialCoordinate)) });
+            initialRequest = tracker!.TryUpdatePosition(InitialCoordinates);
+            trace.Add("initialRequested", new { requestId = initialRequest, position = Vector(InitialCoordinates) });
             trace.Flush();
             await initialPosition.Task.WaitAsync(TimeSpan.FromSeconds(8));
             if (detached) return;
             var position = tracker.Position;
-            if (Vector3.Distance(position, Coordinates(InitialCoordinate)) > .001f)
-                throw new InvalidOperationException("После подтверждения начальной позиции readback не равен 500.");
+            if (Vector3.Distance(position, InitialCoordinates) > .001f)
+                throw new InvalidOperationException("После подтверждения начальной позиции readback не соответствует q = 0,5.");
             CheckGeometry();
             ready = true;
             Status.Text = "Ready";
             AutomationProperties.SetName(Status, "Ready");
             trace.Add("ready", new
             {
-                requestId = initialRequest, position = Vector(position), progress = Active(position) / CoordinateRange,
-                width, height, scale, gain,
+                requestId = initialRequest, position = Vector(position), progress = ToProgress(position),
+                width, height, scale, coordinates = "native", unitsPerProgress = -height,
             });
             trace.Flush();
         }
@@ -114,8 +104,8 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
         var viewport = ElementCompositionPreview.GetElementVisual(TouchStage);
         var compositor = viewport.Compositor;
         tracker = Keep(InteractionTracker.CreateWithOwner(compositor, this));
-        tracker.MinPosition = Vector3.Zero;
-        tracker.MaxPosition = Coordinates(CoordinateRange);
+        tracker.MinPosition = new Vector3(0, -height, 0);
+        tracker.MaxPosition = Vector3.Zero;
         source = Keep(VisualInteractionSource.Create(viewport));
         source.PositionXSourceMode = InteractionSourceMode.Disabled;
         source.PositionYSourceMode = InteractionSourceMode.EnabledWithInertia;
@@ -127,49 +117,36 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
         source.IsPositionYRailsEnabled = true;
         source.ManipulationRedirectionMode = VisualInteractionSourceRedirectionMode.CapableTouchpadOnly;
 
-        var delta = Keep(compositor.CreateExpressionAnimation("source.DeltaPosition.Y * gain"));
-        delta.SetReferenceParameter("source", source);
-        delta.SetScalarParameter("gain", gain);
-        var transfer = Keep(CompositionConditionalValue.Create(compositor));
-        transfer.Condition = Keep(compositor.CreateExpressionAnimation("true"));
-        transfer.Value = delta;
-        var zero = Keep(CompositionConditionalValue.Create(compositor));
-        zero.Condition = Keep(compositor.CreateExpressionAnimation("true"));
-        zero.Value = Keep(compositor.CreateExpressionAnimation("0"));
-        source.ConfigureDeltaPositionXModifiers(new[] { axis == "X" ? transfer : zero });
-        source.ConfigureDeltaPositionYModifiers(new[] { axis == "Y" ? transfer : zero });
         tracker.InteractionSources.Add(source);
 
         var frequency = (float)(2 * Math.PI * 1000 / ResponseMilliseconds);
         var stiffness = frequency * frequency;
         var damping = 2 * frequency;
-        var target = direction > 0 ? CoordinateRange : 0;
+        var target = direction > 0 ? -height : 0;
         var settings = Keep(compositor.CreatePropertySet());
         settings.InsertScalar("Target", target);
         settings.InsertScalar("Stiffness", stiffness);
         settings.InsertScalar("Damping", damping);
         var force = Keep(compositor.CreateExpressionAnimation(
-            $"-settings.Stiffness * (this.Target.Position.{axis} - settings.Target) - settings.Damping * this.Target.PositionVelocityInPixelsPerSecond.{axis}"));
+            "-settings.Stiffness * (this.Target.Position.Y - settings.Target) - settings.Damping * this.Target.PositionVelocityInPixelsPerSecond.Y"));
         force.SetReferenceParameter("settings", settings);
         var motion = Keep(InteractionTrackerInertiaMotion.Create(compositor));
         motion.Condition = Keep(compositor.CreateExpressionAnimation("true"));
         motion.Motion = force;
-        if (axis == "X") tracker.ConfigurePositionXInertiaModifiers(new[] { motion });
-        else tracker.ConfigurePositionYInertiaModifiers(new[] { motion });
+        tracker.ConfigurePositionYInertiaModifiers(new[] { motion });
 
         // Источник ввода неподвижен; положение дочернего visual исполняет композитор.
         var sprite = Keep(compositor.CreateSpriteVisual());
         sprite.Size = new Vector2(width, 24);
         sprite.Brush = Keep(compositor.CreateColorBrush(((SolidColorBrush)Status.Foreground).Color));
-        var projection = Keep(compositor.CreateExpressionAnimation($"tracker.Position.{axis} / 1000 * height"));
+        var projection = Keep(compositor.CreateExpressionAnimation("-tracker.Position.Y"));
         projection.SetReferenceParameter("tracker", tracker);
-        projection.SetScalarParameter("height", height);
         sprite.StartAnimation("Offset.Y", projection);
         ElementCompositionPreview.SetElementChildVisual(TouchStage, sprite);
         trace.Add("metadata", new
         {
-            axis = axis.ToLowerInvariant(), direction, width, height, scale, gain,
-            minimum = 0, maximum = CoordinateRange, initial = InitialCoordinate, target,
+            axis = "y", coordinates = "native", direction, width, height, scale, unitsPerProgress = -height,
+            minimum = -height, maximum = 0, initial = -height / 2, target,
             responseMilliseconds = ResponseMilliseconds, bounce = 0, frequency, stiffness, damping,
             startedAtUtc = trace.StartedAtUtc, stopwatchFrequency = Stopwatch.Frequency,
             positionYSourceMode = source.PositionYSourceMode.ToString(),
@@ -227,8 +204,8 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
             throw new InvalidOperationException("Геометрия или DPI изменились во время опыта; нужен отдельный запуск.");
     }
 
-    private float Active(Vector3 value) => axis == "X" ? value.X : value.Y;
-    private Vector3 Coordinates(float value) => axis == "X" ? new(value, 0, 0) : new(0, value, 0);
+    private Vector3 InitialCoordinates => new(0, -height / 2, 0);
+    private float ToProgress(Vector3 value) => -value.Y / height;
     private static object Vector(Vector3 value) => new { x = value.X, y = value.Y, z = value.Z };
 
     private void Observe(InteractionTracker sender, string phase, int requestId, Vector3? position = null, Vector3? velocity = null)
@@ -240,9 +217,9 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
         {
             phase, requestId, position = Vector(observed), readbackPosition = Vector(readback),
             positionOrigin = position.HasValue ? "event" : "readback",
-            progress = Active(observed) / CoordinateRange, readbackProgress = Active(readback) / CoordinateRange,
+            progress = ToProgress(observed), readbackProgress = ToProgress(readback),
             nativeVelocity = velocity.HasValue ? Vector(velocity.Value) : null,
-            progressVelocity = velocity.HasValue ? (float?)(Active(velocity.Value) / CoordinateRange) : null,
+            progressVelocity = velocity.HasValue ? (float?)ToProgress(velocity.Value) : null,
         });
         if (phase != "value") trace.Flush();
     }
@@ -252,8 +229,8 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
         Observe(sender, "value", args.RequestId, args.Position);
         // TryUpdatePosition из Idle меняет значение без повторного входа в Idle.
         if (!detached && args.RequestId == initialRequest &&
-            Vector3.Distance(args.Position, Coordinates(InitialCoordinate)) <= .001f &&
-            Vector3.Distance(sender.Position, Coordinates(InitialCoordinate)) <= .001f)
+            Vector3.Distance(args.Position, InitialCoordinates) <= .001f &&
+            Vector3.Distance(sender.Position, InitialCoordinates) <= .001f)
             initialPosition.TrySetResult(true);
     }
     public void InertiaStateEntered(InteractionTracker sender, InteractionTrackerInertiaStateEnteredArgs args)

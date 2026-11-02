@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const names = ['x-down', 'y-down', 'x-up', 'y-up'];
+const names = ['y-down', 'y-up'];
 export const limits = Object.freeze({
   dragProgressError: .08,
   positionError: .001,
@@ -19,7 +19,7 @@ const readJson = path => JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/
 const readLines = path => readFileSync(path, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean).map(JSON.parse);
 
 function validateScenario(scenario) {
-  require(object(scenario) && scenario.schema === 1 && names.includes(scenario.name), 'Неизвестный сценарий.');
+  require(object(scenario) && scenario.schema === 2 && scenario.coordinates === 'native' && names.includes(scenario.name), 'Неизвестный сценарий.');
   const [axis, directionName] = scenario.name.split('-');
   require(scenario.axis === axis && scenario.direction === (directionName === 'down' ? 1 : -1), 'Ось или направление не совпали с именем.');
   require(scenario.gesture === 'swipe' && scenario.durationMs === 300 && scenario.coordinateSpace === 'viewport-dip', 'Сценарий не соответствует протоколу swipe 300 ms.');
@@ -52,14 +52,14 @@ function evaluate(events, scenario) {
   const metadata = exactlyOne('metadata', () => true, 'Ожидалась одна запись параметров опыта.');
   const m = metadata.data;
   require(m.axis === scenario.axis && m.direction === scenario.direction && m.width === scenario.viewport.width &&
-    m.height === scenario.viewport.height && m.scale === scenario.viewport.scale && near(m.gain, -1000 / m.height, .0001) &&
-    m.minimum === 0 && m.maximum === 1000 && m.initial === 500 && m.target === (scenario.direction > 0 ? 1000 : 0) &&
+    m.height === scenario.viewport.height && m.scale === scenario.viewport.scale && m.coordinates === 'native' && m.unitsPerProgress === -m.height &&
+    m.minimum === -m.height && m.maximum === 0 && m.initial === -m.height / 2 && m.target === (scenario.direction > 0 ? -m.height : 0) &&
     m.responseMilliseconds === 350 && m.bounce === 0 && m.positionYSourceMode === 'EnabledWithInertia', 'Настройки приложения не совпали со сценарием.');
   const axis = scenario.axis;
   const otherAxes = ['x', 'y', 'z'].filter(value => value !== axis);
   const positions = data => {
-    require(vector(data.position) && vector(data.readbackPosition) && near(data.progress, data.position[axis] / 1000, .00001) &&
-      near(data.readbackProgress, data.readbackPosition[axis] / 1000, .00001), 'Повреждены native position или progress.');
+    require(vector(data.position) && vector(data.readbackPosition) && near(data.progress, -data.position[axis] / m.height, .00001) &&
+      near(data.readbackProgress, -data.readbackPosition[axis] / m.height, .00001), 'Повреждены native position или progress.');
     require(otherAxes.every(other => Math.abs(data.position[other]) <= limits.nativeAxisLeak &&
       Math.abs(data.readbackPosition[other]) <= limits.nativeAxisLeak), 'Движение утекло в неактивную ось.');
   };
@@ -70,15 +70,15 @@ function evaluate(events, scenario) {
     positions(data);
     if (data.phase === 'value') require(data.positionOrigin === 'event', 'Позиция движения не получена из native ValuesChanged.');
     if (data.phase === 'inertia') {
-      require(vector(data.nativeVelocity) && near(data.progressVelocity, data.nativeVelocity[axis] / 1000, .00001), 'Нет конечной native release velocity.');
+      require(vector(data.nativeVelocity) && near(data.progressVelocity, -data.nativeVelocity[axis] / m.height, .00001), 'Нет конечной native release velocity.');
       require(otherAxes.every(other => Math.abs(data.nativeVelocity[other]) <= limits.nativeAxisLeak), 'Release velocity осталась в неактивной оси.');
     }
   });
   const ready = exactlyOne('ready', () => true, 'Нет единственной подтверждённой начальной готовности.');
   const r = ready.data;
   require(metadata.sequence < ready.sequence && Number.isSafeInteger(r.requestId) && r.requestId > 0 && vector(r.position) && near(r.progress, .5) &&
-    near(r.position[axis], 500, 1) && otherAxes.every(other => Math.abs(r.position[other]) <= 1) &&
-    r.width === m.width && r.height === m.height && r.scale === m.scale && near(r.gain, m.gain, .0001), 'Ready не подтверждает начальную позицию и геометрию.');
+    near(r.position[axis], -m.height / 2, 1) && otherAxes.every(other => Math.abs(r.position[other]) <= 1) &&
+    r.width === m.width && r.height === m.height && r.scale === m.scale && r.unitsPerProgress === -m.height, 'Ready не подтверждает начальную позицию и геометрию.');
   require(motions.some(event => event.sequence < ready.sequence && event.data.phase === 'value' &&
     event.data.requestId === r.requestId && near(event.data.progress, .5) && near(event.data.readbackProgress, .5)), 'Нет начального native ValuesChanged с readback до Ready.');
   require(motions.filter(event => event.sequence < ready.sequence).every(event => ['value', 'idle'].includes(event.data.phase)), 'До Ready началось непредусмотренное движение.');
@@ -104,12 +104,12 @@ function evaluate(events, scenario) {
   const delta = lastDrag.data.progress - .5;
   require(near(delta, expectedDelta, limits.dragProgressError) && delta * scenario.direction > 0, 'Drag имеет неверный знак или масштаб.');
   const nominalVelocity = expectedDelta / (scenario.durationMs / 1000);
-  const velocity = inertia.data.nativeVelocity[axis] / 1000;
+  const velocity = -inertia.data.nativeVelocity[axis] / m.height;
   const velocityRatio = velocity / nominalVelocity;
   require(finite(velocityRatio) && velocityRatio >= limits.velocityNominalRatio[0] && velocityRatio <= limits.velocityNominalRatio[1], 'Release velocity имеет неверный знак, нулевую величину или грубую ошибку масштаба.');
   const idle = gestureMotion.find(event => event.sequence > inertia.sequence && event.data.phase === 'idle');
-  require(idle && idle.seconds - inertia.seconds <= limits.settleSeconds && near(idle.data.progress, m.target / 1000) &&
-    near(idle.data.readbackProgress, m.target / 1000), 'Нет native Idle и readback у цели в пределах пяти секунд.');
+  require(idle && idle.seconds - inertia.seconds <= limits.settleSeconds && near(idle.data.progress, -m.target / m.height) &&
+    near(idle.data.readbackProgress, -m.target / m.height), 'Нет native Idle и readback у цели в пределах пяти секунд.');
   const releaseValues = gestureMotion.filter(event => event.sequence > inertia.sequence && event.sequence < idle.sequence && event.data.phase === 'value');
   // Live readback в Inertia может опережать поставленный в очередь ValuesChanged.
   // Сравниваем последовательные native event positions, сохраняя порядок событий.
@@ -136,16 +136,9 @@ export function verifyTouch(directory) {
       return { name, status: error.code === 'ENOENT' ? 'INCOMPLETE' : 'FAIL', reason: error.message };
     }
   });
-  const pairs = ['down', 'up'].map(direction => {
-    const candidate = scenarios.find(result => result.name === `x-${direction}`);
-    const control = scenarios.find(result => result.name === `y-${direction}`);
-    return { direction, candidate: candidate.status, control: control.status,
-      velocityRatioXToY: candidate.status === 'PASS' && control.status === 'PASS'
-        ? candidate.releaseProgressPerSecond / control.releaseProgressPerSecond : null };
-  });
-  return { schema: 1, status: scenarios.some(result => result.status === 'FAIL') ? 'FAIL'
+  return { schema: 2, status: scenarios.some(result => result.status === 'FAIL') ? 'FAIL'
     : scenarios.every(result => result.status === 'PASS') ? 'PASS' : 'INCOMPLETE',
-  scope: 'Фиксированная геометрия/DPI, доставленный touch и грубая передача release velocity; без точной калибровки скорости и performance.', limits, scenarios, pairs };
+  scope: 'Родная ось Y, фиксированная геометрия/DPI, доставленный touch и грубая передача release velocity; без точной калибровки скорости и performance.', limits, scenarios };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
