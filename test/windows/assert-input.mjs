@@ -65,6 +65,8 @@ export function verifyTrace(events, scenarios) {
         .find(e => e.sequence > down.sequence && e.sequence < preference.sequence);
       require(up, `${name}: нет отпускания перед сменой предпочтения`);
       need('motion', d => d.pageOperation === up.data.operation && d.phase === 'requested', 'нет движения отпускания');
+      require(select('motion', d => d.pageOperation === up.data.operation && d.phase === 'value' && d.position > 0 && d.position < 1)
+        .some(e => e.sequence < preference.sequence), `${name}: отпускание не двигалось до смены предпочтения`);
       snap(preference);
       const interrupted = need('completed', d => d.operation === up.data.operation && d.end === 'Stopped' && d.reason === 'snap', 'смена предпочтения не прервала движение');
       require(interrupted.sequence > preference.sequence, `${name}: прерывание предшествует смене предпочтения`);

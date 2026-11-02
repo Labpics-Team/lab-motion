@@ -36,6 +36,7 @@ function fixture() {
       input('pointerReleased');
       const up = intent(false);
       motion(up, 'requested', .8);
+      motion(up, 'value', .4);
       add('completed', { operation: down, nativeOperation: down, end: 'Stopped', reason: 'replaced', isCurrent: false });
       const id = intent(false, 'localPreference', false);
       snap(id, 0);
@@ -120,6 +121,12 @@ test('статическое выключение анимации не подм
   const blocks = fixture();
   blocks[4].events = blocks[4].events.filter(e => e.data.reason !== 'snap');
   assert.throws(() => verify(blocks), /не прервала движение/);
+});
+
+test('отмена ожидающего release не подменяет выключение во время движения', () => {
+  const blocks = fixture();
+  blocks[4].events = blocks[4].events.filter(e => e.data.phase !== 'value');
+  assert.throws(() => verify(blocks), /отпускание не двигалось/);
 });
 
 test('повреждённый JSON даёт exit1 и отрицательный result.json', () => {
