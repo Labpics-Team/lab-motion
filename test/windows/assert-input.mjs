@@ -20,7 +20,8 @@ export function verifyTrace(events, scenarios) {
       ['pressed', 'enabled', 'localAnimation', 'systemAnimation'].every(key => typeof event.data[key] === 'boolean') &&
       event.data.target === Number(event.data.pressed), 'Повреждён intent.');
     if (event.kind === 'motion') require(['position', 'readbackPosition', 'nativeSeconds'].every(key => Number.isFinite(event.data[key])) &&
-      ['pageOperation', 'nativeOperation'].every(key => Number.isSafeInteger(event.data[key]) && event.data[key] >= 0) && typeof event.data.phase === 'string',
+      ['pageOperation', 'nativeOperation'].every(key => Number.isSafeInteger(event.data[key]) && event.data[key] >= 0) && typeof event.data.phase === 'string' &&
+      ['Animation', 'Input', 'Initial', 'Snap', 'Stop'].includes(event.data.origin),
       'Повреждено наблюдение движения.');
     if (event.kind === 'completed') require(['operation', 'nativeOperation'].every(key => Number.isSafeInteger(event.data[key]) && event.data[key] > 0) &&
       ['Finished', 'Stopped'].includes(event.data.end) && typeof event.data.reason === 'string' && typeof event.data.isCurrent === 'boolean', 'Повреждён исход движения.');
@@ -52,7 +53,12 @@ export function verifyTrace(events, scenarios) {
     const snap = intent => {
       need('snapRequested', d => d.operation === intent.data.operation && d.target === intent.data.target, 'нет запроса SnapTo');
       need('snapReadback', d => d.operation === intent.data.operation && d.target === intent.data.target && near(d.position, intent.data.target), 'нет readback у цели SnapTo');
-      require(select('motion', d => d.pageOperation === intent.data.operation && d.phase === 'requested').length === 0, `${name}: анимация при отключённом движении`);
+      const observations = select('motion', d => d.pageOperation === intent.data.operation);
+      require(observations.every(e => e.data.origin === 'Snap' && ['requested', 'value', 'idle'].includes(e.data.phase)),
+        `${name}: анимация при отключённом движении`);
+      need('motion', d => d.pageOperation === intent.data.operation && d.origin === 'Snap' && d.phase === 'requested', 'нет наблюдения запроса SnapTo');
+      require(observations.filter(e => e.data.phase !== 'requested').every(e =>
+        near(e.data.position, intent.data.target) && near(e.data.readbackPosition, intent.data.target)), `${name}: нет readback у цели SnapTo`);
     };
     if (name === 'disable-animation') {
       const pressed = input('pointerPressed', 'Mouse', d => Number.isSafeInteger(d.pointerId));
