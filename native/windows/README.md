@@ -30,7 +30,10 @@ WinUI x64 unpackaged и масштаб 1.5. Проверка запускает 
 сценарии в WinUI Window: движение до ±200, retarget после ±40 к ∓100,
 сохранение ненулевой скорости против варианта со сбросом, спокойную пружину,
 начальную скорость 600, Stop, SnapTo и Dispose. События берут значение из
-`InteractionTrackerValuesChangedArgs.Position`.
+`InteractionTrackerValuesChangedArgs.Position`; `ReadbackPosition` отдельно
+читает `InteractionTracker.Position.X`. Эти сценарии проверяют координату
+tracker и завершение операций. Видимое смещение привязанного `Visual` требует
+отдельной проверки кадров.
 
 Это не публикуемый пакет (`IsPackable=false`). Подключение реального ввода,
 press/sheet, reduced motion, смена DPI/геометрии, точность нормализованных
@@ -42,7 +45,9 @@ press/sheet, reduced motion, смена DPI/геометрии, точность
 В репозитории находятся настоящий WinUI-потребитель
 [`examples/windows`](../../examples/windows/) и
 [`test/windows/verify.ps1`](../../test/windows/verify.ps1). Нужны Windows с
-доступным Composition, .NET SDK 10 и PowerShell. Из корня репозитория:
+доступным Composition, .NET SDK 10.0.403 и PowerShell. Точная версия SDK и
+`rollForward: disable` закреплены в [`global.json`](../../test/windows/global.json).
+Из корня репозитория:
 
 ```powershell
 pwsh -File test/windows/verify.ps1 -OutputDirectory "$env:TEMP/motion-windows-run"
