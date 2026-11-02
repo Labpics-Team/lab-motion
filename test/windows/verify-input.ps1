@@ -110,6 +110,9 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
 }
 
 try {
+    # Подменная ClientAreaAnimation теста живёт в отдельном процессе.
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'cleanup.test.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Проверка восстановления после ошибки не прошла.' }
     & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Проверки различающей силы input oracle не прошли.' }
     $env:LAB_MOTION_PROBE_OUTPUT = $null
@@ -194,29 +197,39 @@ try {
     $_ | Out-String | Set-Content (Join-Path $evidence 'failure.txt')
     throw
 } finally {
-    if ($recording -and !$recording.ended) {
-        if (!$recording.process.HasExited) { $recording.process.Kill($true); $recording.process.WaitForExit() }
-        $remaining = if ($recording.stderr) { $recording.stderr.GetAwaiter().GetResult() } else { '' }
-        [IO.File]::WriteAllText((Join-Path $evidence 'record.stderr.log'), $recording.prefix + $remaining)
-    }
     $closed = $false
-    if ($process) {
-        $forced = $false
-        if (!$process.HasExited) {
-            $null = $process.CloseMainWindow()
-            if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
+    try {
+        try {
+            if ($recording -and !$recording.ended) {
+                if (!$recording.process.HasExited) { $recording.process.Kill($true); $recording.process.WaitForExit() }
+                $remaining = if ($recording.stderr) { $recording.stderr.GetAwaiter().GetResult() } else { '' }
+                [IO.File]::WriteAllText((Join-Path $evidence 'record.stderr.log'), $recording.prefix + $remaining)
+            }
+        } finally {
+            if ($process) {
+                $forced = $false
+                if (!$process.HasExited) {
+                    $null = $process.CloseMainWindow()
+                    if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
+                }
+                $process.Refresh()
+                $closed = !$forced -and $process.HasExited -and $process.ExitCode -eq 0
+                try {
+                    @{ exited = $process.HasExited; forced = $forced; exitCode = $process.ExitCode } | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
+                } finally { $process.Dispose() }
+            }
         }
-        $process.Refresh()
-        $closed = !$forced -and $process.HasExited -and $process.ExitCode -eq 0
-        @{ exited = $process.HasExited; forced = $forced; exitCode = $process.ExitCode } | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
-        $process.Dispose()
-    }
-    $commands | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'commands.json')
-    foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
-    if ($null -ne $animationBefore) {
-        [ClientAreaAnimation]::Write($animationBefore)
-        @{ expected = $animationBefore; actual = [ClientAreaAnimation]::Read() } |
-            ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-restored.json')
+        $commands | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'commands.json')
+    } finally {
+        try {
+            foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+        } finally {
+            if ($null -ne $animationBefore) {
+                [ClientAreaAnimation]::Write($animationBefore)
+                @{ expected = $animationBefore; actual = [ClientAreaAnimation]::Read() } |
+                    ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-restored.json')
+            }
+        }
     }
     if ($passed -and !$closed) { throw 'Приложение не подтвердило штатное завершение.' }
 }
