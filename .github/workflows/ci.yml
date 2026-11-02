@@ -322,6 +322,22 @@ jobs:
         run: |
           Get-Content "$env:RUNNER_TEMP/native-windows/result.json" | Add-Content $env:GITHUB_STEP_SUMMARY
 
+      - name: Verify native input
+        shell: pwsh
+        run: |
+          pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input"
+
+      # Визуальному review нужны кадры и успешного прогона, без SDK и сборки.
+      - name: Keep native input evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-input
+          path: ${{ runner.temp }}/native-input/evidence/
+          retention-days: 1
+          if-no-files-found: error
+          include-hidden-files: false
+
       - name: Keep failed native diagnostics
         if: ${{ failure() || cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
