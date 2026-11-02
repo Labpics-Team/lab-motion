@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$ApplicationDirectory,
-    [Parameter(Mandatory = $true)][string]$OutputDirectory
+    [Parameter(Mandatory = $true)][string]$OutputDirectory,
+    [switch]$ConfigureHostedAnimations
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,6 +18,7 @@ foreach ($name in @('LAB_MOTION_PROBE_OUTPUT', 'LAB_MOTION_PRESS_TRACE', 'WINAPP
 $process = $null
 $recording = $null
 $passed = $false
+$animationBefore = $null
 $commands = [Collections.Generic.List[object]]::new()
 $scenarios = [Collections.Generic.List[object]]::new()
 
@@ -115,6 +117,16 @@ try {
     $env:WINAPP_UI_WORKFLOW_ID = [guid]::NewGuid().ToString()
     $env:WINAPP_CLI_TELEMETRY_OPTOUT = '1'
     $env:WINAPP_CLI_UPDATE_CHECK = '0'
+    if ($ConfigureHostedAnimations) {
+        if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
+            throw 'Изменение настройки разрешено только в одноразовой hosted-сессии GitHub.'
+        }
+        Add-Type -Path (Join-Path $PSScriptRoot 'animation-settings.cs')
+        $animationBefore = [ClientAreaAnimation]::Read()
+        [ClientAreaAnimation]::Write($true)
+        @{ before = $animationBefore; enabled = [ClientAreaAnimation]::Read() } |
+            ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-settings.json')
+    }
     $zip = Join-Path $output 'winapp.zip'
     Invoke-WebRequest 'https://github.com/microsoft/winappCli/releases/download/v0.7.1/winappcli-x64.zip' -OutFile $zip
     $digest = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -138,6 +150,8 @@ try {
         librarySha256 = (Get-FileHash (Join-Path $ApplicationDirectory 'LabMotion.WinUI.dll')).Hash;
         cliVersion = '0.7.1'; cliZipSha256 = $digest } | ConvertTo-Json | Set-Content (Join-Path $evidence 'identity.json')
     Wait-Rest
+    $initialIntent = @(Read-Trace | Where-Object kind -eq 'intent')[-1]
+    if (!$initialIntent.data.systemAnimation) { throw 'UISettings не подтверждает включённую системную анимацию для animated-сценариев.' }
     Invoke-Ui 'inspect' @('inspect')
     Invoke-Ui 'rest-before' @('screenshot', '--output', (Join-Path $evidence 'rest-before.png'))
 
@@ -195,5 +209,10 @@ try {
     }
     $commands | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'commands.json')
     foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+    if ($null -ne $animationBefore) {
+        [ClientAreaAnimation]::Write($animationBefore)
+        @{ expected = $animationBefore; actual = [ClientAreaAnimation]::Read() } |
+            ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-restored.json')
+    }
     if ($passed -and !$closed) { throw 'Приложение не подтвердило штатное завершение.' }
 }
