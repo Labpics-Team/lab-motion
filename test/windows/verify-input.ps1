@@ -159,7 +159,7 @@ try {
     Invoke-Ui 'rest-before' @('screenshot', '--output', (Join-Path $evidence 'rest-before.png'))
 
     $recordClock = [Diagnostics.Stopwatch]::StartNew()
-    $recording = Start-Tool 'record' @('ui', 'record', '-w', $window, '--frames', '--duration-sec', '5', '--fps', '10', '--max-edge', '1000', '--output', (Join-Path $evidence 'press.mp4'), '--json')
+    $recording = Start-Tool 'record' @('ui', 'record', '-w', $window, '--frames', '--duration-sec', '8', '--fps', '10', '--max-edge', '1000', '--output', (Join-Path $evidence 'press.mp4'), '--json')
     $deadline = [DateTime]::UtcNow.AddSeconds(15)
     $started = $false
     $lineTask = $recording.process.StandardError.ReadLineAsync()
