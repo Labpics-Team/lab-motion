@@ -104,8 +104,8 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
         var viewport = ElementCompositionPreview.GetElementVisual(TouchStage);
         var compositor = viewport.Compositor;
         tracker = Keep(InteractionTracker.CreateWithOwner(compositor, this));
-        tracker.MinPosition = new Vector3(0, -height, 0);
-        tracker.MaxPosition = Vector3.Zero;
+        tracker.MinPosition = new Vector3(0, -2 * height, 0);
+        tracker.MaxPosition = new Vector3(0, height, 0);
         source = Keep(VisualInteractionSource.Create(viewport));
         source.PositionXSourceMode = InteractionSourceMode.Disabled;
         source.PositionYSourceMode = InteractionSourceMode.EnabledWithInertia;
@@ -146,7 +146,7 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
         trace.Add("metadata", new
         {
             axis = "y", coordinates = "native", direction, width, height, scale, unitsPerProgress = -height,
-            minimum = -height, maximum = 0, initial = -height / 2, target,
+            minimum = -2 * height, maximum = height, initial = -height / 2, target,
             responseMilliseconds = ResponseMilliseconds, bounce = 0, frequency, stiffness, damping,
             startedAtUtc = trace.StartedAtUtc, stopwatchFrequency = Stopwatch.Frequency,
             positionYSourceMode = source.PositionYSourceMode.ToString(),

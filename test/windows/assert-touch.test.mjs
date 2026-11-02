@@ -26,7 +26,7 @@ function fixture(name = 'y-down', scale = 1) {
   } });
   const events = [
     { seconds: 0, kind: 'metadata', data: { axis, direction, coordinates: 'native', width: 480, height: 320, scale, unitsPerProgress: -320,
-      minimum: -320, maximum: 0, initial: -160, target: -target * 320, responseMilliseconds: 350,
+      minimum: -640, maximum: 320, initial: -160, target: -target * 320, responseMilliseconds: 350,
       bounce: 0, positionYSourceMode: 'EnabledWithInertia' } },
     motion(.01, 'value', .5, 1),
     motion(.02, 'idle', .5, 1),

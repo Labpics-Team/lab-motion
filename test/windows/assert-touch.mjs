@@ -46,14 +46,14 @@ function evaluate(events, scenario) {
   const select = (kind, predicate = () => true) => events.filter(event => event.kind === kind && predicate(event.data));
   const exactlyOne = (kind, predicate, message) => {
     const values = select(kind, predicate);
-    require(values.length === 1, message);
+    require(values.length === 1, `${message} Получено: ${values.length}.`);
     return values[0];
   };
   const metadata = exactlyOne('metadata', () => true, 'Ожидалась одна запись параметров опыта.');
   const m = metadata.data;
   require(m.axis === scenario.axis && m.direction === scenario.direction && m.width === scenario.viewport.width &&
     m.height === scenario.viewport.height && m.scale === scenario.viewport.scale && m.coordinates === 'native' && m.unitsPerProgress === -m.height &&
-    m.minimum === -m.height && m.maximum === 0 && m.initial === -m.height / 2 && m.target === (scenario.direction > 0 ? -m.height : 0) &&
+    m.minimum === -2 * m.height && m.maximum === m.height && m.initial === -m.height / 2 && m.target === (scenario.direction > 0 ? -m.height : 0) &&
     m.responseMilliseconds === 350 && m.bounce === 0 && m.positionYSourceMode === 'EnabledWithInertia', 'Настройки приложения не совпали со сценарием.');
   const axis = scenario.axis;
   const otherAxes = ['x', 'y', 'z'].filter(value => value !== axis);
