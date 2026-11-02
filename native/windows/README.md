@@ -53,7 +53,7 @@ press/sheet, reduced motion, смена DPI/геометрии, точность
 pwsh -File test/windows/verify.ps1 -OutputDirectory "$env:TEMP/motion-windows-run"
 ```
 
-Каталог результата должен быть новым. Проверка собирает шесть lifecycle-проб
+Каталог результата должен быть новым. Проверка собирает девять lifecycle-проб
 и запускает семь сценариев в настоящем WinUI Window. В lifecycle-пробах
 подменена только граница Composition; интегрирование проверяется отдельным
 WinUI-потребителем. Сброс скорости служит контролем для retarget, а вызовы

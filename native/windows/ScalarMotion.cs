@@ -80,13 +80,14 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
             || !float.IsFinite(parameters.Bounce) || parameters.Bounce < 0 || parameters.Bounce >= 1)
             throw new ArgumentOutOfRangeException(nameof(parameters));
         var frequency = (float)(2 * Math.PI * 1000 / parameters.ResponseMilliseconds);
-        if (!float.IsFinite(frequency * frequency) || frequency == 0)
+        var stiffness = frequency * frequency;
+        if (!float.IsFinite(stiffness) || stiffness <= 0)
             throw new ArgumentOutOfRangeException(nameof(parameters));
         if (initialVelocity is { } velocity && (!float.IsFinite(velocity) || phase != "idle" || active is not null))
             throw new ArgumentException("Начальная скорость задаётся только из покоя.", nameof(initialVelocity));
         // Параметризация владельца src/motion/model.ts; интегрирование выполняет Composition.
         settings.InsertScalar("Target", target);
-        settings.InsertScalar("Stiffness", frequency * frequency);
+        settings.InsertScalar("Stiffness", stiffness);
         settings.InsertScalar("Damping", 2 * (1 - parameters.Bounce) * frequency);
         var request = tracker.TryUpdatePositionWithAdditionalVelocity(new Vector3(initialVelocity ?? 0, 0, 0));
         Finish(MotionEnd.Stopped, "replaced");

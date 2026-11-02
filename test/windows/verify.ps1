@@ -35,9 +35,14 @@ Invoke-Dotnet 'dotnet.txt' @('--info')
 Invoke-Dotnet 'unit-build.log' @('build', $unit, '--configuration', 'Release', '--artifacts-path', $buildOutput, '--output', $unitOutput)
 Invoke-Dotnet 'unit.json' @((Join-Path $unitOutput 'lifecycle.dll'))
 $unitResult = Get-Content -LiteralPath (Join-Path $output 'unit.json') -Raw | ConvertFrom-Json
-if (!$unitResult.passed -or $unitResult.results.Count -ne 6 -or @($unitResult.results | Where-Object { !$_.passed }).Count -ne 0) {
-    throw 'Lifecycle-пробы не подтвердили все шесть сценариев.'
+$expectedLifecycle = @('idle-reentrant-observe', 'idle-reentrant-retarget', 'idle-reentrant-stop',
+    'idle-reentrant-snap', 'idle-reentrant-dispose', 'idle-reentrant-throw',
+    'replacement-stale-callbacks', 'own-request-ignored', 'invalid-spring-preserves-operation') | Sort-Object
+if (!$unitResult.passed -or $unitResult.results.Count -ne $expectedLifecycle.Count -or @($unitResult.results | Where-Object { !$_.passed }).Count -ne 0) {
+    throw 'Lifecycle-пробы не подтвердили все сценарии.'
 }
+$actualLifecycle = @($unitResult.results | ForEach-Object { $_.scenario }) | Sort-Object
+if (Compare-Object $expectedLifecycle $actualLifecycle) { throw 'Состав lifecycle-сценариев изменился.' }
 
 Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--artifacts-path', $buildOutput, '--output', $appOutput)
 $exe = Join-Path $appOutput 'NativeWindow.exe'
@@ -90,5 +95,5 @@ foreach ($run in $trace.runs) {
         throw "Сценарий $($run.kind) не наблюдал нативное движение."
     }
 }
-[ordered]@{ passed = $true; lifecycleScenarios = 6; nativeScenarios = 7; scale = $trace.scale } |
+[ordered]@{ passed = $true; lifecycleScenarios = $expectedLifecycle.Count; nativeScenarios = 7; scale = $trace.scale } |
     ConvertTo-Json | Tee-Object -FilePath (Join-Path $output 'result.json')

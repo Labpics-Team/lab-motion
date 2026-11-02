@@ -14,12 +14,19 @@ namespace Microsoft.UI.Composition
 {
     public sealed class Compositor
     {
-        public CompositionPropertySet CreatePropertySet() => new();
+        public List<CompositionPropertySet> PropertySets { get; } = [];
+        public CompositionPropertySet CreatePropertySet()
+        {
+            var properties = new CompositionPropertySet();
+            PropertySets.Add(properties);
+            return properties;
+        }
         public ExpressionAnimation CreateExpressionAnimation(string expression) => new();
     }
     public sealed class CompositionPropertySet : IDisposable
     {
-        public void InsertScalar(string name, float value) { }
+        public Dictionary<string, float> Scalars { get; } = [];
+        public void InsertScalar(string name, float value) => Scalars[name] = value;
         public void Dispose() { }
     }
     public sealed class ExpressionAnimation : IDisposable
