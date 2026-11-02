@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -364,7 +364,7 @@ function assertNativeGraph(files: Map<string, string>) {
           expect(item.if).toBe('${{ !cancelled() }}');
           expect(item.with).toEqual({
             name: 'native-input',
-            path: '${{ runner.temp }}/native-input/evidence/',
+            path: '${{ runner.temp }}/native-input-upload/',
             'retention-days': 1,
             'if-no-files-found': 'error',
             'include-hidden-files': false,
@@ -454,7 +454,9 @@ function assertNativeGraph(files: Map<string, string>) {
       { name: 'Native result', shell: 'pwsh',
         run: 'Get-Content "$env:RUNNER_TEMP/native-windows/result.json" | Add-Content $env:GITHUB_STEP_SUMMARY\n' },
       { name: 'Verify native input', shell: 'pwsh',
-        run: 'pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input"\n' },
+        run: 'pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input" -ConfigureHostedAnimations\n' },
+      { name: 'Prepare native input evidence', if: '${{ !cancelled() }}', shell: 'pwsh',
+        run: 'node test/windows/prepare-input.mjs "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"\n' },
       step(windows, 'Keep native input evidence'),
       step(windows, 'Keep failed native diagnostics'),
     ],
@@ -533,6 +535,45 @@ function assertNativeGraph(files: Map<string, string>) {
   }]);
 }
 
+describe('бюджет артефактов после native teardown', () => {
+  const prepare = (source: string, output: string) => spawnSync(process.execPath,
+    [fileURLToPath(new URL('./windows/prepare-input.mjs', import.meta.url)), source, output], { encoding: 'utf8' });
+
+  it('сохраняет полный малый набор и ограничивает поздний overflow отдельным отчётом', () => {
+    const temporary = mkdtempSync(join(tmpdir(), 'motion-input-upload-'));
+    try {
+      const source = join(temporary, 'evidence');
+      mkdirSync(join(source, 'press.frames'), { recursive: true });
+      writeFileSync(join(source, 'result.json'), '{"passed":false}');
+      writeFileSync(join(source, 'press.frames', 'frame.jpg'), 'frame');
+      const small = join(temporary, 'small');
+      expect(prepare(source, small).status).toBe(0);
+      expect(readFileSync(join(small, 'result.json'), 'utf8')).toBe('{"passed":false}');
+      expect(readFileSync(join(small, 'press.frames', 'frame.jpg'), 'utf8')).toBe('frame');
+      // Эти файлы появляются в finally после проверки размера основной трассы.
+      writeFileSync(join(source, 'commands.json'), '[]');
+      writeFileSync(join(source, 'close.json'), Buffer.alloc(10 * 1024 * 1024));
+      const large = join(temporary, 'large');
+      expect(prepare(source, large).status).toBe(1);
+      expect(readdirSync(large)).toEqual(['preparation.json']);
+      expect(JSON.parse(readFileSync(join(large, 'preparation.json'), 'utf8')).passed).toBe(false);
+      expect(statSync(join(large, 'preparation.json')).size).toBeLessThan(1024);
+      expect(statSync(join(source, 'close.json')).size).toBe(10 * 1024 * 1024);
+      expect(readFileSync(join(small, 'result.json'), 'utf8')).toBe('{"passed":false}');
+    } finally { rmSync(temporary, { recursive: true, force: true }); }
+  });
+
+  it('готовит отрицательный отчёт и при отказе до создания evidence', () => {
+    const temporary = mkdtempSync(join(tmpdir(), 'motion-input-upload-'));
+    try {
+      const output = join(temporary, 'upload');
+      expect(prepare(join(temporary, 'missing'), output).status).toBe(1);
+      expect(readdirSync(output)).toEqual(['preparation.json']);
+      expect(JSON.parse(readFileSync(join(output, 'preparation.json'), 'utf8')).passed).toBe(false);
+    } finally { rmSync(temporary, { recursive: true, force: true }); }
+  });
+});
+
 describe('нативный граф CI', () => {
   it('проверяет любой PR через явные обязательные jobs', () => assertNativeGraph(sources()));
 
@@ -563,6 +604,13 @@ describe('нативный граф CI', () => {
     ['Windows пропускает ввод', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native input').if = false; }],
     ['Windows скрывает отказ ввода', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native input')['continue-on-error'] = true; }],
     ['Windows ввод архивирует SDK', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native input evidence').with!.path = '${{ runner.temp }}/native-input/'; }],
+    ['Windows загружает evidence мимо бюджета', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native input evidence').with!.path = '${{ runner.temp }}/native-input/evidence/'; }],
+    ['Windows не ограничивает неуспешные артефакты', 'ci.yml', (w: Workflow) => { delete step(w.jobs['native-windows']!, 'Prepare native input evidence').if; }],
+    ['Windows загружает до финального бюджета', 'ci.yml', (w: Workflow) => {
+      const steps = w.jobs['native-windows']!.steps!;
+      const index = steps.findIndex(item => item.name === 'Prepare native input evidence');
+      [steps[index], steps[index + 1]] = [steps[index + 1]!, steps[index]!];
+    }],
     ['архив успешной Windows проверки', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep failed native diagnostics').if = '${{ always() }}'; }],
     ['Windows архивирует сборку', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep failed native diagnostics').with!.path = '${{ runner.temp }}/native-windows/'; }],
     ['игнорирование browser caller', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!['continue-on-error'] = true; }],

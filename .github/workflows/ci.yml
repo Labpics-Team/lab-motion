@@ -325,7 +325,13 @@ jobs:
       - name: Verify native input
         shell: pwsh
         run: |
-          pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input"
+          pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input" -ConfigureHostedAnimations
+
+      - name: Prepare native input evidence
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          node test/windows/prepare-input.mjs "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"
 
       # Визуальному review нужны кадры и успешного прогона, без SDK и сборки.
       - name: Keep native input evidence
@@ -333,7 +339,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-input
-          path: ${{ runner.temp }}/native-input/evidence/
+          path: ${{ runner.temp }}/native-input-upload/
           retention-days: 1
           if-no-files-found: error
           include-hidden-files: false
