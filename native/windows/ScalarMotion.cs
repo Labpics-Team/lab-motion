@@ -121,16 +121,16 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     public void SetTarget(float target, Spring parameters)
     {
         CheckAccess();
-        var frequency = ValidateTarget(target, parameters);
+        var coefficients = ValidateTarget(target, parameters);
         Finish(MotionEnd.Stopped, "target-changed");
-        Configure(target, parameters, frequency);
+        Configure(target, parameters, coefficients);
     }
 
     /// <summary>Новая цель сохраняет текущую native-скорость; initialVelocity допустима из покоя.</summary>
     public Task<MotionResult> AnimateTo(float target, Spring parameters, float? initialVelocity = null)
     {
         CheckAccess();
-        var frequency = ValidateTarget(target, parameters);
+        var coefficients = ValidateTarget(target, parameters);
         if (initialVelocity is { } velocity)
         {
             if (!float.IsFinite(velocity * coordinateScale))
@@ -140,7 +140,7 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         }
         // Намерение сохраняется и при RequestIgnored: попытка запуска не является транзакцией настроек.
         Finish(MotionEnd.Stopped, "replaced");
-        Configure(target, parameters, frequency);
+        Configure(target, parameters, coefficients);
         var nativeRequest = tracker.TryUpdatePositionWithAdditionalVelocity(Coordinates((initialVelocity ?? 0) * coordinateScale));
         var operation = new Operation(++generation, nativeRequest, new TaskCompletionSource<MotionResult>(TaskCreationOptions.RunContinuationsAsynchronously));
         active = operation;
@@ -194,24 +194,25 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
             throw new ArgumentOutOfRangeException(nameof(value));
     }
 
-    private float ValidateTarget(float target, Spring parameters)
+    private (float Frequency, float Stiffness) ValidateTarget(float target, Spring parameters)
     {
         ValidatePosition(target);
         if (!float.IsFinite(parameters.ResponseMilliseconds) || parameters.ResponseMilliseconds <= 0
             || !float.IsFinite(parameters.Bounce) || parameters.Bounce < 0 || parameters.Bounce >= 1)
             throw new ArgumentOutOfRangeException(nameof(parameters));
         var frequency = (float)(2 * Math.PI * 1000 / parameters.ResponseMilliseconds);
-        if (!float.IsFinite(frequency * frequency) || frequency == 0)
+        var stiffness = frequency * frequency;
+        if (!float.IsFinite(stiffness) || stiffness <= 0)
             throw new ArgumentOutOfRangeException(nameof(parameters));
-        return frequency;
+        return (frequency, stiffness);
     }
 
-    private void Configure(float target, Spring parameters, float frequency)
+    private void Configure(float target, Spring parameters, (float Frequency, float Stiffness) coefficients)
     {
         // Параметризация владельца src/motion/model.ts; интегрирование выполняет Composition.
         settings.InsertScalar("Target", target * coordinateScale);
-        settings.InsertScalar("Stiffness", frequency * frequency);
-        settings.InsertScalar("Damping", 2 * (1 - parameters.Bounce) * frequency);
+        settings.InsertScalar("Stiffness", coefficients.Stiffness);
+        settings.InsertScalar("Damping", 2 * (1 - parameters.Bounce) * coefficients.Frequency);
         configured = true;
     }
 

@@ -173,8 +173,11 @@ internal static class PanTests
             var settings = new Dictionary<string, float>(compositor.PropertySets[0].Scalars);
             foreach (var invalid in new[] { -641f, 321f, float.NaN, float.NegativeInfinity, float.PositiveInfinity })
                 Throws<ArgumentOutOfRangeException>(() => motion.SetTarget(invalid, Smooth));
-            foreach (var invalid in new[] { new Spring(0, 0), new Spring(float.NaN, 0), new Spring(350, -1), new Spring(350, 1) })
+            foreach (var invalid in new[] { new Spring(0, 0), new Spring(float.NaN, 0), new Spring(350, -1), new Spring(350, 1), new Spring(float.MaxValue, 0), new Spring(float.Epsilon, 0) })
+            {
                 Throws<ArgumentOutOfRangeException>(() => motion.SetTarget(0, invalid));
+                Throws<ArgumentOutOfRangeException>(() => motion.AnimateTo(0, invalid));
+            }
             Require(!current.IsCompleted && tracker.LastRequest == request
                 && settings.All(pair => compositor.PropertySets[0].Scalars[pair.Key] == pair.Value),
                 "Отклонённое намерение изменило текущую цель или завершило её Task.");
