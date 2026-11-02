@@ -62,13 +62,13 @@ const events = (value: unknown): string[] => {
 };
 const bash = process.platform === 'win32'
   ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git/bin/bash.exe') : 'bash';
-const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation', 'security'];
+const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation', 'security', 'native-windows'];
 const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
   + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
   + '[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]\n'
-  + '[[ "$SECURITY_RESULT" == success ]]';
+  + '[[ "$SECURITY_RESULT" == success ]]\n[[ "$WINDOWS_RESULT" == success ]]';
 const actionlintCommand = [
   'archive="$RUNNER_TEMP/actionlint.tar.gz"',
   'install_dir="$RUNNER_TEMP/actionlint"',
@@ -173,7 +173,7 @@ const browserCommands = [
 // Закрепление внешних actions проверяется правилом, а не значениями: SHA и версию меняет
 // Dependabot, поэтому контракт требует полный SHA разрешённого репозитория, а не конкретный.
 const allowedActions = new Set([
-  'actions/checkout', 'actions/setup-node', 'actions/upload-artifact', 'actions/download-artifact',
+  'actions/checkout', 'actions/setup-node', 'actions/setup-dotnet', 'actions/upload-artifact', 'actions/download-artifact',
 ]);
 const externalAction = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$/;
 const localWorkflow = /^\.\/\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/;
@@ -353,12 +353,24 @@ function assertNativeGraph(files: Map<string, string>) {
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
-  // Only the protected release pipeline transports bytes between jobs.
-  // Diagnostic archives are never a requirement or a side effect of verification.
+  // Обычные успешные проверки не создают архивов. Нативная диагностика при отказе
+  // хранит только журналы и trace; release отдельно передаёт проверенный пакет.
   for (const [name, workflow] of workflows) {
     if (name === 'release.yml') continue;
-    for (const job of Object.values(workflow.jobs)) {
+    for (const [id, job] of Object.entries(workflow.jobs)) {
       for (const item of job.steps ?? []) {
+        if (name === 'ci.yml' && id === 'native-windows' && item.name === 'Keep failed native diagnostics') {
+          expect(unpin(item.uses!)).toBe('actions/upload-artifact@<sha>');
+          expect(item.if).toBe('${{ failure() || cancelled() }}');
+          expect(item.with).toEqual({
+            name: 'native-windows-diagnostics',
+            path: '${{ runner.temp }}/native-windows/*.json\n${{ runner.temp }}/native-windows/*.log\n${{ runner.temp }}/native-windows/*.txt\n',
+            'retention-days': 1,
+            'if-no-files-found': 'warn',
+            'include-hidden-files': false,
+          });
+          continue;
+        }
         expect(item.uses ?? '').not.toMatch(/^actions\/(upload-artifact|upload-pages-artifact)@/);
       }
     }
@@ -386,7 +398,7 @@ function assertNativeGraph(files: Map<string, string>) {
     } } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'performance', 'profile-baseline', 'security', 'tests', 'verify']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'native-windows', 'performance', 'profile-baseline', 'security', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}",
     uses: './.github/workflows/profile-01.yml',
@@ -415,6 +427,25 @@ function assertNativeGraph(files: Map<string, string>) {
   const tests = ci.jobs.tests!;
   const mutation = ci.jobs.mutation!;
   const security = ci.jobs.security!;
+  const windows = ci.jobs['native-windows']!;
+  expect(windows).toEqual({
+    name: 'Windows native motion',
+    'runs-on': 'windows-2025',
+    'timeout-minutes': 15,
+    permissions: { contents: 'read' },
+    env: { DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false' },
+    steps: [
+      { name: 'Checkout', uses: step(windows, 'Checkout').uses, with: { 'persist-credentials': false } },
+      { name: 'Setup .NET', uses: step(windows, 'Setup .NET').uses, with: { 'dotnet-version': '10.0.403' } },
+      { name: 'Build and run native consumer', shell: 'pwsh',
+        run: 'pwsh -File test/windows/verify.ps1 -OutputDirectory "$env:RUNNER_TEMP/native-windows"\n' },
+      { name: 'Native result', shell: 'pwsh',
+        run: 'Get-Content "$env:RUNNER_TEMP/native-windows/result.json" | Add-Content $env:GITHUB_STEP_SUMMARY\n' },
+      step(windows, 'Keep failed native diagnostics'),
+    ],
+  });
+  expect(unpin(step(windows, 'Checkout').uses!)).toBe('actions/checkout@<sha>');
+  expect(unpin(step(windows, 'Setup .NET').uses!)).toBe('actions/setup-dotnet@<sha>');
   const conformance = browser.jobs.conformance!;
   for (const job of [verify, tests, mutation, security, conformance]) {
     expect(job['runs-on']).toBe('ubuntu-latest');
@@ -481,6 +512,7 @@ function assertNativeGraph(files: Map<string, string>) {
       BROWSER_RESULT: '${{ needs.browser-static.result }}',
       DOCS_RESULT: '${{ needs.documentation.result }}',
       SECURITY_RESULT: '${{ needs.security.result }}',
+      WINDOWS_RESULT: '${{ needs.native-windows.result }}',
     },
     run: `${gateCommand}\n`,
   }]);
@@ -510,6 +542,11 @@ describe('нативный граф CI', () => {
     }],
     ['игнорирование verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!['continue-on-error'] = true; }],
     ['пропуск verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!.if = false; }],
+    ['пропуск Windows', 'ci.yml', (w: Workflow) => { w.jobs['native-windows']!.if = false; }],
+    ['Windows только собирает consumer', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Build and run native consumer').run = 'dotnet build'; }],
+    ['Windows игнорирует отказ', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Build and run native consumer')['continue-on-error'] = true; }],
+    ['архив успешной Windows проверки', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep failed native diagnostics').if = '${{ always() }}'; }],
+    ['Windows архивирует сборку', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep failed native diagnostics').with!.path = '${{ runner.temp }}/native-windows/'; }],
     ['игнорирование browser caller', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!['continue-on-error'] = true; }],
     ['другой browser worker', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!.uses = './.github/workflows/release.yml'; }],
     ['нет Node floor', 'ci.yml', (w: Workflow) => { w.jobs.verify!.steps = w.jobs.verify!.steps!.filter(item => item.name !== 'Consumer smoke on minimum runtime'); }],
@@ -639,7 +676,7 @@ describe('нативный граф CI', () => {
     }
   });
 
-  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT', 'SECURITY_RESULT']
+  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT', 'SECURITY_RESULT', 'WINDOWS_RESULT']
     .flatMap((key) => ['success', 'failure', 'cancelled', 'skipped', 'neutral', 'pending', '', undefined]
       .map((result) => ({ key, result }))))('shell итога проверяет $key=$result', ({ key, result }) => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
@@ -647,7 +684,7 @@ describe('нативный граф CI', () => {
     const env: NodeJS.ProcessEnv = {
       ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
       MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
-      SECURITY_RESULT: 'success',
+      SECURITY_RESULT: 'success', WINDOWS_RESULT: 'success',
     };
     delete env[key];
     if (result !== undefined) env[key] = result;
