@@ -169,8 +169,9 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     {
         if (disposed || active is not null && args.RequestId != active.Request) return;
         phase = "idle";
-        Emit(phase, 0);
+        // Observer может начать новое движение; результат завершённого уже окончателен.
         if (args.RequestId == active?.Request) Finish(MotionEnd.Finished, "settled");
+        Emit(phase, 0);
     }
     public void InteractingStateEntered(InteractionTracker sender, InteractionTrackerInteractingStateEnteredArgs args)
     {
