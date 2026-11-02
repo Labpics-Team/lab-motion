@@ -14,6 +14,7 @@ $consumer = Join-Path $repository 'examples/windows/NativeWindow.csproj'
 $unit = Join-Path $PSScriptRoot 'lifecycle.csproj'
 $appOutput = Join-Path $output 'app'
 $unitOutput = Join-Path $output 'unit'
+$buildOutput = Join-Path $output 'build'
 
 function Invoke-Dotnet([string]$Log, [string[]]$Arguments) {
     $previousPreference = $ErrorActionPreference
@@ -31,14 +32,14 @@ function Invoke-Dotnet([string]$Log, [string[]]$Arguments) {
 }
 
 Invoke-Dotnet 'dotnet.txt' @('--info')
-Invoke-Dotnet 'unit-build.log' @('build', $unit, '--configuration', 'Release', '--output', $unitOutput)
+Invoke-Dotnet 'unit-build.log' @('build', $unit, '--configuration', 'Release', '--artifacts-path', $buildOutput, '--output', $unitOutput)
 Invoke-Dotnet 'unit.json' @((Join-Path $unitOutput 'lifecycle.dll'))
 $unitResult = Get-Content -LiteralPath (Join-Path $output 'unit.json') -Raw | ConvertFrom-Json
 if (!$unitResult.passed -or $unitResult.results.Count -ne 6 -or @($unitResult.results | Where-Object { !$_.passed }).Count -ne 0) {
     throw 'Lifecycle-пробы не подтвердили все шесть сценариев.'
 }
 
-Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--output', $appOutput)
+Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--artifacts-path', $buildOutput, '--output', $appOutput)
 $exe = Join-Path $appOutput 'NativeWindow.exe'
 $tracePath = Join-Path $output 'trace.json'
 $previousOutput = $env:LAB_MOTION_PROBE_OUTPUT
