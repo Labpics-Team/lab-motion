@@ -47,5 +47,7 @@ foreach (var reaction in new[] { "observe", "retarget", "stop", "snap", "dispose
 }
 var bindings = BindingTests.Run();
 passed &= bindings.All(result => result.Passed);
-Console.WriteLine(JsonSerializer.Serialize(new { passed, results, bindings }, new JsonSerializerOptions { WriteIndented = true }));
+var pans = PanTests.Run();
+passed &= pans.All(result => result.Passed);
+Console.WriteLine(JsonSerializer.Serialize(new { passed, results, bindings, pans }, new JsonSerializerOptions { WriteIndented = true }));
 return passed ? 0 : 1;

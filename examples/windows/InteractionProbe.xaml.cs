@@ -2,8 +2,8 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Text;
 using System.Text.Json;
+using LabMotion.WinUI;
 using Microsoft.UI.Composition;
-using Microsoft.UI.Composition.Interactions;
 using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -29,16 +29,16 @@ public sealed class InteractionViewport : Grid
     }
 }
 
-// Изолированный опыт нативной координаты Y; не API движения и не компонент LabUI.
-public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
+// Настоящий Touch-потребитель публичного канала; фиксированная геометрия, без стилей LabUI.
+public sealed partial class InteractionProbe : Page
 {
     private const float ResponseMilliseconds = 350;
     private readonly InteractionTrace trace = new();
     private readonly List<CompositionObject> resources = [];
     private readonly List<(RoutedEvent Event, PointerEventHandler Handler)> inputHandlers = [];
-    private readonly TaskCompletionSource<bool> initialPosition = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private InteractionTracker? tracker;
-    private VisualInteractionSource? source;
+    private readonly TaskCompletionSource<MotionObservation> initialPosition = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private ScalarMotion? motion;
+    private ScalarPan? pan;
     private int direction;
     private int initialRequest;
     private float width;
@@ -71,15 +71,16 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
                 throw new InvalidOperationException("Область ввода должна иметь ненулевой размер в DIP.");
             Configure();
             AttachInput();
-            initialRequest = tracker!.TryUpdatePosition(InitialCoordinates);
-            trace.Add("initialRequested", new { requestId = initialRequest, position = Vector(InitialCoordinates) });
+            trace.Add("initialRequested", new { origin = "Initial", position = Vector(InitialCoordinates) });
             trace.Flush();
-            await initialPosition.Task.WaitAsync(TimeSpan.FromSeconds(8));
+            var initial = await initialPosition.Task.WaitAsync(TimeSpan.FromSeconds(8));
             if (detached) return;
-            var position = tracker.Position;
-            if (Vector3.Distance(position, InitialCoordinates) > .001f)
+            var position = initial.NativeReadbackPosition;
+            if (Vector3.Distance(position, InitialCoordinates) > .001f || Math.Abs(motion!.Position + height / 2) > .001f)
                 throw new InvalidOperationException("После подтверждения начальной позиции readback не соответствует q = 0,5.");
             CheckGeometry();
+            pan = motion.AttachPan(ElementCompositionPreview.GetElementVisual(TouchStage));
+            LogMetadata();
             ready = true;
             Status.Text = "Ready";
             AutomationProperties.SetName(Status, "Ready");
@@ -103,54 +104,30 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
     {
         var viewport = ElementCompositionPreview.GetElementVisual(TouchStage);
         var compositor = viewport.Compositor;
-        tracker = Keep(InteractionTracker.CreateWithOwner(compositor, this));
-        tracker.MinPosition = new Vector3(0, -2 * height, 0);
-        tracker.MaxPosition = new Vector3(0, height, 0);
-        source = Keep(VisualInteractionSource.Create(viewport));
-        source.PositionXSourceMode = InteractionSourceMode.Disabled;
-        source.PositionYSourceMode = InteractionSourceMode.EnabledWithInertia;
-        source.ScaleSourceMode = InteractionSourceMode.Disabled;
-        source.PositionXChainingMode = InteractionChainingMode.Never;
-        source.PositionYChainingMode = InteractionChainingMode.Never;
-        source.ScaleChainingMode = InteractionChainingMode.Never;
-        source.IsPositionXRailsEnabled = false;
-        source.IsPositionYRailsEnabled = true;
-        source.ManipulationRedirectionMode = VisualInteractionSourceRedirectionMode.CapableTouchpadOnly;
-
-        tracker.InteractionSources.Add(source);
-
-        var frequency = (float)(2 * Math.PI * 1000 / ResponseMilliseconds);
-        var stiffness = frequency * frequency;
-        var damping = 2 * frequency;
-        var target = direction > 0 ? -height : 0;
-        var settings = Keep(compositor.CreatePropertySet());
-        settings.InsertScalar("Target", target);
-        settings.InsertScalar("Stiffness", stiffness);
-        settings.InsertScalar("Damping", damping);
-        var force = Keep(compositor.CreateExpressionAnimation(
-            "-settings.Stiffness * (this.Target.Position.Y - settings.Target) - settings.Damping * this.Target.PositionVelocityInPixelsPerSecond.Y"));
-        force.SetReferenceParameter("settings", settings);
-        var motion = Keep(InteractionTrackerInertiaMotion.Create(compositor));
-        motion.Condition = Keep(compositor.CreateExpressionAnimation("true"));
-        motion.Motion = force;
-        tracker.ConfigurePositionYInertiaModifiers(new[] { motion });
+        motion = new ScalarMotion(compositor, ScalarAxis.Y, -2 * height, height, -height / 2);
+        motion.Observed += Observe;
+        motion.SetTarget(-height / 2, new Spring(ResponseMilliseconds, 0));
 
         // Источник ввода неподвижен; положение дочернего visual исполняет композитор.
         var sprite = Keep(compositor.CreateSpriteVisual());
         sprite.Size = new Vector2(width, 24);
         sprite.Brush = Keep(compositor.CreateColorBrush(((SolidColorBrush)Status.Foreground).Color));
-        var projection = Keep(compositor.CreateExpressionAnimation("-tracker.Position.Y"));
-        projection.SetReferenceParameter("tracker", tracker);
-        sprite.StartAnimation("Offset.Y", projection);
+        motion.Bind(sprite, ScalarProperty.OffsetY, -1);
         ElementCompositionPreview.SetElementChildVisual(TouchStage, sprite);
+    }
+
+    private void LogMetadata()
+    {
+        var target = direction > 0 ? -height : 0;
         trace.Add("metadata", new
         {
             axis = "y", coordinates = "native", direction, width, height, scale, unitsPerProgress = -height,
             minimum = -2 * height, maximum = height, initial = -height / 2, target,
-            responseMilliseconds = ResponseMilliseconds, bounce = 0, frequency, stiffness, damping,
+            responseMilliseconds = ResponseMilliseconds, bounce = 0,
+            consumer = "ScalarMotion", initialReleaseTarget = -height / 2,
             startedAtUtc = trace.StartedAtUtc, stopwatchFrequency = Stopwatch.Frequency,
-            positionYSourceMode = source.PositionYSourceMode.ToString(),
-            redirectionMode = source.ManipulationRedirectionMode.ToString(),
+            positionYSourceMode = pan!.SourceMode.ToString(),
+            redirectionMode = pan.RedirectionMode.ToString(),
         });
     }
 
@@ -185,7 +162,7 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
             if (!ready) throw new InvalidOperationException("Touch пришёл до подтверждения начальной позиции.");
             try
             {
-                source!.TryRedirectForManipulation(args.GetCurrentPoint(null));
+                pan!.Redirect(args.GetCurrentPoint(null));
                 trace.Add("redirect", new { pointerId = args.Pointer.PointerId, result = "returned" });
                 trace.Flush();
             }
@@ -208,44 +185,41 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
     private float ToProgress(Vector3 value) => -value.Y / height;
     private static object Vector(Vector3 value) => new { x = value.X, y = value.Y, z = value.Z };
 
-    private void Observe(InteractionTracker sender, string phase, int requestId, Vector3? position = null, Vector3? velocity = null)
+    private void Observe(MotionObservation observation)
     {
         if (detached) return;
-        var readback = sender.Position;
-        var observed = position ?? readback;
+        var phase = observation.Phase == "custom" ? "customAnimation" : observation.Phase;
+        var requestId = observation.NativeRequestId;
+        var readback = observation.NativeReadbackPosition;
+        var observed = observation.NativePosition;
+        var velocity = observation.NativeVelocityVector;
         trace.Add("motion", new
         {
             phase, requestId, position = Vector(observed), readbackPosition = Vector(readback),
-            positionOrigin = position.HasValue ? "event" : "readback",
+            origin = observation.Origin.ToString(),
+            positionOrigin = phase == "value" ? "event" : "readback",
             progress = ToProgress(observed), readbackProgress = ToProgress(readback),
             nativeVelocity = velocity.HasValue ? Vector(velocity.Value) : null,
             progressVelocity = velocity.HasValue ? (float?)ToProgress(velocity.Value) : null,
         });
         if (phase != "value") trace.Flush();
-    }
-
-    public void ValuesChanged(InteractionTracker sender, InteractionTrackerValuesChangedArgs args)
-    {
-        Observe(sender, "value", args.RequestId, args.Position);
         // TryUpdatePosition из Idle меняет значение без повторного входа в Idle.
-        if (!detached && args.RequestId == initialRequest &&
-            Vector3.Distance(args.Position, InitialCoordinates) <= .001f &&
-            Vector3.Distance(sender.Position, InitialCoordinates) <= .001f)
-            initialPosition.TrySetResult(true);
-    }
-    public void InertiaStateEntered(InteractionTracker sender, InteractionTrackerInertiaStateEnteredArgs args)
-        => Observe(sender, "inertia", args.RequestId, velocity: args.PositionVelocityInPixelsPerSecond);
-    public void InteractingStateEntered(InteractionTracker sender, InteractionTrackerInteractingStateEnteredArgs args)
-        => Observe(sender, "interacting", args.RequestId);
-    public void CustomAnimationStateEntered(InteractionTracker sender, InteractionTrackerCustomAnimationStateEnteredArgs args)
-        => Observe(sender, "customAnimation", args.RequestId);
-    public void IdleStateEntered(InteractionTracker sender, InteractionTrackerIdleStateEnteredArgs args)
-        => Observe(sender, "idle", args.RequestId);
-    public void RequestIgnored(InteractionTracker sender, InteractionTrackerRequestIgnoredArgs args)
-    {
-        Observe(sender, "ignored", args.RequestId);
-        if (args.RequestId == initialRequest)
+        if (observation.Origin == MotionOrigin.Initial && phase == "value" &&
+            Vector3.Distance(observed, InitialCoordinates) <= .001f &&
+            Vector3.Distance(readback, InitialCoordinates) <= .001f)
+        {
+            initialRequest = requestId;
+            initialPosition.TrySetResult(observation);
+        }
+        if (observation.Origin == MotionOrigin.Initial && phase == "ignored")
             initialPosition.TrySetException(new InvalidOperationException("Нативный исполнитель отклонил начальную позицию."));
+        if (observation.Origin == MotionOrigin.Input && phase == "interacting")
+        {
+            var target = direction > 0 ? -height : 0;
+            motion!.SetTarget(target, new Spring(ResponseMilliseconds, 0));
+            trace.Add("targetChanged", new { target, phase, origin = observation.Origin.ToString() });
+            trace.Flush();
+        }
     }
 
     private void Fail(string phase, Exception error)
@@ -268,7 +242,11 @@ public sealed partial class InteractionProbe : Page, IInteractionTrackerOwner
         foreach (var (routedEvent, handler) in inputHandlers) TouchStage.RemoveHandler(routedEvent, handler);
         inputHandlers.Clear();
         ElementCompositionPreview.SetElementChildVisual(TouchStage, null);
-        tracker?.InteractionSources.RemoveAll();
+        if (motion is not null)
+        {
+            motion.Observed -= Observe;
+            motion.Dispose();
+        }
         for (var i = resources.Count - 1; i >= 0; i--) resources[i].Dispose();
         resources.Clear();
         trace.Add("detached", new { });

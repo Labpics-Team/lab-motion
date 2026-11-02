@@ -41,6 +41,9 @@ if (!$unitResult.passed -or $unitResult.results.Count -ne 6 -or @($unitResult.re
 if ($unitResult.bindings.Count -ne 14 -or @($unitResult.bindings | Where-Object { !$_.Passed }).Count -ne 0) {
     throw 'Проверки привязок и единиц прогресса не подтвердили все четырнадцать сценариев.'
 }
+if ($unitResult.pans.Count -ne 18 -or @($unitResult.pans | Where-Object { !$_.Passed }).Count -ne 0) {
+    throw 'Проверки канала ввода не подтвердили все восемнадцать сценариев.'
+}
 
 Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--artifacts-path', $buildOutput, '--output', $appOutput)
 $exe = Join-Path $appOutput 'NativeWindow.exe'

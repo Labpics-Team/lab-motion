@@ -55,6 +55,8 @@ function evaluate(events, scenario) {
     m.height === scenario.viewport.height && m.scale === scenario.viewport.scale && m.coordinates === 'native' && m.unitsPerProgress === -m.height &&
     m.minimum === -2 * m.height && m.maximum === m.height && m.initial === -m.height / 2 && m.target === (scenario.direction > 0 ? -m.height : 0) &&
     m.responseMilliseconds === 350 && m.bounce === 0 && m.positionYSourceMode === 'EnabledWithInertia', 'Настройки приложения не совпали со сценарием.');
+  require(m.consumer === 'ScalarMotion' && m.initialReleaseTarget === -m.height / 2,
+    'Не подтверждён публичный канал с исходной целью в текущей позиции.');
   const axis = scenario.axis;
   const otherAxes = ['x', 'y', 'z'].filter(value => value !== axis);
   const positions = data => {
@@ -80,7 +82,7 @@ function evaluate(events, scenario) {
     near(r.position[axis], -m.height / 2, 1) && otherAxes.every(other => Math.abs(r.position[other]) <= 1) &&
     r.width === m.width && r.height === m.height && r.scale === m.scale && r.unitsPerProgress === -m.height, 'Ready не подтверждает начальную позицию и геометрию.');
   require(motions.some(event => event.sequence < ready.sequence && event.data.phase === 'value' &&
-    event.data.requestId === r.requestId && near(event.data.progress, .5) && near(event.data.readbackProgress, .5)), 'Нет начального native ValuesChanged с readback до Ready.');
+    event.data.origin === 'Initial' && event.data.requestId === r.requestId && near(event.data.progress, .5) && near(event.data.readbackProgress, .5)), 'Нет начального native ValuesChanged с readback до Ready.');
   require(motions.filter(event => event.sequence < ready.sequence).every(event => ['value', 'idle'].includes(event.data.phase)), 'До Ready началось непредусмотренное движение.');
   const pressed = select('input', data => data.event === 'pointerPressed' && data.device === 'Touch');
   if (pressed.length === 0) return { name: scenario.name, status: 'INCOMPLETE', reason: 'Touch PointerPressed не доставлен приложению; результат CLI этого не заменяет.' };
@@ -93,10 +95,15 @@ function evaluate(events, scenario) {
   require(redirected.sequence > down.sequence && select('redirect', data => data.result === 'error').length === 0, 'Нарушен исход перенаправления touch.');
   const gestureMotion = motions.filter(event => event.sequence > down.sequence);
   require(gestureMotion.every(event => event.data.requestId === 0), 'После ввода наблюдался программный requestId вместо чистого native touch.');
+  require(gestureMotion.every(event => event.data.origin === 'Input'), 'Наблюдения жеста не принадлежат вводу публичного канала.');
   require(!gestureMotion.some(event => ['ignored', 'customAnimation'].includes(event.data.phase)), 'Нативный жест прерван или заменён программной анимацией.');
   const interacting = exactlyOne('motion', data => data.phase === 'interacting' && data.requestId === 0, 'Нет native Interacting с requestId 0.');
   const inertia = exactlyOne('motion', data => data.phase === 'inertia' && data.requestId === 0, 'Нет native Inertia с requestId 0.');
   require(interacting.sequence > down.sequence && inertia.sequence > interacting.sequence && inertia.sequence > redirected.sequence, 'Нарушен порядок touch → Interacting → Inertia.');
+  const intent = exactlyOne('targetChanged', data => data.target === m.target && data.phase === 'interacting' && data.origin === 'Input',
+    'Нет единственной смены release target во время drag.');
+  require(intent.sequence > interacting.sequence && intent.sequence < inertia.sequence,
+    'Release target изменена вне native drag.');
   const drag = gestureMotion.filter(event => event.sequence > interacting.sequence && event.sequence < inertia.sequence && event.data.phase === 'value');
   require(new Set(drag.map(event => event.data.progress)).size >= 2, 'Нет изменения позиции во время native touch.');
   const lastDrag = drag.at(-1);

@@ -20,14 +20,14 @@ function fixture(name = 'y-down', scale = 1) {
       end: { x: 400, y: 300 + 80 * direction * scale }, exitCode: 0 } };
   const position = q => ({ x: 0, y: -q * 320, z: 0 });
   const motion = (seconds, phase, progress, requestId = 0, velocity = null) => ({ seconds, kind: 'motion', data: {
-    phase, requestId, position: position(progress), readbackPosition: position(progress), progress, readbackProgress: progress,
+    phase, requestId, origin: requestId === 0 ? 'Input' : 'Initial', position: position(progress), readbackPosition: position(progress), progress, readbackProgress: progress,
     positionOrigin: phase === 'value' ? 'event' : 'readback',
     nativeVelocity: velocity === null ? null : position(velocity), progressVelocity: velocity,
   } });
   const events = [
     { seconds: 0, kind: 'metadata', data: { axis, direction, coordinates: 'native', width: 480, height: 320, scale, unitsPerProgress: -320,
       minimum: -640, maximum: 320, initial: -160, target: -target * 320, responseMilliseconds: 350,
-      bounce: 0, positionYSourceMode: 'EnabledWithInertia' } },
+      bounce: 0, positionYSourceMode: 'EnabledWithInertia', consumer: 'ScalarMotion', initialReleaseTarget: -160 } },
     motion(.01, 'value', .5, 1),
     motion(.02, 'idle', .5, 1),
     { seconds: .03, kind: 'ready', data: { requestId: 1, position: position(.5), progress: .5,
@@ -36,6 +36,7 @@ function fixture(name = 'y-down', scale = 1) {
       ...start, pointerTimestamp: 40000, ready: true } },
     { seconds: .05, kind: 'redirect', data: { pointerId: 7, result: 'returned' } },
     motion(.06, 'interacting', .5),
+    { seconds: .07, kind: 'targetChanged', data: { target: -target * 320, phase: 'interacting', origin: 'Input' } },
     motion(.1, 'value', .5 + .05 * direction),
     motion(.2, 'value', .5 + .15 * direction),
     motion(.35, 'value', .5 + .25 * direction),
@@ -60,6 +61,41 @@ const rejected = (f, reason) => {
   assert.equal(result.status, 'FAIL');
   assert.match(result.reason, reason);
 };
+
+test('локальная цель должна быть установлена через публичный канал во время drag', () => {
+  const f = fixture();
+  f.events = renumber(f.events.filter(event => event.kind !== 'targetChanged'));
+  rejected(f, /смены release target/);
+});
+
+test('смена release target после отпускания не подтверждает намерение во время drag', () => {
+  const f = fixture();
+  const intent = f.events.find(event => event.kind === 'targetChanged');
+  f.events = f.events.filter(event => event !== intent);
+  const at = f.events.findIndex(phase('inertia'));
+  f.events.splice(at + 1, 0, { ...intent, seconds: .365 });
+  f.events = renumber(f.events);
+  rejected(f, /вне native drag/);
+});
+
+test('callback с request 0 не подменяет происхождение Input', () => {
+  const f = fixture();
+  change(f, phase('inertia'), event => { event.data.origin = 'Animation'; });
+  rejected(f, /не принадлежат вводу/);
+});
+
+test('начальная готовность требует происхождение Initial', () => {
+  const f = fixture();
+  change(f, event => event.kind === 'motion' && event.data.phase === 'value' && event.data.requestId === 1,
+    event => { event.data.origin = 'Snap'; });
+  rejected(f, /Нет начального native ValuesChanged/);
+});
+
+test('самостоятельный tracker в обход публичного канала не квалифицирует consumer', () => {
+  const f = fixture();
+  f.events[0].data.consumer = 'InteractionTracker';
+  rejected(f, /публичный канал/);
+});
 
 for (const name of names) {
   for (const scale of [1, 1.5, 2]) {
@@ -217,7 +253,7 @@ test('дублированная позиция на release допускает�
   const f = fixture();
   const duplicate = structuredClone(f.events.find(event => event.seconds === .35));
   duplicate.seconds = .365;
-  f.events.splice(11, 0, duplicate);
+  f.events.splice(f.events.findIndex(phase('inertia')) + 1, 0, duplicate);
   f.events = renumber(f.events);
   assert.equal(verdict(f).status, 'PASS');
 });

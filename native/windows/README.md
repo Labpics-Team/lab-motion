@@ -46,6 +46,51 @@ await motion.AnimateTo(1, new Spring(350, 0));
 точного равенства координаты цели. Requests, устаревшие callbacks и bindings
 принадлежат адаптеру. Ошибка native admission отклоняет Task.
 
+## Ввод в сырой координате
+
+Координатный конструктор принимает `ScalarAxis.X` или `ScalarAxis.Y`. Ось
+одновременно определяет bounds, силу, скорость, наблюдения и привязки.
+Для вертикального viewport `Position` совпадает с native Y; обычно визуальное
+смещение имеет противоположный знак:
+
+```csharp
+using var motion = new ScalarMotion(viewport.Compositor, ScalarAxis.Y, -640, 320);
+motion.SetTarget(-320, new Spring(350, 0));
+using var binding = motion.Bind(content, ScalarProperty.OffsetY, -1);
+using var pan = motion.AttachPan(viewport);
+// В Touch PointerPressed: pan.Redirect(args.GetCurrentPoint(null));
+```
+
+Границы в примере относятся к viewport высотой 320 DIP. Геометрия остаётся
+у потребителя. `AttachPan` требует явно заданную цель и пружину; `CreateProgress`
+к вводу не подключается, поскольку native drag и release работают в сырых
+координатах. Безразмерный progress можно получить проекцией сырой координаты.
+
+`SetTarget` меняет цель и пружину текущей Inertia и следующего отпускания без
+запроса запуска. Его можно вызывать во время drag. Ожидание прежней программной
+анимации заканчивается `Stopped/target-changed`, поэтому оно не подтвердит
+достижение уже заменённой цели. `AnimateTo` объединяет установку намерения с
+попыткой запуска; `RequestIgnored` отклоняет эту попытку, сохраняя намерение.
+Проверка фазы на UI-потоке не делает асинхронные настройки и native Try атомарными.
+
+`Observed.Origin` различает `Animation`, `Input`, `Initial`, `Snap` и `Stop`.
+Ввод поступает и без ожидающей Task; его `Operation` равен 0 и не завершает чужую
+программную операцию. Поля `NativeRequestId`, `NativePosition`,
+`NativeReadbackPosition` и `NativeVelocityVector` сохраняют исходные данные WinUI
+для диагностики. Управление компонентом не требует этих идентификаторов.
+
+`SnapTo` и `Stop` отправляют команду и прекращают локальное ожидание прежней
+анимации. `requested` означает отправку; `value`, `idle` или `ignored` передают
+реально полученный callback. Для no-op callback может отсутствовать: общего
+обещания native ACK и публичного `Ready` нет. Ненулевой старт Touch-примера
+ожидает `Initial/value` с фактической позицией и readback перед приёмом ввода.
+
+Viewport должен оставаться неподвижным. Handle `ScalarPan` принадлежит потоку
+канала; его `Dispose` отключает источник и публичные input-наблюдения, но не
+обещает остановки уже начатой Inertia. Внутренняя фаза продолжает учитывать
+native callbacks. `ScalarMotion.Dispose` освобождает источники и визуальные
+привязки, завершает ожидающую Task и подавляет поздние наблюдения.
+
 ## Область опыта
 
 Проверены Windows 11 build 26200, Windows App Runtime 2.6.4, .NET 10.0.403,
@@ -53,7 +98,10 @@ WinUI x64 unpackaged и масштаб 1.5. Проверка запускает 
 сценарии в WinUI Window: движение до ±200, retarget после ±40 к ∓100,
 сохранение ненулевой скорости против варианта со сбросом, спокойную пружину,
 начальную скорость 600, Stop, SnapTo и Dispose. События берут значение из
-`InteractionTrackerValuesChangedArgs.Position`.
+`InteractionTrackerValuesChangedArgs.Position`; `ReadbackPosition` отдельно
+читает `InteractionTracker.Position.X`. Эти сценарии проверяют координату
+tracker и завершение операций. Видимое смещение привязанного `Visual` требует
+отдельной проверки кадров.
 
 Это не публикуемый пакет (`IsPackable=false`). Жесты sheet, смена DPI/геометрии
 и производственные потребительские гарантии ещё требуют реализации и проверки.
@@ -64,7 +112,9 @@ WinUI x64 unpackaged и масштаб 1.5. Проверка запускает 
 В репозитории находятся настоящий WinUI-потребитель
 [`examples/windows`](../../examples/windows/) и
 [`test/windows/verify.ps1`](../../test/windows/verify.ps1). Нужны Windows с
-доступным Composition, .NET SDK 10 и PowerShell. Из корня репозитория:
+доступным Composition, .NET SDK 10.0.403 и PowerShell. Точная версия SDK и
+`rollForward: disable` закреплены в [`global.json`](../../test/windows/global.json).
+Из корня репозитория:
 
 ```powershell
 pwsh -File test/windows/verify.ps1 -OutputDirectory "$env:TEMP/motion-windows-run"
