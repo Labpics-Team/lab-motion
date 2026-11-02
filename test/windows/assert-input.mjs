@@ -112,6 +112,14 @@ export function verifyTrace(events, scenarios) {
   });
 }
 
+export function verifyCaptureWindow(window, frames) {
+  // Часы harness стартуют ДО recorder, поэтому это верхняя граница времени ввода
+  // относительно первого кадра; последний кадр должен быть позже всей операции.
+  require(Number.isFinite(window.inputStartedMs) && window.inputStartedMs >= 0 &&
+    Number.isFinite(window.inputCompletedMs) && window.inputCompletedMs > window.inputStartedMs &&
+    window.inputCompletedMs < frames.at(-1)?.elapsedMs, 'Запись не охватила полный ввод.');
+}
+
 export function verifyInput(directory) {
   let bytes = 0;
   const count = path => {
@@ -133,6 +141,7 @@ export function verifyInput(directory) {
   require(frames.length >= 10, 'Индекс содержит меньше десяти кадров.');
   frames.forEach((frame, index) => require(Number.isSafeInteger(frame.sampleIndex) && Number.isFinite(frame.elapsedMs) && frame.elapsedMs >= 0 &&
     (index === 0 || frame.sampleIndex > frames[index - 1].sampleIndex && frame.elapsedMs >= frames[index - 1].elapsedMs) && typeof frame.file === 'string', 'Повреждён индекс кадров.'));
+  verifyCaptureWindow(readJson(join(directory, 'capture-window.json')), frames);
   const images = [...new Set(frames.map(frame => frame.file))];
   for (const image of images) {
     const path = resolve(frameDirectory, image);

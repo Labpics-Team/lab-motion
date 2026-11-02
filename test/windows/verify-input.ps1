@@ -155,6 +155,7 @@ try {
     Invoke-Ui 'inspect' @('inspect')
     Invoke-Ui 'rest-before' @('screenshot', '--output', (Join-Path $evidence 'rest-before.png'))
 
+    $recordClock = [Diagnostics.Stopwatch]::StartNew()
     $recording = Start-Tool 'record' @('ui', 'record', '-w', $window, '--frames', '--duration-sec', '5', '--fps', '10', '--max-edge', '1000', '--output', (Join-Path $evidence 'press.mp4'), '--json')
     $deadline = [DateTime]::UtcNow.AddSeconds(15)
     $started = $false
@@ -171,7 +172,10 @@ try {
     } while ([DateTime]::UtcNow -lt $deadline)
     if (!$started) { throw 'Нет подтверждения первого кадра.' }
     $recording.stderr = $recording.process.StandardError.ReadToEndAsync()
+    $inputStartedMs = $recordClock.Elapsed.TotalMilliseconds
     Scenario 'mouse-hold' @('drag', 'Press', 'Press', '--hold-ms', '1000')
+    @{ inputStartedMs = $inputStartedMs; inputCompletedMs = $recordClock.Elapsed.TotalMilliseconds } |
+        ConvertTo-Json | Set-Content (Join-Path $evidence 'capture-window.json')
     $recordResult = Finish-Tool $recording
     $recording = $null
     if ($recordResult.mode -ne 'wgc' -or $recordResult.frames -lt 10) { throw 'Запись не подтвердила одновременный WGC capture и ввод.' }

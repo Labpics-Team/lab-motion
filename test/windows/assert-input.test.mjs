@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { verifyTrace } from './assert-input.mjs';
+import { verifyTrace, verifyCaptureWindow } from './assert-input.mjs';
 
 // Это синтетические свидетели oracle, не результаты нативного ввода или отрисовки.
 function fixture() {
@@ -130,4 +130,10 @@ test('повреждённый JSON даёт exit1 и отрицательный
     assert.equal(result.status, 1);
     assert.equal(JSON.parse(readFileSync(join(directory, 'result.json'), 'utf8')).passed, false);
   } finally { rmSync(directory, { recursive: true }); }
+});
+
+test('полная запись покоя до начала ввода не проходит', () => {
+  const frames = [{ elapsedMs: 0 }, { elapsedMs: 4900 }];
+  assert.doesNotThrow(() => verifyCaptureWindow({ inputStartedMs: 400, inputCompletedMs: 3000 }, frames));
+  assert.throws(() => verifyCaptureWindow({ inputStartedMs: 6000, inputCompletedMs: 7500 }, frames), /не охватила/);
 });
