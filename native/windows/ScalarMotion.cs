@@ -25,26 +25,38 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     private readonly Stopwatch clock = Stopwatch.StartNew();
     private readonly float minimum;
     private readonly float maximum;
+    private readonly float coordinateScale;
     private Operation? active;
     private long generation;
     private bool disposed;
     private string phase = "idle";
-    private readonly List<(Visual Visual, ExpressionAnimation Expression)> bindings = [];
+    private readonly HashSet<ScalarBinding> bindings = [];
 
     public event Action<MotionObservation>? Observed;
-    public float Position { get { CheckAccess(); return tracker.Position.X; } }
+    public float Position { get { CheckAccess(); return tracker.Position.X / coordinateScale; } }
 
     /// <summary>Привязка выполняется композитором: UI не пересчитывает кадры движения.</summary>
-    public void BindOffsetX(Visual visual)
+    public IDisposable BindOffsetX(Visual visual) => Bind(visual, ScalarProperty.OffsetX);
+
+    /// <summary>Проецирует координату как position × multiplier + offset до освобождения привязки.</summary>
+    public IDisposable Bind(Visual visual, ScalarProperty property, float multiplier = 1, float offset = 0)
     {
         CheckAccess();
-        var expression = tracker.Compositor.CreateExpressionAnimation("motion.Position.X");
-        expression.SetReferenceParameter("motion", tracker);
-        visual.StartAnimation("Offset.X", expression);
-        bindings.Add((visual, expression));
+        var binding = ScalarBinding.Create(dispatcher, tracker, visual, property, coordinateScale, multiplier, offset,
+            released => bindings.Remove(released));
+        bindings.Add(binding);
+        return binding;
     }
 
+    /// <summary>Безразмерный канал 0…1; скорость задаётся в единицах progress в секунду.</summary>
+    public static ScalarMotion CreateProgress(Compositor compositor, float initial = 0)
+        // Размах 1000 квалифицирован для точности progress; интегратор остаётся системным.
+        => new(compositor, 0, 1, initial, 1000);
+
     public ScalarMotion(Compositor compositor, float minimum, float maximum, float initial = 0)
+        : this(compositor, minimum, maximum, initial, 1) { }
+
+    private ScalarMotion(Compositor compositor, float minimum, float maximum, float initial, float coordinateScale)
     {
         dispatcher = DispatcherQueue.GetForCurrentThread()
             ?? throw new InvalidOperationException("Нужен поток с DispatcherQueue.");
@@ -52,12 +64,13 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
             throw new ArgumentOutOfRangeException(nameof(minimum));
         this.minimum = minimum;
         this.maximum = maximum;
+        this.coordinateScale = coordinateScale;
         ValidatePosition(initial);
         tracker = InteractionTracker.CreateWithOwner(compositor, this);
-        tracker.MinPosition = new Vector3(minimum, 0, 0);
-        tracker.MaxPosition = new Vector3(maximum, 0, 0);
+        tracker.MinPosition = new Vector3(minimum * coordinateScale, 0, 0);
+        tracker.MaxPosition = new Vector3(maximum * coordinateScale, 0, 0);
         settings = compositor.CreatePropertySet();
-        settings.InsertScalar("Target", initial);
+        settings.InsertScalar("Target", initial * coordinateScale);
         settings.InsertScalar("Stiffness", 1);
         settings.InsertScalar("Damping", 1);
         condition = compositor.CreateExpressionAnimation("true");
@@ -68,7 +81,7 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         modifier.Condition = condition;
         modifier.Motion = force;
         tracker.ConfigurePositionXInertiaModifiers(new[] { modifier });
-        tracker.TryUpdatePosition(new Vector3(initial, 0, 0));
+        tracker.TryUpdatePosition(new Vector3(initial * coordinateScale, 0, 0));
     }
 
     /// <summary>Новая цель сохраняет текущую native-скорость; initialVelocity допустима из покоя.</summary>
@@ -82,13 +95,18 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         var frequency = (float)(2 * Math.PI * 1000 / parameters.ResponseMilliseconds);
         if (!float.IsFinite(frequency * frequency) || frequency == 0)
             throw new ArgumentOutOfRangeException(nameof(parameters));
-        if (initialVelocity is { } velocity && (!float.IsFinite(velocity) || phase != "idle" || active is not null))
-            throw new ArgumentException("Начальная скорость задаётся только из покоя.", nameof(initialVelocity));
+        if (initialVelocity is { } velocity)
+        {
+            if (!float.IsFinite(velocity * coordinateScale))
+                throw new ArgumentOutOfRangeException(nameof(initialVelocity), "Скорость должна быть конечной в координатах исполнителя.");
+            if (phase != "idle" || active is not null)
+                throw new ArgumentException("Начальная скорость задаётся только из покоя.", nameof(initialVelocity));
+        }
         // Параметризация владельца src/motion/model.ts; интегрирование выполняет Composition.
-        settings.InsertScalar("Target", target);
+        settings.InsertScalar("Target", target * coordinateScale);
         settings.InsertScalar("Stiffness", frequency * frequency);
         settings.InsertScalar("Damping", 2 * (1 - parameters.Bounce) * frequency);
-        var request = tracker.TryUpdatePositionWithAdditionalVelocity(new Vector3(initialVelocity ?? 0, 0, 0));
+        var request = tracker.TryUpdatePositionWithAdditionalVelocity(new Vector3((initialVelocity ?? 0) * coordinateScale, 0, 0));
         Finish(MotionEnd.Stopped, "replaced");
         var operation = new Operation(++generation, request, new TaskCompletionSource<MotionResult>(TaskCreationOptions.RunContinuationsAsynchronously));
         active = operation;
@@ -100,7 +118,7 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     {
         CheckAccess();
         ValidatePosition(value);
-        tracker.TryUpdatePosition(new Vector3(value, 0, 0));
+        tracker.TryUpdatePosition(new Vector3(value * coordinateScale, 0, 0));
         Finish(MotionEnd.Stopped, "snap");
     }
 
@@ -117,12 +135,7 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         CheckAccess();
         disposed = true;
         Finish(MotionEnd.Stopped, "disposed");
-        foreach (var (visual, expression) in bindings)
-        {
-            visual.StopAnimation("Offset.X");
-            expression.Dispose();
-        }
-        bindings.Clear();
+        foreach (var binding in bindings.ToArray()) binding.Dispose();
         tracker.Dispose();
         modifier.Dispose();
         condition.Dispose();
@@ -145,7 +158,8 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
 
     private void Emit(string kind, float? velocity, float? eventPosition = null)
     {
-        if (!disposed) Observed?.Invoke(new(active?.Id ?? generation, kind, clock.Elapsed.TotalSeconds, eventPosition ?? tracker.Position.X, velocity, tracker.Position.X));
+        if (!disposed) Observed?.Invoke(new(active?.Id ?? generation, kind, clock.Elapsed.TotalSeconds,
+            (eventPosition ?? tracker.Position.X) / coordinateScale, velocity / coordinateScale, tracker.Position.X / coordinateScale));
     }
 
     private void Finish(MotionEnd end, string reason)

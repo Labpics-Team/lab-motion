@@ -38,6 +38,9 @@ $unitResult = Get-Content -LiteralPath (Join-Path $output 'unit.json') -Raw | Co
 if (!$unitResult.passed -or $unitResult.results.Count -ne 6 -or @($unitResult.results | Where-Object { !$_.passed }).Count -ne 0) {
     throw 'Lifecycle-пробы не подтвердили все шесть сценариев.'
 }
+if ($unitResult.bindings.Count -ne 14 -or @($unitResult.bindings | Where-Object { !$_.Passed }).Count -ne 0) {
+    throw 'Проверки привязок и единиц прогресса не подтвердили все четырнадцать сценариев.'
+}
 
 Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--artifacts-path', $buildOutput, '--output', $appOutput)
 $exe = Join-Path $appOutput 'NativeWindow.exe'
@@ -76,11 +79,12 @@ try {
 }
 
 $trace = Get-Content -LiteralPath $tracePath -Raw | ConvertFrom-Json
-if ($trace.status -ne 'captured' -or $trace.error -or $trace.runs.Count -ne 7) {
-    throw 'Не получены все семь нативных сценариев.'
+if ($trace.status -ne 'captured' -or $trace.error -or $trace.runs.Count -ne 11) {
+    throw 'Не получены все одиннадцать нативных сценариев.'
 }
 $expected = @('idle-reentrant-retarget', 'lifetime', 'retarget-preserve:-1', 'retarget-preserve:1',
-    'retarget-reset-mutant:-1', 'retarget-reset-mutant:1', 'smooth-settle') | Sort-Object
+    'retarget-reset-mutant:-1', 'retarget-reset-mutant:1', 'smooth-settle',
+    'progress-up', 'progress-down', 'progress-reverse', 'progress-velocity') | Sort-Object
 $actual = @($trace.runs | ForEach-Object {
     if ($_.kind -like 'retarget-*') { "$($_.kind):$($_.direction)" } else { $_.kind }
 }) | Sort-Object
@@ -90,5 +94,5 @@ foreach ($run in $trace.runs) {
         throw "Сценарий $($run.kind) не наблюдал нативное движение."
     }
 }
-[ordered]@{ passed = $true; lifecycleScenarios = 6; nativeScenarios = 7; scale = $trace.scale } |
+[ordered]@{ passed = $true; lifecycleScenarios = 6; bindingScenarios = 14; nativeScenarios = 11; scale = $trace.scale } |
     ConvertTo-Json | Tee-Object -FilePath (Join-Path $output 'result.json')

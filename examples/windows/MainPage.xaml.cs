@@ -34,6 +34,10 @@ public sealed partial class MainPage : Page
             await Retarget(true, -1);
             await Settle();
             await Lifetime();
+            await Progress("up");
+            await Progress("down");
+            await Progress("reverse");
+            await Progress("velocity");
             Status.Text = "Траектории проверены";
             Save("captured", null);
         }
@@ -165,6 +169,54 @@ public sealed partial class MainPage : Page
         Require(stopped.End == MotionEnd.Stopped && stopped.Reason == "stopped", "Stop выдал неверное завершение.");
         Require(disposed.End == MotionEnd.Stopped && disposed.Reason == "disposed", "Dispose выдал неверное завершение.");
         Require(lateObservations == 0 && rejected, "Канал доступен или сообщает события после Dispose.");
+    }
+
+    private async Task Progress(string direction)
+    {
+        var compositor = ElementCompositionPreview.GetElementVisual(Stage).Compositor;
+        using var sprite = compositor.CreateSpriteVisual();
+        sprite.Size = new System.Numerics.Vector2(64, 16);
+        sprite.Brush = compositor.CreateColorBrush(((SolidColorBrush)Status.Foreground).Color);
+        ElementCompositionPreview.SetElementChildVisual(Stage, sprite);
+        using var motion = ScalarMotion.CreateProgress(compositor, direction == "down" ? 1 : 0);
+        var trace = new List<MotionObservation>();
+        motion.Observed += trace.Add;
+        using var opacity = motion.Bind(sprite, ScalarProperty.Opacity, .5f, .25f);
+        using var translation = motion.Bind(sprite, ScalarProperty.OffsetY, 64);
+        var target = direction == "down" ? 0 : 1;
+        var first = motion.AnimateTo(target, Smooth, direction == "velocity" ? 2 : null);
+        MotionResult? replaced = null;
+        float? before = null;
+        var last = first;
+        if (direction == "reverse")
+        {
+            await Until(() => trace.Any(x => x.Phase == "value" && x.Position >= .2f));
+            before = motion.Position;
+            target = 0;
+            last = motion.AnimateTo(target, Smooth);
+            replaced = await first;
+        }
+        var outcome = await last.WaitAsync(TimeSpan.FromSeconds(8));
+        var error = Math.Abs(motion.Position - target);
+        var intermediateValues = trace.Where(x => x.Phase == "value" && x.Position > 0 && x.Position < 1)
+            .Select(x => x.Position).Distinct().Count();
+        runs.Add(new { kind = "progress-" + direction, outcome, replaced, before, target,
+            position = motion.Position, error, intermediateValues, trace });
+        Require(outcome.End == MotionEnd.Finished && error <= .001f,
+            "Нормализованный канал завершился дальше 0.001 от цели.");
+        Require(intermediateValues >= 3, "Не наблюдалось промежуточное движение прогресса.");
+        if (direction == "reverse")
+        {
+            var entry = trace.Single(x => x.Operation == 2 && x.Phase == "inertia");
+            var after = trace.First(x => x.Operation == 2 && x.Phase == "value" && x.Seconds > entry.Seconds);
+            Require(replaced?.End == MotionEnd.Stopped && entry.Position >= before
+                && entry.NativeVelocity > 0 && after.Position > entry.Position,
+                "Нормализация потеряла непрерывность разворота.");
+        }
+        if (direction == "velocity")
+            Require(Math.Abs(trace.First(x => x.Phase == "inertia").NativeVelocity!.Value - 2) <= .00001f,
+                "Скорость канала возвращается не в единицах прогресса в секунду.");
+        ElementCompositionPreview.SetElementChildVisual(Stage, null);
     }
 
     private static async Task Until(Func<bool> condition)
