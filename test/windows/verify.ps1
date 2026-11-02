@@ -17,12 +17,16 @@ $unitOutput = Join-Path $output 'unit'
 
 function Invoke-Dotnet([string]$Log, [string[]]$Arguments) {
     $previousPreference = $ErrorActionPreference
+    Push-Location -LiteralPath $PSScriptRoot
     try {
         # Windows PowerShell 5.1 превращает даже служебный stderr в ErrorRecord.
         $ErrorActionPreference = 'Continue'
         & dotnet @Arguments 2>&1 | Tee-Object -FilePath (Join-Path $output $Log)
         $code = $LASTEXITCODE
-    } finally { $ErrorActionPreference = $previousPreference }
+    } finally {
+        $ErrorActionPreference = $previousPreference
+        Pop-Location
+    }
     if ($code -ne 0) { throw "dotnet завершился с кодом $code. Журнал: $Log" }
 }
 
