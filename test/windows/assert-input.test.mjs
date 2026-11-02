@@ -97,6 +97,12 @@ test('CLI hold0 без фактического interruption не принима
   assert.throws(() => verify(blocks), /не было прервано/);
 });
 
+test('замена ожидающего request не подменяет прерывание движения', () => {
+  const blocks = fixture();
+  blocks[1].events = blocks[1].events.filter(e => e.data.phase !== 'value');
+  assert.throws(() => verify(blocks), /движение не началось/);
+});
+
 test('reduced motion отклоняет настоящий запрос анимации', () => {
   const blocks = fixture();
   const id = blocks[5].events.find(e => e.kind === 'intent').data.operation;

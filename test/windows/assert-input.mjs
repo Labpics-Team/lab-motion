@@ -97,6 +97,8 @@ export function verifyTrace(events, scenarios) {
       return { name, passed: true, intermediateValues: intermediate.size };
     }
     if (name === 'mouse-interrupt') {
+      require(select('motion', d => d.pageOperation === down.data.operation && d.phase === 'value' && d.position > 0 && d.position < 1)
+        .some(e => e.sequence < up.sequence), `${name}: до новой цели движение не началось`);
       const stopped = need('completed', d => d.operation === down.data.operation && d.end === 'Stopped' && d.reason === 'replaced', 'нажатие не было прервано новой целью');
       require(stopped.sequence < final.sequence, `${name}: конечная операция не следует за прерванной`);
     }
