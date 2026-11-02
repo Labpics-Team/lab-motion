@@ -82,7 +82,7 @@ function Wait-Rest([long]$After = 0) {
         $intents = @($events | Where-Object kind -eq 'intent')
         if ($intents.Count) {
             $last = $intents[-1].data
-            $ends = @($events | Where-Object { $_.kind -in @('completed', 'snapRequested') -and $_.data.operation -eq $last.operation })
+            $ends = @($events | Where-Object { $_.kind -in @('completed', 'snapReadback') -and $_.data.operation -eq $last.operation })
             if ($intents[-1].sequence -gt $After -and !$last.pressed -and $ends.Count) { return }
         }
         Start-Sleep -Milliseconds 50

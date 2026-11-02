@@ -21,6 +21,10 @@ function fixture() {
       return id;
     };
     const motion = (id, phase, position) => add('motion', { pageOperation: id, nativeOperation: id, phase, position, readbackPosition: position, nativeSeconds: events.length / 100 });
+    const snap = (id, target) => {
+      add('snapRequested', { operation: id, target });
+      add('snapReadback', { operation: id, target, position: target });
+    };
     const complete = (id, target) => {
       motion(id, 'idle', target);
       add('completed', { operation: id, nativeOperation: id, end: 'Finished', reason: 'settled', isCurrent: true });
@@ -34,12 +38,12 @@ function fixture() {
       motion(up, 'requested', .8);
       add('completed', { operation: down, nativeOperation: down, end: 'Stopped', reason: 'replaced', isCurrent: false });
       const id = intent(false, 'localPreference', false);
-      add('snapRequested', { operation: id, target: 0 });
+      snap(id, 0);
       add('completed', { operation: up, nativeOperation: up, end: 'Stopped', reason: 'snap', isCurrent: false });
     } else {
       input(name === 'keyboard' ? 'keyDown' : 'pointerPressed');
       const down = intent(true);
-      if (name === 'reduced-motion') add('snapRequested', { operation: down, target: 1 });
+      if (name === 'reduced-motion') snap(down, 1);
       else {
         motion(down, 'requested', 0);
         for (const value of [.2, .5, .8]) motion(down, 'value', value);
@@ -48,7 +52,7 @@ function fixture() {
       if (name === 'pointer-out') input('pointerExited');
       input(name === 'keyboard' ? 'keyUp' : 'pointerReleased');
       const up = intent(false);
-      if (name === 'reduced-motion') add('snapRequested', { operation: up, target: 0 });
+      if (name === 'reduced-motion') snap(up, 0);
       else {
         motion(up, 'requested', .8);
         if (name !== 'mouse-hold') add('completed', { operation: down, nativeOperation: down, end: 'Stopped', reason: 'replaced', isCurrent: false });
@@ -98,6 +102,12 @@ test('reduced motion отклоняет настоящий запрос аним
   const id = blocks[5].events.find(e => e.kind === 'intent').data.operation;
   blocks[5].events.push({ kind: 'motion', data: { pageOperation: id, nativeOperation: id, phase: 'requested', position: 0, readbackPosition: 0, nativeSeconds: 0 } });
   assert.throws(() => verify(blocks), /анимация при отключённом/);
+});
+
+test('правильный SnapTo request с неверным положением не проходит', () => {
+  const blocks = fixture();
+  blocks[5].events.find(e => e.kind === 'snapReadback').data.position = .5;
+  assert.throws(() => verify(blocks), /нет readback у цели/);
 });
 
 test('статическое выключение анимации не подменяет прерывание', () => {

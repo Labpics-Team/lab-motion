@@ -51,6 +51,7 @@ export function verifyTrace(events, scenarios) {
     };
     const snap = intent => {
       need('snapRequested', d => d.operation === intent.data.operation && d.target === intent.data.target, 'нет запроса SnapTo');
+      need('snapReadback', d => d.operation === intent.data.operation && d.target === intent.data.target && near(d.position, intent.data.target), 'нет readback у цели SnapTo');
       require(select('motion', d => d.pageOperation === intent.data.operation && d.phase === 'requested').length === 0, `${name}: анимация при отключённом движении`);
     };
     if (name === 'disable-animation') {
@@ -86,7 +87,7 @@ export function verifyTrace(events, scenarios) {
     if (name === 'reduced-motion') {
       require(!down.data.localAnimation && !up.data.localAnimation, `${name}: локальная анимация осталась включена`);
       snap(down); snap(up);
-      return { name, passed: true, observed: 'input-and-snap-requests' };
+      return { name, passed: true, observed: 'input-and-snap-readback' };
     }
     const final = ended(up);
     if (name === 'mouse-hold') {

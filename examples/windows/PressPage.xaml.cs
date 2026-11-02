@@ -119,6 +119,7 @@ public sealed partial class PressPage : Page
                 current.SnapTo(pressed ? 1 : 0);
                 trace?.Add("snapRequested", new { operation = id, target = pressed ? 1 : 0 });
                 trace?.Flush();
+                if (trace is not null) await ObserveSnap(current, id, pressed ? 1 : 0);
             }
             else
             {
@@ -139,6 +140,21 @@ public sealed partial class PressPage : Page
             trace?.Add("error", new { operation = id, type = error.GetType().Name, message = error.Message });
             trace?.Flush();
             if (id == operation && ReferenceEquals(current, motion)) State.Text = error.Message;
+        }
+    }
+
+    // Только тестовое чтение: не задаёт положение и не исполняет кадры анимации.
+    private async Task ObserveSnap(ScalarMotion current, long id, float target)
+    {
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            await Task.Delay(50);
+            if (id != operation || !ReferenceEquals(current, motion)) return;
+            var position = current.Position;
+            if (Math.Abs(position - target) > .001f && attempt < 19) continue;
+            trace!.Add("snapReadback", new { operation = id, target, position });
+            trace.Flush();
+            return;
         }
     }
 
