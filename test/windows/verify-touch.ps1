@@ -19,7 +19,7 @@ if ($executables.Count -ne 1) { throw 'Ожидался проверенный w
 $cli = $executables[0].FullName
 $saved = @{}
 foreach ($name in @('LAB_MOTION_PROBE_OUTPUT', 'LAB_MOTION_PRESS_TRACE', 'LAB_MOTION_INTERACTION_OUTPUT',
-    'LAB_MOTION_INTERACTION_DIRECTION', 'WINAPP_UI_WORKFLOW_ID',
+    'LAB_MOTION_INTERACTION_DIRECTION', 'LAB_MOTION_POINTER_HISTORY', 'WINAPP_UI_WORKFLOW_ID',
     'WINAPP_CLI_TELEMETRY_OPTOUT', 'WINAPP_CLI_UPDATE_CHECK')) {
     $saved[$name] = [Environment]::GetEnvironmentVariable($name)
 }
@@ -107,6 +107,7 @@ try {
         try {
             $env:LAB_MOTION_INTERACTION_OUTPUT = $trace
             $env:LAB_MOTION_INTERACTION_DIRECTION = [string]$direction
+            $env:LAB_MOTION_POINTER_HISTORY = if ($direction -eq 1) { Join-Path $case 'pointer-history.json' } else { $null }
             $env:WINAPP_UI_WORKFLOW_ID = [guid]::NewGuid().ToString()
             $script:process = Start-Process -FilePath $app -WorkingDirectory $ApplicationDirectory -WindowStyle Hidden -PassThru
             $ready = Wait-Trace 'ready'

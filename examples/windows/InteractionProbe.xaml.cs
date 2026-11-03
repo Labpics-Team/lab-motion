@@ -39,6 +39,7 @@ public sealed partial class InteractionProbe : Page
     private readonly TaskCompletionSource<MotionObservation> initialPosition = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private ScalarMotion? motion;
     private ScalarPan? pan;
+    private PointerHistoryTrace? pointerHistory;
     private int direction;
     private int initialRequest;
     private float width;
@@ -59,6 +60,8 @@ public sealed partial class InteractionProbe : Page
         Loaded -= Attach;
         try
         {
+            var pointerHistoryPath = Environment.GetEnvironmentVariable("LAB_MOTION_POINTER_HISTORY");
+            if (pointerHistoryPath is not null) pointerHistory = new PointerHistoryTrace(pointerHistoryPath);
             direction = Environment.GetEnvironmentVariable("LAB_MOTION_INTERACTION_DIRECTION") switch
             {
                 "1" => 1, "-1" => -1,
@@ -160,6 +163,7 @@ public sealed partial class InteractionProbe : Page
             trace.Flush();
             if (name != "pointerPressed" || args.Pointer.PointerDeviceType != PointerDeviceType.Touch) return;
             if (!ready) throw new InvalidOperationException("Touch пришёл до подтверждения начальной позиции.");
+            pointerHistory?.Identify(args.Pointer.PointerId);
             try
             {
                 pan!.Redirect(args.GetCurrentPoint(null));
@@ -203,6 +207,7 @@ public sealed partial class InteractionProbe : Page
             progressVelocity = velocity.HasValue ? (float?)ToProgress(velocity.Value) : null,
         });
         if (phase != "value") trace.Flush();
+        if (observation.Origin == MotionOrigin.Input && phase == "idle") pointerHistory?.Write("input-idle");
         // TryUpdatePosition из Idle меняет значение без повторного входа в Idle.
         if (observation.Origin == MotionOrigin.Initial && phase == "value" &&
             Vector3.Distance(observed, InitialCoordinates) <= .001f &&
@@ -239,6 +244,7 @@ public sealed partial class InteractionProbe : Page
         detached = true;
         ready = false;
         initialPosition.TrySetCanceled();
+        pointerHistory?.Dispose();
         foreach (var (routedEvent, handler) in inputHandlers) TouchStage.RemoveHandler(routedEvent, handler);
         inputHandlers.Clear();
         ElementCompositionPreview.SetElementChildVisual(TouchStage, null);

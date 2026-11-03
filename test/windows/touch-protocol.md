@@ -124,3 +124,37 @@ Y→X и Y→Y modifiers с gain −1000/H дали правильный drag, �
 PTP, mouse drag, горизонтальный ввод, смена DPI/размера, прерывание новым
 намерением, точная калибровка, визуальная плавность и производительность
 остаются за пределами этого протокола.
+
+## Диагностика terminal input после публичного pan
+
+На `7a8bfbba` прогон `41551468043` получил native Vy = −1553.4441 в `y-down`:
+отношение к номинальной скорости равно 5.8254 при верхнем допуске 2.5.
+Публичная проекция скорость не меняет; фактическая история последних input
+событий отсутствует. Это FAIL с незакрытой причиной.
+
+Следующий единственный диагностический `y-down` сохраняет injector, геометрию,
+force, target lifecycle и прежние критерии. `y-up` остаётся прежним контролем.
+`pointer-history.json` буферизует сообщения собственного UI-потока через
+[WH_GETMESSAGE](https://learn.microsoft.com/en-us/windows/win32/winmsg/getmsgproc)
+при PM_REMOVE до передачи WinUI. MSG не изменяется; hook всегда передаёт управление
+CallNextHookEx. Глобальной регистрации ввода и перехвата capture нет.
+GetPointerInfoHistory вызывается сразу на потоке получения сообщения:
+[история может исчезнуть уже при следующем сообщении](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getpointerinfohistory).
+Фиксируются raw/predicted экранные координаты, QPC/Win32 timestamps, pointer/frame
+ids, HWND, ошибки API и время работы observer. Запись на диск — после input Idle.
+Лимиты — 512 сообщений, 4096 samples, 128 samples на сообщение; переполнение
+явно помечает результат неполным.
+
+Сначала проверяется покрытие: DOWN, последние UPDATE и UP того же pointerId
+после redirect должны присутствовать с успешной историей. CaptureLost или
+RoutedReleased сами по себе не заменяют UPDATE/UP. Если terminal history
+не доставлена UI-потоку либо API вернул NO_DATA/ACCESS_DENIED, исход —
+OBSERVATION_INCOMPLETE; это не подтверждение нормального ввода.
+RegisterPointerInputTarget отвергнут, поскольку меняет глобальную маршрутизацию
+и требует UIAccess; RegisterPointerInputTargetEx официально не поддерживается.
+
+Повторённый FAIL с необычным raw tail указывает на входное расписание; нормальный
+raw tail при скачке predicted — на prediction; оба обычных tail при большой
+Inertia velocity оставляют вопрос на native boundary, включая force lifecycle.
+Отсутствие повторного FAIL не объясняет исходный случай: observer меняет нагрузку.
+Прежний oracle не меняется, диагностический файл сам по себе не квалифицирует pan.
