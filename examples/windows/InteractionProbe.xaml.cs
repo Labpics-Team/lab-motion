@@ -207,7 +207,11 @@ public sealed partial class InteractionProbe : Page
             progressVelocity = velocity.HasValue ? (float?)ToProgress(velocity.Value) : null,
         });
         if (phase != "value") trace.Flush();
-        if (observation.Origin == MotionOrigin.Input && phase == "idle") pointerHistory?.Write("input-idle");
+        if (observation.Origin == MotionOrigin.Input && phase == "idle")
+        {
+            try { pointerHistory?.Write("input-idle"); }
+            catch (Exception error) { Fail("pointer-history", error); return; }
+        }
         // TryUpdatePosition из Idle меняет значение без повторного входа в Idle.
         if (observation.Origin == MotionOrigin.Initial && phase == "value" &&
             Vector3.Distance(observed, InitialCoordinates) <= .001f &&
@@ -244,7 +248,9 @@ public sealed partial class InteractionProbe : Page
         detached = true;
         ready = false;
         initialPosition.TrySetCanceled();
-        pointerHistory?.Dispose();
+        Exception? pointerHistoryError = null;
+        try { pointerHistory?.Dispose(); }
+        catch (Exception error) { pointerHistoryError = error; }
         foreach (var (routedEvent, handler) in inputHandlers) TouchStage.RemoveHandler(routedEvent, handler);
         inputHandlers.Clear();
         ElementCompositionPreview.SetElementChildVisual(TouchStage, null);
@@ -255,6 +261,11 @@ public sealed partial class InteractionProbe : Page
         }
         for (var i = resources.Count - 1; i >= 0; i--) resources[i].Dispose();
         resources.Clear();
+        if (pointerHistoryError is not null)
+        {
+            Environment.ExitCode = 1;
+            trace.Add("error", new { phase = "pointer-history-detach", error = pointerHistoryError.ToString() });
+        }
         trace.Add("detached", new { });
         trace.Flush();
         trace.Dispose();

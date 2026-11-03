@@ -16,6 +16,7 @@ internal sealed class PointerHistoryTrace : IDisposable
     private readonly List<object> messages = new(MaximumMessages);
     private readonly List<object> samples = new(MaximumSamples);
     private readonly uint threadId = GetCurrentThreadId();
+    private GCHandle callbackRoot;
     private nint hook;
     private bool truncated;
     private bool disposed;
@@ -29,10 +30,17 @@ internal sealed class PointerHistoryTrace : IDisposable
         if (Marshal.SizeOf<PointerInfo>() != 96 || Marshal.SizeOf<Message>() != 48)
             throw new InvalidOperationException("Не совпала x64-разметка Win32 pointer/message.");
         using (new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read)) { }
+        // Все операции, способные бросить при записи, завершаются до регистрации hook.
+        Write("installing");
         callback = Observe;
+        callbackRoot = GCHandle.Alloc(callback);
         hook = SetWindowsHookEx(3, callback, 0, threadId);
-        if (hook == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
-        Write("attached");
+        if (hook == 0)
+        {
+            var installError = Marshal.GetLastWin32Error();
+            callbackRoot.Free();
+            throw new Win32Exception(installError);
+        }
     }
 
     public void Identify(uint pointerId) => inputPointerId = pointerId;
@@ -104,8 +112,16 @@ internal sealed class PointerHistoryTrace : IDisposable
     {
         if (disposed) return;
         disposed = true;
-        if (!UnhookWindowsHookEx(hook)) error ??= new Win32Exception(Marshal.GetLastWin32Error()).ToString();
-        hook = 0;
+        if (UnhookWindowsHookEx(hook))
+        {
+            hook = 0;
+            callbackRoot.Free();
+        }
+        else
+        {
+            // Неосвобождённый hook сохраняет rooted delegate до завершения процесса.
+            error ??= new Win32Exception(Marshal.GetLastWin32Error()).ToString();
+        }
         Write("detached");
         GC.KeepAlive(callback);
     }
