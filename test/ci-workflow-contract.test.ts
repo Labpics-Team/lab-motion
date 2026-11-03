@@ -353,20 +353,21 @@ function assertNativeGraph(files: Map<string, string>) {
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
-  // Обычные успешные проверки не создают архивов. Нативная диагностика при отказе
-  // хранит только журналы и trace; release отдельно передаёт проверенный пакет.
+  // Обычные успешные проверки не создают архивов. Нативные журналы и trace
+  // сохраняются при любом исходе; release отдельно передаёт проверенный пакет.
   for (const [name, workflow] of workflows) {
     if (name === 'release.yml') continue;
     for (const [id, job] of Object.entries(workflow.jobs)) {
       for (const item of job.steps ?? []) {
-        if (name === 'ci.yml' && id === 'native-windows' && item.name === 'Keep failed native diagnostics') {
+        if (name === 'ci.yml' && id === 'native-windows' && item.name === 'Keep native evidence') {
           expect(unpin(item.uses!)).toBe('actions/upload-artifact@<sha>');
-          expect(item.if).toBe('${{ failure() || cancelled() }}');
+          expect(item.if).toBe('${{ always() }}');
+          expect(item['continue-on-error']).toBeUndefined();
           expect(item.with).toEqual({
             name: 'native-windows-diagnostics',
             path: '${{ runner.temp }}/native-windows/*.json\n${{ runner.temp }}/native-windows/*.log\n${{ runner.temp }}/native-windows/*.txt\n',
             'retention-days': 1,
-            'if-no-files-found': 'warn',
+            'if-no-files-found': 'error',
             'include-hidden-files': false,
           });
           continue;
@@ -441,7 +442,7 @@ function assertNativeGraph(files: Map<string, string>) {
         run: 'pwsh -File test/windows/verify.ps1 -OutputDirectory "$env:RUNNER_TEMP/native-windows"\n' },
       { name: 'Native result', shell: 'pwsh',
         run: 'Get-Content "$env:RUNNER_TEMP/native-windows/result.json" | Add-Content $env:GITHUB_STEP_SUMMARY\n' },
-      step(windows, 'Keep failed native diagnostics'),
+      step(windows, 'Keep native evidence'),
     ],
   });
   expect(unpin(step(windows, 'Checkout').uses!)).toBe('actions/checkout@<sha>');
@@ -545,8 +546,13 @@ describe('нативный граф CI', () => {
     ['пропуск Windows', 'ci.yml', (w: Workflow) => { w.jobs['native-windows']!.if = false; }],
     ['Windows только собирает consumer', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Build and run native consumer').run = 'dotnet build'; }],
     ['Windows игнорирует отказ', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Build and run native consumer')['continue-on-error'] = true; }],
-    ['архив успешной Windows проверки', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep failed native diagnostics').if = '${{ always() }}'; }],
-    ['Windows архивирует сборку', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep failed native diagnostics').with!.path = '${{ runner.temp }}/native-windows/'; }],
+    ['потеря native evidence после успеха', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native evidence').if = '${{ failure() || cancelled() }}'; }],
+    ['нет обязательного native evidence', 'ci.yml', (w: Workflow) => {
+      w.jobs['native-windows']!.steps = w.jobs['native-windows']!.steps!.filter(item => item.name !== 'Keep native evidence');
+    }],
+    ['native evidence отсутствует без отказа', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native evidence').with!['if-no-files-found'] = 'warn'; }],
+    ['игнорирование отказа сохранения native evidence', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native evidence')['continue-on-error'] = true; }],
+    ['Windows архивирует сборку', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native evidence').with!.path = '${{ runner.temp }}/native-windows/'; }],
     ['игнорирование browser caller', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!['continue-on-error'] = true; }],
     ['другой browser worker', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!.uses = './.github/workflows/release.yml'; }],
     ['нет Node floor', 'ci.yml', (w: Workflow) => { w.jobs.verify!.steps = w.jobs.verify!.steps!.filter(item => item.name !== 'Consumer smoke on minimum runtime'); }],
