@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory = $true)][string]$ApplicationDirectory,
     [Parameter(Mandatory = $true)][string]$ToolDirectory,
-    [Parameter(Mandatory = $true)][string]$OutputDirectory
+    [Parameter(Mandatory = $true)][string]$OutputDirectory,
+    [string]$DiagnosticToolDirectory
 )
 
 $ErrorActionPreference = 'Stop'
@@ -16,11 +17,22 @@ New-Item -ItemType Directory -Path $output | Out-Null
 $app = Join-Path ([IO.Path]::GetFullPath($ApplicationDirectory)) 'NativeWindow.exe'
 $executables = @(Get-ChildItem -LiteralPath $ToolDirectory -Filter winapp.exe -Recurse -File)
 if ($executables.Count -ne 1) { throw 'Ожидался проверенный winapp.exe из input harness.' }
-$cli = $executables[0].FullName
+$originalCli = $executables[0].FullName
+$diagnosticCli = $null
+$diagnosticIdentity = $null
+if ($DiagnosticToolDirectory) {
+    $diagnosticCli = Join-Path ([IO.Path]::GetFullPath($DiagnosticToolDirectory)) 'winapp.exe'
+    $diagnosticIdentity = Get-Content -Raw (Join-Path $DiagnosticToolDirectory 'identity.json') | ConvertFrom-Json
+    if (!$diagnosticIdentity.passed -or $diagnosticIdentity.variant -ne '0.7.1-touch-trace' -or
+        (Get-FileHash -Algorithm SHA256 -LiteralPath $diagnosticCli).Hash -ne $diagnosticIdentity.exeSha256) {
+        throw 'Не подтверждена идентичность диагностической сборки.'
+    }
+}
+$cli = $originalCli
 $saved = @{}
 foreach ($name in @('LAB_MOTION_PROBE_OUTPUT', 'LAB_MOTION_PRESS_TRACE', 'LAB_MOTION_INTERACTION_OUTPUT',
     'LAB_MOTION_INTERACTION_DIRECTION', 'WINAPP_UI_WORKFLOW_ID',
-    'WINAPP_CLI_TELEMETRY_OPTOUT', 'WINAPP_CLI_UPDATE_CHECK')) {
+    'WINAPP_CLI_TELEMETRY_OPTOUT', 'WINAPP_CLI_UPDATE_CHECK', 'WINAPP_TOUCH_TRACE')) {
     $saved[$name] = [Environment]::GetEnvironmentVariable($name)
 }
 
@@ -36,14 +48,13 @@ function Invoke-Ui([string]$Name, [string[]]$Arguments) {
     $stderr = $child.StandardError.ReadToEndAsync()
     try {
         if (!$child.WaitForExit(30000)) { throw "Таймаут winapp: $Name" }
-        $text = $stdout.GetAwaiter().GetResult()
-        [IO.File]::WriteAllText((Join-Path $script:case "$Name.json"), $text)
-        [IO.File]::WriteAllText((Join-Path $script:case "$Name.stderr.log"), $stderr.GetAwaiter().GetResult())
         if ($child.ExitCode -ne 0) { throw "winapp $Name завершился с кодом $($child.ExitCode)." }
-        return $text | ConvertFrom-Json
+        return $stdout.GetAwaiter().GetResult() | ConvertFrom-Json
     } finally {
         try {
             if (!$child.HasExited) { $child.Kill($true); $child.WaitForExit() }
+            [IO.File]::WriteAllText((Join-Path $script:case "$Name.json"), $stdout.GetAwaiter().GetResult())
+            [IO.File]::WriteAllText((Join-Path $script:case "$Name.stderr.log"), $stderr.GetAwaiter().GetResult())
         } finally { $child.Dispose() }
     }
 }
@@ -98,12 +109,24 @@ try {
     $env:LAB_MOTION_PRESS_TRACE = $null
     $env:WINAPP_CLI_TELEMETRY_OPTOUT = '1'
     $env:WINAPP_CLI_UPDATE_CHECK = '0'
+    $env:WINAPP_TOUCH_TRACE = $null
     foreach ($direction in @(1, -1)) {
         $axis = 'y'
         $name = $axis + $(if ($direction -eq 1) { '-down' } else { '-up' })
         $script:case = (New-Item -ItemType Directory -Path (Join-Path $output $name)).FullName
         $script:trace = Join-Path $case 'trace.jsonl'
         $script:process = $null
+        $diagnostic = $direction -eq 1 -and $null -ne $diagnosticCli
+        $script:cli = if ($diagnostic) { $diagnosticCli } else { $originalCli }
+        $cliVersion = if ($diagnostic) { '0.7.1-touch-trace' } else { '0.7.1' }
+        $cliSource = if ($diagnostic) {
+            @{ kind = 'patched-upstream'; repository = $diagnosticIdentity.repository;
+                upstreamCommit = $diagnosticIdentity.actualUpstreamCommit; patchSha256 = $diagnosticIdentity.patchSha256;
+                sdk = $diagnosticIdentity.sdk; telemetry = $diagnosticIdentity.telemetry; signature = $diagnosticIdentity.signature }
+        } else {
+            @{ kind = 'official-release'; url = 'https://github.com/microsoft/winappCli/releases/download/v0.7.1/winappcli-x64.zip';
+                archiveSha256 = 'd925d1e32cdc320b6d271f653fd2cd3c05b5d7558deb20d1b548bead77900fcf' }
+        }
         try {
             $env:LAB_MOTION_INTERACTION_OUTPUT = $trace
             $env:LAB_MOTION_INTERACTION_DIRECTION = [string]$direction
@@ -116,8 +139,8 @@ try {
             @{ pid = $process.Id; window = $window; source = (git -C $PSScriptRoot rev-parse HEAD);
                 os = [Environment]::OSVersion.VersionString; appSha256 = (Get-FileHash $app).Hash;
                 librarySha256 = (Get-FileHash (Join-Path $ApplicationDirectory 'LabMotion.WinUI.dll')).Hash;
-                cliSha256 = (Get-FileHash $cli).Hash; cliVersion = '0.7.1' } |
-                ConvertTo-Json | Set-Content (Join-Path $case 'identity.json')
+                cliSha256 = (Get-FileHash $cli).Hash; cliVersion = $cliVersion; cliSource = $cliSource } |
+                ConvertTo-Json -Depth 8 | Set-Content (Join-Path $case 'identity.json')
             $inspect = Invoke-Ui 'inspect' @('inspect', '--depth', '8')
             $windows = @($inspect.windows | Where-Object { [string]$_.hwnd -eq $window })
             if ($windows.Count -ne 1 -or $windows[0].coordinateSpace -ne 'physical-screen-pixels') { throw 'Не подтверждены координаты окна.' }
@@ -139,10 +162,20 @@ try {
                 injection = @{ start = $screenStart; end = $screenEnd; coordinateSpace = 'screen-pixel'; exitCode = $null } }
             $scenario | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $case 'scenario.json')
             Invoke-Ui 'before' @('screenshot', '--output', (Join-Path $case 'before.png')) | Out-Null
-            Invoke-Ui 'swipe' @('touch', '--at', "$($screenStart.x),$($screenStart.y)", '--gesture', 'swipe',
-                '--to-point', "$($screenEnd.x),$($screenEnd.y)", '--duration-ms', '300') | Out-Null
+            $submissionTrace = Join-Path $case 'submission.json'
+            try {
+                if ($diagnostic) { $env:WINAPP_TOUCH_TRACE = $submissionTrace }
+                Invoke-Ui 'swipe' @('touch', '--at', "$($screenStart.x),$($screenStart.y)", '--gesture', 'swipe',
+                    '--to-point', "$($screenEnd.x),$($screenEnd.y)", '--duration-ms', '300') | Out-Null
+            } finally { $env:WINAPP_TOUCH_TRACE = $null }
             $scenario.injection.exitCode = 0
             $scenario | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $case 'scenario.json')
+            if ($diagnostic) {
+                $submission = Get-Content -Raw -LiteralPath $submissionTrace | ConvertFrom-Json
+                if ($submission.schema -ne 'winapp-touch-native-calls-v1' -or !$submission.captureComplete) {
+                    throw 'Нет полной трассы отправки единственного диагностического жеста.'
+                }
+            }
             Wait-Trace 'idle' | Out-Null
             Invoke-Ui 'after' @('screenshot', '--output', (Join-Path $case 'after.png')) | Out-Null
         } catch {

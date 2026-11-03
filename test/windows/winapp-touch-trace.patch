@@ -1,0 +1,348 @@
+diff --git a/src/winapp-CLI/Directory.Packages.props b/src/winapp-CLI/Directory.Packages.props
+index 4c0aced..04ca2b8 100644
+--- a/src/winapp-CLI/Directory.Packages.props
++++ b/src/winapp-CLI/Directory.Packages.props
+@@ -19,6 +19,7 @@
+     <PackageVersion Include="SkiaSharp" Version="4.152.0" />
+     <PackageVersion Include="Svg.Skia" Version="5.2.3" />
+     <PackageVersion Include="System.Drawing.Common" Version="10.0.5" />
++    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="8.0.2" />
+     <PackageVersion Include="Microsoft.Diagnostics.Runtime" Version="3.1.512801" />
+     <PackageVersion Include="Microsoft.Diagnostics.Runtime.Utilities" Version="3.0.442202" />
+     <!-- NuGet client libraries. 7.9.0 is the first stable release exposing the
+@@ -38,4 +39,4 @@
+     <PackageVersion Include="Microsoft.Debugging.Platform.DbgEng" Version="20260319.1511.0" />
+     <PackageVersion Include="Microsoft.Debugging.Platform.SymSrv" Version="20260319.1511.0" />
+   </ItemGroup>
+-</Project>
+\ No newline at end of file
++</Project>
+diff --git a/src/winapp-CLI/WinApp.Cli/WinApp.Cli.csproj b/src/winapp-CLI/WinApp.Cli/WinApp.Cli.csproj
+index f8cdc76..f1b35f8 100644
+--- a/src/winapp-CLI/WinApp.Cli/WinApp.Cli.csproj
++++ b/src/winapp-CLI/WinApp.Cli/WinApp.Cli.csproj
+@@ -96,6 +96,7 @@
+     <PackageReference Include="System.CommandLine" />
+     <PackageReference Include="System.Diagnostics.EventLog" />
+     <PackageReference Include="System.Drawing.Common" />
++    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+     <PackageReference Include="Microsoft.Diagnostics.Runtime" />
+     <PackageReference Include="Microsoft.Diagnostics.Runtime.Utilities" />
+     <!-- NuGet client libraries: let winapp honor the user's nuget.config (custom/private package
+diff --git a/src/winapp-CLI/WinApp.UIAutomation/Input/PointerInput.cs b/src/winapp-CLI/WinApp.UIAutomation/Input/PointerInput.cs
+index 5af0b87..98695bb 100644
+--- a/src/winapp-CLI/WinApp.UIAutomation/Input/PointerInput.cs
++++ b/src/winapp-CLI/WinApp.UIAutomation/Input/PointerInput.cs
+@@ -125,6 +125,7 @@ internal static class PointerInput
+         int holdMs,
+         int durationMs)
+     {
++        using var trace = TouchInjectionTrace.Start();
+         // NOTE (M2 — P/Invoke test coverage): The production path below (CreateSyntheticPointerDevice
+         // → RunTouchGesture → InjectSyntheticPointerInput / InjectTouchInput → DestroySyntheticPointerDevice)
+         // requires an unlocked, interactive desktop and cannot be exercised in this shared CI/test
+@@ -139,10 +140,11 @@ internal static class PointerInput
+ 
+         if (!device.IsNull)
+         {
++            trace?.SelectRoute(TouchInjectionApi.Synthetic, 0);
+             try
+             {
+                 RunTouchGesture(gesture, contactPaths, holdMs, durationMs,
+-                    contacts => SendSyntheticTouch(device, contacts));
++                    contacts => SendSyntheticTouch(device, contacts, trace), trace: trace);
+                 return;
+             }
+             finally
+@@ -152,6 +154,7 @@ internal static class PointerInput
+         }
+ 
+         int createErr = Marshal.GetLastPInvokeError();
++        trace?.SelectRoute(TouchInjectionApi.Legacy, createErr);
+ 
+         // Fallback path: the legacy touch-injection API. EnsureTouchInitialized surfaces an honest
+         // Win32 error if even this is unsupported.
+@@ -166,7 +169,8 @@ internal static class PointerInput
+                 $"Win32 error {createErr}: {Win32Message(createErr)}). {ex.Message}");
+         }
+ 
+-        RunTouchGesture(gesture, contactPaths, holdMs, durationMs, SendLegacyTouch);
++        RunTouchGesture(gesture, contactPaths, holdMs, durationMs,
++            contacts => SendLegacyTouch(contacts, trace), trace: trace);
+     }
+ 
+     /// <summary>
+@@ -221,14 +225,19 @@ internal static class PointerInput
+         int holdMs,
+         int durationMs,
+         TouchSender send,
+-        Action<int>? sleepInter = null)
++        Action<int>? sleepInter = null,
++        TouchInjectionTrace? trace = null)
+     {
+         var sleepFn = sleepInter ?? Thread.Sleep;
+         int repeats = gesture == TouchGesture.DoubleTap ? 2 : 1;
+         for (int r = 0; r < repeats; r++)
+         {
+             InjectTouchStroke(contactPaths, holdMs, durationMs,
+-                (contacts) => SendFrameWithRetry(send, contacts));
++                (contacts) =>
++                {
++                    trace?.BeginFrame();
++                    SendFrameWithRetry(send, contacts);
++                });
+             if (r + 1 < repeats)
+             {
+                 sleepFn(60); // inter-tap gap for double-tap
+@@ -399,15 +408,19 @@ internal static class PointerInput
+     /// un-coverable in the shared CI/test environment. The frames it would submit are validated via the
+     /// injectable <see cref="TouchSender"/> seam (see PointerInputFrameTests).
+     /// </remarks>
+-    private static void SendLegacyTouch(POINTER_TOUCH_INFO[] contacts)
++    private static void SendLegacyTouch(POINTER_TOUCH_INFO[] contacts, TouchInjectionTrace? trace)
+     {
+         unsafe
+         {
+             fixed (POINTER_TOUCH_INFO* p = contacts)
+             {
+-                if (!PInvoke.InjectTouchInput((uint)contacts.Length, p))
++                long before = trace is null ? 0 : Stopwatch.GetTimestamp();
++                bool success = PInvoke.InjectTouchInput((uint)contacts.Length, p);
++                int err = success ? 0 : Marshal.GetLastPInvokeError();
++                long after = trace is null ? 0 : Stopwatch.GetTimestamp();
++                trace?.Record(TouchInjectionApi.Legacy, contacts, before, after, success, err);
++                if (!success)
+                 {
+-                    int err = Marshal.GetLastPInvokeError();
+                     throw new InvalidOperationException(
+                         $"InjectTouchInput failed (Win32 error {err}: {Win32Message(err)}) — touch injection " +
+                         "failed or is unsupported on this desktop. The target may be elevated (run this CLI " +
+@@ -427,7 +440,8 @@ internal static class PointerInput
+     /// this native sender is un-coverable in the shared CI/test environment. The frames it would submit
+     /// are validated via the injectable <see cref="TouchSender"/> seam (see PointerInputFrameTests).
+     /// </remarks>
+-    private static void SendSyntheticTouch(HSYNTHETICPOINTERDEVICE device, POINTER_TOUCH_INFO[] contacts)
++    private static void SendSyntheticTouch(HSYNTHETICPOINTERDEVICE device, POINTER_TOUCH_INFO[] contacts,
++        TouchInjectionTrace? trace)
+     {
+         var infos = new POINTER_TYPE_INFO[contacts.Length];
+         for (int i = 0; i < contacts.Length; i++)
+@@ -440,9 +454,13 @@ internal static class PointerInput
+         {
+             fixed (POINTER_TYPE_INFO* p = infos)
+             {
+-                if (!PInvoke.InjectSyntheticPointerInput(device, p, (uint)infos.Length))
++                long before = trace is null ? 0 : Stopwatch.GetTimestamp();
++                bool success = PInvoke.InjectSyntheticPointerInput(device, p, (uint)infos.Length);
++                int err = success ? 0 : Marshal.GetLastPInvokeError();
++                long after = trace is null ? 0 : Stopwatch.GetTimestamp();
++                trace?.Record(TouchInjectionApi.Synthetic, contacts, before, after, success, err);
++                if (!success)
+                 {
+-                    int err = Marshal.GetLastPInvokeError();
+                     throw new InvalidOperationException(
+                         $"InjectSyntheticPointerInput (touch) failed (Win32 error {err}: {Win32Message(err)}) — " +
+                         "touch injection failed on this desktop. The target may be elevated (run this CLI as " +
+diff --git a/src/winapp-CLI/WinApp.UIAutomation/Input/TouchInjectionTrace.cs b/src/winapp-CLI/WinApp.UIAutomation/Input/TouchInjectionTrace.cs
+new file mode 100644
+index 0000000..677055e
+--- /dev/null
++++ b/src/winapp-CLI/WinApp.UIAutomation/Input/TouchInjectionTrace.cs
+@@ -0,0 +1,197 @@
++// Copyright (c) Microsoft Corporation and Contributors. All rights reserved.
++// Licensed under the MIT License.
++
++using System.Diagnostics;
++using System.Runtime.Versioning;
++using System.Text.Json;
++using Windows.Win32.UI.Input.Pointer;
++using Windows.Win32.UI.WindowsAndMessaging;
++
++namespace Microsoft.Windows.SDK.BuildTools.WinApp.UIAutomation;
++
++internal enum TouchInjectionApi { Synthetic, Legacy }
++
++/// <summary>Временная ограниченная запись native-вызовов; файл создаётся после жеста.</summary>
++[SupportedOSPlatform("windows10.0.17763.0")]
++internal sealed class TouchInjectionTrace : IDisposable
++{
++    private const int MaxCalls = 1024;
++    private const int MaxContacts = 10;
++    private readonly string _path;
++    private readonly Call[] _calls = new Call[MaxCalls];
++    private readonly POINTER_TOUCH_INFO[] _contacts = new POINTER_TOUCH_INFO[MaxCalls * MaxContacts];
++    private readonly long _frequency = Stopwatch.Frequency;
++    private readonly DateTime _startedUtc = DateTime.UtcNow;
++    private int _count;
++    private int _dropped;
++    private int _frame;
++    private int _attempt;
++    private uint _activeContacts;
++    private bool _downSeen;
++    private bool _lastCallWasSuccessfulUp;
++    private bool _disposed;
++    private TouchInjectionApi? _route;
++    private int _createError;
++
++    private struct Call
++    {
++        public TouchInjectionApi Api;
++        public int Frame;
++        public int Attempt;
++        public int ContactCount;
++        public long Before;
++        public long After;
++        public long RecordCompleted;
++        public bool Success;
++        public int Error;
++    }
++
++    private TouchInjectionTrace(string path)
++    {
++        _path = Path.GetFullPath(path);
++        if (!Directory.Exists(Path.GetDirectoryName(_path)))
++        {
++            throw new DirectoryNotFoundException("Каталог WINAPP_TOUCH_TRACE должен существовать до жеста.");
++        }
++    }
++
++    internal static TouchInjectionTrace? Start()
++    {
++        string? path = Environment.GetEnvironmentVariable("WINAPP_TOUCH_TRACE");
++        return string.IsNullOrWhiteSpace(path) ? null : new TouchInjectionTrace(path);
++    }
++
++    internal void SelectRoute(TouchInjectionApi route, int createError)
++    {
++        _route = route;
++        _createError = createError;
++    }
++
++    internal void BeginFrame()
++    {
++        _frame++;
++        _attempt = 0;
++    }
++
++    internal void Record(TouchInjectionApi api, ReadOnlySpan<POINTER_TOUCH_INFO> contacts,
++        long before, long after, bool success, int error)
++    {
++        _attempt++;
++        if (_count == MaxCalls || contacts.Length > MaxContacts)
++        {
++            _dropped++;
++            return;
++        }
++
++        int index = _count++;
++        contacts.CopyTo(_contacts.AsSpan(index * MaxContacts, contacts.Length));
++        _lastCallWasSuccessfulUp = success && contacts.Length > 0;
++        foreach (ref readonly var contact in contacts)
++        {
++            var info = contact.pointerInfo;
++            bool down = (info.pointerFlags & POINTER_FLAGS.POINTER_FLAG_DOWN) != 0;
++            bool up = (info.pointerFlags & POINTER_FLAGS.POINTER_FLAG_UP) != 0;
++            _lastCallWasSuccessfulUp &= up;
++            if (success && info.pointerId < MaxContacts)
++            {
++                uint bit = 1u << (int)info.pointerId;
++                if (down) { _activeContacts |= bit; _downSeen = true; }
++                if (up) { _activeContacts &= ~bit; }
++            }
++        }
++
++        _calls[index] = new Call
++        {
++            Api = api, Frame = _frame, Attempt = _attempt, ContactCount = contacts.Length,
++            Before = before, After = after, Success = success, Error = error,
++        };
++        _calls[index].RecordCompleted = Stopwatch.GetTimestamp();
++    }
++
++    public void Dispose()
++    {
++        if (_disposed) { return; }
++        _disposed = true;
++        try
++        {
++            WriteAfterGesture();
++        }
++        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
++        {
++            // Ошибка наблюдения не заменяет исходную ошибку native injection.
++            Console.Error.WriteLine($"WINAPP_TOUCH_TRACE: запись не завершена: {ex.Message}");
++        }
++    }
++
++    private void WriteAfterGesture()
++    {
++        using var stream = new FileStream(_path, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
++        using var json = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true });
++        json.WriteStartObject();
++        json.WriteString("schema", "winapp-touch-native-calls-v1");
++        json.WriteString("upstreamCommit", "e3cd0b94f3e7b776ac51ba0564f4908094e979b5");
++        json.WriteString("startedUtc", _startedUtc);
++        json.WriteNumber("qpcFrequency", _frequency);
++        json.WriteString("selectedRoute", _route is { } route ? ApiName(route) : "none");
++        json.WriteNumber("createSyntheticPointerDeviceError", _createError);
++        json.WriteNumber("capacityCalls", MaxCalls);
++        json.WriteNumber("recordedCalls", _count);
++        json.WriteNumber("droppedCalls", _dropped);
++        json.WriteBoolean("overflow", _dropped != 0);
++        json.WriteBoolean("successfulDownSeen", _downSeen);
++        json.WriteBoolean("terminalSuccessfulUpSeen", _lastCallWasSuccessfulUp);
++        json.WriteNumber("activeContactMask", _activeContacts);
++        json.WriteBoolean("captureComplete", _dropped == 0 && _downSeen
++            && _lastCallWasSuccessfulUp && _activeContacts == 0);
++        json.WriteStartArray("calls");
++        for (int i = 0; i < _count; i++)
++        {
++            ref readonly var call = ref _calls[i];
++            json.WriteStartObject();
++            json.WriteNumber("callIndex", i + 1);
++            json.WriteNumber("frameIndex", call.Frame);
++            json.WriteNumber("attemptIndex", call.Attempt);
++            json.WriteString("api", ApiName(call.Api));
++            json.WriteNumber("qpcBefore", call.Before);
++            json.WriteNumber("qpcAfter", call.After);
++            json.WriteNumber("qpcRecordCompleted", call.RecordCompleted);
++            json.WriteBoolean("success", call.Success);
++            json.WriteNumber("error", call.Error);
++            json.WriteStartArray("contacts");
++            for (int j = 0; j < call.ContactCount; j++)
++            {
++                ref readonly var contact = ref _contacts[i * MaxContacts + j];
++                var info = contact.pointerInfo;
++                json.WriteStartObject();
++                json.WriteNumber("pointerType", (uint)info.pointerType);
++                json.WriteNumber("injectorPointerId", info.pointerId);
++                json.WriteNumber("nativeFrameId", info.frameId);
++                json.WriteNumber("flags", (uint)info.pointerFlags);
++                json.WriteBoolean("down", (info.pointerFlags & POINTER_FLAGS.POINTER_FLAG_DOWN) != 0);
++                json.WriteBoolean("update", (info.pointerFlags & POINTER_FLAGS.POINTER_FLAG_UPDATE) != 0);
++                json.WriteBoolean("up", (info.pointerFlags & POINTER_FLAGS.POINTER_FLAG_UP) != 0);
++                json.WriteNumber("x", info.ptPixelLocation.X);
++                json.WriteNumber("y", info.ptPixelLocation.Y);
++                json.WriteNumber("rawX", info.ptPixelLocationRaw.X);
++                json.WriteNumber("rawY", info.ptPixelLocationRaw.Y);
++                json.WriteNumber("dwTime", info.dwTime);
++                json.WriteNumber("performanceCount", info.PerformanceCount);
++                json.WriteNumber("historyCount", info.historyCount);
++                json.WriteNumber("touchFlags", contact.touchFlags);
++                json.WriteNumber("touchMask", contact.touchMask);
++                json.WriteNumber("contactLeft", contact.rcContact.left);
++                json.WriteNumber("contactTop", contact.rcContact.top);
++                json.WriteNumber("contactRight", contact.rcContact.right);
++                json.WriteNumber("contactBottom", contact.rcContact.bottom);
++                json.WriteEndObject();
++            }
++            json.WriteEndArray();
++            json.WriteEndObject();
++        }
++        json.WriteEndArray();
++        json.WriteEndObject();
++    }
++
++    private static string ApiName(TouchInjectionApi api)
++        => api == TouchInjectionApi.Synthetic ? "InjectSyntheticPointerInput" : "InjectTouchInput";
++}

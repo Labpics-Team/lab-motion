@@ -327,10 +327,15 @@ jobs:
         run: |
           pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input" -ConfigureHostedAnimations
 
+      - name: Build touch submission diagnostics
+        shell: pwsh
+        run: |
+          pwsh -File test/windows/build-submission-tool.ps1 -OutputDirectory "$env:RUNNER_TEMP/native-input/submission-tool" -EvidenceDirectory "$env:RUNNER_TEMP/native-input/evidence/submission-tool"
+
       - name: Verify native touch
         shell: pwsh
         run: |
-          pwsh -File test/windows/verify-touch.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -ToolDirectory "$env:RUNNER_TEMP/native-input/tool" -OutputDirectory "$env:RUNNER_TEMP/native-input/evidence/touch"
+          pwsh -File test/windows/verify-touch.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -ToolDirectory "$env:RUNNER_TEMP/native-input/tool" -OutputDirectory "$env:RUNNER_TEMP/native-input/evidence/touch" -DiagnosticToolDirectory "$env:RUNNER_TEMP/native-input/submission-tool"
 
       - name: Prepare native input evidence
         if: ${{ !cancelled() }}
