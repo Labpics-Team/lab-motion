@@ -21,6 +21,12 @@ $passed = $false
 $animationBefore = $null
 $commands = [Collections.Generic.List[object]]::new()
 $scenarios = [Collections.Generic.List[object]]::new()
+$toolTimeoutMilliseconds = 30000
+$restTimeoutSeconds = 8
+$recordReadyTimeoutSeconds = 15
+# Время mouse-hold вместе с запуском записи: ready, покой до ввода, CLI, покой после.
+$recordInputBudgetMilliseconds = ($recordReadyTimeoutSeconds + 2 * $restTimeoutSeconds) * 1000 + $toolTimeoutMilliseconds
+$recordDurationSeconds = [int]($recordInputBudgetMilliseconds / 1000) + 1
 
 function Start-Tool([string]$Name, [string[]]$Arguments) {
     $info = [Diagnostics.ProcessStartInfo]::new($script:cli)
@@ -35,7 +41,7 @@ function Start-Tool([string]$Name, [string[]]$Arguments) {
     return @{ process = $child; stdout = $stdout; stderr = $stderr; prefix = ''; ended = $false; name = $Name; arguments = $Arguments }
 }
 
-function Finish-Tool($Tool, [int]$Timeout = 30000) {
+function Finish-Tool($Tool, [int]$Timeout = $toolTimeoutMilliseconds) {
     try {
         if (!$Tool.process.WaitForExit($Timeout)) {
             $Tool.process.Kill($true)
@@ -75,7 +81,7 @@ function Read-Trace {
 }
 
 function Wait-Rest([long]$After = 0) {
-    $deadline = [DateTime]::UtcNow.AddSeconds(8)
+    $deadline = [DateTime]::UtcNow.AddSeconds($restTimeoutSeconds)
     do {
         $events = @(Read-Trace)
         if (@($events | Where-Object { $_.kind -in @('error', 'truncated') }).Count) { throw 'Трасса ввода содержит ошибку или обрезана.' }
@@ -87,7 +93,7 @@ function Wait-Rest([long]$After = 0) {
         }
         Start-Sleep -Milliseconds 50
     } while ([DateTime]::UtcNow -lt $deadline)
-    throw 'Кнопка не вернулась в отпущенное состояние за 8 секунд.'
+    throw "Кнопка не вернулась в отпущенное состояние за $restTimeoutSeconds секунд."
 }
 
 function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArguments = @()) {
@@ -97,7 +103,7 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
     Invoke-Ui $Name $Arguments
     Wait-Rest $before
     if ($Name -eq 'disable-animation') {
-        $deadline = [DateTime]::UtcNow.AddSeconds(8)
+        $deadline = [DateTime]::UtcNow.AddSeconds($restTimeoutSeconds)
         do {
             $stopped = @(Read-Trace | Where-Object { $_.sequence -gt $before -and $_.kind -eq 'completed' -and $_.data.reason -eq 'snap' })
             if ($stopped.Count) { break }
@@ -159,8 +165,8 @@ try {
     Invoke-Ui 'rest-before' @('screenshot', '--output', (Join-Path $evidence 'rest-before.png'))
 
     $recordClock = [Diagnostics.Stopwatch]::StartNew()
-    $recording = Start-Tool 'record' @('ui', 'record', '-w', $window, '--frames', '--duration-sec', '8', '--fps', '10', '--max-edge', '1000', '--output', (Join-Path $evidence 'press.mp4'), '--json')
-    $deadline = [DateTime]::UtcNow.AddSeconds(15)
+    $deadline = [DateTime]::UtcNow.AddSeconds($recordReadyTimeoutSeconds)
+    $recording = Start-Tool 'record' @('ui', 'record', '-w', $window, '--frames', '--duration-sec', "$recordDurationSeconds", '--fps', '10', '--max-edge', '1000', '--output', (Join-Path $evidence 'press.mp4'), '--json')
     $started = $false
     $lineTask = $recording.process.StandardError.ReadLineAsync()
     do {
@@ -173,13 +179,16 @@ try {
         if ($recordEvent -and $recordEvent.PSObject.Properties['event'] -and $recordEvent.event -eq 'recording-started') { $started = $true; break }
         $lineTask = $recording.process.StandardError.ReadLineAsync()
     } while ([DateTime]::UtcNow -lt $deadline)
-    if (!$started) { throw 'Нет подтверждения первого кадра.' }
+    if (!$started -or $recordClock.Elapsed.TotalSeconds -gt $recordReadyTimeoutSeconds) { throw 'Нет подтверждения первого кадра в пределах бюджета запуска.' }
     $recording.stderr = $recording.process.StandardError.ReadToEndAsync()
     $inputStartedMs = $recordClock.Elapsed.TotalMilliseconds
     Scenario 'mouse-hold' @('drag', 'Press', 'Press', '--hold-ms', '1000')
-    @{ inputStartedMs = $inputStartedMs; inputCompletedMs = $recordClock.Elapsed.TotalMilliseconds } |
+    $inputCompletedMs = $recordClock.Elapsed.TotalMilliseconds
+    @{ inputStartedMs = $inputStartedMs; inputCompletedMs = $inputCompletedMs } |
         ConvertTo-Json | Set-Content (Join-Path $evidence 'capture-window.json')
-    $recordResult = Finish-Tool $recording
+    if ($inputCompletedMs -gt $recordInputBudgetMilliseconds) { throw 'Mouse-hold вышел за бюджет записи.' }
+    # Ожидаем длительность capture и прежний бюджет завершения CLI; покрытие решает индекс кадров.
+    $recordResult = Finish-Tool $recording -Timeout ($recordDurationSeconds * 1000 + $toolTimeoutMilliseconds)
     $recording = $null
     if ($recordResult.mode -ne 'wgc' -or $recordResult.frames -lt 10) { throw 'Запись не подтвердила одновременный WGC capture и ввод.' }
 
