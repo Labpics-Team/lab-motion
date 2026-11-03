@@ -15,6 +15,10 @@ $unit = Join-Path $PSScriptRoot 'lifecycle.csproj'
 $appOutput = Join-Path $output 'app'
 $unitOutput = Join-Path $output 'unit'
 $buildOutput = Join-Path $output 'build'
+$expectedUnits = @('1:1:preserve', '1000:1:preserve', '1:1:reset', '1000:1:reset',
+    '1:-1:preserve', '1000:-1:preserve', '1:-1:reset', '1000:-1:reset') | Sort-Object
+# Четыре preserve (4+8 с), четыре reset (4+4+8 с), прежняя семёрка — 60 с.
+$processTimeoutMilliseconds = 4 * (4000 + 8000) + 4 * (4000 + 4000 + 8000) + 60000
 
 function Invoke-Dotnet([string]$Log, [string[]]$Arguments) {
     $previousPreference = $ErrorActionPreference
@@ -59,7 +63,7 @@ try {
         exeSha256 = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash
         librarySha256 = (Get-FileHash -LiteralPath (Join-Path $appOutput 'LabMotion.WinUI.dll') -Algorithm SHA256).Hash
     }
-    $finished = $process.WaitForExit(60000)
+    $finished = $process.WaitForExit($processTimeoutMilliseconds)
     if (!$finished) {
         # PID может быть повторно использован; завершаем только свой экземпляр.
         $current = Get-Process -Id $process.Id -ErrorAction SilentlyContinue
@@ -73,6 +77,16 @@ try {
     $identity.exitCode = if ($finished) { $process.ExitCode } else { $null }
     $identity.traceExists = Test-Path -LiteralPath $tracePath
     $identity | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $output 'process.json')
+    if ($identity.traceExists) {
+        $diagnostics = Get-Content -LiteralPath $tracePath -Raw | ConvertFrom-Json
+        $actualUnits = @($diagnostics.units | ForEach-Object {
+            $mode = if ($_.reset) { 'reset' } else { 'preserve' }
+            "$($_.q):$($_.direction):$mode"
+        }) | Sort-Object
+        if ($diagnostics.units.Count -ne $expectedUnits.Count -or (Compare-Object $expectedUnits $actualUnits)) {
+            throw 'Диагностическая матрица единиц получена не полностью.'
+        }
+    }
     if (!$finished -or $identity.exitCode -ne 0 -or !$identity.traceExists) {
         throw 'Нативный процесс не подтвердил успешное завершение.'
     }

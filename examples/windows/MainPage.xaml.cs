@@ -10,6 +10,8 @@ namespace NativeWindow;
 public sealed partial class MainPage : Page
 {
     private readonly List<object> runs = [];
+    private readonly List<object> units = [];
+    private double? legacySeconds;
     private readonly string output = Environment.GetEnvironmentVariable("LAB_MOTION_PROBE_OUTPUT")
         ?? throw new InvalidOperationException("Нужен путь результата опыта.");
     // Два тестовых режима: критическое затухание и пружина с отскоком.
@@ -27,13 +29,10 @@ public sealed partial class MainPage : Page
         Loaded -= Run;
         try
         {
-            await IdleRetarget();
-            await Retarget(false, 1);
-            await Retarget(true, 1);
-            await Retarget(false, -1);
-            await Retarget(true, -1);
-            await Settle();
-            await Lifetime();
+            await UnitsMatrix();
+            var legacyClock = System.Diagnostics.Stopwatch.StartNew();
+            try { await LegacyScenarios().WaitAsync(TimeSpan.FromSeconds(60)); }
+            finally { legacySeconds = legacyClock.Elapsed.TotalSeconds; }
             Status.Text = "Траектории проверены";
             Save("captured", null);
         }
@@ -47,8 +46,129 @@ public sealed partial class MainPage : Page
     }
 
     private void Save(string status, string? error) => File.WriteAllText(output,
-        JsonSerializer.Serialize(new { status, error, scale = XamlRoot.RasterizationScale, runs },
+        JsonSerializer.Serialize(new { status, error, scale = XamlRoot.RasterizationScale, units, legacySeconds, runs },
             new JsonSerializerOptions { WriteIndented = true }));
+
+    private async Task LegacyScenarios()
+    {
+        await IdleRetarget();
+        await Retarget(false, 1);
+        await Retarget(true, 1);
+        await Retarget(false, -1);
+        await Retarget(true, -1);
+        await Settle();
+        await Lifetime();
+    }
+
+    private async Task UnitsMatrix()
+    {
+        foreach (var direction in new[] { 1f, -1f })
+        foreach (var reset in new[] { false, true })
+        foreach (var q in new[] { 1f, 1000f })
+        {
+            units.Add(await UnitsRetarget(q, reset, direction));
+            Save("diagnostic", null);
+        }
+    }
+
+    private async Task<object> UnitsRetarget(float q, bool reset, float direction)
+    {
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        var trace = new List<MotionObservation>();
+        var spring = Expressive;
+        var target = -100 * direction;
+        float? before = null;
+        float? finalPosition = null;
+        MotionResult? firstResult = null;
+        MotionResult? secondResult = null;
+        string? error = null;
+        try
+        {
+            var compositor = ElementCompositionPreview.GetElementVisual(Stage).Compositor;
+            using var parent = compositor.CreateContainerVisual();
+            parent.Scale = new System.Numerics.Vector3(1 / q, 1, 1);
+            parent.CenterPoint = System.Numerics.Vector3.Zero;
+            using var sprite = compositor.CreateSpriteVisual();
+            sprite.Size = new System.Numerics.Vector2(32 * q, 32);
+            sprite.Brush = compositor.CreateColorBrush(((SolidColorBrush)Status.Foreground).Color);
+            parent.Children.InsertAtTop(sprite);
+            ElementCompositionPreview.SetElementChildVisual(Stage, parent);
+            using var motion = new ScalarMotion(compositor, -1000 * q, 1000 * q);
+            motion.Observed += trace.Add;
+            motion.BindOffsetX(sprite);
+            try
+            {
+                var first = motion.AnimateTo(200 * q * direction, spring);
+                await Until(() => trace.Any(x => x.Phase == "value" && x.Position * direction >= 40 * q));
+                before = motion.Position;
+                if (reset)
+                {
+                    motion.Stop();
+                    await Until(() => trace.Last().Phase == "idle");
+                }
+                var second = motion.AnimateTo(target * q, spring, reset ? 0 * q : null);
+                firstResult = first.IsCompletedSuccessfully ? first.Result : null;
+                secondResult = await second.WaitAsync(TimeSpan.FromSeconds(8));
+            }
+            finally
+            {
+                finalPosition = motion.Position;
+                ElementCompositionPreview.SetElementChildVisual(Stage, null);
+            }
+        }
+        catch (Exception caught) { error = caught.ToString(); }
+
+        var entries = trace.Where(x => x.Operation == 2 && x.Phase == "inertia").ToArray();
+        var idles = trace.Where(x => x.Operation == 2 && x.Phase == "idle").ToArray();
+        MotionObservation? entry = entries.Length == 1 ? entries[0] : null;
+        MotionObservation? idle = idles.Length == 1 ? idles[0] : null;
+        MotionObservation? requested = trace.Where(x => x.Operation == 2 && x.Phase == "requested")
+            .Select(x => (MotionObservation?)x).FirstOrDefault();
+        MotionObservation? after = entry is { } inertia
+            ? trace.Where(x => x.Operation == 2 && x.Phase == "value" && x.Seconds > inertia.Seconds)
+                .Select(x => (MotionObservation?)x).FirstOrDefault()
+            : null;
+        var normalizedError = finalPosition / q - target;
+        var physicalError = Math.Abs(normalizedError ?? float.NaN) * XamlRoot.RasterizationScale;
+        var checks = new Dictionary<string, bool>
+        {
+            ["completed"] = error is null,
+            ["generations"] = firstResult == new MotionResult(1, MotionEnd.Stopped, reset ? "stopped" : "replaced")
+                && secondResult == new MotionResult(2, MotionEnd.Finished, "settled"),
+            ["ownIdle"] = idle is not null,
+            ["positionPreserved"] = entry is { } positionEntry && before is { } previous
+                && positionEntry.Position * direction >= previous * direction,
+            ["velocityPreserved"] = entry is { } velocityEntry
+                && (reset ? velocityEntry.NativeVelocity == 0 : velocityEntry.NativeVelocity * direction > 0),
+            ["trajectoryDistinguishesReset"] = entry is { } trajectoryEntry && after is { } step
+                && (reset ? (step.Position - trajectoryEntry.Position) * direction <= 0
+                    : (step.Position - trajectoryEntry.Position) * direction > 0),
+            ["precision"] = physicalError <= .5
+        };
+
+        object? Project(MotionObservation? sample) => sample is { } value ? new
+        {
+            value.Operation, value.Phase, value.Seconds,
+            rawPosition = value.Position, normalizedPosition = value.Position / q,
+            rawReadbackPosition = value.ReadbackPosition, normalizedReadbackPosition = value.ReadbackPosition / q,
+            // Idle не передаёт скорость: ноль в исходном trace добавлен адаптером.
+            rawNativeVelocity = value.Phase == "inertia" ? value.NativeVelocity : null,
+            normalizedNativeVelocity = value.Phase == "inertia" ? value.NativeVelocity / q : null
+        } : null;
+
+        return new
+        {
+            q, direction, reset, spring, target, rawTarget = target * q,
+            before, normalizedBefore = before / q,
+            requested = Project(requested), entry = Project(entry), after = Project(after), idle = Project(idle),
+            first = firstResult, second = secondResult, finalPosition, normalizedFinalPosition = finalPosition / q,
+            rawError = finalPosition - target * q, normalizedError,
+            physicalError = double.IsFinite(physicalError) ? (double?)physicalError : null,
+            secondsToIdle = idle?.Seconds - requested?.Seconds,
+            caseSeconds = clock.Elapsed.TotalSeconds, checks, passed = checks.Values.All(value => value), error,
+            trace, normalizedTrace = trace.Select(value => Project(value)).ToArray()
+        };
+    }
 
     private ScalarMotion Motion(List<MotionObservation> trace)
     {
