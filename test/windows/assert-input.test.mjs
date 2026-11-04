@@ -383,15 +383,16 @@ function systemReleaseViolations(source) {
   const scenario = source.slice(source.indexOf('function Scenario('), source.indexOf('\ntry {\n    if (!$ConfigureHostedAnimations)'));
   const dispatch = scenario.slice(0, scenario.indexOf('    Wait-Rest $before'));
   return [
-    ['system-only asynchronous release', !dispatch.includes("if ($Name -eq 'system-disable-animation') {")
-      || !dispatch.includes("$releaseTool = Start-Tool $Name (@('ui') + $Arguments + @('-w', $script:window, '--json'))")
+    ['shared interruption-only asynchronous release', !dispatch.includes("if ($Name -in @('disable-animation', 'system-disable-animation'))")
+      || !dispatch.includes("$releaseTool = Start-Tool $releaseName (@('ui') + $releaseArguments + @('-w', $script:window, '--json'))")
+      || !dispatch.includes('$releaseName = $Name') || !dispatch.includes('$releaseArguments = $Arguments')
       || !/\} else \{\s+Invoke-Ui \$Name \$Arguments\s+\}/.test(dispatch)
-      || dispatch.indexOf('Invoke-Ui $Name $Arguments') < dispatch.indexOf("if ($Name -eq 'system-disable-animation')")],
+      || dispatch.indexOf('Invoke-Ui $Name $Arguments') < dispatch.indexOf("if ($Name -in @('disable-animation', 'system-disable-animation'))")],
     ['original absolute tool cap', !dispatch.includes('$releaseClock = [Diagnostics.Stopwatch]::StartNew()')
       || !dispatch.includes('30000 - $releaseClock.ElapsedMilliseconds')
       || !dispatch.includes('$releaseClock.ElapsedMilliseconds -ge 30000')],
     ['active request before setter', !dispatch.includes('$deadline = [DateTime]::UtcNow.AddSeconds(8)')
-      || !dispatch.includes("if ($completed.Count) { throw 'Операция завершилась до системного запрета.' }")
+      || !dispatch.includes("if ($completed.Count) { throw 'Операция завершилась до запрета анимации.' }")
       || !dispatch.includes("if ($requested.Count) { $active = $true; break }")
       || dispatch.indexOf('[ClientAreaAnimation]::Write($false)') > dispatch.indexOf('Finish-Tool $releaseTool')
       || /\$_.data.phase -eq 'value'/.test(dispatch)],
@@ -404,13 +405,71 @@ function systemReleaseViolations(source) {
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
 
+function localReleaseViolations(source) {
+  const scenario = source.slice(source.indexOf('function Scenario('), source.indexOf('\ntry {\n    if (!$ConfigureHostedAnimations)'));
+  const dispatch = scenario.slice(0, scenario.indexOf('    Wait-Rest $before'));
+  return [
+    ['actual BeforeArguments release is not synchronously finished', !dispatch.includes("if ($BeforeArguments.Count -and $Name -ne 'disable-animation')")
+      || !dispatch.includes("if ($Name -in @('disable-animation', 'system-disable-animation'))")
+      || !dispatch.includes('$releaseArguments = $BeforeArguments') || !dispatch.includes('$releaseName = "$Name-press"')
+      || !dispatch.includes("$releaseTool = Start-Tool $releaseName (@('ui') + $releaseArguments")],
+    ['actual local space follows observed active release before Finish', !dispatch.includes("if ($requested.Count) { $active = $true; break }")
+      || !dispatch.includes("if ($completed.Count) { throw 'Операция завершилась до запрета анимации.' }")
+      || !/if \(\$Name -eq 'disable-animation'\) \{\s*Invoke-Ui \$Name \$Arguments\s*\} else \{\s*\[ClientAreaAnimation\]::Write\(\$false\)/.test(dispatch)
+      || dispatch.indexOf('Invoke-Ui $Name $Arguments') > dispatch.indexOf('Finish-Tool $releaseTool')],
+    ['same release owned through local action failure', !dispatch.includes('30000 - $releaseClock.ElapsedMilliseconds')
+      || !/catch \{ \$releaseFailure = \$_ \}\s+finally \{/.test(dispatch)
+      || (dispatch.match(/Finish-Tool \$releaseTool/g) ?? []).length !== 1
+      || !dispatch.includes('catch { Save-CleanupFailure $_ ([ref]$releaseFailure) }')],
+  ].filter(([, bad]) => bad).map(([name]) => name);
+}
+
+test('local disable-animation с настоящими BeforeArguments не ждёт release CLI перед Space', () => {
+  const source = readSource(new URL('./verify-input.ps1', import.meta.url));
+  assert.deepEqual(localReleaseViolations(source), []);
+  for (const [before, after, violation] of [
+    ["$BeforeArguments.Count -and $Name -ne 'disable-animation'", '$BeforeArguments.Count', 'actual BeforeArguments release is not synchronously finished'],
+    ['$releaseArguments = $BeforeArguments', '$releaseArguments = $Arguments', 'actual BeforeArguments release is not synchronously finished'],
+    ["$releaseTool = Start-Tool $releaseName", '$releaseTool = Invoke-Ui $releaseName', 'actual BeforeArguments release is not synchronously finished'],
+    ["if ($completed.Count) { throw 'Операция завершилась до запрета анимации.' }", '', 'actual local space follows observed active release before Finish'],
+    ['30000 - $releaseClock.ElapsedMilliseconds', '30000', 'same release owned through local action failure'],
+  ]) assert(localReleaseViolations(source.replaceAll(before, after)).includes(violation), violation);
+  const controls = readSource(new URL('./cleanup.test.ps1', import.meta.url));
+  assert(controls.includes("Scenario 'disable-animation' @('send-keys', 'space', '--target', 'Animation', '--via', 'send-input') @('drag', 'Press', 'Press', '--hold-ms', '0')"));
+  for (const name of ['local-healthy', 'local-delayed-exit', 'local-settled', 'local-race', 'local-read',
+    'local-action', 'local-action-finish', 'local-toggle-exit', 'local-finish', 'local-start']) assert(controls.includes(`'${name}'`), name);
+  assert(controls.includes('local-release-toggle-result-control'));
+});
+
+test('local release модель различает delayed CLI и already-settled; прежний oracle не принимает отсутствие interruption', () => {
+  // Модель порядка, не исполнение PowerShell/native: ожидание CLI может закрыть активное окно.
+  const prepare = ({ delayedExit, settled, waitBeforeToggle }) => {
+    let active = !settled;
+    if (delayedExit && waitBeforeToggle) active = false;
+    if (!active) throw new Error('already-settled');
+    return ['release-request', 'local-space', 'finish-release'];
+  };
+  const wanted = ['release-request', 'local-space', 'finish-release'];
+  for (const delayedExit of [false, true]) assert.deepEqual(prepare({ delayedExit, settled: false, waitBeforeToggle: false }), wanted);
+  assert.throws(() => prepare({ delayedExit: false, settled: true, waitBeforeToggle: false }), /already-settled/);
+  assert.throws(() => prepare({ delayedExit: true, settled: false, waitBeforeToggle: true }), /already-settled/);
+  const healthy = fixture();
+  assert.equal(verify(healthy).find(row => row.name === 'disable-animation').passed, true);
+  const noInterruption = fixture();
+  const local = noInterruption.find(row => row.name === 'disable-animation');
+  const interrupted = local.events.find(row => row.kind === 'completed' && row.data.reason === 'snap');
+  interrupted.data.reason = 'settled';
+  interrupted.data.end = 'Finished';
+  assert.throws(() => verify(noInterruption), /смена предпочтения не прервала движение/);
+});
+
 test('system release observes app request before delayed CLI exit and finishes the same child once', () => {
   const source = readSource(new URL('./verify-input.ps1', import.meta.url));
   assert.deepEqual(systemReleaseViolations(source), []);
   for (const [before, after, name] of [
-    ["$releaseTool = Start-Tool $Name", "$releaseTool = Invoke-Ui $Name", 'system-only asynchronous release'],
+    ["$releaseTool = Start-Tool $releaseName", "$releaseTool = Invoke-Ui $releaseName", 'shared interruption-only asynchronous release'],
     ['30000 - $releaseClock.ElapsedMilliseconds', '30000', 'original absolute tool cap'],
-    ["if ($completed.Count) { throw 'Операция завершилась до системного запрета.' }", '', 'active request before setter'],
+    ["if ($completed.Count) { throw 'Операция завершилась до запрета анимации.' }", '', 'active request before setter'],
     ['catch { Save-CleanupFailure $_ ([ref]$releaseFailure) }', 'catch { throw }', 'one finally owner and first primary'],
   ]) assert(systemReleaseViolations(source.replaceAll(before, after)).includes(name), name);
 });
@@ -488,7 +547,7 @@ test('PowerShell wildcard primary oracle selects one matching arm', () => {
 });
 
 function inputPhaseDiagnosticViolations(source) {
-  const guard = source.slice(source.indexOf("if ($Name -in @('disable-animation', 'system-disable-animation'))"), source.indexOf('$after = @(Read-Trace)[-1].sequence'));
+  const guard = source.slice(source.lastIndexOf("if ($Name -in @('disable-animation', 'system-disable-animation'))"), source.indexOf('$after = @(Read-Trace)[-1].sequence'));
   return [
     ['named snap failure', !guard.includes("'InputSnapNotObserved'") || !guard.includes('[scenario={0}]')],
     ['failure captured before phase projection', !/\$failure = \[Management\.Automation\.ErrorRecord\]::new[\s\S]*try \{[\s\S]*Get-InputPhaseSummary/.test(guard)],

@@ -253,14 +253,21 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
     $systemSetterReceipt = $null
     Wait-Rest
     $before = @(Read-Trace)[-1].sequence
-    if ($BeforeArguments.Count) { Invoke-Ui "$Name-press" $BeforeArguments }
-    if ($Name -eq 'system-disable-animation') {
+    if ($BeforeArguments.Count -and $Name -ne 'disable-animation') { Invoke-Ui "$Name-press" $BeforeArguments }
+    if ($Name -in @('disable-animation', 'system-disable-animation')) {
         $releaseTool = $null
         $releaseFailure = $null
         $releaseClock = [Diagnostics.Stopwatch]::StartNew()
         try {
+            $releaseName = $Name
+            $releaseArguments = $Arguments
+            if ($Name -eq 'disable-animation') {
+                if (!$BeforeArguments.Count) { throw 'Локальному запрету нужна предшествующая команда отпускания.' }
+                $releaseName = "$Name-press"
+                $releaseArguments = $BeforeArguments
+            }
             # Выход CLI не подтверждает обработку release приложением и может опоздать к settled.
-            $releaseTool = Start-Tool $Name (@('ui') + $Arguments + @('-w', $script:window, '--json'))
+            $releaseTool = Start-Tool $releaseName (@('ui') + $releaseArguments + @('-w', $script:window, '--json'))
             $deadline = [DateTime]::UtcNow.AddSeconds(8)
             $active = $false
             do {
@@ -272,25 +279,29 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
                     $operation = $released[-1].data.operation
                     $requested = @($events | Where-Object { $_.kind -eq 'motion' -and $_.data.pageOperation -eq $operation -and $_.data.phase -eq 'requested' })
                     $completed = @($events | Where-Object { $_.kind -eq 'completed' -and $_.data.operation -eq $operation })
-                    if ($completed.Count) { throw 'Операция завершилась до системного запрета.' }
+                    if ($completed.Count) { throw 'Операция завершилась до запрета анимации.' }
                     if ($requested.Count) { $active = $true; break }
                 }
                 Start-Sleep -Milliseconds 50
             } while ([DateTime]::UtcNow -lt $deadline -and $releaseClock.ElapsedMilliseconds -lt 30000)
-            if (!$active) { throw 'Нет незавершённой операции перед системным запретом.' }
-            if ($releaseClock.ElapsedMilliseconds -ge 30000) { throw 'Таймаут winapp до системного запрета.' }
+            if (!$active) { throw 'Нет незавершённой операции перед запретом анимации.' }
+            if ($releaseClock.ElapsedMilliseconds -ge 30000) { throw 'Таймаут winapp до запрета анимации.' }
             # Значения кадра буферизуются; итоговая проверка подтвердит движение до preference и snap.
-            # Между незавершённым request и Write нет ожидания CLI, value или покоя.
-            [ClientAreaAnimation]::Write($false)
-            $systemSetterReceipt = [pscustomobject]@{
-                SetEnteredQpc = [ClientAreaAnimation]::SetEnteredQpc
-                SetReturnedQpc = [ClientAreaAnimation]::SetReturnedQpc
-                SetSucceeded = [ClientAreaAnimation]::SetSucceeded
-                ReadbackQpc = [ClientAreaAnimation]::ReadbackQpc
-                ReadbackEnabled = [ClientAreaAnimation]::ReadbackEnabled
-                QpcFrequency = [ClientAreaAnimation]::QpcFrequency
+            # Перед запретом не ждём exit release CLI, value или покоя.
+            if ($Name -eq 'disable-animation') {
+                Invoke-Ui $Name $Arguments
+            } else {
+                [ClientAreaAnimation]::Write($false)
+                $systemSetterReceipt = [pscustomobject]@{
+                    SetEnteredQpc = [ClientAreaAnimation]::SetEnteredQpc
+                    SetReturnedQpc = [ClientAreaAnimation]::SetReturnedQpc
+                    SetSucceeded = [ClientAreaAnimation]::SetSucceeded
+                    ReadbackQpc = [ClientAreaAnimation]::ReadbackQpc
+                    ReadbackEnabled = [ClientAreaAnimation]::ReadbackEnabled
+                    QpcFrequency = [ClientAreaAnimation]::QpcFrequency
+                }
+                @{ enabled = [ClientAreaAnimation]::Read(); timing = $systemSetterReceipt } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
             }
-            @{ enabled = [ClientAreaAnimation]::Read(); timing = $systemSetterReceipt } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
         } catch { $releaseFailure = $_ }
         finally {
             if ($null -ne $releaseTool) {

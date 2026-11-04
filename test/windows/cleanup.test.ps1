@@ -485,7 +485,9 @@ try {
     $releaseFunctions = [scriptblock]::Create(($releaseDefinitions | ForEach-Object { $_.Extent.Text }) -join "`n")
     $releaseCases = 0
     foreach ($releaseFault in @('healthy', 'delayed-exit', 'settled', 'race', 'read', 'setter', 'readback',
-        'read-finish', 'setter-finish', 'finish', 'start', 'budget', 'local')) {
+        'read-finish', 'setter-finish', 'finish', 'start', 'budget', 'local',
+        'local-healthy', 'local-delayed-exit', 'local-settled', 'local-race', 'local-read',
+        'local-action', 'local-action-finish', 'local-toggle-exit', 'local-finish', 'local-start')) {
         & {
             param([string]$Probe)
             . $releaseFunctions
@@ -493,10 +495,13 @@ try {
             $script:releaseProbeReads = 0
             $script:releaseProbeStarts = 0
             $script:releaseProbeWaits = [Collections.Generic.List[int]]::new()
+            $script:releaseProbeActionWaits = [Collections.Generic.List[int]]::new()
+            $script:releaseProbeActionDisposes = 0
+            $script:releaseProbeLocalDisabled = $false
             $script:releaseProbeKills = 0
             $script:releaseProbeDisposes = 0
             $script:releaseProbeReadBeforeFinish = $false
-            $script:releaseProbeSettled = $Probe -eq 'settled'
+            $script:releaseProbeSettled = $Probe -in @('settled', 'local-settled')
             $script:releaseProbeTool = $null
             $script:releaseProbeArguments = @()
             $script:window = 'fixture-window'
@@ -516,7 +521,7 @@ try {
                 if ($script:releaseProbeStarts -gt 0 -and $script:releaseProbeWaits.Count -eq 0) {
                     $script:releaseProbeReadBeforeFinish = $true
                 }
-                if ($script:releaseProbe -in @('read', 'read-finish')) { throw [IO.IOException]::new('release-primary-read') }
+                if ($script:releaseProbe -in @('read', 'read-finish', 'local-read')) { throw [IO.IOException]::new('release-primary-read') }
                 $rows = @(
                     [pscustomobject]@{ sequence = 10; kind = 'intent'; data = [pscustomobject]@{
                         operation = 2; trigger = 'pressed'; pressed = $false; localAnimation = $true; systemAnimation = $true } },
@@ -525,29 +530,39 @@ try {
                 )
                 if ($script:releaseProbeSettled) {
                     $rows += [pscustomobject]@{ sequence = 12; kind = 'completed'; data = [pscustomobject]@{ operation = 2; reason = 'settled' } }
-                } elseif (![ClientAreaAnimation]::Current) {
+                } elseif (![ClientAreaAnimation]::Current -or $script:releaseProbeLocalDisabled) {
                     $rows += [pscustomobject]@{ sequence = 12; kind = 'completed'; data = [pscustomobject]@{ operation = 2; reason = 'snap' } }
                 }
                 # Setter может опоздать уже после допустимого snapshot: настоящий snap guard обязан отказать.
-                if ($script:releaseProbe -eq 'race') { $script:releaseProbeSettled = $true }
+                if ($script:releaseProbe -in @('race', 'local-race')) { $script:releaseProbeSettled = $true }
                 return $rows
             }
             function Start-Tool {
                 param([string]$Name, [string[]]$Arguments)
                 $script:releaseProbeStarts++
-                $script:releaseProbeArguments = $Arguments
-                if ($script:releaseProbe -eq 'start') { throw [IO.IOException]::new('release-primary-start') }
+                $isToggle = $Name -eq 'disable-animation'
+                if ($isToggle) {
+                    if (($Arguments -join ',') -cne 'ui,send-keys,space,--target,Animation,--via,send-input,-w,fixture-window,--json') {
+                        throw 'local-release-space-arguments-control'
+                    }
+                    if ($script:releaseProbe -in @('local-action', 'local-action-finish')) { throw [IO.IOException]::new('local-primary-toggle') }
+                    $script:releaseProbeLocalDisabled = $true
+                } else { $script:releaseProbeArguments = $Arguments }
+                if ($script:releaseProbe -in @('start', 'local-start')) { throw [IO.IOException]::new('release-primary-start') }
                 if ($script:releaseProbe -eq 'budget') { [Threading.Thread]::Sleep(30) }
-                $owned = [pscustomobject]@{ IsExited = $false }
+                $owned = [pscustomobject]@{ IsExited = $false; IsToggle = $isToggle; Tool = $null }
                 $owned | Add-Member ScriptMethod WaitForExit {
                     param([int]$Timeout)
                     if ($Timeout -lt 0 -or $Timeout -gt 30000) { throw 'release-unbounded-wait' }
-                    $script:releaseProbeWaits.Add($Timeout)
-                    if ($script:releaseProbeWaits.Count -eq 1 -and $script:releaseProbe -in @('read-finish', 'setter-finish', 'finish')) {
+                    if ($this.IsToggle) { $script:releaseProbeActionWaits.Add($Timeout) }
+                    else { $script:releaseProbeWaits.Add($Timeout) }
+                    if (!$this.IsToggle -and $script:releaseProbeWaits.Count -eq 1 -and
+                        $script:releaseProbe -in @('read-finish', 'setter-finish', 'finish', 'local-action-finish', 'local-finish')) {
                         throw [IO.IOException]::new('release-secondary-finish')
                     }
                     # В delayed-exit приложение settles, пока прежний sync consumer ждёт CLI.
-                    if ($script:releaseProbe -eq 'delayed-exit' -and [ClientAreaAnimation]::Current) { $script:releaseProbeSettled = $true }
+                    if (!$this.IsToggle -and $script:releaseProbe -in @('delayed-exit', 'local-delayed-exit') -and
+                        [ClientAreaAnimation]::Current -and !$script:releaseProbeLocalDisabled) { $script:releaseProbeSettled = $true }
                     $this.IsExited = $true
                     return $true
                 }
@@ -557,10 +572,14 @@ try {
                     $script:releaseProbeKills++
                 }
                 $owned | Add-Member ScriptProperty HasExited { return $this.IsExited }
-                $owned | Add-Member ScriptProperty ExitCode { return 0 }
+                $owned | Add-Member ScriptProperty ExitCode {
+                    if ($this.IsToggle -and $script:releaseProbe -eq 'local-toggle-exit') { return 1 }
+                    return 0
+                }
                 $owned | Add-Member ScriptMethod Dispose {
-                    if (!$script:releaseProbeTool.ended) { throw 'release-disposed-before-finish' }
-                    $script:releaseProbeDisposes++
+                    if (!$this.Tool.ended) { throw 'release-disposed-before-finish' }
+                    if ($this.IsToggle) { $script:releaseProbeActionDisposes++ }
+                    else { $script:releaseProbeDisposes++ }
                 }
                 $stdout = [pscustomobject]@{ Stream = 'stdout' }
                 $stderr = [pscustomobject]@{ Stream = 'stderr' }
@@ -571,16 +590,23 @@ try {
                         return '{"finished":true}'
                     }
                 }
-                $script:releaseProbeTool = @{ process = $owned; stdout = $stdout; stderr = $stderr; prefix = '';
+                $tool = @{ process = $owned; stdout = $stdout; stderr = $stderr; prefix = '';
                     ended = $false; name = $Name; arguments = $Arguments }
-                return $script:releaseProbeTool
+                $owned.Tool = $tool
+                if (!$isToggle) { $script:releaseProbeTool = $tool }
+                return $tool
             }
             try {
                 $observed = $null
-                $name = if ($Probe -eq 'local') { 'mouse-hold' } else { 'system-disable-animation' }
-                try { Scenario $name @('drag', 'Press', 'Press', '--hold-ms', '0') } catch { $observed = $_ }
+                $isLocal = $Probe.StartsWith('local-')
+                $name = if ($isLocal) { 'disable-animation' } elseif ($Probe -eq 'local') { 'mouse-hold' } else { 'system-disable-animation' }
+                try {
+                    if ($isLocal) {
+                        Scenario 'disable-animation' @('send-keys', 'space', '--target', 'Animation', '--via', 'send-input') @('drag', 'Press', 'Press', '--hold-ms', '0')
+                    } else { Scenario $name @('drag', 'Press', 'Press', '--hold-ms', '0') }
+                } catch { $observed = $_ }
                 $expectedPrimary = switch ($Probe) {
-                    'settled' { 'Операция завершилась до системного запрета.' }
+                    'settled' { 'Операция завершилась до запрета анимации.' }
                     'race' { 'completed/snap не наблюдался' }
                     'read' { 'release-primary-read' }
                     'read-finish' { 'release-primary-read' }
@@ -589,6 +615,14 @@ try {
                     'readback' { 'cleanup-setting-read' }
                     'finish' { 'release-secondary-finish' }
                     'start' { 'release-primary-start' }
+                    'local-settled' { 'Операция завершилась до запрета анимации.' }
+                    'local-race' { 'completed/snap не наблюдался' }
+                    'local-read' { 'release-primary-read' }
+                    'local-action' { 'local-primary-toggle' }
+                    'local-action-finish' { 'local-primary-toggle' }
+                    'local-toggle-exit' { 'winapp disable-animation: exit 1' }
+                    'local-finish' { 'release-secondary-finish' }
+                    'local-start' { 'release-primary-start' }
                     default { $null }
                 }
                 if ($null -eq $expectedPrimary) {
@@ -596,17 +630,25 @@ try {
                 } elseif ($null -eq $observed -or !$observed.Exception.Message.Contains($expectedPrimary) -or $scenarios.Count -ne 0) {
                     throw "release-primary-control: $Probe $observed"
                 }
-                $writes = if ($Probe -in @('settled', 'read', 'read-finish', 'setter', 'setter-finish', 'start', 'local')) { 0 } else { 1 }
-                if ([ClientAreaAnimation]::Writes -ne $writes -or $script:releaseProbeStarts -ne 1) { throw "release-effect-control: $Probe" }
-                if ($Probe -ne 'start') {
-                    $waits = if ($Probe -in @('read-finish', 'setter-finish', 'finish')) { 2 } else { 1 }
+                $writes = if ($isLocal -or $Probe -in @('settled', 'read', 'read-finish', 'setter', 'setter-finish', 'start', 'local')) { 0 } else { 1 }
+                $starts = if ($isLocal -and $Probe -notin @('local-settled', 'local-read', 'local-start')) { 2 } else { 1 }
+                if ([ClientAreaAnimation]::Writes -ne $writes -or $script:releaseProbeStarts -ne $starts) { throw "release-effect-control: $Probe" }
+                $toggleFinished = $isLocal -and $Probe -notin @('local-settled', 'local-read', 'local-start', 'local-action', 'local-action-finish')
+                if ($script:releaseProbeActionWaits.Count -ne [int]$toggleFinished -or $script:releaseProbeActionDisposes -ne [int]$toggleFinished) {
+                    throw "local-release-toggle-result-control: $Probe"
+                }
+                if ($isLocal -and $script:releaseProbeTool -and $script:releaseProbeTool.name -cne 'disable-animation-press') {
+                    throw 'local-release-child-name-control'
+                }
+                if ($Probe -notin @('start', 'local-start')) {
+                    $waits = if ($Probe -in @('read-finish', 'setter-finish', 'finish', 'local-action-finish', 'local-finish')) { 2 } else { 1 }
                     $kills = if ($waits -eq 2) { 1 } else { 0 }
                     if ($script:releaseProbeWaits.Count -ne $waits -or $script:releaseProbeKills -ne $kills -or
                         $script:releaseProbeDisposes -ne 1 -or !$script:releaseProbeTool.ended) { throw "release-owned-finish-control: $Probe" }
                     if ($Probe -ne 'local' -and !$script:releaseProbeReadBeforeFinish) { throw "release-delayed-observation-control: $Probe" }
                 } elseif ($script:releaseProbeWaits.Count -ne 0 -or $script:releaseProbeDisposes -ne 0) { throw 'release-failed-start-control' }
                 if ($Probe -eq 'budget' -and $script:releaseProbeWaits[0] -gt 29980) { throw 'release-original-deadline-control' }
-                if ($Probe -in @('read-finish', 'setter-finish') -and @($script:warnings | Where-Object { $_ -match 'release-secondary-finish' }).Count -ne 1) {
+                if ($Probe -in @('read-finish', 'setter-finish', 'local-action-finish') -and @($script:warnings | Where-Object { $_ -match 'release-secondary-finish' }).Count -ne 1) {
                     throw 'release-secondary-observable-control'
                 }
                 if (($script:releaseProbeArguments -join "`n") -cne (@('ui', 'drag', 'Press', 'Press', '--hold-ms', '0', '-w', 'fixture-window', '--json') -join "`n")) {
@@ -620,7 +662,7 @@ try {
         } $releaseFault
         $releaseCases++
     }
-    "system release: $releaseCases synthetic controls PASS"
+    "interruption release: $releaseCases synthetic controls PASS"
 
     # Настоящая проекция и failure-ветка из AST: синтетические случаи, не WinUI/runtime RCA.
     $systemSetterReceipt = $null
