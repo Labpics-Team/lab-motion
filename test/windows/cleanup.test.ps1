@@ -24,9 +24,9 @@ $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseInput([IO.File]::ReadAllText($Harness), [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw 'Invalid harness syntax' }
 $readers = @($ast.EndBlock.Statements | Where-Object {
-    $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -in @('Read-ProcessHasExited', 'Read-ProcessExitCode')
+    $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -in @('Read-ProcessHasExited', 'Read-ProcessExitCode', 'Save-CleanupFailure')
 })
-if ($readers.Count -ne 2) { throw 'Missing actual completion readers' }
+if ($readers.Count -ne 3) { throw 'Missing actual completion readers/arbitration' }
 $completionReaders = [scriptblock]::Create(($readers | ForEach-Object { $_.Extent.Text }) -join "`n")
 . $completionReaders
 $outer = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.TryStatementAst] })[-1]
@@ -48,15 +48,18 @@ try {
         'exit-code', 'exit-code-null', 'exit-code-invalid', 'post-refresh-running',
         'record-healthy', 'record-has-exited', 'record-has-null', 'record-has-invalid',
         'record-has-exited-late', 'record-has-null-late', 'record-has-invalid-late',
-        'has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait', 'record-has-null-kill')) {
+        'has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait', 'record-has-null-kill',
+        'has-null-dispose', 'record-has-null-app-close', 'record-has-null-dispose', 'has-null-restore-read', 'has-null-restore-env')) {
         $script:fault = $fault
+        $compound = $fault -in @('has-null-dispose', 'record-has-null-app-close', 'record-has-null-dispose', 'has-null-restore-read', 'has-null-restore-env')
         [ClientAreaAnimation]::Current = !$before
-        [ClientAreaAnimation]::FailRead = $fault -eq 'restore-read'
+        [ClientAreaAnimation]::FailRead = $fault -in @('restore-read', 'has-null-restore-read')
         [ClientAreaAnimation]::Writes = 0
         $animationBefore = $before
         $saved = @{ LAB_MOTION_PRESS_TRACE = 'previous-trace' }
+        if ($fault -eq 'has-null-restore-env') { $saved['LAB_MOTION_INVALID=NAME'] = 'invalid-name-control' }
         $env:LAB_MOTION_PRESS_TRACE = 'current-trace'
-        $passed = !$injectPrimary -and $fault -in @('forced-close', 'record-healthy')
+        $passed = (!$injectPrimary -and $fault -in @('forced-close', 'record-healthy')) -or $compound
         $primaryFailure = $null
         $commands = @(@{ name = 'example' })
         $script:disposed = $false
@@ -73,7 +76,8 @@ try {
         $process = [pscustomobject]@{ IsExited = $false; Refreshed = $false }
         $process | Add-Member ScriptProperty HasExited {
             if ($script:fault -eq 'has-exited') { throw [InvalidOperationException]::new('cleanup-has-exited') }
-            if ($script:fault -in @('has-null', 'has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait')) { return $null }
+            if ($script:fault -in @('has-null', 'has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait',
+                'has-null-dispose', 'has-null-restore-read', 'has-null-restore-env')) { return $null }
             if ($script:fault -eq 'has-invalid') { return 'false' }
             if ($this.Refreshed) {
                 if ($script:fault -eq 'has-exited-late') { throw [InvalidOperationException]::new('cleanup-has-exited-late') }
@@ -92,7 +96,7 @@ try {
         }
         $process | Add-Member ScriptMethod CloseMainWindow {
             $script:closeReached = $true
-            if ($script:fault -in @('close-main', 'has-null-close-main')) { throw [InvalidOperationException]::new('cleanup-close-main') }
+            if ($script:fault -in @('close-main', 'has-null-close-main', 'record-has-null-app-close')) { throw [InvalidOperationException]::new('cleanup-close-main') }
             return $true
         }
         $process | Add-Member ScriptMethod WaitForExit {
@@ -120,14 +124,14 @@ try {
         }
         $process | Add-Member ScriptMethod Dispose {
             $script:disposed = $true
-            if ($script:fault -eq 'dispose') { throw [IO.IOException]::new('cleanup-dispose') }
+            if ($script:fault -in @('dispose', 'has-null-dispose')) { throw [IO.IOException]::new('cleanup-dispose') }
         }
         $recording = $null
         if ($fault -eq 'record' -or $fault.StartsWith('record-')) {
             $recorder = [pscustomobject]@{ IsExited = $false }
             $recorder | Add-Member ScriptProperty HasExited {
                 if ($script:fault -eq 'record-has-exited') { throw [InvalidOperationException]::new('cleanup-record-has-exited') }
-                if ($script:fault -in @('record-has-null', 'record-has-null-kill')) { return $null }
+                if ($script:fault -in @('record-has-null', 'record-has-null-kill', 'record-has-null-app-close', 'record-has-null-dispose')) { return $null }
                 if ($script:fault -eq 'record-has-invalid') { return 'false' }
                 if ($this.IsExited) {
                     if ($script:fault -eq 'record-has-exited-late') { throw [InvalidOperationException]::new('cleanup-record-has-exited-late') }
@@ -142,7 +146,10 @@ try {
                 $this.IsExited = $true
             }
             $recorder | Add-Member ScriptMethod WaitForExit { $script:recorderWaitReached = $true }
-            $recorder | Add-Member ScriptMethod Dispose { $script:recorderDisposed = $true }
+            $recorder | Add-Member ScriptMethod Dispose {
+                $script:recorderDisposed = $true
+                if ($script:fault -eq 'record-has-null-dispose') { throw [IO.IOException]::new('cleanup-recorder-dispose') }
+            }
             $recording = @{ ended = $false; process = $recorder; stderr = $null; prefix = '' }
         }
         function Set-Content {
@@ -183,6 +190,25 @@ try {
         if ($fault -in @('none', 'record-healthy')) {
             if ($null -eq $script:closeEvidence -or $script:closeEvidence.exited -isnot [bool] -or
                 !$script:closeEvidence.exited -or $script:closeEvidence.exitCode -ne 0) { throw 'Healthy completion evidence lost' }
+        }
+        if ($compound) {
+            if (!$injectPrimary -and (!$passed -or !$observed -or $observed.Exception.Message -notmatch 'bool HasExited')) {
+                throw "First cleanup error lost after successful body: $fault"
+            }
+            $secondary = switch ($fault) {
+                'has-null-dispose' { 'cleanup-dispose' }
+                'record-has-null-app-close' { 'cleanup-close-main' }
+                'record-has-null-dispose' { 'cleanup-recorder-dispose' }
+                'has-null-restore-read' { 'cleanup-setting-read' }
+                'has-null-restore-env' { 'Вторичная ошибка очистки:' }
+            }
+            if (!@($script:warnings | Where-Object { $_ -match [regex]::Escape($secondary) }).Count) {
+                throw "Subsequent cleanup stage error not observable: $fault"
+            }
+            if (!$script:closeReached) { throw 'Compound error cancelled application cleanup' }
+            if ($fault.StartsWith('record-')) {
+                if (!$script:recorderKillReached -or !$script:recorderWaitReached) { throw 'Compound recorder error cancelled stop' }
+            } elseif (!$script:closeWaitReached -or $script:exitCodeReached) { throw 'Compound application error cancelled stop or admitted exit code' }
         }
         if (!$injectPrimary -and $fault -in @('close-main', 'close-wait', 'kill', 'kill-wait', 'record')) {
             $terminationMessage = if ($fault -eq 'record') { 'cleanup-recorder' } else { 'cleanup-' + $fault }
@@ -250,6 +276,17 @@ try {
         $actual = Read-ProcessExitCode ([pscustomobject]@{ ExitCode = $value })
         if ($actual -isnot [int] -or $actual -ne $value) { throw 'Healthy int exit code changed' }
     }
+    # Настоящий helper получает ErrorRecord и ref текущего scope; второй отказ не заменяет первый.
+    $firstControl = [Management.Automation.ErrorRecord]::new([IO.IOException]::new('first-cleanup-control'),
+        'first-cleanup-control', [Management.Automation.ErrorCategory]::ReadError, $null)
+    $secondControl = [Management.Automation.ErrorRecord]::new([IO.IOException]::new('second-cleanup-control'),
+        'second-cleanup-control', [Management.Automation.ErrorCategory]::CloseError, $null)
+    $first = $null
+    $script:warnings.Clear()
+    Save-CleanupFailure $firstControl ([ref]$first)
+    Save-CleanupFailure $secondControl ([ref]$first)
+    if (![object]::ReferenceEquals($first, $firstControl) -or $script:warnings.Count -ne 1 -or
+        $script:warnings[0] -notmatch 'second-cleanup-control') { throw 'First-error arbitration/reference changed' }
     # Настоящий неассоциированный .NET getter: процесс не запускается и ничего не меняет.
     $unassociated = [Diagnostics.Process]::new()
     try {
@@ -265,3 +302,4 @@ try {
 }
 "cleanup: $cases PASS"
 'completion readers: 4 healthy controls + actual .NET getter PASS'
+'cleanup arbitration: actual ErrorRecord/ref control PASS'

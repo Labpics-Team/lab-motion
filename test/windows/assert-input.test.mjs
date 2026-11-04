@@ -255,12 +255,11 @@ function inputCleanupViolations(source) {
     ['only qualified completion getters', (source.match(/\.HasExited\b/g) ?? []).length !== 1 || (source.match(/\.ExitCode\b/g) ?? []).length !== 1],
     ['post-refresh qualified evidence', !/\$process\.Refresh\(\)\s+\$exited = Read-ProcessHasExited \$process\s+if \(!\$exited\) \{ throw '[^']+' \}\s+\$exitCode = Read-ProcessExitCode \$process/.test(source)
       || !source.includes('@{ exited = $exited; forced = $forced; exitCode = $exitCode }')],
-    ['first completion failure retained through stop failure', (source.match(/if \(\$null -eq \$completionFailure\) \{ throw \}/g) ?? []).length !== 2
-      || !source.includes("Write-Warning ('Ошибка остановки записи после отказа чтения завершения: ' + $_.Exception.Message) -WarningAction Continue")
-      || !source.includes("Write-Warning ('Ошибка завершения приложения после отказа чтения завершения: ' + $_.Exception.Message) -WarningAction Continue")],
+    ['first completion failure retained through stop failure', (source.match(/catch \{ \$completionReadFailed = \$true; Save-CleanupFailure \$_ \(\[ref\]\$cleanupFailure\) \}/g) ?? []).length !== 2
+      || (source.match(/catch \{ \$stopFailed = \$true; Save-CleanupFailure \$_ \(\[ref\]\$cleanupFailure\) \}/g) ?? []).length !== 2],
     ['primary captured before evidence', !/\$primaryFailure = \$_\s+try \{ \$primaryFailure \| Out-String \| Set-Content/.test(source)],
     ['application disposal encloses process boundary', !/if \(\$process\) \{\s+try \{\s+\$forced = \$false/.test(source)],
-    ['cleanup retains primary', !/catch \{\s+if \(\$null -eq \$primaryFailure\) \{ throw \}/.test(source)],
+    ['cleanup retains primary', !/if \(\$null -eq \$primaryFailure\) \{ throw \$cleanupFailure \}/.test(source)],
     ['fixed observable warning', !source.includes("Write-Warning 'Очистка после ошибки не завершена.' -WarningAction Continue")],
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
@@ -273,10 +272,10 @@ test('input source captures primary before evidence and disposes across process 
     ['$exitCode -isnot [int]', '$false', 'exit code int validated before use'],
     ['$needsClose = !(Read-ProcessHasExited $process)', '$needsClose = !$process.HasExited', 'only qualified completion getters'],
     ['$exited = Read-ProcessHasExited $process', '$exited = $true', 'post-refresh qualified evidence'],
-    ['if ($null -eq $completionFailure) { throw }', 'throw', 'first completion failure retained through stop failure'],
+    ['$completionReadFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure)', 'throw', 'first completion failure retained through stop failure'],
     ['$primaryFailure = $_', '$primaryFailure = $null', 'primary captured before evidence'],
-    ['try {\n                        $forced = $false', '$forced = $false', 'application disposal encloses process boundary'],
-    ['if ($null -eq $primaryFailure) { throw }', 'throw', 'cleanup retains primary'],
+    ['try {\n            $forced = $false', '$forced = $false', 'application disposal encloses process boundary'],
+    ['if ($null -eq $primaryFailure) { throw $cleanupFailure }', 'throw $cleanupFailure', 'cleanup retains primary'],
     ["Write-Warning 'Очистка после ошибки не завершена.' -WarningAction Continue", '$null', 'fixed observable warning'],
   ]) assert(inputCleanupViolations(source.replaceAll(before, after)).includes(expected), expected);
 });
@@ -305,6 +304,40 @@ test('input witness requires first completion error and observable secondary ter
   assert(source.includes("$observed.Exception.Message -notmatch 'bool HasExited'"));
   assert(source.includes('[regex]::Escape($secondary)'));
   assert(source.includes('$script:killWaitReached -ne'));
+});
+
+function cleanupArbitrationViolations(source) {
+  return [
+    ['typed first-error arbitration', !/function Save-CleanupFailure\(\[Management\.Automation\.ErrorRecord\]\$Failure, \[ref\]\$FirstFailure\)/.test(source)
+      || !/if \(\$null -eq \$FirstFailure.Value\) \{ \$FirstFailure.Value = \$Failure \}/.test(source)],
+    ['secondary failures observable', !source.includes("Write-Warning ('Вторичная ошибка очистки: ' + $Failure.Exception.Message) -WarningAction Continue")],
+    ['cleanup throw independent of passed', !/if \(\$null -ne \$cleanupFailure\) \{\s+if \(\$null -eq \$primaryFailure\) \{ throw \$cleanupFailure \}/.test(source)],
+    ['close outcome preserves input primary', !source.includes('if ($null -eq $primaryFailure -and $passed -and !$closed)')],
+    ['both disposals arbitrated', !source.includes('try { $recording.process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }')
+      || !source.includes('try { $process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }')],
+    ['environment restoration per value', !/foreach \(\$name in \$saved.Keys\) \{\s+try \{ \[Environment\]::SetEnvironmentVariable\(\$name, \$saved\[\$name\]\) \}\s+catch \{ Save-CleanupFailure \$_ \(\[ref\]\$cleanupFailure\) \}/.test(source)],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('input cleanup retains the first error across Dispose, app cleanup and restoration', () => {
+  const source = readFileSync(new URL('./verify-input.ps1', import.meta.url), 'utf8');
+  assert.deepEqual(cleanupArbitrationViolations(source), []);
+  for (const [before, after, expected] of [
+    ['$FirstFailure.Value = $Failure', '$null', 'typed first-error arbitration'],
+    ['$null -eq $FirstFailure.Value', '$true', 'typed first-error arbitration'],
+    ['-WarningAction Continue', '-WarningAction Stop', 'secondary failures observable'],
+    ['throw $cleanupFailure', 'throw', 'cleanup throw independent of passed'],
+    ['$null -eq $primaryFailure -and $passed -and !$closed', '$passed -and !$closed', 'close outcome preserves input primary'],
+    ['try { $process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }', '$process.Dispose()', 'both disposals arbitrated'],
+  ]) assert(cleanupArbitrationViolations(source.replaceAll(before, after)).includes(expected), expected);
+  const witness = readFileSync(new URL('./cleanup.test.ps1', import.meta.url), 'utf8');
+  for (const fault of ['has-null-dispose', 'record-has-null-app-close', 'record-has-null-dispose', 'has-null-restore-read', 'has-null-restore-env']) {
+    assert(witness.includes(`'${fault}'`), fault);
+  }
+  assert(witness.includes("'Save-CleanupFailure'"));
+  assert(witness.includes("$saved['LAB_MOTION_INVALID=NAME']"));
+  assert(witness.includes('!$passed -or !$observed'));
+  assert(witness.includes('[object]::ReferenceEquals($first, $firstControl)'));
 });
 
 test('повреждённый JSON даёт exit1 и отрицательный result.json', () => {

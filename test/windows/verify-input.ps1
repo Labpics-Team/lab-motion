@@ -36,6 +36,12 @@ function Read-ProcessExitCode($Process) {
     return $exitCode
 }
 
+function Save-CleanupFailure([Management.Automation.ErrorRecord]$Failure, [ref]$FirstFailure) {
+    # Исключение из следующего finally не должно заменять уже сохранённую ошибку.
+    if ($null -eq $FirstFailure.Value) { $FirstFailure.Value = $Failure }
+    else { Write-Warning ('Вторичная ошибка очистки: ' + $Failure.Exception.Message) -WarningAction Continue }
+}
+
 function Start-Tool([string]$Name, [string[]]$Arguments) {
     $info = [Diagnostics.ProcessStartInfo]::new($script:cli)
     $info.UseShellExecute = $false
@@ -264,72 +270,73 @@ try {
     throw $primaryFailure
 } finally {
     $closed = $false
-    try {
+    $cleanupFailure = $null
+    if ($recording -and !$recording.ended) {
         try {
-            try {
-                if ($recording -and !$recording.ended) {
-                    try {
-                        $completionFailure = $null
-                        $needsStop = $true
-                        try { $needsStop = !(Read-ProcessHasExited $recording.process) }
-                        catch { $completionFailure = $_ }
-                        # Неизвестное завершение не отменяет попытку остановить свою запись.
-                        if ($needsStop) {
-                            try { $recording.process.Kill($true); $recording.process.WaitForExit() }
-                            catch {
-                                if ($null -eq $completionFailure) { throw }
-                                Write-Warning ('Ошибка остановки записи после отказа чтения завершения: ' + $_.Exception.Message) -WarningAction Continue
-                            }
-                        }
-                        if ($null -ne $completionFailure) { throw $completionFailure }
-                        if (!(Read-ProcessHasExited $recording.process)) { throw 'Запись не подтвердила завершение после очистки.' }
-                        $remaining = if ($recording.stderr) { $recording.stderr.GetAwaiter().GetResult() } else { '' }
-                        [IO.File]::WriteAllText((Join-Path $evidence 'record.stderr.log'), $recording.prefix + $remaining)
-                    } finally { $recording.process.Dispose() }
-                }
-            } finally {
-                if ($process) {
-                    try {
-                        $forced = $false
-                        $completionFailure = $null
-                        $needsClose = $true
-                        try { $needsClose = !(Read-ProcessHasExited $process) }
-                        catch { $completionFailure = $_ }
-                        # Ошибка чтения остаётся ошибкой после попытки завершить свой процесс.
-                        if ($needsClose) {
-                            try {
-                                $null = $process.CloseMainWindow()
-                                if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
-                            } catch {
-                                if ($null -eq $completionFailure) { throw }
-                                Write-Warning ('Ошибка завершения приложения после отказа чтения завершения: ' + $_.Exception.Message) -WarningAction Continue
-                            }
-                        }
-                        if ($null -ne $completionFailure) { throw $completionFailure }
-                        $process.Refresh()
-                        $exited = Read-ProcessHasExited $process
-                        if (!$exited) { throw 'Приложение не подтвердило завершение после очистки.' }
-                        $exitCode = Read-ProcessExitCode $process
-                        $closed = !$forced -and $exited -and $exitCode -eq 0
-                        @{ exited = $exited; forced = $forced; exitCode = $exitCode } | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
-                    } finally { $process.Dispose() }
-                }
+            $completionReadFailed = $false
+            $stopFailed = $false
+            $needsStop = $true
+            try { $needsStop = !(Read-ProcessHasExited $recording.process) }
+            catch { $completionReadFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+            # Неизвестное завершение не отменяет попытку остановить свою запись.
+            if ($needsStop) {
+                try { $recording.process.Kill($true); $recording.process.WaitForExit() }
+                catch { $stopFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
             }
-            $commands | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'commands.json')
-        } finally {
-            try {
-                foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
-            } finally {
-                if ($null -ne $animationBefore) {
-                    [ClientAreaAnimation]::Write($animationBefore)
-                    @{ expected = $animationBefore; actual = [ClientAreaAnimation]::Read() } |
-                        ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-restored.json')
-                }
+            if (!$completionReadFailed -and !$stopFailed) {
+                if (!(Read-ProcessHasExited $recording.process)) { throw 'Запись не подтвердила завершение после очистки.' }
+                $remaining = if ($recording.stderr) { $recording.stderr.GetAwaiter().GetResult() } else { '' }
+                [IO.File]::WriteAllText((Join-Path $evidence 'record.stderr.log'), $recording.prefix + $remaining)
             }
+        } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+        finally {
+            try { $recording.process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
         }
-    } catch {
-        if ($null -eq $primaryFailure) { throw }
+    }
+    if ($process) {
+        try {
+            $forced = $false
+            $completionReadFailed = $false
+            $stopFailed = $false
+            $needsClose = $true
+            try { $needsClose = !(Read-ProcessHasExited $process) }
+            catch { $completionReadFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+            if ($needsClose) {
+                try {
+                    $null = $process.CloseMainWindow()
+                    if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
+                } catch { $stopFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+            }
+            if (!$completionReadFailed -and !$stopFailed) {
+                $process.Refresh()
+                $exited = Read-ProcessHasExited $process
+                if (!$exited) { throw 'Приложение не подтвердило завершение после очистки.' }
+                $exitCode = Read-ProcessExitCode $process
+                $closed = !$forced -and $exited -and $exitCode -eq 0
+                @{ exited = $exited; forced = $forced; exitCode = $exitCode } | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
+            }
+        } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+        finally {
+            try { $process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+        }
+    }
+    try { $commands | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'commands.json') }
+    catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+    foreach ($name in $saved.Keys) {
+        try { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+        catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+    }
+    if ($null -ne $animationBefore) {
+        try { [ClientAreaAnimation]::Write($animationBefore) }
+        catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+        try {
+            @{ expected = $animationBefore; actual = [ClientAreaAnimation]::Read() } |
+                ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-restored.json')
+        } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+    }
+    if ($null -ne $cleanupFailure) {
+        if ($null -eq $primaryFailure) { throw $cleanupFailure }
         Write-Warning 'Очистка после ошибки не завершена.' -WarningAction Continue
     }
-    if ($passed -and !$closed) { throw 'Приложение не подтвердило штатное завершение.' }
+    if ($null -eq $primaryFailure -and $passed -and !$closed) { throw 'Приложение не подтвердило штатное завершение.' }
 }
