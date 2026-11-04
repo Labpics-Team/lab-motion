@@ -174,6 +174,9 @@ public sealed partial class PressPage : Page
                     end = result.End.ToString(), reason = result.Reason,
                     isCurrent = id == operation && ReferenceEquals(current, motion),
                     systemAnimation = ReadSystemAnimationForTrace(),
+                    // Выборки независимы; last-issued id не подтверждает receipt для текущего SPI.
+                    notification = ReadSystemNotificationForTrace(),
+                    diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0,
                 });
                 trace?.Flush();
             }
@@ -184,6 +187,13 @@ public sealed partial class PressPage : Page
             trace?.Flush();
             if (id == operation && ReferenceEquals(current, motion)) State.Text = error.Message;
         }
+    }
+
+    private long? ReadSystemNotificationForTrace()
+    {
+        var notification = Volatile.Read(ref systemNotification);
+        return notification > 0 && notification <= 9007199254740991
+            ? (long?)notification : null;
     }
 
     private bool? ReadSystemAnimationForTrace()

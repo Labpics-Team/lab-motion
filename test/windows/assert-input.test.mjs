@@ -581,6 +581,77 @@ function completedGetterViolations(source) {
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
 
+function completedNotificationViolations(source) {
+  const helper = source.match(/private long\? ReadSystemNotificationForTrace\(\)\s*\{([\s\S]*?)\n    \}/)?.[1] ?? '';
+  const body = helper.replace(/\/\/[^\n]*/g, '');
+  const completion = source.match(/trace\?\.Add\("completed", new\s*\{([\s\S]*?)\}\);/)?.[1] ?? '';
+  return [
+    ['bounded nullable volatile snapshot without mutation', !/^\s*var notification = Volatile\.Read\(ref systemNotification\);\s*return notification > 0 && notification <= 9007199254740991\s*\? \(long\?\)notification : null;\s*$/.test(body)],
+    ['sticky failure read without mutation', !completion.includes('diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0')],
+    ['snapshot only in existing conditional completed payload', !completion.includes('notification = ReadSystemNotificationForTrace()')
+      || (source.match(/ReadSystemNotificationForTrace\(/g) ?? []).length !== 2
+      || !completion.includes('operation = id, nativeOperation = result.Operation')
+      || !completion.includes('end = result.End.ToString(), reason = result.Reason')
+      || !completion.includes('isCurrent = id == operation && ReferenceEquals(current, motion)')],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('source oracle completed notification пропускает read-only witness и обнаруживает опасные подмены', () => {
+  // Независимый wanted-state witness: не выполняет C# и не доказывает native receipt.
+  const healthy = `trace?.Add("completed", new
+    {
+      operation = id, nativeOperation = result.Operation,
+      end = result.End.ToString(), reason = result.Reason,
+      isCurrent = id == operation && ReferenceEquals(current, motion),
+      notification = ReadSystemNotificationForTrace(),
+      diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0,
+    });
+    private long? ReadSystemNotificationForTrace()
+    {
+      var notification = Volatile.Read(ref systemNotification);
+      return notification > 0 && notification <= 9007199254740991
+        ? (long?)notification : null;
+    }`;
+  assert.deepEqual(completedNotificationViolations(healthy), []);
+  for (const [before, after, violation] of [
+    ['Volatile.Read(ref systemNotification)', 'systemNotification', 'bounded nullable volatile snapshot without mutation'],
+    ['notification > 0', 'notification >= 0', 'bounded nullable volatile snapshot without mutation'],
+    ['notification <= 9007199254740991', 'notification <= long.MaxValue', 'bounded nullable volatile snapshot without mutation'],
+    ['Volatile.Read(ref systemNotification)', 'Interlocked.Increment(ref systemNotification)', 'bounded nullable volatile snapshot without mutation'],
+    ['(long?)notification : null', '(long?)notification : 1', 'bounded nullable volatile snapshot without mutation'],
+    ['Volatile.Read(ref notificationDiagnosticFailed) != 0', 'notificationDiagnosticFailed != 0', 'sticky failure read without mutation'],
+    ['Volatile.Read(ref notificationDiagnosticFailed) != 0', 'Volatile.Read(ref notificationDiagnosticFailed) == 0', 'sticky failure read without mutation'],
+    ['notification = ReadSystemNotificationForTrace()', 'notification = systemNotification', 'snapshot only in existing conditional completed payload'],
+    ['trace?.Add', 'trace.Add', 'snapshot only in existing conditional completed payload'],
+    ['private long?', 'var early = ReadSystemNotificationForTrace();\n    private long?', 'snapshot only in existing conditional completed payload'],
+  ]) assert(completedNotificationViolations(healthy.replace(before, after)).includes(violation), violation);
+});
+
+test('completed trace снимает существующий last-issued counter и sticky diagnosticFailed без нового callback', () => {
+  const source = readSource(new URL('../../examples/windows/PressPage.xaml.cs', import.meta.url));
+  assert.deepEqual(completedNotificationViolations(source), []);
+});
+
+test('completed notification использует прежние number/bool поля и controls настоящей проекции', () => {
+  const source = readSource(new URL('./verify-input.ps1', import.meta.url));
+  const projection = source.slice(source.indexOf('function Read-InputPhaseField'), source.indexOf('function Scenario'));
+  assert(projection.includes("Read-InputPhaseField $data 'notification' 'number'"));
+  assert(projection.includes("Read-InputPhaseField $data 'diagnosticFailed' 'bool'"));
+  const controls = readSource(new URL('./cleanup.test.ps1', import.meta.url));
+  const completed = controls.slice(controls.indexOf('$completedNotificationCases ='), controls.indexOf('$received ='));
+  assert(completed.includes("Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($completedEvent)"));
+  assert(completed.includes("kind = 'completed'"));
+  for (const name of ['none', 'positive', 'upper', 'zero-consumer', 'out-of-range', 'negative', 'malformed', 'missing']) {
+    assert(completed.includes(`name = '${name}'`), name);
+  }
+  assert(completed.includes('$notificationSummary.rows[0][10]'));
+  assert(completed.includes('$notificationSummary.rows[0][12]'));
+  assert(completed.includes('$notificationSummary.rows[0].Count -ne 13'));
+  assert(completed.includes('$actualNotification -isnot [long]'));
+  assert(completed.includes('$actualFailure -isnot [bool]'));
+  assert(completed.includes('phase-completed-notification-control'));
+});
+
 test('completed trace читает тот же UISettings только на owner thread и сохраняет неизвестное значение как null', () => {
   const source = readSource(new URL('../../examples/windows/PressPage.xaml.cs', import.meta.url));
   assert.deepEqual(completedGetterViolations(source), []);

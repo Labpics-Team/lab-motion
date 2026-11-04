@@ -705,6 +705,50 @@ try {
         $completedGetterCases++
     }
     "completion getter projection: $completedGetterCases synthetic controls PASS"
+    # Last-issued snapshot не заменяет receipt; zero допускается reader, но producer отдаёт null.
+    $completedNotificationCases = 0
+    foreach ($notificationCase in @(
+        @{ name = 'none'; notification = $null; failed = $false; expectedNotification = $null; expectedFailure = $false },
+        @{ name = 'positive'; notification = 7; failed = $false; expectedNotification = 7; expectedFailure = $false },
+        @{ name = 'upper'; notification = 9007199254740991L; failed = $true; expectedNotification = 9007199254740991L; expectedFailure = $true },
+        @{ name = 'zero-consumer'; notification = 0; failed = $false; expectedNotification = 0; expectedFailure = $false },
+        @{ name = 'out-of-range'; notification = 9007199254740992L; failed = $true; expectedNotification = $null; expectedFailure = $true },
+        @{ name = 'negative'; notification = -1; failed = $false; expectedNotification = $null; expectedFailure = $false },
+        @{ name = 'malformed'; notification = '::error::secret'; failed = 'true'; expectedNotification = $null; expectedFailure = $null },
+        @{ name = 'missing'; expectedNotification = $null; expectedFailure = $null }
+    )) {
+        $completedData = @{ operation = 17; nativeOperation = 14; reason = 'settled'; end = 'Finished'; isCurrent = $true }
+        if ($notificationCase.ContainsKey('notification')) { $completedData.notification = $notificationCase.notification }
+        if ($notificationCase.ContainsKey('failed')) { $completedData.diagnosticFailed = $notificationCase.failed }
+        $completedEvent = [pscustomobject]@{ sequence = 10; kind = 'completed'; data = [pscustomobject]$completedData }
+        $notificationText = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($completedEvent)
+        $notificationSummary = $notificationText | ConvertFrom-Json
+        $actualNotification = $notificationSummary.rows[0][10]
+        $actualFailure = $notificationSummary.rows[0][12]
+        if ($notificationSummary.schema -ne 2 -or $notificationSummary.count -ne 1 -or $notificationSummary.rows.Count -ne 1 -or
+            $notificationSummary.rows[0].Count -ne 13 -or $notificationSummary.omitted -ne 0 -or $notificationSummary.invalid -ne 0 -or
+            $notificationSummary.rows[0][0] -ne 10 -or $notificationSummary.rows[0][1] -cne 'completed' -or
+            $notificationSummary.rows[0][2] -ne 17 -or $notificationSummary.rows[0][3] -ne 14 -or
+            $notificationSummary.rows[0][7] -cne 'settled' -or $notificationSummary.rows[0][8] -cne 'Finished' -or
+            $notificationSummary.rows[0][9] -cne $true -or $null -ne $notificationSummary.rows[0][11] -or
+            $notificationText -match 'secret|::error::' -or $notificationText.Length -gt 1800 -or
+            [Text.Encoding]::UTF8.GetByteCount($notificationText) -gt 1800) {
+            throw "phase-completed-notification-control: $($notificationCase.name)"
+        }
+        if ($null -eq $notificationCase.expectedNotification) {
+            if ($null -ne $actualNotification) { throw "phase-completed-notification-control: $($notificationCase.name)" }
+        } elseif (($actualNotification -isnot [int] -and $actualNotification -isnot [long]) -or
+            $actualNotification -ne $notificationCase.expectedNotification) {
+            throw "phase-completed-notification-control: $($notificationCase.name)"
+        }
+        if ($null -eq $notificationCase.expectedFailure) {
+            if ($null -ne $actualFailure) { throw "phase-completed-notification-control: $($notificationCase.name)" }
+        } elseif ($actualFailure -isnot [bool] -or $actualFailure -cne $notificationCase.expectedFailure) {
+            throw "phase-completed-notification-control: $($notificationCase.name)"
+        }
+        $completedNotificationCases++
+    }
+    "completion notification projection: $completedNotificationCases synthetic controls PASS"
     $received = [pscustomobject]@{ sequence = 10; kind = 'systemNotification'; data = [pscustomobject]@{
         notification = 7; phase = 'Received'; queued = $null; diagnosticFailed = $false } }
     $queueResult = [pscustomobject]@{ sequence = 11; kind = 'systemNotification'; data = [pscustomobject]@{
