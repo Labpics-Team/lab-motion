@@ -49,7 +49,8 @@ try {
         'record-healthy', 'record-has-exited', 'record-has-null', 'record-has-invalid',
         'record-has-exited-late', 'record-has-null-late', 'record-has-invalid-late',
         'has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait', 'record-has-null-kill',
-        'has-null-dispose', 'record-has-null-app-close', 'record-has-null-dispose', 'has-null-restore-read', 'has-null-restore-env')) {
+        'has-null-dispose', 'record-has-null-app-close', 'record-has-null-dispose', 'has-null-restore-read', 'has-null-restore-env',
+        'close-main-kill', 'close-main-kill-wait', 'close-wait-kill', 'close-wait-kill-wait', 'record-already-closed')) {
         $script:fault = $fault
         $compound = $fault -in @('has-null-dispose', 'record-has-null-app-close', 'record-has-null-dispose', 'has-null-restore-read', 'has-null-restore-env')
         [ClientAreaAnimation]::Current = !$before
@@ -59,7 +60,7 @@ try {
         $saved = @{ LAB_MOTION_PRESS_TRACE = 'previous-trace' }
         if ($fault -eq 'has-null-restore-env') { $saved['LAB_MOTION_INVALID=NAME'] = 'invalid-name-control' }
         $env:LAB_MOTION_PRESS_TRACE = 'current-trace'
-        $passed = (!$injectPrimary -and $fault -in @('forced-close', 'record-healthy')) -or $compound
+        $passed = (!$injectPrimary -and $fault -in @('forced-close', 'record-healthy', 'record-already-closed')) -or $compound
         $primaryFailure = $null
         $commands = @(@{ name = 'example' })
         $script:disposed = $false
@@ -68,6 +69,10 @@ try {
         $script:closeWaitReached = $false
         $script:killReached = $false
         $script:killWaitReached = $false
+        $script:killCount = 0
+        $script:killWaitCount = 0
+        $script:killCountAtDispose = 0
+        $script:killWaitCountAtDispose = 0
         $script:recorderKillReached = $false
         $script:recorderWaitReached = $false
         $script:exitCodeReached = $false
@@ -96,18 +101,20 @@ try {
         }
         $process | Add-Member ScriptMethod CloseMainWindow {
             $script:closeReached = $true
-            if ($script:fault -in @('close-main', 'has-null-close-main', 'record-has-null-app-close')) { throw [InvalidOperationException]::new('cleanup-close-main') }
+            if ($script:fault -in @('close-main', 'has-null-close-main', 'record-has-null-app-close',
+                'close-main-kill', 'close-main-kill-wait')) { throw [InvalidOperationException]::new('cleanup-close-main') }
             return $true
         }
         $process | Add-Member ScriptMethod WaitForExit {
             param([int]$Timeout = 0)
             if ($Timeout -eq 5000) {
                 $script:closeWaitReached = $true
-                if ($script:fault -in @('close-wait', 'has-null-close-wait')) { throw [InvalidOperationException]::new('cleanup-close-wait') }
+                if ($script:fault -in @('close-wait', 'has-null-close-wait', 'close-wait-kill', 'close-wait-kill-wait')) { throw [InvalidOperationException]::new('cleanup-close-wait') }
                 if ($script:fault -in @('kill', 'kill-wait', 'forced-close', 'has-null-kill', 'has-null-kill-wait')) { return $false }
             } else {
                 $script:killWaitReached = $true
-                if ($script:fault -in @('kill-wait', 'has-null-kill-wait')) { throw [InvalidOperationException]::new('cleanup-kill-wait') }
+                $script:killWaitCount++
+                if ($script:fault -in @('kill-wait', 'has-null-kill-wait', 'close-main-kill-wait', 'close-wait-kill-wait')) { throw [InvalidOperationException]::new('cleanup-kill-wait') }
             }
             $this.IsExited = $true
             return $true
@@ -115,7 +122,8 @@ try {
         $process | Add-Member ScriptMethod Kill {
             param([bool]$EntireProcessTree)
             $script:killReached = $true
-            if ($script:fault -in @('kill', 'has-null-kill')) { throw [IO.IOException]::new('cleanup-kill') }
+            $script:killCount++
+            if ($script:fault -in @('kill', 'has-null-kill', 'close-main-kill', 'close-wait-kill')) { throw [IO.IOException]::new('cleanup-kill') }
             $this.IsExited = $true
         }
         $process | Add-Member ScriptMethod Refresh {
@@ -124,11 +132,13 @@ try {
         }
         $process | Add-Member ScriptMethod Dispose {
             $script:disposed = $true
+            $script:killCountAtDispose = $script:killCount
+            $script:killWaitCountAtDispose = $script:killWaitCount
             if ($script:fault -in @('dispose', 'has-null-dispose')) { throw [IO.IOException]::new('cleanup-dispose') }
         }
         $recording = $null
         if ($fault -eq 'record' -or $fault.StartsWith('record-')) {
-            $recorder = [pscustomobject]@{ IsExited = $false }
+            $recorder = [pscustomobject]@{ IsExited = $fault -eq 'record-already-closed' }
             $recorder | Add-Member ScriptProperty HasExited {
                 if ($script:fault -eq 'record-has-exited') { throw [InvalidOperationException]::new('cleanup-record-has-exited') }
                 if ($script:fault -in @('record-has-null', 'record-has-null-kill', 'record-has-null-app-close', 'record-has-null-dispose')) { return $null }
@@ -187,9 +197,30 @@ try {
         if ($fault -in @('has-exited-late', 'has-null-late', 'has-invalid-late', 'post-refresh-running')) {
             if (!$script:closeReached -or $script:exitCodeReached) { throw 'Late completion did not guard exit code' }
         }
-        if ($fault -in @('none', 'record-healthy')) {
+        if ($fault -in @('none', 'record-healthy', 'record-already-closed')) {
             if ($null -eq $script:closeEvidence -or $script:closeEvidence.exited -isnot [bool] -or
                 !$script:closeEvidence.exited -or $script:closeEvidence.exitCode -ne 0) { throw 'Healthy completion evidence lost' }
+            if ($script:killCount -ne 0) { throw 'Healthy graceful close forced a kill' }
+        }
+        if ($fault -eq 'record-already-closed' -and ($script:recorderKillReached -or $script:recorderWaitReached)) {
+            throw 'Already closed recorder was stopped again'
+        }
+        if ($fault -in @('close-main', 'close-wait', 'has-null-close-main', 'has-null-close-wait', 'record-has-null-app-close')) {
+            if ($script:killCountAtDispose -ne 1 -or $script:killWaitCountAtDispose -ne 1 -or !$process.IsExited -or
+                $script:exitCodeReached -or $null -ne $script:closeEvidence) { throw 'Graceful failure lost independent forced stop before Dispose' }
+        }
+        if ($fault -in @('close-main-kill', 'close-main-kill-wait', 'close-wait-kill', 'close-wait-kill-wait')) {
+            $firstMessage = if ($fault.StartsWith('close-main-')) { 'cleanup-close-main' } else { 'cleanup-close-wait' }
+            $secondary = if ($fault.EndsWith('-kill-wait')) { 'cleanup-kill-wait' } else { 'cleanup-kill' }
+            if (!$injectPrimary -and (!$observed -or $observed.Exception.Message -notmatch [regex]::Escape($firstMessage))) {
+                throw 'Forced failure replaced first graceful error'
+            }
+            if (!@($script:warnings | Where-Object { $_ -match [regex]::Escape($secondary) }).Count -or
+                $script:killCountAtDispose -ne 1 -or $script:killWaitCountAtDispose -ne [int]($fault.EndsWith('-kill-wait')) -or
+                $script:exitCodeReached -or $null -ne $script:closeEvidence) { throw 'Forced stop failure retried or lost its warning' }
+        }
+        if ($fault -in @('kill', 'kill-wait', 'has-null-kill', 'has-null-kill-wait') -and $script:killCount -ne 1) {
+            throw 'An already attempted Kill was retried'
         }
         if ($compound) {
             if (!$injectPrimary -and (!$passed -or !$observed -or $observed.Exception.Message -notmatch 'bool HasExited')) {
@@ -237,18 +268,18 @@ try {
             } else {
                 if (!$script:closeReached -or $script:exitCodeReached) { throw 'Application double fault lost close or admitted exit code' }
                 if ($script:closeWaitReached -ne ($fault -ne 'has-null-close-main') -or
-                    $script:killReached -ne ($fault -in @('has-null-kill', 'has-null-kill-wait')) -or
-                    $script:killWaitReached -ne ($fault -eq 'has-null-kill-wait')) { throw 'Double fault invocation path changed' }
+                    !$script:killReached -or
+                    $script:killWaitReached -ne ($fault -ne 'has-null-kill')) { throw 'Double fault invocation path changed' }
             }
         }
         if ($injectPrimary) {
             if (!$observed -or $observed.Exception.Message -notmatch 'primary-system-preference') {
                 throw "Primary system error lost: before=$before fault=$fault"
             }
-            $expectedWarning = if ($fault -eq 'failure-evidence') { 'Не удалось записать первичную ошибку.' } elseif ($fault -notin @('none', 'forced-close', 'record-healthy')) { 'Очистка после ошибки не завершена.' } else { $null }
+            $expectedWarning = if ($fault -eq 'failure-evidence') { 'Не удалось записать первичную ошибку.' } elseif ($fault -notin @('none', 'forced-close', 'record-healthy', 'record-already-closed')) { 'Очистка после ошибки не завершена.' } else { $null }
             if ($expectedWarning -and !$script:warnings.Contains($expectedWarning)) { throw "Cleanup fault not observable: $fault" }
         } else {
-            $expectsFailure = $fault -notin @('none', 'failure-evidence', 'record-healthy')
+            $expectsFailure = $fault -notin @('none', 'failure-evidence', 'record-healthy', 'record-already-closed')
             if ([bool]$observed -ne $expectsFailure) { throw "Cleanup exit contract failed: before=$before fault=$fault" }
         }
         $cases++
@@ -261,11 +292,27 @@ try {
     [ClientAreaAnimation]::FailRead = $false
     [ClientAreaAnimation]::Writes = 0
     $script:fault = 'none'
+    $saved = @{ LAB_MOTION_PRESS_TRACE = 'previous-trace' }
+    $env:LAB_MOTION_PRESS_TRACE = 'current-trace'
+    $script:disposed = $false
+    $script:closeReached = $false
+    $script:killCount = 0
+    $script:killWaitCount = 0
+    $script:warnings.Clear()
     $primaryFailure = $null
     $passed = $false
     $recording = $null
     & $cleanup
-    if (![ClientAreaAnimation]::Current -or [ClientAreaAnimation]::Writes -ne 0) { throw 'Cleanup changed an unowned preference' }
+    if (![ClientAreaAnimation]::Current -or [ClientAreaAnimation]::Writes -ne 0 -or !$script:disposed -or
+        $env:LAB_MOTION_PRESS_TRACE -ne 'previous-trace' -or $script:closeReached -or $script:killCount -ne 0 -or $script:warnings.Count) {
+        throw 'Cleanup changed an unowned preference or stopped an already closed app'
+    }
+    $cases++
+    $process = $null
+    $script:disposed = $false
+    $script:recorderDisposed = $false
+    & $cleanup
+    if ($script:disposed -or $script:recorderDisposed -or [ClientAreaAnimation]::Writes -ne 0) { throw 'Cleanup invented an unowned process/preference' }
     $cases++
     # Здоровые типы сохраняют оба bool и ненулевой int без приведения.
     foreach ($value in @($false, $true)) {

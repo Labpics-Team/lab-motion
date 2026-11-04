@@ -302,10 +302,17 @@ try {
             try { $needsClose = !(Read-ProcessHasExited $process) }
             catch { $completionReadFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
             if ($needsClose) {
+                $forceStop = $false
                 try {
                     $null = $process.CloseMainWindow()
-                    if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
-                } catch { $stopFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+                    $forceStop = !$process.WaitForExit(5000)
+                } catch { $stopFailed = $true; $forceStop = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+                # Отказ graceful cleanup не отменяет одну отдельную попытку остановки.
+                if ($forceStop) {
+                    $forced = $true
+                    try { $process.Kill($true); $process.WaitForExit() }
+                    catch { $stopFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+                }
             }
             if (!$completionReadFailed -and !$stopFailed) {
                 $process.Refresh()

@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { verifyTrace, verifyCaptureWindow } from './assert-input.mjs';
 
+function normalizeSourceText(source) { return source.replace(/\r\n/g, '\n'); }
+function readSource(url) { return normalizeSourceText(readFileSync(url, 'utf8')); }
+
 // Это синтетические свидетели oracle, не результаты нативного ввода или отрисовки.
 function fixture() {
   const blocks = [];
@@ -130,7 +133,7 @@ test('system reduced motion требует local=true/system=false и откло
 });
 
 test('состояния различают настоящий PressPage guard и named mutant без systemAnimation', () => {
-  const source = readFileSync(new URL('../../examples/windows/PressPage.xaml.cs', import.meta.url), 'utf8');
+  const source = readSource(new URL('../../examples/windows/PressPage.xaml.cs', import.meta.url));
   const condition = source.match(/if \((!localAnimation \|\| !systemAnimation)\)/)?.[1];
   assert(condition, 'проверяется условие настоящего PressPage, а не копия правила');
   // Только проекция ветки C# над наблюдаемыми bool; это не нативный запуск страницы.
@@ -158,8 +161,7 @@ function processCleanupViolations(source) {
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
 
-test('post-start lifetime source contract retains cleanup, original error and the actual PowerShell witness', () => {
-  const source = readFileSync(new URL('./verify.ps1', import.meta.url), 'utf8');
+function assertProcessCleanupSource(source) {
   assert.deepEqual(processCleanupViolations(source), []);
   for (const [before, after, expected] of [
     ['$handle = $process.Handle', '$handle = $null', 'own handle validated before identity'],
@@ -174,10 +176,14 @@ test('post-start lifetime source contract retains cleanup, original error and th
     ['$env:LAB_MOTION_PROBE_OUTPUT = $previousOutput', '$null', 'environment restored finally'],
     ['process-cleanup.test.ps1', 'missing-process-test.ps1', 'real process witness wired'],
   ]) assert(processCleanupViolations(source.replace(before, after)).includes(expected), expected);
+}
+
+test('post-start lifetime source contract retains cleanup, original error and the actual PowerShell witness', () => {
+  assertProcessCleanupSource(readSource(new URL('./verify.ps1', import.meta.url)));
 });
 
 test('process witness retains getter faults, invalid identity and a non-effect .NET getter control', () => {
-  const source = readFileSync(new URL('./process-cleanup.test.ps1', import.meta.url), 'utf8');
+  const source = readSource(new URL('./process-cleanup.test.ps1', import.meta.url));
   for (const fault of ['handle', 'start-time', 'handle-null', 'handle-zero', 'start-time-null', 'start-time-invalid']) {
     assert(source.includes(`'${fault}'`), fault);
   }
@@ -264,8 +270,7 @@ function inputCleanupViolations(source) {
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
 
-test('input source captures primary before evidence and disposes across process boundaries', () => {
-  const source = readFileSync(new URL('./verify-input.ps1', import.meta.url), 'utf8');
+function assertInputCleanupSource(source) {
   assert.deepEqual(inputCleanupViolations(source), []);
   for (const [before, after, expected] of [
     ['$exited -isnot [bool]', '$false', 'completion bool validated before use'],
@@ -278,10 +283,14 @@ test('input source captures primary before evidence and disposes across process 
     ['if ($null -eq $primaryFailure) { throw $cleanupFailure }', 'throw $cleanupFailure', 'cleanup retains primary'],
     ["Write-Warning 'Очистка после ошибки не завершена.' -WarningAction Continue", '$null', 'fixed observable warning'],
   ]) assert(inputCleanupViolations(source.replaceAll(before, after)).includes(expected), expected);
+}
+
+test('input source captures primary before evidence and disposes across process boundaries', () => {
+  assertInputCleanupSource(readSource(new URL('./verify-input.ps1', import.meta.url)));
 });
 
 test('input witness preserves getter negatives, late reads and actual helper loading', () => {
-  const source = readFileSync(new URL('./cleanup.test.ps1', import.meta.url), 'utf8');
+  const source = readSource(new URL('./cleanup.test.ps1', import.meta.url));
   for (const fault of ['has-exited', 'has-null', 'has-invalid', 'has-exited-late', 'has-null-late', 'has-invalid-late',
     'exit-code', 'exit-code-null', 'exit-code-invalid', 'post-refresh-running', 'record-healthy',
     'record-has-exited', 'record-has-null', 'record-has-invalid', 'record-has-exited-late', 'record-has-null-late', 'record-has-invalid-late']) {
@@ -297,7 +306,7 @@ test('input witness preserves getter negatives, late reads and actual helper loa
 });
 
 test('input witness requires first completion error and observable secondary termination failures', () => {
-  const source = readFileSync(new URL('./cleanup.test.ps1', import.meta.url), 'utf8');
+  const source = readSource(new URL('./cleanup.test.ps1', import.meta.url));
   for (const fault of ['has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait', 'record-has-null-kill']) {
     assert(source.includes(`'${fault}'`), fault);
   }
@@ -319,8 +328,7 @@ function cleanupArbitrationViolations(source) {
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
 
-test('input cleanup retains the first error across Dispose, app cleanup and restoration', () => {
-  const source = readFileSync(new URL('./verify-input.ps1', import.meta.url), 'utf8');
+function assertCleanupArbitrationSource(source) {
   assert.deepEqual(cleanupArbitrationViolations(source), []);
   for (const [before, after, expected] of [
     ['$FirstFailure.Value = $Failure', '$null', 'typed first-error arbitration'],
@@ -330,7 +338,11 @@ test('input cleanup retains the first error across Dispose, app cleanup and rest
     ['$null -eq $primaryFailure -and $passed -and !$closed', '$passed -and !$closed', 'close outcome preserves input primary'],
     ['try { $process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }', '$process.Dispose()', 'both disposals arbitrated'],
   ]) assert(cleanupArbitrationViolations(source.replaceAll(before, after)).includes(expected), expected);
-  const witness = readFileSync(new URL('./cleanup.test.ps1', import.meta.url), 'utf8');
+}
+
+test('input cleanup retains the first error across Dispose, app cleanup and restoration', () => {
+  assertCleanupArbitrationSource(readSource(new URL('./verify-input.ps1', import.meta.url)));
+  const witness = readSource(new URL('./cleanup.test.ps1', import.meta.url));
   for (const fault of ['has-null-dispose', 'record-has-null-app-close', 'record-has-null-dispose', 'has-null-restore-read', 'has-null-restore-env']) {
     assert(witness.includes(`'${fault}'`), fault);
   }
@@ -338,6 +350,33 @@ test('input cleanup retains the first error across Dispose, app cleanup and rest
   assert(witness.includes("$saved['LAB_MOTION_INVALID=NAME']"));
   assert(witness.includes('!$passed -or !$observed'));
   assert(witness.includes('[object]::ReferenceEquals($first, $firstControl)'));
+});
+
+test('LF and in-memory Windows CRLF retain healthy source and the same mutation sensitivity', () => {
+  const processSource = readSource(new URL('./verify.ps1', import.meta.url));
+  const inputSource = readSource(new URL('./verify-input.ps1', import.meta.url));
+  for (const [source, check] of [[processSource, assertProcessCleanupSource], [inputSource, assertInputCleanupSource],
+    [inputSource, assertCleanupArbitrationSource]]) {
+    const windowsSource = source.replaceAll('\n', '\r\n');
+    assert.equal(normalizeSourceText(windowsSource), source);
+    check(normalizeSourceText(source));
+    check(normalizeSourceText(windowsSource));
+  }
+});
+
+test('input application has one independent forced-stop attempt after graceful failure', () => {
+  const source = readSource(new URL('./verify-input.ps1', import.meta.url));
+  const application = source.slice(source.lastIndexOf('if ($process) {'), source.lastIndexOf('try { $commands'));
+  assert(application.includes('$forceStop = !$process.WaitForExit(5000)'));
+  assert(application.includes('$stopFailed = $true; $forceStop = $true; Save-CleanupFailure'));
+  assert.match(application, /if \(\$forceStop\) \{\s+\$forced = \$true\s+try \{ \$process.Kill\(\$true\); \$process.WaitForExit\(\) \}/);
+  assert.equal((application.match(/\$process.Kill\(\$true\)/g) ?? []).length, 1);
+});
+
+test('unowned healthy cleanup resets the injected invalid environment map', () => {
+  const source = readSource(new URL('./cleanup.test.ps1', import.meta.url));
+  const control = source.slice(source.indexOf('# Без разрешённого изменения'), source.indexOf('# Здоровые типы'));
+  assert.match(control, /\$saved = @\{ LAB_MOTION_PRESS_TRACE = 'previous-trace' \}[\s\S]*& \$cleanup/);
 });
 
 test('повреждённый JSON даёт exit1 и отрицательный result.json', () => {
