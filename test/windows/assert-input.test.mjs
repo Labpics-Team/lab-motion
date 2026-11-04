@@ -11,13 +11,14 @@ import { verifyTrace, verifyCaptureWindow } from './assert-input.mjs';
 function fixture() {
   const blocks = [];
   let operation = 0;
-  for (const name of ['mouse-hold', 'mouse-interrupt', 'pointer-out', 'keyboard', 'disable-animation', 'reduced-motion']) {
+  for (const name of ['mouse-hold', 'mouse-interrupt', 'pointer-out', 'keyboard', 'disable-animation', 'reduced-motion', 'system-reduced-motion']) {
     const events = [];
     const add = (kind, data) => events.push({ kind, data });
     const input = event => add('input', name === 'keyboard' ? { event, device: 'Keyboard', key: 'Space' } : { event, device: 'Mouse', pointerId: 1 });
     const intent = (pressed, trigger = 'pressed', localAnimation = name !== 'reduced-motion') => {
       const id = ++operation;
-      add('intent', { operation: id, trigger, pressed, enabled: true, localAnimation, systemAnimation: true, target: Number(pressed) });
+      add('intent', { operation: id, trigger, pressed, enabled: true, localAnimation,
+        systemAnimation: name !== 'system-reduced-motion', target: Number(pressed) });
       return id;
     };
     const motion = (id, phase, position) => add('motion', { pageOperation: id, nativeOperation: id, phase, position, readbackPosition: position, nativeSeconds: events.length / 100 });
@@ -44,7 +45,7 @@ function fixture() {
     } else {
       input(name === 'keyboard' ? 'keyDown' : 'pointerPressed');
       const down = intent(true);
-      if (name === 'reduced-motion') snap(down, 1);
+      if (name.endsWith('reduced-motion')) snap(down, 1);
       else {
         motion(down, 'requested', 0);
         for (const value of [.2, .5, .8]) motion(down, 'value', value);
@@ -53,7 +54,7 @@ function fixture() {
       if (name === 'pointer-out') input('pointerExited');
       input(name === 'keyboard' ? 'keyUp' : 'pointerReleased');
       const up = intent(false);
-      if (name === 'reduced-motion') snap(up, 0);
+      if (name.endsWith('reduced-motion')) snap(up, 0);
       else {
         motion(up, 'requested', .8);
         if (name !== 'mouse-hold') add('completed', { operation: down, nativeOperation: down, end: 'Stopped', reason: 'replaced', isCurrent: false });
@@ -77,7 +78,7 @@ function verify(blocks) {
 
 test('полный синтетический witness допускается; pointer-out не навязывает порядок IsPressed/release', () => {
   const result = verify(fixture());
-  assert.equal(result.length, 6);
+  assert.equal(result.length, 7);
   assert.equal(result.find(r => r.name === 'pointer-out').unpressedBeforeRelease, false);
 });
 
@@ -109,6 +110,61 @@ test('reduced motion отклоняет настоящий запрос аним
   const id = blocks[5].events.find(e => e.kind === 'intent').data.operation;
   blocks[5].events.push({ kind: 'motion', data: { pageOperation: id, nativeOperation: id, phase: 'requested', position: 0, readbackPosition: 0, nativeSeconds: 0 } });
   assert.throws(() => verify(blocks), /анимация при отключённом/);
+});
+
+test('system reduced motion требует local=true/system=false и отклоняет игнорирование системного запрета', () => {
+  const healthy = fixture();
+  assert.equal(verify(healthy).find(result => result.name === 'system-reduced-motion').passed, true);
+  const id = healthy[6].events.find(event => event.kind === 'intent').data.operation;
+  healthy[6].events.push({ kind: 'motion', data: { pageOperation: id, nativeOperation: id,
+    phase: 'requested', position: 0, readbackPosition: 0, nativeSeconds: 0 } });
+  assert.throws(() => verify(healthy), /анимация при отключённом/);
+  for (const key of ['localAnimation', 'systemAnimation']) {
+    const wrongState = fixture();
+    wrongState[6].events.find(event => event.kind === 'intent').data[key] = key === 'systemAnimation';
+    assert.throws(() => verify(wrongState), /локальная.*системная/);
+  }
+});
+
+test('семь состояний различают настоящий PressPage guard и named mutant без systemAnimation', () => {
+  const source = readFileSync(new URL('../../examples/windows/PressPage.xaml.cs', import.meta.url), 'utf8');
+  const condition = source.match(/if \((!localAnimation \|\| !systemAnimation)\)/)?.[1];
+  assert(condition, 'проверяется условие настоящего PressPage, а не копия правила');
+  // Только проекция ветки C# над наблюдаемыми bool; это не нативный запуск страницы.
+  const branch = new Function('localAnimation', 'systemAnimation', `return ${condition}`);
+  const mutant = new Function('localAnimation', 'systemAnimation', 'return !localAnimation');
+  const intents = fixture().flatMap(block => block.events).filter(event => event.kind === 'intent');
+  assert(intents.every(event => branch(event.data.localAnimation, event.data.systemAnimation)
+    === (!event.data.localAnimation || !event.data.systemAnimation)));
+  const discriminators = intents.filter(event => branch(event.data.localAnimation, event.data.systemAnimation)
+    !== mutant(event.data.localAnimation, event.data.systemAnimation));
+  assert.equal(discriminators.length, 2);
+  assert(discriminators.every(event => event.data.localAnimation && !event.data.systemAnimation));
+});
+
+function processCleanupViolations(source) {
+  const cleanup = source.slice(source.lastIndexOf('} finally {'));
+  return [
+    ['own handle retained', !source.includes('$null = $process.Handle')],
+    ['own process disposal', !source.includes('$process.Dispose()')],
+    ['own process termination', !source.includes('$process.Kill()')],
+    ['original failure retained', !source.includes('$primaryFailure = $_')],
+    ['environment restored finally', !cleanup.includes('$env:LAB_MOTION_PROBE_OUTPUT = $previousOutput')],
+    ['real process witness wired', !source.includes("'process-cleanup.test.ps1'")],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('post-start lifetime source contract retains cleanup, original error and the actual PowerShell witness', () => {
+  const source = readFileSync(new URL('./verify.ps1', import.meta.url), 'utf8');
+  assert.deepEqual(processCleanupViolations(source), []);
+  for (const [before, after, expected] of [
+    ['$null = $process.Handle', '$null', 'own handle retained'],
+    ['$process.Dispose()', '$null', 'own process disposal'],
+    ['$process.Kill()', '$null', 'own process termination'],
+    ['$primaryFailure = $_', '$primaryFailure = $null', 'original failure retained'],
+    ['$env:LAB_MOTION_PROBE_OUTPUT = $previousOutput', '$null', 'environment restored finally'],
+    ['process-cleanup.test.ps1', 'missing-process-test.ps1', 'real process witness wired'],
+  ]) assert(processCleanupViolations(source.replace(before, after)).includes(expected), expected);
 });
 
 test('правильный SnapTo request с неверным положением не проходит', () => {

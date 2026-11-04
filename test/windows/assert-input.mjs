@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, join, relative, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const names = ['mouse-hold', 'mouse-interrupt', 'pointer-out', 'keyboard', 'disable-animation', 'reduced-motion'];
+const names = ['mouse-hold', 'mouse-interrupt', 'pointer-out', 'keyboard', 'disable-animation', 'reduced-motion', 'system-reduced-motion'];
 const require = (condition, message) => { if (!condition) throw new Error(message); };
 const near = (value, target) => Number.isFinite(value) && Math.abs(value - target) <= .001;
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -86,11 +86,16 @@ export function verifyTrace(events, scenarios) {
         require(released.sequence > pressed.sequence, `${name}: нарушен порядок указателя`);
       }
     }
-    if (name === 'reduced-motion') {
-      require(!down.data.localAnimation && !up.data.localAnimation, `${name}: локальная анимация осталась включена`);
+    if (name === 'reduced-motion' || name === 'system-reduced-motion') {
+      const local = name === 'system-reduced-motion';
+      require(down.data.localAnimation === local && up.data.localAnimation === local &&
+        down.data.systemAnimation === !local && up.data.systemAnimation === !local,
+      `${name}: локальная и системная настройки не различают причину запрета`);
       snap(down); snap(up);
       return { name, passed: true, observed: 'input-and-snap-readback' };
     }
+    require(down.data.localAnimation && up.data.localAnimation && down.data.systemAnimation && up.data.systemAnimation,
+      `${name}: animated-сценарий не подтвердил обе включённые настройки`);
     const final = ended(up);
     if (name === 'mouse-hold') {
       ended(down);

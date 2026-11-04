@@ -13,9 +13,10 @@ $outer = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automati
 $cleanup = [scriptblock]::Create($outer.Finally.Extent.Text.Substring(1, $outer.Finally.Extent.Text.Length - 2))
 
 # Выполняется настоящий finally, но процессы, настройки и запись подменены.
+foreach ($before in @($false, $true)) {
 foreach ($fault in @('none', 'commands', 'close', 'record')) {
-    [ClientAreaAnimation]::Current = $true
-    $animationBefore = $false
+    [ClientAreaAnimation]::Current = !$before
+    $animationBefore = $before
     $saved = @{}
     $passed = $false
     $evidence = [IO.Path]::GetTempPath()
@@ -40,8 +41,16 @@ foreach ($fault in @('none', 'commands', 'close', 'record')) {
     }
     $failed = $false
     try { & $cleanup } catch { $failed = $true }
-    if ([ClientAreaAnimation]::Current -or !$script:disposed -or $failed -ne ($fault -ne 'none')) {
-        throw "Cleanup contract failed: $fault"
+    if ([ClientAreaAnimation]::Current -ne $before -or !$script:disposed -or $failed -ne ($fault -ne 'none')) {
+        throw "Cleanup contract failed: before=$before fault=$fault"
     }
 }
-'cleanup: 4 PASS'
+}
+# Без разрешённого изменения null не должен превращаться в запись предпочтения.
+$animationBefore = $null
+[ClientAreaAnimation]::Current = $true
+$fault = 'none'
+$recording = $null
+& $cleanup
+if (![ClientAreaAnimation]::Current) { throw 'Cleanup changed an unowned preference' }
+'cleanup: 9 PASS'

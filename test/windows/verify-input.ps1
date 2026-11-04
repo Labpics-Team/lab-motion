@@ -110,6 +110,9 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
 }
 
 try {
+    if (!$ConfigureHostedAnimations) {
+        throw 'Полный набор ввода включает системный запрет: нужен -ConfigureHostedAnimations в одноразовой hosted-сессии GitHub.'
+    }
     # Подменная ClientAreaAnimation теста живёт в отдельном процессе.
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'cleanup.test.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Проверка восстановления после ошибки не прошла.' }
@@ -188,6 +191,30 @@ try {
     Scenario 'keyboard' @('send-keys', 'space', '--target', 'Press', '--via', 'send-input')
     Scenario 'disable-animation' @('send-keys', 'space', '--target', 'Animation', '--via', 'send-input') @('drag', 'Press', 'Press', '--hold-ms', '0')
     Scenario 'reduced-motion' @('drag', 'Press', 'Press', '--hold-ms', '200')
+    # Системный запрет должен работать при включённом локальном переключателе.
+    $beforePreference = @(Read-Trace)[-1].sequence
+    Invoke-Ui 'enable-local-animation' @('send-keys', 'space', '--target', 'Animation', '--via', 'send-input')
+    Wait-Rest $beforePreference
+    $localEnabled = @(Read-Trace | Where-Object kind -eq 'intent')[-1]
+    if (!$localEnabled.data.localAnimation -or !$localEnabled.data.systemAnimation) {
+        throw 'Повторное включение локальной анимации не подтверждено приложением.'
+    }
+    $beforePreference = @(Read-Trace)[-1].sequence
+    [ClientAreaAnimation]::Write($false)
+    @{ enabled = [ClientAreaAnimation]::Read() } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
+    Wait-Rest $beforePreference
+    $systemDisabled = @(Read-Trace | Where-Object kind -eq 'intent')[-1]
+    if ($systemDisabled.data.systemAnimation -or !$systemDisabled.data.localAnimation -or $systemDisabled.data.trigger -ne 'systemPreference') {
+        throw 'UISettings не подтвердил системный запрет при включённой локальной анимации.'
+    }
+    Scenario 'system-reduced-motion' @('drag', 'Press', 'Press', '--hold-ms', '200')
+    $beforePreference = @(Read-Trace)[-1].sequence
+    [ClientAreaAnimation]::Write($true)
+    Wait-Rest $beforePreference
+    $systemEnabled = @(Read-Trace | Where-Object kind -eq 'intent')[-1]
+    if (!$systemEnabled.data.systemAnimation -or !$systemEnabled.data.localAnimation) {
+        throw 'UISettings не подтвердил возврат обеих настроек для animated-состояния.'
+    }
     Invoke-Ui 'rest-after' @('screenshot', '--output', (Join-Path $evidence 'rest-after.png'))
     $scenarios | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'scenarios.json')
     & node (Join-Path $PSScriptRoot 'assert-input.mjs') $evidence

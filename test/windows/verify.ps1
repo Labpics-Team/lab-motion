@@ -6,6 +6,8 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
     throw 'Для проверки Composition нужна Windows.'
 }
 Get-Command dotnet -ErrorAction Stop | Out-Null
+& pwsh -NoProfile -File (Join-Path $PSScriptRoot 'process-cleanup.test.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'Проверка владения нативным процессом не прошла.' }
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $output) { throw 'Каталог результата уже существует.' }
 New-Item -ItemType Directory -Path $output | Out-Null
@@ -52,8 +54,12 @@ $exe = Join-Path $appOutput 'NativeWindow.exe'
 $tracePath = Join-Path $output 'trace.json'
 $previousOutput = $env:LAB_MOTION_PROBE_OUTPUT
 $env:LAB_MOTION_PROBE_OUTPUT = $tracePath
+$process = $null
+$primaryFailure = $null
 try {
     $process = Start-Process -FilePath $exe -WorkingDirectory $appOutput -WindowStyle Hidden -PassThru
+    # Удерживаем handle своего запуска до чтения необязательной identity.
+    $null = $process.Handle
     $started = $process.StartTime
     $identity = [ordered]@{
         pid = $process.Id
@@ -79,8 +85,28 @@ try {
     if (!$finished -or $identity.exitCode -ne 0 -or !$identity.traceExists) {
         throw 'Нативный процесс не подтвердил успешное завершение.'
     }
+} catch {
+    $primaryFailure = $_
+    throw
 } finally {
-    $env:LAB_MOTION_PROBE_OUTPUT = $previousOutput
+    try {
+        try {
+            if ($process) {
+                try {
+                    if (!$process.HasExited) {
+                        # Process владеет handle запуска; новый поиск по PID здесь не нужен.
+                        $process.Kill()
+                        $process.WaitForExit()
+                    }
+                } finally { $process.Dispose() }
+            }
+        } catch {
+            if ($null -eq $primaryFailure) { throw }
+            Write-Warning 'Cleanup нативного процесса не подтверждён; первичная ошибка сохранена.' -WarningAction Continue
+        }
+    } finally {
+        $env:LAB_MOTION_PROBE_OUTPUT = $previousOutput
+    }
 }
 
 $trace = Get-Content -LiteralPath $tracePath -Raw | ConvertFrom-Json
