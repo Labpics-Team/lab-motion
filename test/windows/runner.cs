@@ -49,5 +49,10 @@ var bindings = BindingTests.Run();
 passed &= bindings.All(result => result.Passed);
 var pans = PanTests.Run();
 passed &= pans.All(result => result.Passed);
-Console.WriteLine(JsonSerializer.Serialize(new { passed, results, bindings, pans }, new JsonSerializerOptions { WriteIndented = true }));
+var rawTrace = RawTraceTests.Run();
+passed &= rawTrace.All(result => result.Passed);
+var publicSurface = typeof(ScalarMotion).GetMembers(System.Reflection.BindingFlags.Public |
+    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.DeclaredOnly)
+    .Select(member => member.ToString()).OrderBy(member => member).ToArray();
+Console.WriteLine(JsonSerializer.Serialize(new { passed, results, bindings, pans, rawTrace, publicSurface }, new JsonSerializerOptions { WriteIndented = true }));
 return passed ? 0 : 1;

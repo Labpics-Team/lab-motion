@@ -48,6 +48,112 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     private readonly HashSet<ScalarBinding> bindings = [];
     private readonly HashSet<ScalarPan> inputs = [];
 
+    // Временный private trace для закреплённого Space-опыта. Удалить вместе с diagnostic pin
+    // после различающего hosted результата; это не публичная возможность продукта.
+    private RawTraceBuffer? rawTrace;
+    private enum RawKind { Values, Inertia, Idle, Interacting, Custom, Ignored }
+    private enum RawDisposition { Pending, Disposed, Input, Request, Mismatch, Unconditional }
+    private enum RawPhase { Idle, Inertia, Interacting, Custom, Unknown }
+    private readonly record struct RawVector(float? X, float? Y, float? Z)
+    {
+        internal static RawVector From(Vector3 value) => new(
+            float.IsFinite(value.X) ? value.X : null, float.IsFinite(value.Y) ? value.Y : null,
+            float.IsFinite(value.Z) ? value.Z : null);
+    }
+    private readonly record struct RawState(int? RequestId, MotionOrigin? RequestOrigin, long? RequestOperation,
+        int? ActiveRequest, long? ActiveOperation, bool Disposed, bool Interacting, RawPhase Phase);
+    private readonly record struct RawRecord(long Sequence, long Timestamp, int ThreadId, RawKind Kind,
+        RawState Before, int? IncomingRequestId = null, RawVector? Position = null, RawVector? Velocity = null,
+        RawDisposition Disposition = RawDisposition.Pending);
+    private readonly record struct RawCount(RawKind Kind, RawDisposition Disposition, long Count);
+    private readonly record struct RawTerminal(RawKind Kind, RawDisposition Disposition, RawRecord First, RawRecord Last);
+    private sealed record RawTraceSnapshot(int SchemaVersion, int ProcessId, long StartedTicks, long EndedTicks,
+        long Frequency, int OwnerThreadId, bool Stopped, long CallbackCount, long CompletedCount, long OtherThreadCount,
+        bool CountersComplete, bool RecordsTruncated, long DroppedRecords, RawState Initial,
+        RawRecord[] Records, RawCount[] Counts, RawTerminal[] Terminals);
+
+    private RawState RawPreState() => new(request?.Id, request?.Origin, request?.Operation, active?.Request, active?.Id,
+        disposed, interacting, phase switch { "idle" => RawPhase.Idle, "inertia" => RawPhase.Inertia,
+            "interacting" => RawPhase.Interacting, "custom" => RawPhase.Custom, _ => RawPhase.Unknown });
+    private void BeginRawTrace()
+    {
+        CheckAccess();
+        rawTrace = new(RawPreState());
+    }
+    private RawTraceSnapshot CaptureRawTrace(bool stop)
+    {
+        // Managed readback допустим и после Dispose: tracker и args здесь не читаются.
+        if (!dispatcher.HasThreadAccess) throw new InvalidOperationException("Trace читается на потоке владельца.");
+        return (rawTrace ?? throw new InvalidOperationException("Raw trace не включён.")).Snapshot(stop);
+    }
+
+    private sealed class RawTraceBuffer(RawState initial)
+    {
+        private const int FirstCapacity = 8, LastCapacity = 16, Dispositions = 6;
+        private readonly object gate = new();
+        private readonly long started = Stopwatch.GetTimestamp();
+        private readonly int ownerThread = Environment.CurrentManagedThreadId;
+        private readonly RawRecord?[] first = new RawRecord?[FirstCapacity];
+        private readonly RawRecord?[] last = new RawRecord?[LastCapacity];
+        private readonly long[] counts = new long[6 * Dispositions];
+        private readonly RawTerminal?[] terminals = new RawTerminal?[6 * Dispositions];
+        private long callbacks, completed, otherThreads;
+        private long? ended;
+
+        internal RawRecord Enter(ScalarMotion motion, RawKind kind)
+        {
+            lock (gate)
+            {
+                if (ended is not null) return default;
+                var row = new RawRecord(++callbacks, Stopwatch.GetTimestamp(), Environment.CurrentManagedThreadId, kind, motion.RawPreState());
+                if (row.ThreadId != ownerThread) otherThreads++;
+                counts[(int)kind * Dispositions]++;
+                if (row.Sequence <= FirstCapacity) first[(int)row.Sequence - 1] = row;
+                last[(int)((row.Sequence - 1) % LastCapacity)] = row;
+                return row;
+            }
+        }
+
+        internal void Complete(RawRecord row, RawDisposition disposition)
+        {
+            if (row.Sequence == 0) return;
+            lock (gate)
+            {
+                row = row with { Disposition = disposition };
+                counts[(int)row.Kind * Dispositions]--;
+                var index = (int)row.Kind * Dispositions + (int)disposition;
+                counts[index]++;
+                completed++;
+                if (row.Sequence <= FirstCapacity) first[(int)row.Sequence - 1] = row;
+                var slot = (int)((row.Sequence - 1) % LastCapacity);
+                if (last[slot]?.Sequence == row.Sequence) last[slot] = row;
+                if (row.Kind is RawKind.Idle or RawKind.Ignored)
+                {
+                    var previous = terminals[index];
+                    terminals[index] = new(row.Kind, disposition,
+                        previous is { } earliest && earliest.First.Sequence < row.Sequence ? earliest.First : row,
+                        previous is { } latest && latest.Last.Sequence > row.Sequence ? latest.Last : row);
+                }
+            }
+        }
+
+        internal RawTraceSnapshot Snapshot(bool stop)
+        {
+            lock (gate)
+            {
+                if (stop) ended ??= Stopwatch.GetTimestamp();
+                var records = first.Concat(last.Where(row => row?.Sequence > FirstCapacity))
+                    .Where(row => row.HasValue).Select(row => row!.Value).OrderBy(row => row.Sequence).ToArray();
+                return new(1, Environment.ProcessId, started, ended ?? Stopwatch.GetTimestamp(), Stopwatch.Frequency,
+                    ownerThread, ended is not null, callbacks, completed, otherThreads, callbacks == completed,
+                    callbacks > records.Length, callbacks - records.Length, initial, records,
+                    counts.Select((count, index) => new RawCount((RawKind)(index / Dispositions),
+                        (RawDisposition)(index % Dispositions), count)).ToArray(),
+                    terminals.Where(row => row.HasValue).Select(row => row!.Value).ToArray());
+            }
+        }
+    }
+
     public event Action<MotionObservation>? Observed;
     public float Position { get { CheckAccess(); return Coordinate(tracker.Position) / coordinateScale; } }
 
@@ -242,35 +348,57 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
 
     public void ValuesChanged(InteractionTracker sender, InteractionTrackerValuesChangedArgs args)
     {
-        if (disposed) return;
-        if (args.RequestId == 0 && interacting) Emit("value", new(0, MotionOrigin.Input), eventPosition: args.Position);
-        else if (args.RequestId == request?.Id) Emit("value", request, eventPosition: args.Position);
+        var trace = rawTrace;
+        var entry = trace?.Enter(this, RawKind.Values) ?? default;
+        if (disposed) { trace?.Complete(entry, RawDisposition.Disposed); return; }
+        if (entry.Sequence != 0) entry = entry with { IncomingRequestId = args.RequestId, Position = RawVector.From(args.Position) };
+        if (args.RequestId == 0 && interacting)
+        {
+            trace?.Complete(entry, RawDisposition.Input);
+            Emit("value", new(0, MotionOrigin.Input), eventPosition: args.Position);
+        }
+        else if (args.RequestId == request?.Id)
+        {
+            trace?.Complete(entry, RawDisposition.Request);
+            Emit("value", request, eventPosition: args.Position);
+        }
+        else trace?.Complete(entry, RawDisposition.Mismatch);
     }
     public void InertiaStateEntered(InteractionTracker sender, InteractionTrackerInertiaStateEnteredArgs args)
     {
-        if (disposed) return;
+        var trace = rawTrace;
+        var entry = trace?.Enter(this, RawKind.Inertia) ?? default;
+        if (disposed) { trace?.Complete(entry, RawDisposition.Disposed); return; }
+        if (entry.Sequence != 0) entry = entry with { IncomingRequestId = args.RequestId, Velocity = RawVector.From(args.PositionVelocityInPixelsPerSecond) };
         if (args.RequestId == 0 && interacting)
         {
+            trace?.Complete(entry, RawDisposition.Input);
             phase = "inertia";
             Emit(phase, new(0, MotionOrigin.Input), args.PositionVelocityInPixelsPerSecond);
             return;
         }
-        if (args.RequestId != request?.Id) return;
+        if (args.RequestId != request?.Id) { trace?.Complete(entry, RawDisposition.Mismatch); return; }
+        trace?.Complete(entry, RawDisposition.Request);
         phase = "inertia";
         interacting = false;
         Emit(phase, request, args.PositionVelocityInPixelsPerSecond);
     }
     public void IdleStateEntered(InteractionTracker sender, InteractionTrackerIdleStateEnteredArgs args)
     {
-        if (disposed) return;
+        var trace = rawTrace;
+        var entry = trace?.Enter(this, RawKind.Idle) ?? default;
+        if (disposed) { trace?.Complete(entry, RawDisposition.Disposed); return; }
+        if (entry.Sequence != 0) entry = entry with { IncomingRequestId = args.RequestId };
         if (args.RequestId == 0 && interacting)
         {
+            trace?.Complete(entry, RawDisposition.Input);
             phase = "idle";
             interacting = false;
             Emit(phase, new(0, MotionOrigin.Input), Vector3.Zero);
             return;
         }
-        if (args.RequestId != request?.Id) return;
+        if (args.RequestId != request?.Id) { trace?.Complete(entry, RawDisposition.Mismatch); return; }
+        trace?.Complete(entry, RawDisposition.Request);
         phase = "idle";
         interacting = false;
         var source = request;
@@ -280,7 +408,11 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     }
     public void InteractingStateEntered(InteractionTracker sender, InteractionTrackerInteractingStateEnteredArgs args)
     {
-        if (disposed) return;
+        var trace = rawTrace;
+        var entry = trace?.Enter(this, RawKind.Interacting) ?? default;
+        if (disposed) { trace?.Complete(entry, RawDisposition.Disposed); return; }
+        if (entry.Sequence != 0) entry = entry with { IncomingRequestId = args.RequestId };
+        trace?.Complete(entry, RawDisposition.Unconditional);
         phase = "interacting";
         interacting = true;
         Finish(MotionEnd.Stopped, "interaction");
@@ -289,14 +421,24 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     }
     public void CustomAnimationStateEntered(InteractionTracker sender, InteractionTrackerCustomAnimationStateEnteredArgs args)
     {
-        if (disposed || args.RequestId != request?.Id) return;
+        var trace = rawTrace;
+        var entry = trace?.Enter(this, RawKind.Custom) ?? default;
+        if (disposed) { trace?.Complete(entry, RawDisposition.Disposed); return; }
+        if (entry.Sequence != 0) entry = entry with { IncomingRequestId = args.RequestId };
+        if (args.RequestId != request?.Id) { trace?.Complete(entry, RawDisposition.Mismatch); return; }
+        trace?.Complete(entry, RawDisposition.Request);
         phase = "custom";
         interacting = false;
         Emit(phase, request);
     }
     public void RequestIgnored(InteractionTracker sender, InteractionTrackerRequestIgnoredArgs args)
     {
-        if (disposed || args.RequestId != request?.Id) return;
+        var trace = rawTrace;
+        var entry = trace?.Enter(this, RawKind.Ignored) ?? default;
+        if (disposed) { trace?.Complete(entry, RawDisposition.Disposed); return; }
+        if (entry.Sequence != 0) entry = entry with { IncomingRequestId = args.RequestId };
+        if (args.RequestId != request?.Id) { trace?.Complete(entry, RawDisposition.Mismatch); return; }
+        trace?.Complete(entry, RawDisposition.Request);
         var source = request;
         request = null;
         if (args.RequestId == active?.Request)

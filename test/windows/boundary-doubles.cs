@@ -96,7 +96,9 @@ namespace Microsoft.UI.Composition.Interactions
         public Compositor Compositor { get; private set; } = null!;
         public Vector3 MinPosition { get; set; }
         public Vector3 MaxPosition { get; set; }
-        public Vector3 Position { get; set; }
+        private Vector3 position;
+        public int PositionReads { get; private set; }
+        public Vector3 Position { get { PositionReads++; return position; } set => position = value; }
         public int LastRequest { get; private set; }
         public Vector3 LastAdditionalVelocity { get; private set; }
         public string? ConfiguredAxis { get; private set; }
@@ -143,18 +145,31 @@ namespace Microsoft.UI.Composition.Interactions
         public static InteractionTrackerInertiaMotion Create(Compositor compositor) => new();
         public void Dispose() { }
     }
-    public sealed class InteractionTrackerValuesChangedArgs
+    public abstract class CallbackArgs
     {
-        public int RequestId { get; init; }
-        public Vector3 Position { get; init; }
+        public int Reads { get; private set; }
+        public bool ThrowOnRead { get; init; }
+        protected T Read<T>(T value)
+        {
+            Reads++;
+            if (ThrowOnRead) throw new InvalidOperationException("Чтение освобождённого callback args.");
+            return value;
+        }
+        private int requestId;
+        public int RequestId { get => Read(requestId); init => requestId = value; }
     }
-    public sealed class InteractionTrackerInertiaStateEnteredArgs
+    public sealed class InteractionTrackerValuesChangedArgs : CallbackArgs
     {
-        public int RequestId { get; init; }
-        public Vector3 PositionVelocityInPixelsPerSecond { get; init; }
+        private Vector3 position;
+        public Vector3 Position { get => Read(position); init => position = value; }
     }
-    public sealed class InteractionTrackerIdleStateEnteredArgs { public int RequestId { get; init; } }
-    public sealed class InteractionTrackerInteractingStateEnteredArgs { }
-    public sealed class InteractionTrackerCustomAnimationStateEnteredArgs { public int RequestId { get; init; } }
-    public sealed class InteractionTrackerRequestIgnoredArgs { public int RequestId { get; init; } }
+    public sealed class InteractionTrackerInertiaStateEnteredArgs : CallbackArgs
+    {
+        private Vector3 velocity;
+        public Vector3 PositionVelocityInPixelsPerSecond { get => Read(velocity); init => velocity = value; }
+    }
+    public sealed class InteractionTrackerIdleStateEnteredArgs : CallbackArgs { }
+    public sealed class InteractionTrackerInteractingStateEnteredArgs : CallbackArgs { }
+    public sealed class InteractionTrackerCustomAnimationStateEnteredArgs : CallbackArgs { }
+    public sealed class InteractionTrackerRequestIgnoredArgs : CallbackArgs { }
 }
