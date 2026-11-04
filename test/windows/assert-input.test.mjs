@@ -392,6 +392,72 @@ function inputPhaseDiagnosticViolations(source) {
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
 
+function systemNotificationSourceViolations(source) {
+  const callback = source.slice(source.indexOf('private void SystemPreferenceChanged'), source.indexOf('private void Observe(MotionObservation'));
+  return [
+    ['no-trace callback unchanged', !/if \(trace is null\)\s*\{\s*DispatcherQueue.TryEnqueue\(\(\) => Update\("systemPreference"\)\);\s*return;\s*\}/.test(callback)],
+    ['genuine callback identity and receipt', !callback.includes('Interlocked.Increment(ref systemNotification)')
+      || !callback.includes('ObserveSystemNotification(notification, SystemNotificationPhase.Received)')],
+    ['actual enqueue result and delegate', !/var queued = DispatcherQueue.TryEnqueue\(\(\) =>\s*\{\s*ObserveSystemNotification\(notification, SystemNotificationPhase.Delegate\);\s*Update\("systemPreference"\);\s*\}\);/.test(callback)
+      || !callback.includes('ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true)')],
+    ['typed bounded diagnostic fields', !source.includes('enum SystemNotificationPhase { Received, Queued, Delegate }')
+      || !callback.includes('notification > 0 && notification <= 9007199254740991')
+      || !callback.includes('notification = validIdentity ? (long?)notification : null')
+      || !callback.includes('phase = phase.ToString()') || !callback.includes('diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0')],
+    ['diagnostic errors isolated and observable', !/catch\s*\{\s*Interlocked.Exchange\(ref notificationDiagnosticFailed, 1\);\s*\}/.test(callback.replace(/\/\/[^\n]*/g, ''))
+      || !callback.includes('if (flush) trace.Flush();')],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('настоящий callback сохраняет no-trace поведение, queue bool и ограниченные диагностические фазы', () => {
+  const source = readSource(new URL('../../examples/windows/PressPage.xaml.cs', import.meta.url));
+  assert.deepEqual(systemNotificationSourceViolations(source), []);
+  const callback = source.slice(source.indexOf('private void SystemPreferenceChanged'), source.indexOf('private void ObserveSystemNotification'));
+  const observation = source.slice(source.indexOf('private void ObserveSystemNotification'), source.indexOf('private void Observe(MotionObservation')).replace(/\/\/[^\n]*/g, '');
+  assert(!callback.includes('catch'), 'ошибка настоящего enqueue не перехватывается диагностикой');
+  assert(!/Press\.|Animation\.|motion\.|sender\.|args\.|AnimationsEnabled|State\./.test(observation), 'фоновая диагностика не читает XAML или preference getter');
+  assert.equal((observation.match(/trace\.Flush\(\)/g) ?? []).length, 1);
+  assert(!observation.includes('error.Message'));
+  for (const [before, after, name] of [
+    ['if (trace is null)', 'if (false)', 'no-trace callback unchanged'],
+    ['SystemNotificationPhase.Received)', 'SystemNotificationPhase.Queued)', 'genuine callback identity and receipt'],
+    ['var queued = DispatcherQueue.TryEnqueue', 'var queued = true; DispatcherQueue.TryEnqueue', 'actual enqueue result and delegate'],
+    ['SystemNotificationPhase.Delegate);', 'SystemNotificationPhase.Received);', 'actual enqueue result and delegate'],
+    ['notification <= 9007199254740991', 'true', 'typed bounded diagnostic fields'],
+    ['Interlocked.Exchange(ref notificationDiagnosticFailed, 1);', 'return;', 'diagnostic errors isolated and observable'],
+  ]) assert(systemNotificationSourceViolations(source.replaceAll(before, after)).includes(name), name);
+});
+
+test('callback/queue/delegate проецируются настоящим helper отдельно от systemPreference intent', () => {
+  const source = readSource(new URL('./verify-input.ps1', import.meta.url));
+  const projection = source.slice(source.indexOf('function Read-InputPhaseField'), source.indexOf('function Scenario'));
+  assert(projection.includes("'systemNotification'"), 'b13 отбрасывает receipt/queue/delegate целиком');
+  for (const [raw, phase] of [['Received', 'systemCallback'], ['Queued', 'systemQueued'], ['Delegate', 'systemDelegate']]) {
+    assert(projection.includes(`'${raw}' { $phase = '${phase}' }`));
+  }
+  for (const [field, type] of [['notification', 'number'], ['queued', 'bool'], ['diagnosticFailed', 'bool']]) {
+    assert(projection.includes(`Read-InputPhaseField $data '${field}' '${type}'`));
+  }
+  assert(projection.includes('schema = 2'));
+  const controls = readSource(new URL('./cleanup.test.ps1', import.meta.url));
+  for (const name of ['phase-notification-received-only-control', 'phase-notification-queue-rejected-control',
+    'phase-notification-accepted-control', 'phase-notification-delegate-before-result-control',
+    'phase-notification-diagnostic-failed-control', 'phase-notification-malformed-control', 'phase-notification-bounded-control']) {
+    assert(controls.includes(name), name);
+  }
+});
+
+test('notification диагностика не заменяет system preference или snap и не создаёт input GREEN', () => {
+  const healthy = fixture();
+  const system = healthy.find(block => block.name === 'system-disable-animation');
+  const notifications = ['Received', 'Queued', 'Delegate'].map(phase => ({ kind: 'systemNotification',
+    data: { phase, notification: 1, queued: phase === 'Queued' ? false : null, diagnosticFailed: true } }));
+  system.events.unshift(...notifications);
+  assert.equal(verify(healthy).find(result => result.name === 'system-disable-animation').passed, true);
+  system.events = system.events.filter(event => event.data.trigger !== 'systemPreference');
+  assert.throws(() => verify(healthy), /не наблюдалось выключение/);
+});
+
 test('отказ snap называет сценарий и сохраняет порядок фаз без нового чтения trace', () => {
   const source = readSource(new URL('./verify-input.ps1', import.meta.url));
   assert.deepEqual(inputPhaseDiagnosticViolations(source), []);

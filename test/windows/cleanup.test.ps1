@@ -393,6 +393,68 @@ try {
         $bounded.rows.Count -gt 12 -or $bounded.omitted -ne (100 - $bounded.rows.Count) -or
         $bounded.rows[0][0] -ne 1 -or $bounded.rows[-1][0] -ne 100) { throw 'phase-bounded-first-last-control' }
     $phaseCases += 3
+    # Новые фазы не выводятся из intent: receipt/queue/delegate — отдельные события.
+    $received = [pscustomobject]@{ sequence = 10; kind = 'systemNotification'; data = [pscustomobject]@{
+        notification = 7; phase = 'Received'; queued = $null; diagnosticFailed = $false } }
+    $queueResult = [pscustomobject]@{ sequence = 11; kind = 'systemNotification'; data = [pscustomobject]@{
+        notification = 7; phase = 'Queued'; queued = $false; diagnosticFailed = $false } }
+    $delegate = [pscustomobject]@{ sequence = 12; kind = 'systemNotification'; data = [pscustomobject]@{
+        notification = 7; phase = 'Delegate'; queued = $null; diagnosticFailed = $false } }
+    $summary = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($received) | ConvertFrom-Json
+    if ($summary.schema -ne 2 -or $summary.rows.Count -ne 1 -or $summary.rows[0][1] -cne 'systemCallback' -or
+        $summary.rows[0][10] -ne 7 -or $null -ne $summary.rows[0][11] -or $summary.rows[0][12] -cne $false) {
+        throw 'phase-notification-received-only-control'
+    }
+    $summary = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($received, $queueResult) | ConvertFrom-Json
+    if ($summary.rows.Count -ne 2 -or $summary.rows[1][1] -cne 'systemQueued' -or
+        $summary.rows[1][10] -ne 7 -or $summary.rows[1][11] -isnot [bool] -or $summary.rows[1][11] -cne $false -or
+        @($summary.rows | Where-Object { $_[1] -in @('systemDelegate', 'systemPreference', 'snapRequested') }).Count -ne 0) {
+        throw 'phase-notification-queue-rejected-control'
+    }
+    $queueResult.data.queued = $true
+    foreach ($delegateBeforeResult in @($false, $true)) {
+        $queueResult.sequence = if ($delegateBeforeResult) { 12 } else { 11 }
+        $delegate.sequence = if ($delegateBeforeResult) { 11 } else { 12 }
+        $notificationEvents = if ($delegateBeforeResult) { @($received, $delegate, $queueResult) } else { @($received, $queueResult, $delegate) }
+        $notificationEvents += $phaseEvents[3]
+        $summary = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events $notificationEvents | ConvertFrom-Json
+        $queueIndex = if ($delegateBeforeResult) { 2 } else { 1 }
+        $delegateIndex = if ($delegateBeforeResult) { 1 } else { 2 }
+        if ($summary.rows.Count -ne 4 -or $summary.rows[$queueIndex][1] -cne 'systemQueued' -or
+            $summary.rows[$queueIndex][11] -cne $true -or $summary.rows[$delegateIndex][1] -cne 'systemDelegate' -or
+            $summary.rows[$delegateIndex][10] -ne 7 -or $summary.rows[3][1] -cne 'systemPreference' -or
+            $summary.rows[3][6] -cne $false) {
+            if ($delegateBeforeResult) { throw 'phase-notification-delegate-before-result-control' }
+            throw 'phase-notification-accepted-control'
+        }
+    }
+    $queueResult.data.diagnosticFailed = $true
+    $summary = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($queueResult) | ConvertFrom-Json
+    if ($summary.rows.Count -ne 1 -or $summary.rows[0][12] -isnot [bool] -or $summary.rows[0][12] -cne $true) {
+        throw 'phase-notification-diagnostic-failed-control'
+    }
+    $notificationBad = @(
+        [pscustomobject]@{ sequence = 10; kind = 'systemNotification'; data = [pscustomobject]@{
+            phase = 'Queued'; notification = 9007199254740992L; queued = 'false'; diagnosticFailed = 'true'; arbitrary = 'secret' } },
+        [pscustomobject]@{ sequence = 11; kind = 'systemNotification'; data = [pscustomobject]@{
+            phase = '::error::secret'; notification = 1; queued = $true; diagnosticFailed = $false } }
+    )
+    $text = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events $notificationBad
+    $summary = $text | ConvertFrom-Json
+    if ($text -match 'secret|::error::|arbitrary' -or $summary.rows.Count -ne 1 -or
+        $null -ne $summary.rows[0][10] -or $null -ne $summary.rows[0][11] -or $null -ne $summary.rows[0][12]) {
+        throw 'phase-notification-malformed-control'
+    }
+    $notificationMany = @(1..100 | ForEach-Object {
+        [pscustomobject]@{ sequence = $_; kind = 'systemNotification'; data = [pscustomobject]@{
+            notification = 9007199254740991L; phase = 'Queued'; queued = $false; diagnosticFailed = $true } }
+    })
+    $text = Get-InputPhaseSummary -Name 'system-disable-animation' -After 0 -Events $notificationMany
+    $summary = $text | ConvertFrom-Json
+    if ($text.Length -gt 1800 -or [Text.Encoding]::UTF8.GetByteCount($text) -gt 1800 -or $summary.rows.Count -gt 12 -or
+        $summary.count -ne 100 -or $summary.omitted -ne (100 - $summary.rows.Count) -or
+        $summary.rows[0][0] -ne 1 -or $summary.rows[-1][0] -ne 100) { throw 'phase-notification-bounded-control' }
+    $phaseCases += 7
     $scenarioAst = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -eq 'Scenario' })[0]
     $failureAst = @($scenarioAst.FindAll({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and
         $node.Extent.Text.StartsWith('if (!$stopped.Count)') }, $true))[0]

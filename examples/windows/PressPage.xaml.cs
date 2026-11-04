@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
+using System.Threading;
 using Windows.UI.ViewManagement;
 
 namespace NativeWindow;
@@ -17,6 +18,9 @@ public sealed partial class PressPage : Page
     private long pressedToken;
     private long enabledToken;
     private long operation;
+    private long systemNotification;
+    private int notificationDiagnosticFailed;
+    private enum SystemNotificationPhase { Received, Queued, Delegate }
     private List<(RoutedEvent Event, Delegate Handler)>? inputHandlers;
 
     public PressPage()
@@ -50,7 +54,45 @@ public sealed partial class PressPage : Page
         => Update(property == ButtonBase.IsPressedProperty ? "pressed" : "enabled");
     private void PreferenceChanged(object sender, RoutedEventArgs args) => Update("localPreference");
     private void SystemPreferenceChanged(UISettings sender, UISettingsAnimationsEnabledChangedEventArgs args)
-        => DispatcherQueue.TryEnqueue(() => Update("systemPreference"));
+    {
+        if (trace is null)
+        {
+            DispatcherQueue.TryEnqueue(() => Update("systemPreference"));
+            return;
+        }
+        var notification = Interlocked.Increment(ref systemNotification);
+        ObserveSystemNotification(notification, SystemNotificationPhase.Received);
+        var queued = DispatcherQueue.TryEnqueue(() =>
+        {
+            ObserveSystemNotification(notification, SystemNotificationPhase.Delegate);
+            Update("systemPreference");
+        });
+        // Отказ очереди не имеет будущего Update/Flush; фиксируем также его bool.
+        ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true);
+    }
+
+    private void ObserveSystemNotification(long notification, SystemNotificationPhase phase, bool? queued = null, bool flush = false)
+    {
+        if (trace is null) return;
+        var validIdentity = notification > 0 && notification <= 9007199254740991;
+        if (!validIdentity) Interlocked.Exchange(ref notificationDiagnosticFailed, 1);
+        try
+        {
+            // Callback может быть фоновым: здесь нет чтения XAML или изменения motion.
+            trace.Add("systemNotification", new
+            {
+                notification = validIdentity ? (long?)notification : null,
+                phase = phase.ToString(), queued,
+                diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0,
+            });
+            if (flush) trace.Flush();
+        }
+        catch
+        {
+            // Следующая доступная запись покажет сбой; ошибка диагностики не заменяет callback.
+            Interlocked.Exchange(ref notificationDiagnosticFailed, 1);
+        }
+    }
 
     private void Observe(MotionObservation value)
     {

@@ -131,15 +131,30 @@ Animated-сценарии требуют обе включённые настр�
 Если shared guard не увидел `completed/snap`, первичная ошибка называет локальный
 или системный сценарий. В той же `failure.txt` она сохраняет последнюю уже
 прочитанную выборку: до 12 строк фаз после начала сценария, без нового чтения trace.
-`input-phase` schema1 содержит `after`, `count`, `omitted`, `invalid` и `rows`;
+`input-phase` schema2 содержит `after`, `count`, `omitted`, `invalid` и `rows`;
 поля строки — sequence, phase, operation, nativeOperation, pressed, localAnimation,
-systemAnimation, reason, end, isCurrent. Сохраняются только фиксированные
+systemAnimation, reason, end, isCurrent, notification, queued, diagnosticFailed.
+Фазы `systemCallback`, `systemQueued`, `systemDelegate` отдельно показывают вход в
+настоящий `UISettings` callback, возвращённый `TryEnqueue` bool и начало делегата.
+`notification` связывает только эти три записи; последующий `systemPreference`
+intent по-прежнему содержит прочитанный приложением systemAnimation. Порядок
+делегата и записи queue-result может различаться; соседство с intent не является
+атомарной связью callback→intent. Сохраняются только фиксированные
 перечисления, bool и неотрицательные целые; отсутствующее или неверное поле даёт
 null. JSON ограничен 1800 ASCII-символами, пропуски отмечены явно. При `omitted>0`
 отсутствие фазы в summary не доказывает её отсутствия в trace. Это диагностика
 порядка release/preference/request/completion/snap, без изменения oracle или
 сроков. Отказ проекции не заменяет первичную ошибку. Полные trace, CLI arguments,
 stdout и пользовательское содержимое в summary не попадают.
+В режиме trace callback делает один Flush после enqueue: иначе отказ очереди не
+имел бы будущего Update, способного записать receipt и false. Этот дополнительный
+lock/IO может изменить расписание и не доказывает причину исчезнувшего отказа.
+Диагностика не читает XAML из фонового callback и не перехватывает ошибки самого
+enqueue или Update. Ошибка Add/Flush сохраняется в sticky `diagnosticFailed` для
+следующей доступной диагностической записи; false означает лишь отсутствие ранее
+замеченной ошибки. Если следующих записей или рабочего транспорта нет, результат
+диагностики неизвестен. Эти события не дают input GREEN и не являются новым gate.
+Без trace callback сохраняет прежний путь enqueue→Update.
 Флаг `-ConfigureHostedAnimations` доступен только в одноразовой GitHub-hosted
 сессии: он включает и временно отключает client-area animation через `SystemParametersInfo`,
 проверяет системный readback и события `UISettings`, затем восстанавливает прежнее значение

@@ -158,21 +158,32 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events) {
             'completed' { $phase = 'completed' }
             'snapRequested' { $phase = 'snapRequested' }
             'snapReadback' { $phase = 'snapReadback' }
+            'systemNotification' {
+                $phaseProperty = if ($null -ne $data) { $data.PSObject.Properties['phase'] } else { $null }
+                if ($null -ne $phaseProperty) {
+                    switch -CaseSensitive ($phaseProperty.Value) {
+                        'Received' { $phase = 'systemCallback' }
+                        'Queued' { $phase = 'systemQueued' }
+                        'Delegate' { $phase = 'systemDelegate' }
+                    }
+                }
+            }
         }
         if ($null -eq $phase) { continue }
         $operationField = if ($phase -eq 'requested') { 'pageOperation' } else { 'operation' }
-        # Строка schema1: sequence,phase,operation,nativeOperation,pressed,local,system,reason,end,isCurrent.
+        # Строка schema2: прежние десять полей, затем notification,queued,diagnosticFailed.
         $rows.Add(@($sequence, $phase, (Read-InputPhaseField $data $operationField 'number'),
             (Read-InputPhaseField $data 'nativeOperation' 'number'), (Read-InputPhaseField $data 'pressed' 'bool'),
             (Read-InputPhaseField $data 'localAnimation' 'bool'), (Read-InputPhaseField $data 'systemAnimation' 'bool'),
             (Read-InputPhaseField $data 'reason' 'reason'), (Read-InputPhaseField $data 'end' 'end'),
-            (Read-InputPhaseField $data 'isCurrent' 'bool')))
+            (Read-InputPhaseField $data 'isCurrent' 'bool'), (Read-InputPhaseField $data 'notification' 'number'),
+            (Read-InputPhaseField $data 'queued' 'bool'), (Read-InputPhaseField $data 'diagnosticFailed' 'bool')))
     }
     $count = $rows.Count
     # Сохраняем начало и конец в исходном порядке; пропуск явно учитывается, не означает отсутствия фазы.
     while ($rows.Count -gt 12) { $rows.RemoveAt([int][Math]::Floor($rows.Count / 2)) }
     do {
-        $summary = [ordered]@{ schema = 1; scenario = $scenario; after = $After; count = $count;
+        $summary = [ordered]@{ schema = 2; scenario = $scenario; after = $After; count = $count;
             omitted = $count - $rows.Count; invalid = $invalid; rows = @($rows.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
         if ($summary.Length -le 1800) { return $summary }
         $rows.RemoveAt([int][Math]::Floor($rows.Count / 2))
