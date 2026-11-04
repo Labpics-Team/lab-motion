@@ -18,6 +18,7 @@ foreach ($name in @('LAB_MOTION_PROBE_OUTPUT', 'LAB_MOTION_PRESS_TRACE', 'WINAPP
 $process = $null
 $recording = $null
 $passed = $false
+$primaryFailure = $null
 $animationBefore = $null
 $commands = [Collections.Generic.List[object]]::new()
 $scenarios = [Collections.Generic.List[object]]::new()
@@ -95,8 +96,31 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
     $before = @(Read-Trace)[-1].sequence
     if ($BeforeArguments.Count) { Invoke-Ui "$Name-press" $BeforeArguments }
     Invoke-Ui $Name $Arguments
+    if ($Name -eq 'system-disable-animation') {
+        $deadline = [DateTime]::UtcNow.AddSeconds(8)
+        $active = $false
+        do {
+            $events = @(Read-Trace)
+            if (@($events | Where-Object { $_.kind -in @('error', 'truncated') }).Count) { throw 'Трасса ввода содержит ошибку или обрезана.' }
+            $released = @($events | Where-Object { $_.sequence -gt $before -and $_.kind -eq 'intent' -and
+                $_.data.trigger -eq 'pressed' -and !$_.data.pressed -and $_.data.localAnimation -and $_.data.systemAnimation })
+            if ($released.Count) {
+                $operation = $released[-1].data.operation
+                $requested = @($events | Where-Object { $_.kind -eq 'motion' -and $_.data.pageOperation -eq $operation -and $_.data.phase -eq 'requested' })
+                $completed = @($events | Where-Object { $_.kind -eq 'completed' -and $_.data.operation -eq $operation })
+                if ($completed.Count) { throw 'Операция завершилась до системного запрета.' }
+                if ($requested.Count) { $active = $true; break }
+            }
+            Start-Sleep -Milliseconds 50
+        } while ([DateTime]::UtcNow -lt $deadline)
+        if (!$active) { throw 'Нет незавершённой операции перед системным запретом.' }
+        # Значения кадра буферизуются; oracle после Flush проверит движение до события.
+        # Между незавершённым request и Write нет ожидания покоя.
+        [ClientAreaAnimation]::Write($false)
+        @{ enabled = [ClientAreaAnimation]::Read() } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
+    }
     Wait-Rest $before
-    if ($Name -eq 'disable-animation') {
+    if ($Name -in @('disable-animation', 'system-disable-animation')) {
         $deadline = [DateTime]::UtcNow.AddSeconds(8)
         do {
             $stopped = @(Read-Trace | Where-Object { $_.sequence -gt $before -and $_.kind -eq 'completed' -and $_.data.reason -eq 'snap' })
@@ -199,10 +223,7 @@ try {
     if (!$localEnabled.data.localAnimation -or !$localEnabled.data.systemAnimation) {
         throw 'Повторное включение локальной анимации не подтверждено приложением.'
     }
-    $beforePreference = @(Read-Trace)[-1].sequence
-    [ClientAreaAnimation]::Write($false)
-    @{ enabled = [ClientAreaAnimation]::Read() } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
-    Wait-Rest $beforePreference
+    Scenario 'system-disable-animation' @('drag', 'Press', 'Press', '--hold-ms', '0')
     $systemDisabled = @(Read-Trace | Where-Object kind -eq 'intent')[-1]
     if ($systemDisabled.data.systemAnimation -or !$systemDisabled.data.localAnimation -or $systemDisabled.data.trigger -ne 'systemPreference') {
         throw 'UISettings не подтвердил системный запрет при включённой локальной анимации.'
@@ -212,51 +233,61 @@ try {
     [ClientAreaAnimation]::Write($true)
     Wait-Rest $beforePreference
     $systemEnabled = @(Read-Trace | Where-Object kind -eq 'intent')[-1]
-    if (!$systemEnabled.data.systemAnimation -or !$systemEnabled.data.localAnimation) {
+    if (!$systemEnabled.data.systemAnimation -or !$systemEnabled.data.localAnimation -or $systemEnabled.data.trigger -ne 'systemPreference') {
         throw 'UISettings не подтвердил возврат обеих настроек для animated-состояния.'
     }
+    Scenario 'system-restored-motion' @('drag', 'Press', 'Press', '--hold-ms', '200')
     Invoke-Ui 'rest-after' @('screenshot', '--output', (Join-Path $evidence 'rest-after.png'))
     $scenarios | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'scenarios.json')
     & node (Join-Path $PSScriptRoot 'assert-input.mjs') $evidence
     if ($LASTEXITCODE -ne 0) { throw 'Проверка трассы ввода не прошла.' }
     $passed = $true
 } catch {
-    $_ | Out-String | Set-Content (Join-Path $evidence 'failure.txt')
-    throw
+    $primaryFailure = $_
+    try { $primaryFailure | Out-String | Set-Content (Join-Path $evidence 'failure.txt') }
+    catch { Write-Warning 'Не удалось записать первичную ошибку.' -WarningAction Continue }
+    throw $primaryFailure
 } finally {
     $closed = $false
     try {
         try {
-            if ($recording -and !$recording.ended) {
-                if (!$recording.process.HasExited) { $recording.process.Kill($true); $recording.process.WaitForExit() }
-                $remaining = if ($recording.stderr) { $recording.stderr.GetAwaiter().GetResult() } else { '' }
-                [IO.File]::WriteAllText((Join-Path $evidence 'record.stderr.log'), $recording.prefix + $remaining)
-            }
-        } finally {
-            if ($process) {
-                $forced = $false
-                if (!$process.HasExited) {
-                    $null = $process.CloseMainWindow()
-                    if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
+            try {
+                if ($recording -and !$recording.ended) {
+                    try {
+                        if (!$recording.process.HasExited) { $recording.process.Kill($true); $recording.process.WaitForExit() }
+                        $remaining = if ($recording.stderr) { $recording.stderr.GetAwaiter().GetResult() } else { '' }
+                        [IO.File]::WriteAllText((Join-Path $evidence 'record.stderr.log'), $recording.prefix + $remaining)
+                    } finally { $recording.process.Dispose() }
                 }
-                $process.Refresh()
-                $closed = !$forced -and $process.HasExited -and $process.ExitCode -eq 0
-                try {
-                    @{ exited = $process.HasExited; forced = $forced; exitCode = $process.ExitCode } | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
-                } finally { $process.Dispose() }
+            } finally {
+                if ($process) {
+                    try {
+                        $forced = $false
+                        if (!$process.HasExited) {
+                            $null = $process.CloseMainWindow()
+                            if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
+                        }
+                        $process.Refresh()
+                        $closed = !$forced -and $process.HasExited -and $process.ExitCode -eq 0
+                        @{ exited = $process.HasExited; forced = $forced; exitCode = $process.ExitCode } | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
+                    } finally { $process.Dispose() }
+                }
             }
-        }
-        $commands | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'commands.json')
-    } finally {
-        try {
-            foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+            $commands | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'commands.json')
         } finally {
-            if ($null -ne $animationBefore) {
-                [ClientAreaAnimation]::Write($animationBefore)
-                @{ expected = $animationBefore; actual = [ClientAreaAnimation]::Read() } |
-                    ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-restored.json')
+            try {
+                foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+            } finally {
+                if ($null -ne $animationBefore) {
+                    [ClientAreaAnimation]::Write($animationBefore)
+                    @{ expected = $animationBefore; actual = [ClientAreaAnimation]::Read() } |
+                        ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-restored.json')
+                }
             }
         }
+    } catch {
+        if ($null -eq $primaryFailure) { throw }
+        Write-Warning 'Очистка после ошибки не завершена.' -WarningAction Continue
     }
     if ($passed -and !$closed) { throw 'Приложение не подтвердило штатное завершение.' }
 }

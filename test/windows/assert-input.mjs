@@ -2,7 +2,7 @@ import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve, join, relative, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const names = ['mouse-hold', 'mouse-interrupt', 'pointer-out', 'keyboard', 'disable-animation', 'reduced-motion', 'system-reduced-motion'];
+const names = ['mouse-hold', 'mouse-interrupt', 'pointer-out', 'keyboard', 'disable-animation', 'reduced-motion', 'system-disable-animation', 'system-reduced-motion', 'system-restored-motion'];
 const require = (condition, message) => { if (!condition) throw new Error(message); };
 const near = (value, target) => Number.isFinite(value) && Math.abs(value - target) <= .001;
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -31,6 +31,9 @@ export function verifyTrace(events, scenarios) {
   ordered.forEach((scenario, index) => require(Number.isSafeInteger(scenario.after) && Number.isSafeInteger(scenario.through) &&
     scenario.after >= 0 && scenario.through > scenario.after && scenario.through <= events.length &&
     (index === 0 || scenario.after >= ordered[index - 1].through), 'Нарушены границы сценария.'));
+  require(scenarios.find(s => s.name === 'system-reduced-motion').after >= scenarios.find(s => s.name === 'system-disable-animation').through &&
+    scenarios.find(s => s.name === 'system-restored-motion').after >= scenarios.find(s => s.name === 'system-reduced-motion').through,
+  'Нарушен порядок системного отключения, ввода и восстановления.');
 
   return names.map(name => {
     const { after, through } = scenarios.find(s => s.name === name);
@@ -54,23 +57,36 @@ export function verifyTrace(events, scenarios) {
       need('snapReadback', d => d.operation === intent.data.operation && d.target === intent.data.target && near(d.position, intent.data.target), 'нет readback у цели SnapTo');
       require(select('motion', d => d.pageOperation === intent.data.operation && d.phase === 'requested').length === 0, `${name}: анимация при отключённом движении`);
     };
-    if (name === 'disable-animation') {
+    if (name === 'disable-animation' || name === 'system-disable-animation') {
+      const system = name === 'system-disable-animation';
       const pressed = input('pointerPressed', 'Mouse', d => Number.isSafeInteger(d.pointerId));
       const released = input('pointerReleased', 'Mouse', d => d.pointerId === pressed.data.pointerId);
       require(released.sequence > pressed.sequence, `${name}: нарушен порядок указателя`);
-      const preference = need('intent', d => d.trigger === 'localPreference' && d.localAnimation === false && d.pressed === false,
-        'не наблюдалось выключение локальной анимации');
-      const down = need('intent', d => d.trigger === 'pressed' && d.pressed === true && d.localAnimation === true, 'нет предшествующего нажатия');
-      const up = select('intent', d => d.trigger === 'pressed' && d.pressed === false && d.localAnimation === true)
+      const preference = need('intent', d => d.trigger === (system ? 'systemPreference' : 'localPreference') &&
+        d.localAnimation === system && d.systemAnimation === !system && d.pressed === false,
+        `не наблюдалось выключение ${system ? 'системной' : 'локальной'} анимации`);
+      const down = need('intent', d => d.trigger === 'pressed' && d.pressed === true && d.localAnimation && d.systemAnimation, 'нет предшествующего нажатия');
+      const up = select('intent', d => d.trigger === 'pressed' && d.pressed === false && d.localAnimation && d.systemAnimation)
         .find(e => e.sequence > down.sequence && e.sequence < preference.sequence);
       require(up, `${name}: нет отпускания перед сменой предпочтения`);
-      need('motion', d => d.pageOperation === up.data.operation && d.phase === 'requested', 'нет движения отпускания');
+      require(select('motion', d => d.pageOperation === up.data.operation && d.phase === 'requested')
+        .some(e => e.sequence > up.sequence && e.sequence < preference.sequence), `${name}: нет движения отпускания`);
       require(select('motion', d => d.pageOperation === up.data.operation && d.phase === 'value' && d.position > 0 && d.position < 1)
         .some(e => e.sequence < preference.sequence), `${name}: отпускание не двигалось до смены предпочтения`);
       snap(preference);
       const interrupted = need('completed', d => d.operation === up.data.operation && d.end === 'Stopped' && d.reason === 'snap', 'смена предпочтения не прервала движение');
       require(interrupted.sequence > preference.sequence, `${name}: прерывание предшествует смене предпочтения`);
-      return { name, passed: true, observed: 'mid-flight-localPreference', checkboxKeyRouting: 'not-observed' };
+      if (system) {
+        require(!select('completed', d => d.operation === up.data.operation).some(e => e.sequence < preference.sequence),
+          `${name}: операция завершилась до системного запрета`);
+        require(interrupted.data.isCurrent === false, `${name}: прерванная операция осталась актуальной`);
+        const offThrough = scenarios.find(s => s.name === 'system-reduced-motion').through;
+        require(!events.some(e => e.kind === 'motion' && e.sequence > preference.sequence && e.sequence <= offThrough &&
+          e.data.pageOperation >= up.data.operation && ['requested', 'value'].includes(e.data.phase)),
+        `${name}: движение после системного запрета`);
+      }
+      return { name, passed: true, observed: `mid-flight-${system ? 'systemPreference' : 'localPreference'}`,
+        ...(system ? {} : { checkboxKeyRouting: 'not-observed' }) };
     }
     const down = need('intent', d => d.trigger === 'pressed' && d.pressed === true && d.enabled === true, 'нет состояния нажатия');
     const up = select('intent', d => d.trigger === 'pressed' && d.pressed === false).find(e => e.sequence > down.sequence);
@@ -97,6 +113,10 @@ export function verifyTrace(events, scenarios) {
     require(down.data.localAnimation && up.data.localAnimation && down.data.systemAnimation && up.data.systemAnimation,
       `${name}: animated-сценарий не подтвердил обе включённые настройки`);
     const final = ended(up);
+    if (name === 'system-restored-motion') {
+      require(select('motion', d => d.pageOperation === up.data.operation && d.phase === 'value' && d.position > 0 && d.position < 1)
+        .some(e => e.sequence > up.sequence && e.sequence < final.sequence), `${name}: восстановленное движение не наблюдалось`);
+    }
     if (name === 'mouse-hold') {
       ended(down);
       const intermediate = new Set(select('motion', d => d.pageOperation === down.data.operation && d.phase === 'value' && d.position > 0 && d.position < 1).map(e => e.data.position));
