@@ -47,7 +47,8 @@ try {
         'has-null', 'has-invalid', 'has-exited-late', 'has-null-late', 'has-invalid-late',
         'exit-code', 'exit-code-null', 'exit-code-invalid', 'post-refresh-running',
         'record-healthy', 'record-has-exited', 'record-has-null', 'record-has-invalid',
-        'record-has-exited-late', 'record-has-null-late', 'record-has-invalid-late')) {
+        'record-has-exited-late', 'record-has-null-late', 'record-has-invalid-late',
+        'has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait', 'record-has-null-kill')) {
         $script:fault = $fault
         [ClientAreaAnimation]::Current = !$before
         [ClientAreaAnimation]::FailRead = $fault -eq 'restore-read'
@@ -62,6 +63,8 @@ try {
         $script:recorderDisposed = $false
         $script:closeReached = $false
         $script:closeWaitReached = $false
+        $script:killReached = $false
+        $script:killWaitReached = $false
         $script:recorderKillReached = $false
         $script:recorderWaitReached = $false
         $script:exitCodeReached = $false
@@ -70,7 +73,7 @@ try {
         $process = [pscustomobject]@{ IsExited = $false; Refreshed = $false }
         $process | Add-Member ScriptProperty HasExited {
             if ($script:fault -eq 'has-exited') { throw [InvalidOperationException]::new('cleanup-has-exited') }
-            if ($script:fault -eq 'has-null') { return $null }
+            if ($script:fault -in @('has-null', 'has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait')) { return $null }
             if ($script:fault -eq 'has-invalid') { return 'false' }
             if ($this.Refreshed) {
                 if ($script:fault -eq 'has-exited-late') { throw [InvalidOperationException]::new('cleanup-has-exited-late') }
@@ -89,22 +92,26 @@ try {
         }
         $process | Add-Member ScriptMethod CloseMainWindow {
             $script:closeReached = $true
-            if ($script:fault -eq 'close-main') { throw [InvalidOperationException]::new('cleanup-close-main') }
+            if ($script:fault -in @('close-main', 'has-null-close-main')) { throw [InvalidOperationException]::new('cleanup-close-main') }
             return $true
         }
         $process | Add-Member ScriptMethod WaitForExit {
             param([int]$Timeout = 0)
             if ($Timeout -eq 5000) {
                 $script:closeWaitReached = $true
-                if ($script:fault -eq 'close-wait') { throw [InvalidOperationException]::new('cleanup-close-wait') }
-                if ($script:fault -in @('kill', 'kill-wait', 'forced-close')) { return $false }
-            } elseif ($script:fault -eq 'kill-wait') { throw [InvalidOperationException]::new('cleanup-kill-wait') }
+                if ($script:fault -in @('close-wait', 'has-null-close-wait')) { throw [InvalidOperationException]::new('cleanup-close-wait') }
+                if ($script:fault -in @('kill', 'kill-wait', 'forced-close', 'has-null-kill', 'has-null-kill-wait')) { return $false }
+            } else {
+                $script:killWaitReached = $true
+                if ($script:fault -in @('kill-wait', 'has-null-kill-wait')) { throw [InvalidOperationException]::new('cleanup-kill-wait') }
+            }
             $this.IsExited = $true
             return $true
         }
         $process | Add-Member ScriptMethod Kill {
             param([bool]$EntireProcessTree)
-            if ($script:fault -eq 'kill') { throw [IO.IOException]::new('cleanup-kill') }
+            $script:killReached = $true
+            if ($script:fault -in @('kill', 'has-null-kill')) { throw [IO.IOException]::new('cleanup-kill') }
             $this.IsExited = $true
         }
         $process | Add-Member ScriptMethod Refresh {
@@ -120,7 +127,7 @@ try {
             $recorder = [pscustomobject]@{ IsExited = $false }
             $recorder | Add-Member ScriptProperty HasExited {
                 if ($script:fault -eq 'record-has-exited') { throw [InvalidOperationException]::new('cleanup-record-has-exited') }
-                if ($script:fault -eq 'record-has-null') { return $null }
+                if ($script:fault -in @('record-has-null', 'record-has-null-kill')) { return $null }
                 if ($script:fault -eq 'record-has-invalid') { return 'false' }
                 if ($this.IsExited) {
                     if ($script:fault -eq 'record-has-exited-late') { throw [InvalidOperationException]::new('cleanup-record-has-exited-late') }
@@ -131,7 +138,7 @@ try {
             }
             $recorder | Add-Member ScriptMethod Kill {
                 $script:recorderKillReached = $true
-                if ($script:fault -eq 'record') { throw [IO.IOException]::new('cleanup-recorder') }
+                if ($script:fault -in @('record', 'record-has-null-kill')) { throw [IO.IOException]::new('cleanup-recorder') }
                 $this.IsExited = $true
             }
             $recorder | Add-Member ScriptMethod WaitForExit { $script:recorderWaitReached = $true }
@@ -176,6 +183,37 @@ try {
         if ($fault -in @('none', 'record-healthy')) {
             if ($null -eq $script:closeEvidence -or $script:closeEvidence.exited -isnot [bool] -or
                 !$script:closeEvidence.exited -or $script:closeEvidence.exitCode -ne 0) { throw 'Healthy completion evidence lost' }
+        }
+        if (!$injectPrimary -and $fault -in @('close-main', 'close-wait', 'kill', 'kill-wait', 'record')) {
+            $terminationMessage = if ($fault -eq 'record') { 'cleanup-recorder' } else { 'cleanup-' + $fault }
+            if (!$observed -or $observed.Exception.Message -notmatch [regex]::Escape($terminationMessage) -or $script:warnings.Count) {
+                throw "Standalone termination error changed: $fault"
+            }
+        }
+        if ($fault -in @('has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait', 'record-has-null-kill')) {
+            if (!$injectPrimary -and (!$observed -or $observed.Exception.Message -notmatch 'bool HasExited')) {
+                throw "First completion error lost through termination: $fault"
+            }
+            $secondary = switch ($fault) {
+                'has-null-close-main' { 'cleanup-close-main' }
+                'has-null-close-wait' { 'cleanup-close-wait' }
+                'has-null-kill' { 'cleanup-kill' }
+                'has-null-kill-wait' { 'cleanup-kill-wait' }
+                'record-has-null-kill' { 'cleanup-recorder' }
+            }
+            if (!@($script:warnings | Where-Object { $_ -match [regex]::Escape($secondary) }).Count) {
+                throw "Secondary termination error not observable: $fault"
+            }
+            if ($fault -eq 'record-has-null-kill') {
+                if (!$script:recorderKillReached -or $script:recorderWaitReached -or !$script:closeReached) {
+                    throw 'Recorder double fault lost own termination or application cleanup'
+                }
+            } else {
+                if (!$script:closeReached -or $script:exitCodeReached) { throw 'Application double fault lost close or admitted exit code' }
+                if ($script:closeWaitReached -ne ($fault -ne 'has-null-close-main') -or
+                    $script:killReached -ne ($fault -in @('has-null-kill', 'has-null-kill-wait')) -or
+                    $script:killWaitReached -ne ($fault -eq 'has-null-kill-wait')) { throw 'Double fault invocation path changed' }
+            }
         }
         if ($injectPrimary) {
             if (!$observed -or $observed.Exception.Message -notmatch 'primary-system-preference') {

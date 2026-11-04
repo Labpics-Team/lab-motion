@@ -274,7 +274,13 @@ try {
                         try { $needsStop = !(Read-ProcessHasExited $recording.process) }
                         catch { $completionFailure = $_ }
                         # Неизвестное завершение не отменяет попытку остановить свою запись.
-                        if ($needsStop) { $recording.process.Kill($true); $recording.process.WaitForExit() }
+                        if ($needsStop) {
+                            try { $recording.process.Kill($true); $recording.process.WaitForExit() }
+                            catch {
+                                if ($null -eq $completionFailure) { throw }
+                                Write-Warning ('Ошибка остановки записи после отказа чтения завершения: ' + $_.Exception.Message) -WarningAction Continue
+                            }
+                        }
                         if ($null -ne $completionFailure) { throw $completionFailure }
                         if (!(Read-ProcessHasExited $recording.process)) { throw 'Запись не подтвердила завершение после очистки.' }
                         $remaining = if ($recording.stderr) { $recording.stderr.GetAwaiter().GetResult() } else { '' }
@@ -291,8 +297,13 @@ try {
                         catch { $completionFailure = $_ }
                         # Ошибка чтения остаётся ошибкой после попытки завершить свой процесс.
                         if ($needsClose) {
-                            $null = $process.CloseMainWindow()
-                            if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
+                            try {
+                                $null = $process.CloseMainWindow()
+                                if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
+                            } catch {
+                                if ($null -eq $completionFailure) { throw }
+                                Write-Warning ('Ошибка завершения приложения после отказа чтения завершения: ' + $_.Exception.Message) -WarningAction Continue
+                            }
                         }
                         if ($null -ne $completionFailure) { throw $completionFailure }
                         $process.Refresh()

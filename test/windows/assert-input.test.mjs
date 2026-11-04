@@ -255,6 +255,9 @@ function inputCleanupViolations(source) {
     ['only qualified completion getters', (source.match(/\.HasExited\b/g) ?? []).length !== 1 || (source.match(/\.ExitCode\b/g) ?? []).length !== 1],
     ['post-refresh qualified evidence', !/\$process\.Refresh\(\)\s+\$exited = Read-ProcessHasExited \$process\s+if \(!\$exited\) \{ throw '[^']+' \}\s+\$exitCode = Read-ProcessExitCode \$process/.test(source)
       || !source.includes('@{ exited = $exited; forced = $forced; exitCode = $exitCode }')],
+    ['first completion failure retained through stop failure', (source.match(/if \(\$null -eq \$completionFailure\) \{ throw \}/g) ?? []).length !== 2
+      || !source.includes("Write-Warning ('Ошибка остановки записи после отказа чтения завершения: ' + $_.Exception.Message) -WarningAction Continue")
+      || !source.includes("Write-Warning ('Ошибка завершения приложения после отказа чтения завершения: ' + $_.Exception.Message) -WarningAction Continue")],
     ['primary captured before evidence', !/\$primaryFailure = \$_\s+try \{ \$primaryFailure \| Out-String \| Set-Content/.test(source)],
     ['application disposal encloses process boundary', !/if \(\$process\) \{\s+try \{\s+\$forced = \$false/.test(source)],
     ['cleanup retains primary', !/catch \{\s+if \(\$null -eq \$primaryFailure\) \{ throw \}/.test(source)],
@@ -270,6 +273,7 @@ test('input source captures primary before evidence and disposes across process 
     ['$exitCode -isnot [int]', '$false', 'exit code int validated before use'],
     ['$needsClose = !(Read-ProcessHasExited $process)', '$needsClose = !$process.HasExited', 'only qualified completion getters'],
     ['$exited = Read-ProcessHasExited $process', '$exited = $true', 'post-refresh qualified evidence'],
+    ['if ($null -eq $completionFailure) { throw }', 'throw', 'first completion failure retained through stop failure'],
     ['$primaryFailure = $_', '$primaryFailure = $null', 'primary captured before evidence'],
     ['try {\n                        $forced = $false', '$forced = $false', 'application disposal encloses process boundary'],
     ['if ($null -eq $primaryFailure) { throw }', 'throw', 'cleanup retains primary'],
@@ -291,6 +295,16 @@ test('input witness preserves getter negatives, late reads and actual helper loa
   assert(source.includes('$unassociated.HasExited'));
   assert(source.includes('finally { $unassociated.Dispose() }'));
   assert(!source.includes('$unassociated.Start('));
+});
+
+test('input witness requires first completion error and observable secondary termination failures', () => {
+  const source = readFileSync(new URL('./cleanup.test.ps1', import.meta.url), 'utf8');
+  for (const fault of ['has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait', 'record-has-null-kill']) {
+    assert(source.includes(`'${fault}'`), fault);
+  }
+  assert(source.includes("$observed.Exception.Message -notmatch 'bool HasExited'"));
+  assert(source.includes('[regex]::Escape($secondary)'));
+  assert(source.includes('$script:killWaitReached -ne'));
 });
 
 test('повреждённый JSON даёт exit1 и отрицательный result.json', () => {
