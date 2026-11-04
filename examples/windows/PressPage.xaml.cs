@@ -273,10 +273,11 @@ public sealed partial class PressPage : Page
             try { action(); }
             catch (Exception error) { failure ??= ExceptionDispatchInfo.Capture(error); }
         }
-        if (notifications is not null)
+        var subscription = notifications;
+        if (subscription is not null)
         {
-            Attempt(notifications.Dispose);
-            if (!notifications.IsAttached) notifications = null;
+            Attempt(subscription.Dispose);
+            if (!subscription.IsAttached && ReferenceEquals(notifications, subscription)) notifications = null;
         }
         if (motion is not null)
         {

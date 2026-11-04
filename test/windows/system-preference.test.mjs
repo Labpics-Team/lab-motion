@@ -123,8 +123,8 @@ test('managed lifecycle source rejects stale/reloaded/window-closed notification
   assert(source.includes('if (windowClosed) throw new InvalidOperationException'));
   assert(source.includes('if (notifications is not null) throw new InvalidOperationException'));
   assert(source.includes('if (subscription is null || !ReferenceEquals(notifications, subscription) || !subscription.IsAttached) return;'));
-  assert(source.includes('Attempt(notifications.Dispose);'));
-  assert(source.includes('if (!notifications.IsAttached) notifications = null;'));
+  assert(source.includes('Attempt(subscription.Dispose);'));
+  assert(source.includes('if (!subscription.IsAttached && ReferenceEquals(notifications, subscription)) notifications = null;'));
   assert(source.includes('Attempt(motion.Dispose);'));
   assert(source.includes('failure ??= ExceptionDispatchInfo.Capture(error);'));
   assert(source.includes('failure?.Throw();'));
