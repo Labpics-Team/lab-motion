@@ -335,6 +335,36 @@ jobs:
         run: |
           node test/windows/prepare-input.mjs "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"
 
+      # Малый контекст отказа остаётся в логе: без кадров, архивов и полного дампа.
+      - name: Native failure diagnostics
+        if: ${{ failure() && !cancelled() }}
+        shell: pwsh
+        run: |
+          $stopMarker = [Guid]::NewGuid().ToString("N")
+          Write-Output "::stop-commands::$stopMarker"
+          try {
+              foreach ($relative in @("native-windows/process.json", "native-input/evidence/failure.txt", "native-input/evidence/close.json")) {
+                  Write-Output "native-diagnostic: $relative"
+                  $path = Join-Path $env:RUNNER_TEMP $relative
+                  if (!(Test-Path -LiteralPath $path -PathType Leaf)) {
+                      Write-Output "[missing]"
+                      continue
+                  }
+                  try {
+                      $reader = [IO.File]::OpenText($path)
+                      try {
+                          $buffer = [char[]]::new(4096)
+                          $count = $reader.ReadBlock($buffer, 0, $buffer.Length)
+                          $lines = @([regex]::Split([string]::new($buffer, 0, $count), "\r\n|\n|\r"))
+                          Write-Output (($lines | Select-Object -First 64) -join "`n")
+                          if ($reader.Peek() -ne -1 -or $lines.Length -gt 64) { Write-Output "[truncated: 4096 chars / 64 lines]" }
+                      } finally { $reader.Dispose() }
+                  } catch {
+                      Write-Output ("[unreadable: {0}]" -f $_.Exception.GetType().Name)
+                  }
+              }
+          } finally { Write-Output "::${stopMarker}::" }
+
   CI:
     name: CI
     if: ${{ always() }}

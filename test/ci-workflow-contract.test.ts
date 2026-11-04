@@ -64,6 +64,32 @@ const bash = process.platform === 'win32'
   ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git/bin/bash.exe') : 'bash';
 const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation', 'security', 'native-windows'];
 const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
+const nativeFailureDiagnostics = [
+  "$stopMarker = [Guid]::NewGuid().ToString(\"N\")",
+  "Write-Output \"::stop-commands::$stopMarker\"",
+  "try {",
+  "    foreach ($relative in @(\"native-windows/process.json\", \"native-input/evidence/failure.txt\", \"native-input/evidence/close.json\")) {",
+  "        Write-Output \"native-diagnostic: $relative\"",
+  "        $path = Join-Path $env:RUNNER_TEMP $relative",
+  "        if (!(Test-Path -LiteralPath $path -PathType Leaf)) {",
+  "            Write-Output \"[missing]\"",
+  "            continue",
+  "        }",
+  "        try {",
+  "            $reader = [IO.File]::OpenText($path)",
+  "            try {",
+  "                $buffer = [char[]]::new(4096)",
+  "                $count = $reader.ReadBlock($buffer, 0, $buffer.Length)",
+  "                $lines = @([regex]::Split([string]::new($buffer, 0, $count), \"\\r\\n|\\n|\\r\"))",
+  "                Write-Output (($lines | Select-Object -First 64) -join \"`n\")",
+  "                if ($reader.Peek() -ne -1 -or $lines.Length -gt 64) { Write-Output \"[truncated: 4096 chars / 64 lines]\" }",
+  "            } finally { $reader.Dispose() }",
+  "        } catch {",
+  "            Write-Output (\"[unreadable: {0}]\" -f $_.Exception.GetType().Name)",
+  "        }",
+  "    }",
+  "} finally { Write-Output \"::${stopMarker}::\" }",
+].join('\n');
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
   + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
@@ -433,6 +459,8 @@ function assertNativeGraph(files: Map<string, string>) {
         run: 'pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input" -ConfigureHostedAnimations\n' },
       { name: 'Prepare native input evidence', if: '${{ !cancelled() }}', shell: 'pwsh',
         run: 'node test/windows/prepare-input.mjs "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"\n' },
+      { name: 'Native failure diagnostics', if: '${{ failure() && !cancelled() }}', shell: 'pwsh',
+        run: nativeFailureDiagnostics + '\n' },
     ],
   });
   expect(unpin(step(windows, 'Checkout').uses!)).toBe('actions/checkout@<sha>');
@@ -582,6 +610,15 @@ describe('нативный граф CI', () => {
       w.jobs['native-windows']!.steps = w.jobs['native-windows']!.steps!.filter(item => item.name !== 'Prepare native input evidence');
     }],
     ['Windows скрывает отказ финального бюджета', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Prepare native input evidence')['continue-on-error'] = true; }],
+    ['Windows теряет малую диагностику отказа', 'ci.yml', (w: Workflow) => {
+      w.jobs['native-windows']!.steps = w.jobs['native-windows']!.steps!.filter(item => item.name !== 'Native failure diagnostics');
+    }],
+    ['Windows печатает диагностику успешного прогона', 'ci.yml', (w: Workflow) => {
+      step(w.jobs['native-windows']!, 'Native failure diagnostics').if = '${{ always() }}';
+    }],
+    ['Windows печатает диагностику без ограничения размера', 'ci.yml', (w: Workflow) => {
+      step(w.jobs['native-windows']!, 'Native failure diagnostics').run = 'Get-Content "$env:RUNNER_TEMP/native-input/evidence/failure.txt" -Raw';
+    }],
     ...['Keep native input evidence', 'Keep native evidence'].map(name => [
       `Windows возвращает архив: ${name}`, 'ci.yml', (w: Workflow) => {
         w.jobs['native-windows']!.steps!.push({ name, uses: 'actions/upload-artifact@0123456789012345678901234567890123456789', with: { path: '${{ runner.temp }}/native-windows/' } });
