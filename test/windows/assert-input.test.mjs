@@ -476,6 +476,17 @@ test('Finish-Tool WaitForExit exception retains one independent bounded Kill bef
   }
 });
 
+test('PowerShell wildcard primary oracle selects one matching arm', () => {
+  const source = readSource(new URL('./cleanup.test.ps1', import.meta.url));
+  const selection = source.slice(source.indexOf('$expectedPrimary = switch -Wildcard'), source.indexOf('if (!$toolObserved'));
+  // PowerShell продолжает проверять patterns: точные wait-null/invalid также подходят wait*.
+  const isSingleMatch = text => ['wait-null', 'wait-invalid', 'wait*', 'timeout', 'exhausted', 'stdout*', 'stderr*', 'exit*', 'dispose']
+    .every(pattern => text.includes(`'${pattern}' {`) && text.split(`'${pattern}' {`)[1].split('}')[0].trimEnd().endsWith('; break'));
+  assert(isSingleMatch(selection), 'каждая найденная ветка обязана завершать switch, не добавлять второй primary');
+  assert(!isSingleMatch(selection.replace("'wait-null' { 'bool после ожидания'; break }", "'wait-null' { 'bool после ожидания' }")));
+  assert(!isSingleMatch(selection.replace("'wait-invalid' { 'bool после ожидания'; break }", "'wait-invalid' { 'bool после ожидания' }")));
+});
+
 function inputPhaseDiagnosticViolations(source) {
   const guard = source.slice(source.indexOf("if ($Name -in @('disable-animation', 'system-disable-animation'))"), source.indexOf('$after = @(Read-Trace)[-1].sequence'));
   return [

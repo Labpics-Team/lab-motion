@@ -435,15 +435,15 @@ try {
             }
         } else {
             $expectedPrimary = switch -Wildcard ($toolFault) {
-                'wait-null' { 'bool после ожидания' }
-                'wait-invalid' { 'bool после ожидания' }
-                'wait*' { 'tool-primary-wait' }
-                'timeout' { 'Таймаут winapp' }
-                'exhausted' { 'Таймаут winapp' }
-                'stdout*' { 'tool-primary-stdout' }
-                'stderr*' { 'tool-primary-stderr' }
-                'exit*' { 'exit 7' }
-                'dispose' { 'tool-secondary-dispose' }
+                'wait-null' { 'bool после ожидания'; break }
+                'wait-invalid' { 'bool после ожидания'; break }
+                'wait*' { 'tool-primary-wait'; break }
+                'timeout' { 'Таймаут winapp'; break }
+                'exhausted' { 'Таймаут winapp'; break }
+                'stdout*' { 'tool-primary-stdout'; break }
+                'stderr*' { 'tool-primary-stderr'; break }
+                'exit*' { 'exit 7'; break }
+                'dispose' { 'tool-secondary-dispose'; break }
                 default { $null }
             }
             if (!$toolObserved -or ($expectedPrimary -and $toolObserved.Exception.Message -notmatch [regex]::Escape($expectedPrimary)) -or
