@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using System.Threading;
+using System.Runtime.ExceptionServices;
 using Windows.UI.ViewManagement;
 
 namespace NativeWindow;
@@ -14,6 +15,10 @@ public sealed partial class PressPage : Page
 {
     private readonly UISettings settings = new();
     private readonly PressTrace? trace = PressTrace.FromEnvironment();
+    private readonly Window window;
+    private SystemPreferenceNotifications? notifications;
+    private bool? observedSystemAnimation;
+    private bool windowClosed;
     private ScalarMotion? motion;
     private long pressedToken;
     private long enabledToken;
@@ -23,8 +28,9 @@ public sealed partial class PressPage : Page
     private enum SystemNotificationPhase { Received, Queued, Delegate }
     private List<(RoutedEvent Event, Delegate Handler)>? inputHandlers;
 
-    public PressPage()
+    public PressPage(Window window)
     {
+        this.window = window;
         InitializeComponent();
         Loaded += Attach;
         Unloaded += Detach;
@@ -32,7 +38,11 @@ public sealed partial class PressPage : Page
 
     private void Attach(object sender, RoutedEventArgs args)
     {
+        if (windowClosed) throw new InvalidOperationException("Окно системной подписки уже закрыто.");
+        notifications?.ThrowIfFaulted();
         if (motion is not null) return;
+        if (notifications is not null) throw new InvalidOperationException("Прежняя системная подписка ещё не снята.");
+        notifications = new SystemPreferenceNotifications(window, SystemPreferenceChanged, NotificationFailed);
         var visual = ElementCompositionPreview.GetElementVisual(Highlight);
         motion = ScalarMotion.CreateProgress(visual.Compositor);
         motion.Bind(visual, ScalarProperty.Opacity, .45f);
@@ -45,7 +55,6 @@ public sealed partial class PressPage : Page
         enabledToken = Press.RegisterPropertyChangedCallback(Control.IsEnabledProperty, Changed);
         Animation.Checked += PreferenceChanged;
         Animation.Unchecked += PreferenceChanged;
-        settings.AnimationsEnabledChanged += SystemPreferenceChanged;
         trace?.Add("attached", new { scale = XamlRoot.RasterizationScale });
         Update("attach");
     }
@@ -53,11 +62,13 @@ public sealed partial class PressPage : Page
     private void Changed(DependencyObject sender, DependencyProperty property)
         => Update(property == ButtonBase.IsPressedProperty ? "pressed" : "enabled");
     private void PreferenceChanged(object sender, RoutedEventArgs args) => Update("localPreference");
-    private void SystemPreferenceChanged(UISettings sender, UISettingsAnimationsEnabledChangedEventArgs args)
+    private void SystemPreferenceChanged()
     {
+        var subscription = notifications;
         if (trace is null)
         {
-            DispatcherQueue.TryEnqueue(() => Update("systemPreference"));
+            if (!DispatcherQueue.TryEnqueue(() => ApplySystemPreference(subscription)))
+                throw new InvalidOperationException("Очередь отказала системному уведомлению.");
             return;
         }
         var notification = Interlocked.Increment(ref systemNotification);
@@ -65,10 +76,31 @@ public sealed partial class PressPage : Page
         var queued = DispatcherQueue.TryEnqueue(() =>
         {
             ObserveSystemNotification(notification, SystemNotificationPhase.Delegate);
-            Update("systemPreference");
+            ApplySystemPreference(subscription);
         });
         // Отказ очереди не имеет будущего Update/Flush; фиксируем также его bool.
         ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true);
+        if (!queued) throw new InvalidOperationException("Очередь отказала системному уведомлению.");
+    }
+
+    private void ApplySystemPreference(SystemPreferenceNotifications? subscription)
+    {
+        if (subscription is null || !ReferenceEquals(notifications, subscription) || !subscription.IsAttached) return;
+        subscription.ThrowIfFaulted();
+        var enabled = settings.AnimationsEnabled;
+        if (observedSystemAnimation == enabled) return;
+        Update("systemPreference");
+    }
+
+    private void NotificationFailed(Exception error)
+    {
+        const string message = "Ошибка уведомления системной настройки.";
+        try
+        {
+            trace?.Add("error", new { type = error.GetType().Name, message });
+            trace?.Flush();
+        }
+        finally { State.Text = message; }
     }
 
     private void ObserveSystemNotification(long notification, SystemNotificationPhase phase, bool? queued = null, bool flush = false)
@@ -78,11 +110,11 @@ public sealed partial class PressPage : Page
         if (!validIdentity) Interlocked.Exchange(ref notificationDiagnosticFailed, 1);
         try
         {
-            // Callback может быть фоновым: здесь нет чтения XAML или изменения motion.
+            // Настоящий WM callback: запись не утверждает изменение preference или исполнение queue.
             trace.Add("systemNotification", new
             {
                 notification = validIdentity ? (long?)notification : null,
-                phase = phase.ToString(), queued,
+                source = "WM_SETTINGCHANGE", phase = phase.ToString(), queued,
                 diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0,
             });
             if (flush) trace.Flush();
@@ -142,12 +174,14 @@ public sealed partial class PressPage : Page
 
     private async void Update(string trigger)
     {
+        notifications?.ThrowIfFaulted();
         var current = motion;
         if (current is null) return;
         var id = ++operation;
         var pressed = Press.IsEnabled && Press.IsPressed;
         var localAnimation = Animation.IsChecked == true;
         var systemAnimation = settings.AnimationsEnabled;
+        observedSystemAnimation = systemAnimation;
         State.Text = pressed ? "Нажато" : "Отпущено";
         trace?.Add("intent", new
         {
@@ -223,23 +257,46 @@ public sealed partial class PressPage : Page
     }
 
     private void Detach(object sender, RoutedEventArgs args)
+        => Detach();
+
+    internal void Close()
     {
-        if (motion is null) return;
-        Press.UnregisterPropertyChangedCallback(ButtonBase.IsPressedProperty, pressedToken);
-        Press.UnregisterPropertyChangedCallback(Control.IsEnabledProperty, enabledToken);
-        Animation.Checked -= PreferenceChanged;
-        Animation.Unchecked -= PreferenceChanged;
-        settings.AnimationsEnabledChanged -= SystemPreferenceChanged;
-        ++operation;
-        if (trace is not null) motion.Observed -= Observe;
-        if (inputHandlers is not null)
+        windowClosed = true;
+        Detach();
+    }
+
+    private void Detach()
+    {
+        ExceptionDispatchInfo? failure = null;
+        void Attempt(Action action)
         {
-            foreach (var (routedEvent, handler) in inputHandlers) Press.RemoveHandler(routedEvent, handler);
-            inputHandlers = null;
+            try { action(); }
+            catch (Exception error) { failure ??= ExceptionDispatchInfo.Capture(error); }
         }
-        motion.Dispose();
-        motion = null;
-        trace?.Add("detached", new { operation });
-        trace?.Flush();
+        if (notifications is not null)
+        {
+            Attempt(notifications.Dispose);
+            if (!notifications.IsAttached) notifications = null;
+        }
+        if (motion is not null)
+        {
+            Attempt(() => Press.UnregisterPropertyChangedCallback(ButtonBase.IsPressedProperty, pressedToken));
+            Attempt(() => Press.UnregisterPropertyChangedCallback(Control.IsEnabledProperty, enabledToken));
+            Animation.Checked -= PreferenceChanged;
+            Animation.Unchecked -= PreferenceChanged;
+            ++operation;
+            if (trace is not null) motion.Observed -= Observe;
+            if (inputHandlers is not null)
+            {
+                foreach (var (routedEvent, handler) in inputHandlers) Attempt(() => Press.RemoveHandler(routedEvent, handler));
+                inputHandlers = null;
+            }
+            Attempt(motion.Dispose);
+            motion = null;
+            observedSystemAnimation = null;
+            Attempt(() => trace?.Add("detached", new { operation }));
+            Attempt(() => trace?.Flush());
+        }
+        failure?.Throw();
     }
 }

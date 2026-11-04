@@ -503,11 +503,12 @@ function inputPhaseDiagnosticViolations(source) {
 function systemNotificationSourceViolations(source) {
   const callback = source.slice(source.indexOf('private void SystemPreferenceChanged'), source.indexOf('private void Observe(MotionObservation'));
   return [
-    ['no-trace callback unchanged', !/if \(trace is null\)\s*\{\s*DispatcherQueue.TryEnqueue\(\(\) => Update\("systemPreference"\)\);\s*return;\s*\}/.test(callback)],
+    ['no-trace callback retains managed admission', !/if \(trace is null\)\s*\{\s*if \(!DispatcherQueue.TryEnqueue\(\(\) => ApplySystemPreference\(subscription\)\)\)\s*throw new InvalidOperationException\("Очередь отказала системному уведомлению\."\);\s*return;\s*\}/.test(callback)],
     ['genuine callback identity and receipt', !callback.includes('Interlocked.Increment(ref systemNotification)')
       || !callback.includes('ObserveSystemNotification(notification, SystemNotificationPhase.Received)')],
-    ['actual enqueue result and delegate', !/var queued = DispatcherQueue.TryEnqueue\(\(\) =>\s*\{\s*ObserveSystemNotification\(notification, SystemNotificationPhase.Delegate\);\s*Update\("systemPreference"\);\s*\}\);/.test(callback)
-      || !callback.includes('ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true)')],
+    ['actual enqueue result and delegate', !/var queued = DispatcherQueue.TryEnqueue\(\(\) =>\s*\{\s*ObserveSystemNotification\(notification, SystemNotificationPhase.Delegate\);\s*ApplySystemPreference\(subscription\);\s*\}\);/.test(callback)
+      || !callback.includes('ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true)')
+      || !callback.includes('if (!queued) throw new InvalidOperationException("Очередь отказала системному уведомлению.");')],
     ['typed bounded diagnostic fields', !source.includes('enum SystemNotificationPhase { Received, Queued, Delegate }')
       || !callback.includes('notification > 0 && notification <= 9007199254740991')
       || !callback.includes('notification = validIdentity ? (long?)notification : null')
@@ -517,7 +518,7 @@ function systemNotificationSourceViolations(source) {
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
 
-test('настоящий callback сохраняет no-trace поведение, queue bool и ограниченные диагностические фазы', () => {
+test('настоящий WM callback сохраняет managed queue, наблюдаемый отказ и ограниченные диагностические фазы', () => {
   const source = readSource(new URL('../../examples/windows/PressPage.xaml.cs', import.meta.url));
   assert.deepEqual(systemNotificationSourceViolations(source), []);
   const callback = source.slice(source.indexOf('private void SystemPreferenceChanged'), source.indexOf('private void ObserveSystemNotification'));
@@ -527,7 +528,7 @@ test('настоящий callback сохраняет no-trace поведение
   assert.equal((observation.match(/trace\.Flush\(\)/g) ?? []).length, 1);
   assert(!observation.includes('error.Message'));
   for (const [before, after, name] of [
-    ['if (trace is null)', 'if (false)', 'no-trace callback unchanged'],
+    ['if (trace is null)', 'if (false)', 'no-trace callback retains managed admission'],
     ['SystemNotificationPhase.Received)', 'SystemNotificationPhase.Queued)', 'genuine callback identity and receipt'],
     ['var queued = DispatcherQueue.TryEnqueue', 'var queued = true; DispatcherQueue.TryEnqueue', 'actual enqueue result and delegate'],
     ['SystemNotificationPhase.Delegate);', 'SystemNotificationPhase.Received);', 'actual enqueue result and delegate'],

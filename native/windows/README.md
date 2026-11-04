@@ -172,8 +172,12 @@ request приложения. Системный `Write(false)` следует �
 поля строки — sequence, phase, operation, nativeOperation, pressed, localAnimation,
 systemAnimation, reason, end, isCurrent, notification, queued, diagnosticFailed.
 Фазы `systemCallback`, `systemQueued`, `systemDelegate` отдельно показывают вход в
-настоящий `UISettings` callback, возвращённый `TryEnqueue` bool и начало делегата.
-`notification` связывает только эти три записи; последующий `systemPreference`
+настоящий `WM_SETTINGCHANGE` callback собственного окна, возвращённый `TryEnqueue`
+bool и начало managed делегата. В trace источник явно указан как `WM_SETTINGCHANGE`;
+это не receipt события `UISettings`. Прежняя ограниченная проекция сохраняет 13 полей.
+`notification` связывает три фазы одного callback; в `completed` тот же счётчик
+читается как last-issued snapshot, не как receipt для конкретного SPI. Snapshot
+счётчика и sticky flag не атомарны. Последующий `systemPreference`
 intent по-прежнему содержит прочитанный приложением systemAnimation. Порядок
 делегата и записи queue-result может различаться; соседство с intent не является
 атомарной связью callback→intent. Сохраняются только фиксированные
@@ -186,15 +190,28 @@ stdout и пользовательское содержимое в summary не 
 В режиме trace callback делает один Flush после enqueue: иначе отказ очереди не
 имел бы будущего Update, способного записать receipt и false. Этот дополнительный
 lock/IO может изменить расписание и не доказывает причину исчезнувшего отказа.
-Диагностика не читает XAML из фонового callback и не перехватывает ошибки самого
-enqueue или Update. Ошибка Add/Flush сохраняется в sticky `diagnosticFailed` для
+Диагностика не читает XAML из native callback; её catch изолирует только Add/Flush,
+а ошибки enqueue отдельно сохраняет adapter. Ошибка Add/Flush сохраняется в sticky `diagnosticFailed` для
 следующей доступной диагностической записи; false означает лишь отсутствие ранее
 замеченной ошибки. Если следующих записей или рабочего транспорта нет, результат
 диагностики неизвестен. Эти события не дают input GREEN и не являются новым gate.
-Без trace callback сохраняет прежний путь enqueue→Update.
+Без trace callback также доставляет уведомление через managed очередь. Отказ
+enqueue наблюдаем как ошибка, а не заменяется прямым Update. Единственный источник
+системной смены — `WM_SETTINGCHANGE` собственного top-level HWND; подписки на
+`UISettings.AnimationsEnabledChanged` и второго fallback нет. На owner thread
+делегат перечитывает тот же `UISettings`; unrelated/repeated notifications при
+неизменном значении не запускают новые команды движения. Начальное чтение и все
+предметные реакции обновляют последний принятый snapshot в одном владельце.
+Снятие подписки при Unloaded/Closed и destroy отменяет старые queued delegates;
+Reload не получает вторую route, пока прежний subclass не снят. Managed delegate
+удерживается до подтверждённого Remove или собственного WM_NCDESTROY, каждый
+native callback сохраняет DefSubclassProc forwarding. Ошибка регистрации видима;
+ошибка доставки/снятия сохраняется и читается на managed admission/cleanup, а не
+выходит исключением в Win32. Getter и реакция не выполняются из reverse-PInvoke.
 Флаг `-ConfigureHostedAnimations` доступен только в одноразовой GitHub-hosted
 сессии: он включает и временно отключает client-area animation через `SystemParametersInfo`,
-проверяет системный readback и события `UISettings`, затем восстанавливает прежнее значение
+проверяет системный readback и реакцию приложения через `WM_SETTINGCHANGE` с чтением
+того же `UISettings`, затем восстанавливает прежнее значение
 при завершении, в том числе после ошибки. Ошибка очистки не подменяет первичную ошибку
 ввода или настройки и выдаёт фиксированное предупреждение; `Dispose` приложения и
 восстановление окружения/предпочтения выполняются через `finally`.

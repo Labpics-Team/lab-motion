@@ -13,9 +13,14 @@ public partial class App : Application
         window = new Window
         {
             Title = "LabMotion — проверка движения",
-            Content = Environment.GetEnvironmentVariable("LAB_MOTION_PROBE_OUTPUT") is null
-                ? new PressPage() : new MainPage(),
         };
+        if (Environment.GetEnvironmentVariable("LAB_MOTION_PROBE_OUTPUT") is null)
+        {
+            var press = new PressPage(window);
+            window.Content = press;
+            window.Closed += (_, _) => press.Close();
+        }
+        else window.Content = new MainPage();
         window.AppWindow.Resize(new Windows.Graphics.SizeInt32(640,
             Environment.GetEnvironmentVariable("LAB_MOTION_PROBE_OUTPUT") is null ? 440 : 360));
         window.Activate();
