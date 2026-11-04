@@ -327,35 +327,13 @@ jobs:
         run: |
           pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input" -ConfigureHostedAnimations
 
+      # Проверяем полный бюджет после finally, включая поздние cleanup-файлы.
+      # Подготовленный набор остаётся только в одноразовом каталоге runner.
       - name: Prepare native input evidence
         if: ${{ !cancelled() }}
         shell: pwsh
         run: |
           node test/windows/prepare-input.mjs "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"
-
-      # Визуальному review нужны кадры и успешного прогона, без SDK и сборки.
-      - name: Keep native input evidence
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: native-input
-          path: ${{ runner.temp }}/native-input-upload/
-          retention-days: 1
-          if-no-files-found: error
-          include-hidden-files: false
-
-      - name: Keep native evidence
-        if: ${{ always() }}
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: native-windows-diagnostics
-          path: |
-            ${{ runner.temp }}/native-windows/*.json
-            ${{ runner.temp }}/native-windows/*.log
-            ${{ runner.temp }}/native-windows/*.txt
-          retention-days: 1
-          if-no-files-found: error
-          include-hidden-files: false
 
   CI:
     name: CI

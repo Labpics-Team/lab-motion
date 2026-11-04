@@ -353,38 +353,12 @@ function assertNativeGraph(files: Map<string, string>) {
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
-  // Native review получает кадры ввода; нативные журналы и trace сохраняются
-  // при любом исходе. Остальные проверки не архивируют успешные сборки;
-  // release отдельно передаёт проверенный пакет.
+  // Только release передаёт проверенный пакет между jobs. Обычная проверка
+  // сохраняет native capture локально и не зависит от хранилища архивов.
   for (const [name, workflow] of workflows) {
     if (name === 'release.yml') continue;
-    for (const [id, job] of Object.entries(workflow.jobs)) {
+    for (const job of Object.values(workflow.jobs)) {
       for (const item of job.steps ?? []) {
-        if (name === 'ci.yml' && id === 'native-windows' && item.name === 'Keep native input evidence') {
-          expect(unpin(item.uses!)).toBe('actions/upload-artifact@<sha>');
-          expect(item.if).toBe('${{ !cancelled() }}');
-          expect(item.with).toEqual({
-            name: 'native-input',
-            path: '${{ runner.temp }}/native-input-upload/',
-            'retention-days': 1,
-            'if-no-files-found': 'error',
-            'include-hidden-files': false,
-          });
-          continue;
-        }
-        if (name === 'ci.yml' && id === 'native-windows' && item.name === 'Keep native evidence') {
-          expect(unpin(item.uses!)).toBe('actions/upload-artifact@<sha>');
-          expect(item.if).toBe('${{ always() }}');
-          expect(item['continue-on-error']).toBeUndefined();
-          expect(item.with).toEqual({
-            name: 'native-windows-diagnostics',
-            path: '${{ runner.temp }}/native-windows/*.json\n${{ runner.temp }}/native-windows/*.log\n${{ runner.temp }}/native-windows/*.txt\n',
-            'retention-days': 1,
-            'if-no-files-found': 'error',
-            'include-hidden-files': false,
-          });
-          continue;
-        }
         expect(item.uses ?? '').not.toMatch(/^actions\/(upload-artifact|upload-pages-artifact)@/);
       }
     }
@@ -459,8 +433,6 @@ function assertNativeGraph(files: Map<string, string>) {
         run: 'pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input" -ConfigureHostedAnimations\n' },
       { name: 'Prepare native input evidence', if: '${{ !cancelled() }}', shell: 'pwsh',
         run: 'node test/windows/prepare-input.mjs "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"\n' },
-      step(windows, 'Keep native input evidence'),
-      step(windows, 'Keep native evidence'),
     ],
   });
   expect(unpin(step(windows, 'Checkout').uses!)).toBe('actions/checkout@<sha>');
@@ -605,21 +577,16 @@ describe('нативный граф CI', () => {
     ['Windows игнорирует отказ', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Build and run native consumer')['continue-on-error'] = true; }],
     ['Windows пропускает ввод', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native input').if = false; }],
     ['Windows скрывает отказ ввода', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native input')['continue-on-error'] = true; }],
-    ['Windows ввод архивирует SDK', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native input evidence').with!.path = '${{ runner.temp }}/native-input/'; }],
-    ['Windows загружает evidence мимо бюджета', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native input evidence').with!.path = '${{ runner.temp }}/native-input/evidence/'; }],
     ['Windows не ограничивает неуспешные артефакты', 'ci.yml', (w: Workflow) => { delete step(w.jobs['native-windows']!, 'Prepare native input evidence').if; }],
-    ['Windows загружает до финального бюджета', 'ci.yml', (w: Workflow) => {
-      const steps = w.jobs['native-windows']!.steps!;
-      const index = steps.findIndex(item => item.name === 'Prepare native input evidence');
-      [steps[index], steps[index + 1]] = [steps[index + 1]!, steps[index]!];
+    ['Windows пропускает финальный бюджет', 'ci.yml', (w: Workflow) => {
+      w.jobs['native-windows']!.steps = w.jobs['native-windows']!.steps!.filter(item => item.name !== 'Prepare native input evidence');
     }],
-    ['потеря native evidence после успеха', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native evidence').if = '${{ failure() || cancelled() }}'; }],
-    ['нет обязательного native evidence', 'ci.yml', (w: Workflow) => {
-      w.jobs['native-windows']!.steps = w.jobs['native-windows']!.steps!.filter(item => item.name !== 'Keep native evidence');
-    }],
-    ['native evidence отсутствует без отказа', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native evidence').with!['if-no-files-found'] = 'warn'; }],
-    ['игнорирование отказа сохранения native evidence', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native evidence')['continue-on-error'] = true; }],
-    ['Windows архивирует сборку', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native evidence').with!.path = '${{ runner.temp }}/native-windows/'; }],
+    ['Windows скрывает отказ финального бюджета', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Prepare native input evidence')['continue-on-error'] = true; }],
+    ...['Keep native input evidence', 'Keep native evidence'].map(name => [
+      `Windows возвращает архив: ${name}`, 'ci.yml', (w: Workflow) => {
+        w.jobs['native-windows']!.steps!.push({ name, uses: 'actions/upload-artifact@0123456789012345678901234567890123456789', with: { path: '${{ runner.temp }}/native-windows/' } });
+      },
+    ] as const),
     ['игнорирование browser caller', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!['continue-on-error'] = true; }],
     ['другой browser worker', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!.uses = './.github/workflows/release.yml'; }],
     ['нет Node floor', 'ci.yml', (w: Workflow) => { w.jobs.verify!.steps = w.jobs.verify!.steps!.filter(item => item.name !== 'Consumer smoke on minimum runtime'); }],
