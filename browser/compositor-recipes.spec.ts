@@ -1,8 +1,20 @@
 import type { Page } from '@playwright/test';
+import type { CompositorSpring } from '../src/compositor/index';
+import type { MotionValue } from '../src/driver/index';
 import { expect, packedJourneyTest as test } from './fixtures/harness';
 
 const recipeUrl = '/browser/.artifacts/scope-recipes.js';
 type Family = 'sheet' | 'pager';
+
+type SheetOraclePageState = {
+  consumer: { motion: CompositorSpring; selected: number; select(index: number): void; destroy(): void };
+  handle: HTMLButtonElement;
+  target: HTMLElement;
+  frame(time: number): void;
+  pending(): number;
+  oldLive: MotionValue;
+  pointer: number;
+};
 
 async function mount(page: Page, family: Family, quiet = false) {
   await page.evaluate(async ({ url, family, quiet }) => {
@@ -260,7 +272,7 @@ for (const family of ['sheet', 'pager'] as const) {
     });
   }
 
-  test(`${family}: native interruption → live follow → native release; один inert callback`, async ({ page }) => {
+  test(`${family}: native interruption → live follow → native release; один inert callback`, async ({ page }, testInfo) => {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     await mount(page, family);
     const before = await page.evaluate(family => {
@@ -316,6 +328,78 @@ for (const family of ['sheet', 'pager'] as const) {
       return { effects: w.target.getAnimations().length, pending: w.pending(), focus: document.activeElement?.id };
     });
     expect(terminal).toEqual({ effects: 0, pending: 0, focus: 'previous-focus' });
+
+    if (family === 'sheet') for (const direction of [1, -1]) {
+      // Независимое решение x'' + 28x' + 240(x-goal)=0, без поставляемого солвера.
+      const spring = (from: number, goal: number, velocity: number, seconds: number) => {
+        const omega = Math.sqrt(240 - 14 ** 2), displacement = from - goal;
+        const sine = Math.sin(omega * seconds), cosine = Math.cos(omega * seconds);
+        const coefficient = (velocity + 14 * displacement) / omega;
+        const decay = Math.exp(-14 * seconds);
+        return {
+          value: goal + decay * (displacement * cosine + coefficient * sine),
+          velocity: decay * ((-14 * displacement + omega * coefficient) * cosine
+            + (-14 * coefficient - omega * displacement) * sine),
+        };
+      };
+      const from = direction === 1 ? 0 : 240;
+      const expected = spring(from, 120, 0, 0.08);
+      // Интеграл скорости отпускания: расстояние = power * velocity * tau.
+      const projected = expected.value + 0.8 * expected.velocity * 0.35;
+      const points = [0, 120, 240] as const;
+      const nearest = (position: number): 0 | 1 | 2 => {
+        let best: 0 | 1 | 2 = 0;
+        for (const index of [1, 2] as const)
+          if (Math.abs(points[index] - position) < Math.abs(points[best] - position)) best = index;
+        return best;
+      };
+      const expectedIndex = nearest(projected);
+      expect(expectedIndex).toBe(direction === 1 ? 2 : 0);
+      expect(expectedIndex).not.toBe(nearest(expected.value));
+      await mount(page, 'sheet');
+      await page.evaluate(from => {
+        const w = window as unknown as SheetOraclePageState;
+        // Оба отпускания после сдвига +/-120px остаются внутри viewport.
+        w.handle.style.top = '140px';
+        w.consumer.motion.handoffToLive(from).snapTo(from);
+        w.consumer.select(from === 0 ? 2 : 0);
+        const animation = w.target.getAnimations()[0];
+        if (!animation) throw new Error('Перед захватом отсутствует нативная анимация панели');
+        animation.pause(); animation.currentTime = 0;
+      }, from);
+      await page.mouse.move(50, 155); await page.mouse.down();
+      await page.mouse.move(50, 155 + direction * 120);
+      const driven = await page.evaluate(() => {
+        const w = window as unknown as SheetOraclePageState;
+        w.frame(0); w.frame(80);
+        w.oldLive = w.consumer.motion.handoffToLive();
+        return { value: w.oldLive.value, velocity: w.oldLive.velocity,
+          capture: w.handle.hasPointerCapture(w.pointer) };
+      });
+      expect(driven.capture).toBe(true);
+      expect(driven.value).toBeCloseTo(expected.value, 2);
+      expect(driven.velocity).toBeCloseTo(expected.velocity, 2);
+      await page.mouse.up();
+      const snapped = await page.evaluate(() => {
+        const w = window as unknown as SheetOraclePageState;
+        const animation = w.target.getAnimations()[0];
+        if (!animation) throw new Error('После отпускания отсутствует нативная анимация панели');
+        animation.pause(); animation.currentTime = 10;
+        const pixel = new DOMMatrixReadOnly(getComputedStyle(w.target).transform).m42;
+        const result = { selected: w.consumer.selected, pixel,
+          capture: w.handle.hasPointerCapture(w.pointer) };
+        w.oldLive.setTarget(100_000); w.frame(160); w.frame(240);
+        w.consumer.destroy(); w.consumer.destroy(); w.handle.click();
+        return { ...result, effects: w.target.getAnimations().length, pending: w.pending(),
+          focus: document.activeElement?.id };
+      });
+      const impulse = spring(expected.value, points[expectedIndex], expected.velocity, 0.01);
+      await testInfo.attach(`sheet-impulse-${direction}`, { contentType: 'application/json',
+        body: JSON.stringify({ direction, from, expected, projected, expectedIndex, impulse, driven, snapped }) });
+      expect.soft(snapped.selected, `projected snap direction ${direction}`).toBe(expectedIndex);
+      expect.soft(Math.abs(snapped.pixel - impulse.value), `release impulse direction ${direction}`).toBeLessThan(0.2);
+      expect(snapped).toMatchObject({ capture: false, effects: 0, pending: 0, focus: 'previous-focus' });
+    }
   });
 
   test(`${family}: pointercancel не меняет выбранную цель, pause сохраняет позу`, async ({ page }) => {

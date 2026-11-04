@@ -1,20 +1,32 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
-import { expect, it } from 'vitest';
+import { afterAll, beforeAll, expect, it } from 'vitest';
 import ts from 'typescript';
 import ts5 from 'typescript5';
 import { rootRecipe } from '../browser/fixtures/motion-root.mjs';
 
-it('установленный пакет предоставляет один root API, одинаковые ESM/CJS и точные типы', () => {
-  const work = mkdtempSync(join(tmpdir(), 'lab-motion-api-'));
+let work = '', installed: string;
+beforeAll(() => {
+  work = mkdtempSync(join(tmpdir(), 'lab-motion-api-'));
   try {
     execFileSync('pnpm', ['pack', '--pack-destination', work], { cwd: resolve('.'), stdio: 'pipe' });
     const archive = readdirSync(work).find(name => name.endsWith('.tgz'))!;
-    const installed = join(work, 'node_modules/@labpics/motion'); mkdirSync(installed, { recursive: true });
+    installed = join(work, 'node_modules/@labpics/motion'); mkdirSync(installed, { recursive: true });
     execFileSync('tar', ['-xzf', join(work, archive), '--strip-components=1', '-C', installed]);
     writeFileSync(join(work, 'package.json'), JSON.stringify({ type: 'module' }));
+    for (const fixture of ['motion-production-retention.mjs', 'motion-layout-pending.mjs', 'motion-target-caps.mjs', 'motion-root-caps.mjs']) {
+      copyFileSync(resolve('test/fixtures', fixture), join(work, fixture));
+    }
+  } catch (error) {
+    rmSync(work, { recursive: true, force: true });
+    throw error;
+  }
+}, 60_000);
+afterAll(() => { if (work) rmSync(work, { recursive: true, force: true }); });
+
+it('установленный пакет предоставляет один root API, одинаковые ESM/CJS и точные типы', () => {
     const metadata = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'));
     expect(metadata.exports['.'].import.default).toBe('./dist/motion/index.js');
     writeFileSync(join(work, 'probe.mjs'), `
@@ -80,12 +92,29 @@ area.dispose();`;
         module: compiler.ModuleKind.NodeNext, moduleResolution: compiler.ModuleResolutionKind.NodeNext, types: [], lib: ['lib.es2022.d.ts', 'lib.dom.d.ts', 'lib.dom.iterable.d.ts'] });
       expect(compiler.getPreEmitDiagnostics(program).map(d => compiler.flattenDiagnosticMessageText(d.messageText, '\n'))).toEqual([]);
     }
-  } finally { rmSync(work, { recursive: true, force: true }); }
 }, 60_000);
 
-it('10 000 жизненных циклов release удержанных controllers освобождают компоненты', () => {
-  const result = spawnSync(process.execPath, ['--expose-gc', 'test/fixtures/motion-production-retention.mjs', resolve('dist/motion/index.js')],
-    { encoding: 'utf8', timeout: 90_000 });
+it.each(['esm', 'cjs'])('packed root ограничивает список целей до эффектов и сохраняет соседние controls (%s)', format => {
+  const result = spawnSync(process.execPath, ['motion-target-caps.mjs', format],
+    { cwd: work, encoding: 'utf8', timeout: 15_000 });
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+  const proof = JSON.parse(result.stdout.trim());
+  expect(proof).toMatchObject({ format, cap: 100_000, checks: 19, pendingFrames: 0 });
+  expect(proof.receipts).toHaveLength(19);
+}, 20_000);
+
+it.each(['esm', 'cjs'])('packed root сохраняет ранние лимиты properties, values и sequence до эффектов (%s)', format => {
+  const result = spawnSync(process.execPath, ['motion-root-caps.mjs', format],
+    { cwd: work, encoding: 'utf8', timeout: 15_000 });
+  expect(result.status, result.stdout + result.stderr).toBe(0);
+  const proof = JSON.parse(result.stdout.trim());
+  expect(proof).toMatchObject({ format, cap: 100_000, checks: 36, pendingFrames: 0 });
+  expect(proof.receipts).toHaveLength(36);
+}, 20_000);
+
+it.each(['esm', 'cjs'])('10 000 жизненных циклов release удержанных controllers освобождают компоненты (%s)', format => {
+  const result = spawnSync(process.execPath, ['--expose-gc', 'motion-production-retention.mjs', '@labpics/motion', '', format],
+    { cwd: work, encoding: 'utf8', timeout: 90_000 });
   expect(result.status, result.stdout + result.stderr).toBe(0);
   const proof = JSON.parse(result.stdout.trim().split('\n').at(-1)!);
   expect(proof.cycles).toBe(10_000); expect(proof.retainedComponents).toBe(0); expect(proof.frames).toBe(0);
@@ -94,15 +123,15 @@ it('10 000 жизненных циклов release удержанных controll
 }, 100_000);
 
 
-it('отменённый layout освобождает root до завершения обновления приложения', () => {
-  const result = spawnSync(process.execPath, ['--expose-gc', 'test/fixtures/motion-layout-pending.mjs', resolve('dist/motion/index.js')],
-    { encoding: 'utf8', timeout: 15_000 });
+it.each(['esm', 'cjs'])('отменённый layout освобождает root до завершения обновления приложения (%s)', format => {
+  const result = spawnSync(process.execPath, ['--expose-gc', 'motion-layout-pending.mjs', '@labpics/motion', '', format],
+    { cwd: work, encoding: 'utf8', timeout: 15_000 });
   expect(result.status, result.stdout + result.stderr).toBe(0);
 }, 20_000);
 
-it('packed playhead сохраняет controls без удержания уничтоженных компонентов', () => {
-  const result = spawnSync(process.execPath, ['--expose-gc', 'test/fixtures/motion-production-retention.mjs', resolve('dist/motion/index.js'), 'playhead'],
-    { encoding: 'utf8', timeout: 90_000 });
+it.each(['esm', 'cjs'])('packed playhead сохраняет controls без удержания уничтоженных компонентов (%s)', format => {
+  const result = spawnSync(process.execPath, ['--expose-gc', 'motion-production-retention.mjs', '@labpics/motion', 'playhead', format],
+    { cwd: work, encoding: 'utf8', timeout: 90_000 });
   expect(result.status, result.stdout + result.stderr).toBe(0);
   const proof = JSON.parse(result.stdout.trim().split('\n').at(-1)!);
   expect(proof.transport).toBe(true); expect(proof.cycles).toBe(10_000);
