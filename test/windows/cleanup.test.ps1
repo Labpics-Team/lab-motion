@@ -673,6 +673,38 @@ try {
         $bounded.rows[0][0] -ne 1 -or $bounded.rows[-1][0] -ne 100) { throw 'phase-bounded-first-last-control' }
     $phaseCases += 3
     # Новые фазы не выводятся из intent: receipt/queue/delegate — отдельные события.
+    # Тот же completed payload: false/true различаются, недоступное чтение не становится false.
+    $completedGetterCases = 0
+    foreach ($getterCase in @(
+        @{ name = 'false'; value = $false; expected = $false },
+        @{ name = 'true'; value = $true; expected = $true },
+        @{ name = 'unavailable'; value = $null; expected = $null },
+        @{ name = 'malformed'; value = '::error::secret'; expected = $null },
+        @{ name = 'missing'; expected = $null }
+    )) {
+        $completedData = @{ operation = 17; nativeOperation = 14; reason = 'settled'; end = 'Finished'; isCurrent = $true }
+        if ($getterCase.ContainsKey('value')) { $completedData.systemAnimation = $getterCase.value }
+        $completedEvent = [pscustomobject]@{ sequence = 10; kind = 'completed'; data = [pscustomobject]$completedData }
+        $getterText = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($completedEvent)
+        $getterSummary = $getterText | ConvertFrom-Json
+        $actual = $getterSummary.rows[0][6]
+        if ($getterSummary.schema -ne 2 -or $getterSummary.count -ne 1 -or $getterSummary.rows.Count -ne 1 -or
+            $getterSummary.rows[0].Count -ne 13 -or $getterSummary.omitted -ne 0 -or $getterSummary.invalid -ne 0 -or
+            $getterSummary.rows[0][0] -ne 10 -or $getterSummary.rows[0][1] -cne 'completed' -or
+            $getterSummary.rows[0][2] -ne 17 -or $getterSummary.rows[0][3] -ne 14 -or
+            $getterSummary.rows[0][7] -cne 'settled' -or $getterSummary.rows[0][8] -cne 'Finished' -or
+            $getterSummary.rows[0][9] -cne $true -or $getterText -match 'secret|::error::' -or
+            $getterText.Length -gt 1800 -or [Text.Encoding]::UTF8.GetByteCount($getterText) -gt 1800) {
+            throw "phase-completed-getter-control: $($getterCase.name)"
+        }
+        if ($null -eq $getterCase.expected) {
+            if ($null -ne $actual) { throw "phase-completed-getter-control: $($getterCase.name)" }
+        } elseif ($actual -isnot [bool] -or $actual -cne $getterCase.expected) {
+            throw "phase-completed-getter-control: $($getterCase.name)"
+        }
+        $completedGetterCases++
+    }
+    "completion getter projection: $completedGetterCases synthetic controls PASS"
     $received = [pscustomobject]@{ sequence = 10; kind = 'systemNotification'; data = [pscustomobject]@{
         notification = 7; phase = 'Received'; queued = $null; diagnosticFailed = $false } }
     $queueResult = [pscustomobject]@{ sequence = 11; kind = 'systemNotification'; data = [pscustomobject]@{

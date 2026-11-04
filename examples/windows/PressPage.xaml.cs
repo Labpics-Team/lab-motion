@@ -173,6 +173,7 @@ public sealed partial class PressPage : Page
                     operation = id, nativeOperation = result.Operation,
                     end = result.End.ToString(), reason = result.Reason,
                     isCurrent = id == operation && ReferenceEquals(current, motion),
+                    systemAnimation = ReadSystemAnimationForTrace(),
                 });
                 trace?.Flush();
             }
@@ -183,6 +184,17 @@ public sealed partial class PressPage : Page
             trace?.Flush();
             if (id == operation && ReferenceEquals(current, motion)) State.Text = error.Message;
         }
+    }
+
+    private bool? ReadSystemAnimationForTrace()
+    {
+        try
+        {
+            // Значение относится к этой completed-выборке, не к моменту SPI или native idle.
+            if (!DispatcherQueue.HasThreadAccess) return null;
+            return settings.AnimationsEnabled;
+        }
+        catch { return null; } // Недоступное диагностическое чтение не меняет исход движения.
     }
 
     // Только тестовое чтение: не задаёт положение и не исполняет кадры анимации.

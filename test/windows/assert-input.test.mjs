@@ -566,6 +566,51 @@ test('notification диагностика не заменяет system preferenc
   assert.throws(() => verify(healthy), /не наблюдалось выключение/);
 });
 
+function completedGetterViolations(source) {
+  const helper = source.match(/private bool\? ReadSystemAnimationForTrace\(\)\s*\{([\s\S]*?)\n    \}/)?.[1] ?? '';
+  const body = helper.replace(/\/\/[^\n]*/g, '');
+  const completion = source.match(/trace\?\.Add\("completed", new\s*\{([\s\S]*?)\}\);/)?.[1] ?? '';
+  return [
+    ['owner-thread admission before same-instance getter', !/if \(!DispatcherQueue\.HasThreadAccess\) return null;\s*return settings\.AnimationsEnabled;/.test(body)],
+    ['isolated nullable read with no state mutation', !/^\s*try\s*\{\s*if \(!DispatcherQueue\.HasThreadAccess\) return null;\s*return settings\.AnimationsEnabled;\s*\}\s*catch\s*\{\s*return null;\s*\}\s*$/.test(body)],
+    ['sample only in existing conditional completed payload', !completion.includes('systemAnimation = ReadSystemAnimationForTrace()')
+      || (source.match(/ReadSystemAnimationForTrace\(/g) ?? []).length !== 2
+      || !completion.includes('operation = id, nativeOperation = result.Operation')
+      || !completion.includes('end = result.End.ToString(), reason = result.Reason')
+      || !completion.includes('isCurrent = id == operation && ReferenceEquals(current, motion)')],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('completed trace читает тот же UISettings только на owner thread и сохраняет неизвестное значение как null', () => {
+  const source = readSource(new URL('../../examples/windows/PressPage.xaml.cs', import.meta.url));
+  assert.deepEqual(completedGetterViolations(source), []);
+  for (const [before, after, violation] of [
+    ['if (!DispatcherQueue.HasThreadAccess) return null;', '', 'owner-thread admission before same-instance getter'],
+    ['return settings.AnimationsEnabled;', 'return new UISettings().AnimationsEnabled;', 'owner-thread admission before same-instance getter'],
+    ['catch { return null; }', 'catch { return false; }', 'isolated nullable read with no state mutation'],
+    ['return settings.AnimationsEnabled;', 'Update("systemPreference"); return settings.AnimationsEnabled;', 'isolated nullable read with no state mutation'],
+    ['systemAnimation = ReadSystemAnimationForTrace()', 'systemAnimation = settings.AnimationsEnabled', 'sample only in existing conditional completed payload'],
+  ]) assert(completedGetterViolations(source.replace(before, after)).includes(violation), violation);
+});
+
+test('nullable completed getter использует прежнюю bool проекцию и подготовленные controls настоящего helper', () => {
+  const source = readSource(new URL('./verify-input.ps1', import.meta.url));
+  const projection = source.slice(source.indexOf('function Read-InputPhaseField'), source.indexOf('function Scenario'));
+  assert(projection.includes("'completed' { $phase = 'completed' }"));
+  assert(projection.includes("Read-InputPhaseField $data 'systemAnimation' 'bool'"));
+  assert(projection.includes('$value -is [bool]'));
+  const controls = readSource(new URL('./cleanup.test.ps1', import.meta.url));
+  const completed = controls.slice(controls.indexOf('$completedGetterCases ='), controls.indexOf('$received ='));
+  assert(completed.includes("Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($completedEvent)"));
+  assert(completed.includes('kind = \'completed\''));
+  assert(completed.includes('$getterSummary.rows[0][6]'));
+  assert(completed.includes('$getterSummary.rows[0].Count -ne 13'));
+  for (const name of ['false', 'true', 'unavailable', 'malformed', 'missing']) assert(completed.includes(`name = '${name}'`), name);
+  assert(completed.includes('$actual -isnot [bool]'));
+  assert(completed.includes('$null -ne $actual'));
+  assert(completed.includes('phase-completed-getter-control'));
+});
+
 test('отказ snap называет сценарий и сохраняет порядок фаз без нового чтения trace', () => {
   const source = readSource(new URL('./verify-input.ps1', import.meta.url));
   assert.deepEqual(inputPhaseDiagnosticViolations(source), []);
