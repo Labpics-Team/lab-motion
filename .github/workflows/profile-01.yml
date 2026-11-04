@@ -72,6 +72,7 @@ jobs:
           test -n "$CPU"
           taskset -c "$CPU" node --input-type=module <<'NODE'
           import { createRequire } from 'node:module';
+          import { readFileSync } from 'node:fs';
           import { join, dirname } from 'node:path';
           import { arch, platform, release } from 'node:os';
           import { captureServerMachine, createServerJournal } from './bench/profile/server-profile-runner.mjs';
@@ -90,7 +91,16 @@ jobs:
             const clock = prepareServerThreadCpuClock({ directory: out });
             receipt.engineClock = clock.metadata;
             try { receipt.machine = captureServerMachine(); }
-            catch (error) { receipt.failures.push({ boundary: 'machine-resource-prerequisite', message: error.message, raw: error.raw ?? null }); }
+            catch (error) {
+              const topology = {};
+              for (const file of ['/proc/self/cgroup', '/proc/self/mountinfo', '/sys/fs/cgroup/cgroup.controllers',
+                '/sys/fs/cgroup/cgroup.subtree_control', '/sys/fs/cgroup/cpu.stat']) {
+                try { topology[file] = { text: readFileSync(file, 'utf8') }; }
+                catch (readError) { topology[file] = { error: { code: readError.code, message: readError.message } }; }
+              }
+              receipt.failures.push({ boundary: 'machine-resource-prerequisite', message: error.message,
+                raw: error.raw ?? null, topology });
+            }
             const requireBench = createRequire(join(process.cwd(), 'bench/compare/package.json'));
             const browserType = requireBench('playwright').chromium;
             const executable = browserType.executablePath();

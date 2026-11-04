@@ -375,21 +375,23 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(download.with?.['artifact-ids']).toBe('$' + '{{ needs.verify.outputs.artifact_id }}');
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
-  expect(ci.on).toEqual({
+  const dispatch = ci.on.workflow_dispatch as { inputs: Record<string, Record<string, unknown>> };
+  const dispatchInputs = Object.fromEntries(Object.entries(dispatch.inputs)
+    .map(([name, { description: _description, ...contract }]) => [name, contract]));
+  expect({ ...ci.on, workflow_dispatch: { ...dispatch, inputs: dispatchInputs } }).toEqual({
     push: { branches: ['main'] }, pull_request: null, merge_group: null,
-    workflow_dispatch: { inputs: { profile_baseline: {
-      description: 'Снять зарегистрированный размерный baseline PROFILE-01',
-      type: 'boolean', default: false,
-    }, performance_baseline: {
-      description: 'Commit для парного сравнения полной стоимости движения',
-      type: 'string', default: '',
-    } } },
+    workflow_dispatch: { inputs: {
+      profile_baseline: { type: 'boolean', default: false },
+      profile_prepare: { type: 'boolean', default: false },
+      performance_baseline: { type: 'string', default: '' },
+    } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
   expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'performance', 'profile-baseline', 'security', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}",
+    if: "${{ github.event_name == 'workflow_dispatch' && (inputs.profile_baseline || inputs.profile_prepare) }}",
     uses: './.github/workflows/profile-01.yml',
+    with: { prepare_only: '${{ inputs.profile_prepare }}' },
   });
   expect(ci.jobs.performance).toEqual({
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' }}",
@@ -401,7 +403,32 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(performance.permissions).toEqual({ contents: 'read' });
   expect(performance.jobs.compare!['runs-on']).toBe('ubuntu-latest');
   expect(performance.jobs.compare!['continue-on-error']).toBeUndefined();
-  expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
+  const profile = workflows.get('profile-01.yml')!;
+  const call = profile.on.workflow_call as { inputs: Record<string, Record<string, unknown>> };
+  const callInputs = Object.fromEntries(Object.entries(call.inputs)
+    .map(([name, { description: _description, ...contract }]) => [name, contract]));
+  expect({ ...profile.on, workflow_call: { ...call, inputs: callInputs } }).toEqual({
+    workflow_call: { inputs: { prepare_only: { type: 'boolean', default: false } } },
+  });
+  expect(profile.permissions).toEqual({ contents: 'read' });
+  const probe = profile.jobs.probe!;
+  expect(probe['continue-on-error']).toBeUndefined();
+  const profileNode = probe.steps!.find(item => item.uses?.startsWith('actions/setup-node@'))!;
+  expect(profileNode.with).toEqual({ 'node-version': "${{ inputs.prepare_only && '24.19.0' || '24' }}" });
+  const prepareBrowser = probe.steps!.find(item => item.run?.includes('playwright install --with-deps chromium'))!;
+  const prepareIdentity = probe.steps!.find(item => item.run?.includes('HOSTED_PROFILE_PREPARATION'))!;
+  const measurement = probe.steps!.find(item => item.run?.includes('node bench/profile/probe-profile-01.mjs'))!;
+  expect(prepareBrowser.if).toBe('${{ inputs.prepare_only }}');
+  expect(prepareIdentity.if).toBe('${{ inputs.prepare_only }}');
+  expect(measurement.if).toBe('${{ !inputs.prepare_only }}');
+  expect(measurement.id).toBe('probe');
+  for (const item of [profileNode, prepareBrowser, prepareIdentity, measurement]) {
+    expect(item['continue-on-error']).toBeUndefined();
+  }
+  expect(probe.steps!.find(item => item.run?.includes('node bench/profile/validate-profile-01.mjs --raw'))!.if)
+    .toBe("${{ !cancelled() && steps.probe.outcome != 'skipped' }}");
+  expect(probe.steps!.find(item => item.run?.includes('profile-replay-mutations-'))!.if)
+    .toBe("${{ !cancelled() && steps.probe.outcome == 'success' }}");
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);
   for (const document of [ci, browser]) {
     expect(document.permissions).toEqual({ contents: 'read' });
@@ -490,6 +517,45 @@ describe('нативный граф CI', () => {
   it('проверяет любой PR через явные обязательные jobs', () => assertNativeGraph(sources()));
 
   it.each([
+    ['workflow_dispatch', undefined, undefined, false, false],
+    ['workflow_dispatch', false, false, false, false],
+    ['workflow_dispatch', true, false, true, false],
+    ['workflow_dispatch', false, true, true, true],
+    ['workflow_dispatch', true, true, true, true],
+    ['pull_request', false, false, false, false],
+    ['pull_request', true, true, false, false],
+    ['push', true, true, false, false],
+    ['merge_group', true, true, false, false],
+  ] as const)('PROFILE mode: %s baseline=%s prepare=%s',
+    (event, baseline, prepare, invoked, metadataOnly) => {
+      const files = sources();
+      assertNativeGraph(files);
+      const ci = parse(files.get('ci.yml')!) as Workflow;
+      const profile = parse(files.get('profile-01.yml')!) as Workflow;
+      const call = ci.jobs['profile-baseline']!;
+      // Эти выражения уже проверены как ограниченный JS-совместимый поднабор Actions выше.
+      const evaluate = (expression: unknown, inputs: Record<string, boolean>) => {
+        expect(expression).toEqual(expect.any(String));
+        const body = (expression as string).slice(3, -2).trim();
+        return Function('github', 'inputs', `return (${body});`)({ event_name: event }, inputs) as boolean;
+      };
+      const defaults = (ci.on.workflow_dispatch as { inputs: Record<string, { default: boolean }> }).inputs;
+      const dispatchInputs = {
+        profile_baseline: baseline ?? defaults.profile_baseline!.default,
+        profile_prepare: prepare ?? defaults.profile_prepare!.default,
+      };
+      expect(evaluate(call.if, dispatchInputs)).toBe(invoked);
+      const prepareOnly = evaluate(call.with!.prepare_only, dispatchInputs);
+      const probe = profile.jobs.probe!;
+      for (const token of ['playwright install --with-deps chromium', 'HOSTED_PROFILE_PREPARATION']) {
+        const item = probe.steps!.find(value => value.run?.includes(token))!;
+        expect(invoked && evaluate(item.if, { prepare_only: prepareOnly })).toBe(metadataOnly);
+      }
+      const measurement = probe.steps!.find(item => item.run?.includes('node bench/profile/probe-profile-01.mjs'))!;
+      expect(invoked && evaluate(measurement.if, { prepare_only: prepareOnly })).toBe(invoked && !metadataOnly);
+    });
+
+  it.each([
     ['PR base filter', 'ci.yml', (w: Workflow) => { w.on.pull_request = { branches: ['main'] }; }],
     ['PR path filter', 'ci.yml', (w: Workflow) => { w.on.pull_request = { paths: ['src/**'] }; }],
     ['нет always', 'ci.yml', (w: Workflow) => { delete w.jobs.CI!.if; }],
@@ -538,6 +604,35 @@ describe('нативный граф CI', () => {
     ['PROFILE запущен для обычного кандидата', 'ci.yml', (w: Workflow) => { delete w.jobs['profile-baseline']!.if; }],
     ['PROFILE без явного запроса', 'ci.yml', (w: Workflow) => {
       w.jobs['profile-baseline']!.if = "${{ github.event_name == 'workflow_dispatch' }}";
+    }],
+    ['PROFILE input включён по умолчанию', 'ci.yml', (w: Workflow) => {
+      (w.on.workflow_dispatch as { inputs: Record<string, { default: boolean }> }).inputs.profile_prepare!.default = true;
+    }],
+    ['PROFILE потерял prepare routing', 'ci.yml', (w: Workflow) => { delete w.jobs['profile-baseline']!.with; }],
+    ['PROFILE принудительный prepare routing', 'ci.yml', (w: Workflow) => {
+      w.jobs['profile-baseline']!.with = { prepare_only: true };
+    }],
+    ['PROFILE prepare default изменён', 'profile-01.yml', (w: Workflow) => {
+      (w.on.workflow_call as { inputs: Record<string, { default: boolean }> }).inputs.prepare_only!.default = true;
+    }],
+    ['PROFILE permission расширены', 'profile-01.yml', (w: Workflow) => { w.permissions = { contents: 'write' }; }],
+    ['PROFILE браузер без prepare guard', 'profile-01.yml', (w: Workflow) => {
+      delete w.jobs.probe!.steps!.find(item => item.run?.includes('playwright install --with-deps chromium'))!.if;
+    }],
+    ['PROFILE identity без prepare guard', 'profile-01.yml', (w: Workflow) => {
+      delete w.jobs.probe!.steps!.find(item => item.run?.includes('HOSTED_PROFILE_PREPARATION'))!.if;
+    }],
+    ['PROFILE samples включены при prepare', 'profile-01.yml', (w: Workflow) => {
+      w.jobs.probe!.steps!.find(item => item.run?.includes('node bench/profile/probe-profile-01.mjs'))!.if = '${{ inputs.prepare_only }}';
+    }],
+    ['PROFILE prepare скрывает failure', 'profile-01.yml', (w: Workflow) => {
+      w.jobs.probe!.steps!.find(item => item.run?.includes('HOSTED_PROFILE_PREPARATION'))!['continue-on-error'] = true;
+    }],
+    ['PROFILE validator запускается без samples', 'profile-01.yml', (w: Workflow) => {
+      delete w.jobs.probe!.steps!.find(item => item.run?.includes('node bench/profile/validate-profile-01.mjs --raw'))!.if;
+    }],
+    ['PROFILE mutation validator выключен', 'profile-01.yml', (w: Workflow) => {
+      w.jobs.probe!.steps!.find(item => item.run?.includes('profile-replay-mutations-'))!.if = false;
     }],
     ['нет workflow_call', 'browser.yml', (w: Workflow) => { w.on = { workflow_dispatch: null }; }],
     ...['chromium', 'firefox', 'webkit'].map((engine) => [`нет ${engine}`, 'browser.yml', (w: Workflow) => {
