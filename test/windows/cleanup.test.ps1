@@ -24,9 +24,10 @@ $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseInput([IO.File]::ReadAllText($Harness), [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw 'Invalid harness syntax' }
 $readers = @($ast.EndBlock.Statements | Where-Object {
-    $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -in @('Read-ProcessHasExited', 'Read-ProcessExitCode', 'Save-CleanupFailure')
+    $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -in @('Read-ProcessHasExited', 'Read-ProcessExitCode', 'Save-CleanupFailure',
+        'Read-InputPhaseField', 'Get-InputPhaseSummary')
 })
-if ($readers.Count -ne 3) { throw 'Missing actual completion readers/arbitration' }
+if ($readers.Count -ne 5) { throw 'Missing actual completion readers/arbitration/phase projection' }
 $completionReaders = [scriptblock]::Create(($readers | ForEach-Object { $_.Extent.Text }) -join "`n")
 . $completionReaders
 $outer = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.TryStatementAst] })[-1]
@@ -334,6 +335,88 @@ try {
     Save-CleanupFailure $secondControl ([ref]$first)
     if (![object]::ReferenceEquals($first, $firstControl) -or $script:warnings.Count -ne 1 -or
         $script:warnings[0] -notmatch 'second-cleanup-control') { throw 'First-error arbitration/reference changed' }
+
+    # Настоящая проекция и failure-ветка из AST: синтетические случаи, не WinUI/runtime RCA.
+    $phaseEvents = @(
+        [pscustomobject]@{ sequence = 10; kind = 'intent'; data = [pscustomobject]@{ operation = 2; trigger = 'pressed'; pressed = $false; localAnimation = $true; systemAnimation = $true } },
+        [pscustomobject]@{ sequence = 11; kind = 'motion'; data = [pscustomobject]@{ pageOperation = 2; nativeOperation = 20; phase = 'requested' } },
+        [pscustomobject]@{ sequence = 12; kind = 'completed'; data = [pscustomobject]@{ operation = 2; nativeOperation = 20; reason = 'settled'; end = 'Finished'; isCurrent = $true } },
+        [pscustomobject]@{ sequence = 13; kind = 'intent'; data = [pscustomobject]@{ operation = 3; trigger = 'localPreference'; pressed = $false; localAnimation = $false; systemAnimation = $true } },
+        [pscustomobject]@{ sequence = 14; kind = 'snapRequested'; data = [pscustomobject]@{ operation = 3 } },
+        [pscustomobject]@{ sequence = 15; kind = 'snapReadback'; data = [pscustomobject]@{ operation = 3 } }
+    )
+    $phaseCases = 0
+    foreach ($name in @('disable-animation', 'system-disable-animation')) {
+        $phaseEvents[3].data.trigger = if ($name -eq 'disable-animation') { 'localPreference' } else { 'systemPreference' }
+        $phaseEvents[3].data.localAnimation = $name -eq 'system-disable-animation'
+        $phaseEvents[3].data.systemAnimation = $name -eq 'disable-animation'
+        $summary = Get-InputPhaseSummary -Name $name -After 9 -Events $phaseEvents | ConvertFrom-Json
+        if ($summary.scenario -cne $name -or $summary.rows.Count -ne 6 -or $summary.omitted -ne 0 -or
+            $summary.rows[0][1] -cne 'release' -or $summary.rows[1][2] -ne 2 -or $summary.rows[1][3] -ne 20 -or
+            $summary.rows[2][7] -cne 'settled' -or $summary.rows[2][0] -ge $summary.rows[3][0] -or
+            $summary.rows[3][1] -cne $phaseEvents[3].data.trigger -or
+            $summary.rows[3][5] -ne $phaseEvents[3].data.localAnimation -or $summary.rows[3][6] -ne $phaseEvents[3].data.systemAnimation -or
+            $summary.rows[4][1] -cne 'snapRequested' -or $summary.rows[5][1] -cne 'snapReadback') {
+            throw 'phase-healthy-order-or-operation-control'
+        }
+        $noPreference = Get-InputPhaseSummary -Name $name -After 9 -Events @($phaseEvents | Where-Object kind -ne 'intent') | ConvertFrom-Json
+        if (@($noPreference.rows | Where-Object { $_[1] -in @('localPreference', 'systemPreference') }).Count -ne 0 -or
+            $noPreference.rows.Count -ne 4) { throw 'phase-no-preference-control' }
+        $missedSnap = Get-InputPhaseSummary -Name $name -After 12 -Events @($phaseEvents[3]) | ConvertFrom-Json
+        if ($missedSnap.rows.Count -ne 1 -or $missedSnap.rows[0][1] -cne $phaseEvents[3].data.trigger) {
+            throw 'phase-preference-without-snap-control'
+        }
+        $missedReadback = Get-InputPhaseSummary -Name $name -After 12 -Events @($phaseEvents[3], $phaseEvents[4]) | ConvertFrom-Json
+        if ($missedReadback.rows.Count -ne 2 -or $missedReadback.rows[1][1] -cne 'snapRequested') {
+            throw 'phase-snap-without-readback-control'
+        }
+        $phaseCases += 4
+    }
+    $missing = Get-InputPhaseSummary -Name 'untrusted-name' -After 9 -Events @() | ConvertFrom-Json
+    if ($missing.scenario -cne 'unknown' -or $missing.rows.Count -ne 0 -or $missing.count -ne 0) { throw 'phase-missing-control' }
+    $malformed = @(
+        [pscustomobject]@{ sequence = '::error::secret'; kind = 'completed'; data = 'secret' },
+        [pscustomobject]@{ sequence = 10; kind = 'completed'; data = [pscustomobject]@{ operation = 'secret'; nativeOperation = -1; reason = '::error::secret'; end = 'secret'; isCurrent = 'true'; arbitrary = 'secret' } },
+        [pscustomobject]@{ sequence = 11; kind = 'ignored'; data = 'secret' }
+    )
+    $text = Get-InputPhaseSummary -Name '::error::secret' -After 9 -Events $malformed
+    $bad = $text | ConvertFrom-Json
+    if ($text -match 'secret|::error::|arbitrary' -or $bad.invalid -ne 1 -or $bad.rows.Count -ne 1 -or
+        $null -ne $bad.rows[0][2] -or $null -ne $bad.rows[0][3] -or $null -ne $bad.rows[0][7] -or
+        $null -ne $bad.rows[0][8] -or $null -ne $bad.rows[0][9]) { throw 'phase-malformed-redaction-control' }
+    $many = @(1..100 | ForEach-Object {
+        [pscustomobject]@{ sequence = $_; kind = 'completed'; data = [pscustomobject]@{ operation = 9007199254740991L; nativeOperation = 9007199254740991L; reason = 'interaction'; end = 'Stopped'; isCurrent = $false } }
+    })
+    $text = Get-InputPhaseSummary -Name 'system-disable-animation' -After 0 -Events $many
+    $bounded = $text | ConvertFrom-Json
+    if ($text.Length -gt 1800 -or [Text.Encoding]::UTF8.GetByteCount($text) -gt 1800 -or $bounded.count -ne 100 -or
+        $bounded.rows.Count -gt 12 -or $bounded.omitted -ne (100 - $bounded.rows.Count) -or
+        $bounded.rows[0][0] -ne 1 -or $bounded.rows[-1][0] -ne 100) { throw 'phase-bounded-first-last-control' }
+    $phaseCases += 3
+    $scenarioAst = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -eq 'Scenario' })[0]
+    $failureAst = @($scenarioAst.FindAll({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and
+        $node.Extent.Text.StartsWith('if (!$stopped.Count)') }, $true))[0]
+    $phaseFailure = [scriptblock]::Create($failureAst.Clauses[0].Item2.Extent.Text.TrimStart('{').TrimEnd('}'))
+    $before = 9
+    $events = $phaseEvents
+    foreach ($Name in @('disable-animation', 'system-disable-animation')) {
+        $observed = $null
+        try { & $phaseFailure } catch { $observed = $_ }
+        if ($null -eq $observed -or $observed.FullyQualifiedErrorId -notmatch 'InputSnapNotObserved' -or
+            !$observed.Exception.Message.Contains("[scenario=$Name]") -or
+            !$observed.ErrorDetails.Message.Contains('input-phase:')) { throw 'phase-named-failure-control' }
+        $phaseCases++
+    }
+    try {
+        function Get-InputPhaseSummary { throw 'secondary-phase-projection-control' }
+        $observed = $null
+        try { & $phaseFailure } catch { $observed = $_ }
+        if ($null -eq $observed -or $observed.FullyQualifiedErrorId -notmatch 'InputSnapNotObserved' -or
+            $observed.Exception.Message -match 'secondary-phase-projection-control' -or
+            !$observed.ErrorDetails.Message.Contains('input-phase: unavailable')) { throw 'phase-primary-preserved-control' }
+        $phaseCases++
+    } finally { . $completionReaders }
+    "phase diagnostics: $phaseCases synthetic controls PASS"
     # Настоящий неассоциированный .NET getter: процесс не запускается и ничего не меняет.
     $unassociated = [Diagnostics.Process]::new()
     try {

@@ -128,6 +128,18 @@ WinUI, промежуточные значения движения и возв�
 запрете локальный переключатель остаётся включённым. Oracle требует `Stopped/snap`
 старой операции, snap-readback и отсутствие позднего движения после системного запрета.
 Animated-сценарии требуют обе включённые настройки.
+Если shared guard не увидел `completed/snap`, первичная ошибка называет локальный
+или системный сценарий. В той же `failure.txt` она сохраняет последнюю уже
+прочитанную выборку: до 12 строк фаз после начала сценария, без нового чтения trace.
+`input-phase` schema1 содержит `after`, `count`, `omitted`, `invalid` и `rows`;
+поля строки — sequence, phase, operation, nativeOperation, pressed, localAnimation,
+systemAnimation, reason, end, isCurrent. Сохраняются только фиксированные
+перечисления, bool и неотрицательные целые; отсутствующее или неверное поле даёт
+null. JSON ограничен 1800 ASCII-символами, пропуски отмечены явно. При `omitted>0`
+отсутствие фазы в summary не доказывает её отсутствия в trace. Это диагностика
+порядка release/preference/request/completion/snap, без изменения oracle или
+сроков. Отказ проекции не заменяет первичную ошибку. Полные trace, CLI arguments,
+stdout и пользовательское содержимое в summary не попадают.
 Флаг `-ConfigureHostedAnimations` доступен только в одноразовой GitHub-hosted
 сессии: он включает и временно отключает client-area animation через `SystemParametersInfo`,
 проверяет системный readback и события `UISettings`, затем восстанавливает прежнее значение

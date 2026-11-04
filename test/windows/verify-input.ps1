@@ -112,6 +112,74 @@ function Wait-Rest([long]$After = 0) {
     throw 'Кнопка не вернулась в отпущенное состояние за 8 секунд.'
 }
 
+function Read-InputPhaseField($Data, [string]$Field, [string]$Type) {
+    if ($null -eq $Data) { return $null }
+    $property = $Data.PSObject.Properties[$Field]
+    if ($null -eq $property) { return $null }
+    $value = $property.Value
+    switch ($Type) {
+        'number' { if (($value -is [int] -or $value -is [long]) -and $value -ge 0 -and $value -le 9007199254740991) { return $value } }
+        'bool' { if ($value -is [bool]) { return $value } }
+        'reason' { if ($value -is [string] -and $value -cin @('settled', 'snap', 'replaced', 'stopped', 'disposed', 'interaction')) { return $value } }
+        'end' { if ($value -is [string] -and $value -cin @('Finished', 'Stopped')) { return $value } }
+    }
+    return $null
+}
+
+function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events) {
+    # Только фиксированные enums/bool/числа; никакие data, args или тексты ошибок не сериализуются.
+    $scenario = if ($Name -cin @('disable-animation', 'system-disable-animation')) { $Name } else { 'unknown' }
+    $rows = [Collections.Generic.List[object]]::new()
+    $invalid = 0
+    foreach ($event in $Events) {
+        $sequence = Read-InputPhaseField $event 'sequence' 'number'
+        if ($null -eq $sequence) { $invalid++; continue }
+        if ($sequence -le $After) { continue }
+        $kindProperty = $event.PSObject.Properties['kind']
+        $dataProperty = $event.PSObject.Properties['data']
+        if ($null -eq $kindProperty -or $null -eq $dataProperty) { $invalid++; continue }
+        $data = $dataProperty.Value
+        $phase = $null
+        switch -CaseSensitive ($kindProperty.Value) {
+            'intent' {
+                $triggerProperty = if ($null -ne $data) { $data.PSObject.Properties['trigger'] } else { $null }
+                if ($null -ne $triggerProperty) {
+                    switch -CaseSensitive ($triggerProperty.Value) {
+                        'pressed' { if ((Read-InputPhaseField $data 'pressed' 'bool') -ceq $false) { $phase = 'release' } }
+                        'localPreference' { $phase = 'localPreference' }
+                        'systemPreference' { $phase = 'systemPreference' }
+                    }
+                }
+            }
+            'motion' {
+                $phaseProperty = if ($null -ne $data) { $data.PSObject.Properties['phase'] } else { $null }
+                if ($null -ne $phaseProperty -and $phaseProperty.Value -ceq 'requested') { $phase = 'requested' }
+            }
+            'completed' { $phase = 'completed' }
+            'snapRequested' { $phase = 'snapRequested' }
+            'snapReadback' { $phase = 'snapReadback' }
+        }
+        if ($null -eq $phase) { continue }
+        $operationField = if ($phase -eq 'requested') { 'pageOperation' } else { 'operation' }
+        # Строка schema1: sequence,phase,operation,nativeOperation,pressed,local,system,reason,end,isCurrent.
+        $rows.Add(@($sequence, $phase, (Read-InputPhaseField $data $operationField 'number'),
+            (Read-InputPhaseField $data 'nativeOperation' 'number'), (Read-InputPhaseField $data 'pressed' 'bool'),
+            (Read-InputPhaseField $data 'localAnimation' 'bool'), (Read-InputPhaseField $data 'systemAnimation' 'bool'),
+            (Read-InputPhaseField $data 'reason' 'reason'), (Read-InputPhaseField $data 'end' 'end'),
+            (Read-InputPhaseField $data 'isCurrent' 'bool')))
+    }
+    $count = $rows.Count
+    # Сохраняем начало и конец в исходном порядке; пропуск явно учитывается, не означает отсутствия фазы.
+    while ($rows.Count -gt 12) { $rows.RemoveAt([int][Math]::Floor($rows.Count / 2)) }
+    do {
+        $summary = [ordered]@{ schema = 1; scenario = $scenario; after = $After; count = $count;
+            omitted = $count - $rows.Count; invalid = $invalid; rows = @($rows.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
+        if ($summary.Length -le 1800) { return $summary }
+        $rows.RemoveAt([int][Math]::Floor($rows.Count / 2))
+    } while ($rows.Count)
+    throw 'Диагностика фаз превысила свой фиксированный предел.'
+}
+
 function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArguments = @()) {
     Wait-Rest
     $before = @(Read-Trace)[-1].sequence
@@ -144,11 +212,24 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
     if ($Name -in @('disable-animation', 'system-disable-animation')) {
         $deadline = [DateTime]::UtcNow.AddSeconds(8)
         do {
-            $stopped = @(Read-Trace | Where-Object { $_.sequence -gt $before -and $_.kind -eq 'completed' -and $_.data.reason -eq 'snap' })
+            $events = @(Read-Trace)
+            $stopped = @($events | Where-Object { $_.sequence -gt $before -and $_.kind -eq 'completed' -and $_.data.reason -eq 'snap' })
             if ($stopped.Count) { break }
             Start-Sleep -Milliseconds 50
         } while ([DateTime]::UtcNow -lt $deadline)
-        if (!$stopped.Count) { throw 'Переключатель не прервал движение: completed/snap не наблюдался.' }
+        if (!$stopped.Count) {
+            $failure = [Management.Automation.ErrorRecord]::new(
+                [InvalidOperationException]::new(('Переключатель не прервал движение: completed/snap не наблюдался. [scenario={0}]' -f $Name)),
+                'InputSnapNotObserved', [Management.Automation.ErrorCategory]::InvalidResult, $null)
+            try {
+                $summary = Get-InputPhaseSummary -Name $Name -After $before -Events $events
+                $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`ninput-phase: " + $summary)
+            } catch { # Ошибка диагностической проекции не заменяет сохранённый отказ ввода.
+                try { $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`ninput-phase: unavailable") }
+                catch { }
+            }
+            throw $failure
+        }
     }
     $after = @(Read-Trace)[-1].sequence
     $scenarios.Add(@{ name = $Name; after = $before; through = $after })

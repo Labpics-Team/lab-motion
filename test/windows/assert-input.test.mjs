@@ -379,6 +379,52 @@ test('unowned healthy cleanup resets the injected invalid environment map', () =
   assert.match(control, /\$saved = @\{ LAB_MOTION_PRESS_TRACE = 'previous-trace' \}[\s\S]*& \$cleanup/);
 });
 
+function inputPhaseDiagnosticViolations(source) {
+  const guard = source.slice(source.indexOf("if ($Name -in @('disable-animation', 'system-disable-animation'))"), source.indexOf('$after = @(Read-Trace)[-1].sequence'));
+  return [
+    ['named snap failure', !guard.includes("'InputSnapNotObserved'") || !guard.includes('[scenario={0}]')],
+    ['failure captured before phase projection', !/\$failure = \[Management\.Automation\.ErrorRecord\]::new[\s\S]*try \{[\s\S]*Get-InputPhaseSummary/.test(guard)],
+    ['bounded snapshot reused', !guard.includes('$events = @(Read-Trace)') || !guard.includes('-Events $events')
+      || (guard.match(/Read-Trace/g) ?? []).length !== 1],
+    ['diagnostic cannot replace primary', !/catch \{ \}\s+\}\s+throw \$failure/.test(guard)],
+    ['fixed phase summary bound', !source.includes('$rows.Count -gt 12') || !source.includes('$summary.Length -le 1800')],
+    ['real projection controls', !readSource(new URL('./cleanup.test.ps1', import.meta.url)).includes("'Get-InputPhaseSummary'")],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('отказ snap называет сценарий и сохраняет порядок фаз без нового чтения trace', () => {
+  const source = readSource(new URL('./verify-input.ps1', import.meta.url));
+  assert.deepEqual(inputPhaseDiagnosticViolations(source), []);
+  for (const [before, after, namedError] of [
+    ["'InputSnapNotObserved'", "'unnamed'", 'named snap failure'],
+    ['-Events $events', '-Events @(Read-Trace)', 'bounded snapshot reused'],
+    ['throw $failure', 'throw', 'diagnostic cannot replace primary'],
+    ['$summary.Length -le 1800', '$true', 'fixed phase summary bound'],
+  ]) assert(inputPhaseDiagnosticViolations(source.replace(before, after)).includes(namedError), namedError);
+});
+
+test('диагностика фаз проецирует enum/bool/number и сохраняет missing/malformed проверки настоящего helper', () => {
+  const source = readSource(new URL('./verify-input.ps1', import.meta.url));
+  const projection = source.slice(source.indexOf('function Read-InputPhaseField'), source.indexOf('function Scenario'));
+  assert.match(projection, /\$value -is \[int\] -or \$value -is \[long\]/);
+  assert(projection.includes('$value -ge 0 -and $value -le 9007199254740991'));
+  assert(projection.includes('$value -is [bool]'));
+  assert(projection.includes("@('settled', 'snap', 'replaced', 'stopped', 'disposed', 'interaction')"));
+  assert(projection.includes("@('Finished', 'Stopped')"));
+  assert(projection.includes("'pageOperation' } else { 'operation'"));
+  assert(projection.includes('$sequence -le $After'));
+  assert(projection.includes('rows = @($rows.ToArray())'));
+  assert(!/\$Events\s*\|\s*ConvertTo-Json|\$data\s*\|\s*ConvertTo-Json/.test(projection));
+  const witness = readSource(new URL('./cleanup.test.ps1', import.meta.url));
+  for (const control of ['phase-healthy-order-or-operation-control', 'phase-no-preference-control',
+    'phase-preference-without-snap-control', 'phase-snap-without-readback-control', 'phase-missing-control', 'phase-malformed-redaction-control',
+    'phase-bounded-first-last-control', 'phase-named-failure-control', 'phase-primary-preserved-control']) {
+    assert(witness.includes(control), control);
+  }
+  assert(witness.includes('$text -match \'secret|::error::|arbitrary\''));
+  assert(witness.includes('$phaseFailure = [scriptblock]::Create($failureAst.Clauses[0].Item2.Extent.Text'));
+});
+
 test('повреждённый JSON даёт exit1 и отрицательный result.json', () => {
   const directory = mkdtempSync(join(tmpdir(), 'lab-motion-input-oracle-'));
   try {
