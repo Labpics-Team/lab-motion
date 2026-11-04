@@ -58,9 +58,15 @@ $process = $null
 $primaryFailure = $null
 try {
     $process = Start-Process -FilePath $exe -WorkingDirectory $appOutput -WindowStyle Hidden -PassThru
-    # Удерживаем handle своего запуска до чтения необязательной identity.
-    $null = $process.Handle
+    # PowerShell может вернуть null вместо ошибки getter; допуск проверяем явно.
+    $handle = $process.Handle
+    if ($null -eq $handle -or $handle -eq [IntPtr]::Zero) {
+        throw 'Не получен действительный handle собственного процесса.'
+    }
     $started = $process.StartTime
+    if ($started -isnot [DateTime]) {
+        throw 'Не получено время запуска собственного процесса.'
+    }
     $identity = [ordered]@{
         pid = $process.Id
         path = $exe

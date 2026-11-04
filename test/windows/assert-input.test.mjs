@@ -148,7 +148,8 @@ test('состояния различают настоящий PressPage guard �
 function processCleanupViolations(source) {
   const cleanup = source.slice(source.lastIndexOf('} finally {'));
   return [
-    ['own handle retained', !source.includes('$null = $process.Handle')],
+    ['own handle validated before identity', !/\$handle = \$process\.Handle\s+if \(\$null -eq \$handle -or \$handle -eq \[IntPtr\]::Zero\) \{\s+throw '[^']+'\s+\}\s+\$started = \$process\.StartTime/.test(source)],
+    ['start time validated before identity', !/\$started = \$process\.StartTime\s+if \(\$started -isnot \[DateTime\]\) \{\s+throw '[^']+'\s+\}\s+\$identity =/.test(source)],
     ['own process disposal', !source.includes('$process.Dispose()')],
     ['own process termination', !source.includes('$process.Kill()')],
     ['original failure retained', !source.includes('$primaryFailure = $_')],
@@ -161,13 +162,33 @@ test('post-start lifetime source contract retains cleanup, original error and th
   const source = readFileSync(new URL('./verify.ps1', import.meta.url), 'utf8');
   assert.deepEqual(processCleanupViolations(source), []);
   for (const [before, after, expected] of [
-    ['$null = $process.Handle', '$null', 'own handle retained'],
+    ['$handle = $process.Handle', '$handle = $null', 'own handle validated before identity'],
+    ['$null -eq $handle -or $handle -eq [IntPtr]::Zero', '$false', 'own handle validated before identity'],
+    ['$null -eq $handle -or ', '', 'own handle validated before identity'],
+    [' -or $handle -eq [IntPtr]::Zero', '', 'own handle validated before identity'],
+    ['$started -isnot [DateTime]', '$false', 'start time validated before identity'],
+    ['$started -isnot [DateTime]', '$started -is [DateTime]', 'start time validated before identity'],
     ['$process.Dispose()', '$null', 'own process disposal'],
     ['$process.Kill()', '$null', 'own process termination'],
     ['$primaryFailure = $_', '$primaryFailure = $null', 'original failure retained'],
     ['$env:LAB_MOTION_PROBE_OUTPUT = $previousOutput', '$null', 'environment restored finally'],
     ['process-cleanup.test.ps1', 'missing-process-test.ps1', 'real process witness wired'],
   ]) assert(processCleanupViolations(source.replace(before, after)).includes(expected), expected);
+});
+
+test('process witness retains getter faults, invalid identity and a non-effect .NET getter control', () => {
+  const source = readFileSync(new URL('./process-cleanup.test.ps1', import.meta.url), 'utf8');
+  for (const fault of ['handle', 'start-time', 'handle-null', 'handle-zero', 'start-time-null', 'start-time-invalid']) {
+    assert(source.includes(`'${fault}'`), fault);
+  }
+  assert(source.includes('Add-Member ScriptProperty $property'));
+  assert(source.includes("throw [InvalidOperationException]::new('primary-identity')"));
+  assert(source.includes('$script:killed -ne $needsKill'));
+  assert(source.includes('$script:waitReached -ne $expectsWait'));
+  assert(source.includes('$unassociated = [Diagnostics.Process]::new()'));
+  assert(source.includes('$unassociatedHandle = $unassociated.Handle'));
+  assert(source.includes('finally { $unassociated.Dispose() }'));
+  assert(!source.includes('$unassociated.Start('));
 });
 
 test('правильный SnapTo request с неверным положением не проходит', () => {
