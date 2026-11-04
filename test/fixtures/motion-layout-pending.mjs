@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 import { setImmediate } from 'node:timers/promises';
 
-const { layout } = await import(pathToFileURL(process.argv[2]).href);
+const { layout } = process.argv[4] === 'cjs'
+  ? createRequire(import.meta.url)(process.argv[2]) : await import(process.argv[2]);
 let resolve;
 const pending = new Promise(done => { resolve = done; });
 const documents = [];

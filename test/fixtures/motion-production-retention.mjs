@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 import { setImmediate } from 'node:timers/promises';
 
-const { scope, layout, playhead } = await import(pathToFileURL(process.argv[2]).href);
+const { scope, layout, playhead } = process.argv[4] === 'cjs'
+  ? createRequire(import.meta.url)(process.argv[2]) : await import(process.argv[2]);
 assert.equal(typeof global.gc, 'function');
 const transport = process.argv[3] === 'playhead';
 const view = transport ? playhead : run => run;
