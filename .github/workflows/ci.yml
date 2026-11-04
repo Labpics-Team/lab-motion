@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       profile_baseline:
-        description: 'Снять зарегистрированный размерный baseline PROFILE-01'
+        description: 'Снять зарегистрированный размерный baseline PROFILE-01, только если profile_prepare выключен'
         type: boolean
         default: false
       profile_prepare:
-        description: 'Снять только hosted identity до регистрации server epoch, без samples'
+        description: 'Снять только hosted identity до регистрации server epoch, без samples; имеет приоритет над profile_baseline'
         type: boolean
         default: false
       performance_baseline:
@@ -40,8 +40,9 @@ jobs:
     with:
       baseline: ${{ inputs.performance_baseline }}
 
-  # Только явный baseline-запрос: обычный кандидат может менять runtime и
-  # не обязан совпадать с зарегистрированным старым источником PROFILE-01.
+  # Два явных маршрута: подготовка hosted identity или размерный baseline.
+  # При обоих входах profile_prepare имеет приоритет: baseline не измеряется.
+  # Обычный кандидат не обязан совпадать с зарегистрированным старым источником PROFILE-01.
   profile-baseline:
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.profile_baseline || inputs.profile_prepare) }}
     uses: ./.github/workflows/profile-01.yml
