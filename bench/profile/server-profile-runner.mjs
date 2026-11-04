@@ -1,7 +1,7 @@
 // Расширение существующего bench owner: общие сборка, origin, адаптеры и законы
 // round-robin. Ни одного вывода о физическом мобильном устройстве здесь нет.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, statfsSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readlinkSync, realpathSync, statSync, statfsSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { arch, cpus, hostname, loadavg, platform, release, totalmem } from 'node:os';
 import path from 'node:path';
@@ -16,7 +16,7 @@ import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPack
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
 import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './server-thread-cpu-clock.mjs';
 import { compactServerCpuEvidence, compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
-  serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerResourceIdentity, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration } from './server-profile-contract.mjs';
+  serverFamilyIntervals, serverOrders, serverResourceBinding, serverResourceReasons, validateServerResourceIdentity, validateServerBrowserSample, validateServerEngineSample, verifyServerClockBuildEvidence, verifyServerClockRegistration } from './server-profile-contract.mjs';
 import { writeServerArtifact } from './server-profile-artifact.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -117,7 +117,7 @@ function captureServerLoad() {
   });
   const after = captureResourceConfiguration();
   const affinityAfter = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
-  if (serverProfileDigest(resource) !== serverProfileDigest(after) || affinity !== affinityAfter) {
+  if (serverProfileDigest(serverResourceBinding(resource)) !== serverProfileDigest(serverResourceBinding(after)) || affinity !== affinityAfter) {
     throw Object.assign(new Error('server profile: cgroup/affinity изменились при snapshot'), { raw: { resource, after, affinity, affinityAfter } });
   }
   return { at: new Date().toISOString(), affinity, resource, scopes, cpuMax: resource.scopes[0].cpuMax.text,
@@ -131,19 +131,46 @@ async function withBrowserTimeout(promise, label) {
     })]);
   } finally { clearTimeout(timeout); }
 }
+export function captureServerClockBuildEvidence() {
+  const evidence = { files: {}, namespaces: {}, packages: [] };
+  for (const file of ['/proc/version', '/proc/version_signature', '/proc/cmdline', '/proc/self/timens_offsets',
+    '/proc/1/timens_offsets', `/boot/config-${release()}`]) {
+    try { evidence.files[file] = { text: readFileSync(file, 'utf8') }; }
+    catch (error) { evidence.files[file] = { error: { code: error.code, message: error.message } }; }
+  }
+  for (const file of ['/proc/self/ns/time', '/proc/self/ns/time_for_children', '/proc/1/ns/time']) {
+    try { evidence.namespaces[file] = { target: readlinkSync(file) }; }
+    catch (error) { evidence.namespaces[file] = { error: { code: error.code, message: error.message } }; }
+  }
+  for (const name of [`linux-image-${release()}`, `linux-modules-${release()}`]) {
+    const args = ['-W', '-f=${binary:Package} ${Version} ${source:Package} ${source:Version}\n', name];
+    const result = spawnSync('dpkg-query', args, { encoding: 'utf8', timeout: 10_000, maxBuffer: 1024 * 1024 });
+    evidence.packages.push({ command: 'dpkg-query', args, status: result.status, signal: result.signal,
+      stdout: result.stdout, stderr: result.stderr,
+      ...(result.error ? { error: { code: result.error.code, message: result.error.message } } : {}) });
+  }
+  return evidence;
+}
 export function captureServerMachine() {
-  const affinity = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
-  if (!/^\d+$/.test(affinity ?? '')) throw new Error('server profile: нужен один CPU через taskset, общий scheduler не закреплён');
-  const resource = captureServerLoad();
-  if (resource.affinity !== affinity) throw Object.assign(new Error('server profile: affinity изменилась до регистрации'), { raw: { affinity, resource } });
-  const cgroupCpuMax = resource.cpuMax;
-  const identity = { platform: platform(), release: release(), arch: arch(), host: hostname(),
-    cpu: cpus()[Number(affinity)]?.model, logicalCpus: cpus().length, totalMemoryBytes: totalmem(), affinity,
-    cgroupCpuMax, resource: resource.resource, cgroupMemoryMax: resource.resource.scopes[0].memoryMax,
-    governor: readOptional(`/sys/devices/system/cpu/cpu${affinity}/cpufreq/scaling_governor`),
-    display: 'headless; физический экран отсутствует', power: 'среда сервера; не устройство', thermal: 'не измеряется',
-    node: process.version, nodeExecutableSha256: sha256File(process.execPath), execArgv: process.execArgv };
-  return { identity, sha256: serverProfileDigest(identity), observation: { at: new Date().toISOString(), resource, loadavg: loadavg(), memory: process.memoryUsage() } };
+  const clockBuildEvidence = captureServerClockBuildEvidence();
+  try {
+    verifyServerClockBuildEvidence(clockBuildEvidence, { release: release(), arch: arch() });
+    const affinity = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
+    if (!/^\d+$/.test(affinity ?? '')) throw new Error('server profile: нужен один CPU через taskset, общий scheduler не закреплён');
+    const resource = captureServerLoad();
+    if (resource.affinity !== affinity) throw Object.assign(new Error('server profile: affinity изменилась до регистрации'), { raw: { affinity, resource } });
+    const cgroupCpuMax = resource.cpuMax;
+    const identity = { platform: platform(), release: release(), arch: arch(), host: hostname(),
+      cpu: cpus()[Number(affinity)]?.model, logicalCpus: cpus().length, totalMemoryBytes: totalmem(), affinity,
+      cgroupCpuMax, resource: resource.resource, cgroupMemoryMax: resource.resource.scopes[0].memoryMax, clockBuildEvidence,
+      governor: readOptional(`/sys/devices/system/cpu/cpu${affinity}/cpufreq/scaling_governor`),
+      display: 'headless; физический экран отсутствует', power: 'среда сервера; не устройство', thermal: 'не измеряется',
+      node: process.version, nodeExecutableSha256: sha256File(process.execPath), execArgv: process.execArgv };
+    return { identity, sha256: serverProfileDigest(identity), observation: { at: new Date().toISOString(), resource, loadavg: loadavg(), memory: process.memoryUsage() } };
+  } catch (error) {
+    error.raw = { ...error.raw, clockBuildEvidence };
+    throw error;
+  }
 }
 
 export function createServerJournal(out) {
@@ -594,12 +621,18 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     jitObservation: { status: 'UNPROVEN', reason: 'GC events наблюдаются; точная JIT attribution требует отдельного intrusive trace и не подменяется гипотезой' } };
   let browser, origin, observer, engineClock, interruptionRecorded = false;
   const checkpoint = () => dependencies.signal?.throwIfAborted();
-  let prepared = {}, roots = {}, harness = {}, packages = {};
-  const verify = () => {
+  let prepared = {}, roots = {}, harness = {}, packages = {}, registrationAttempt;
+  const verify = (registration = artifact.registration) => {
     engineClock?.assertUnchanged();
-    if (artifact.registration) {
-      const current = captureServerLoad(), registered = artifact.registration.machine.identity;
-      if (current.affinity !== registered.affinity || serverProfileDigest(current.resource) !== serverProfileDigest(registered.resource)) {
+    if (registration) {
+      const registered = registration.machine.identity;
+      const clockBuildEvidence = captureServerClockBuildEvidence();
+      if (serverProfileDigest(verifyServerClockBuildEvidence(clockBuildEvidence, { release: release(), arch: arch() })) !==
+        serverProfileDigest(verifyServerClockBuildEvidence(registered.clockBuildEvidence, registered))) {
+        throw Object.assign(new Error('server profile: clock build premise изменилась после регистрации'), { raw: { clockBuildEvidence } });
+      }
+      const current = captureServerLoad();
+      if (current.affinity !== registered.affinity || serverProfileDigest(serverResourceBinding(current.resource)) !== serverProfileDigest(serverResourceBinding(registered.resource))) {
         throw Object.assign(new Error('server profile: machine affinity/quota изменились после регистрации'), { raw: { current, registered } });
       }
     }
@@ -609,10 +642,10 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       assertInstalledPackageTreesUnchanged(BENCH, provenance.environment.packages);
     }
     assertFileHashesUnchanged(harness);
-    for (const consumer of [...Object.values(packages), ...Object.values(artifact.registration?.transitivePackages ?? {})]) {
+    for (const consumer of [...Object.values(packages), ...Object.values(registrationAttempt?.transitivePackages ?? {})]) {
       if (sha256File(consumer.tarball) !== consumer.tarballSha256 || hashFileTree(consumer.directory).sha256 !== consumer.treeSha256) throw new Error('server profile: изменились consumer bytes');
     }
-    if (artifact.registration?.browserTree && hashFileTree(artifact.registration.browserTree.directory).sha256 !== artifact.registration.browserTree.sha256) throw new Error('server profile: изменились browser bytes');
+    if (registrationAttempt?.browserTree && hashFileTree(registrationAttempt.browserTree.directory).sha256 !== registrationAttempt.browserTree.sha256) throw new Error('server profile: изменились browser bytes');
   };
   try {
     checkpoint();
@@ -648,15 +681,18 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     Object.entries(adapters).forEach(([id, value]) => { harness[`adapter:${id}`] = value; });
     origin = await startBenchmarkOrigin(); checkpoint();
     browser = await browserType.launch({ headless: SERVER_PROFILE.headless, executablePath: executable }); checkpoint();
-    artifact.registration = { protocolDigest: serverProfileDigest(SERVER_PROFILE), candidateSamplesObserved: false,
+    registrationAttempt = { protocolDigest: serverProfileDigest(SERVER_PROFILE), candidateSamplesObserved: false,
       candidateSamplesObservedScope: SERVER_PROFILE.candidateSamplesObservedScope,
       clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError),
       registeredAt: new Date().toISOString(), browser: browserName, browserVersion: browser.version(), browserExecutableSha256, browserTree,
       machine, engineClock: engineClock.metadata, provenance: prepared, packages, transitivePackages: Object.fromEntries(closure), harness,
       allocationScope: 'observational heap + GC; retained отдельным процессом после timing' };
-    verifyServerClockRegistration(artifact.registration);
-    artifact.registrationDigest = serverProfileDigest(artifact.registration);
-    journal('registration-before-any-sample', { registration: artifact.registration, digest: artifact.registrationDigest });
+    verifyServerClockRegistration(registrationAttempt);
+    verify(registrationAttempt);
+    const registrationDigest = serverProfileDigest(registrationAttempt);
+    journal('registration-before-any-sample', { registration: registrationAttempt, digest: registrationDigest });
+    artifact.registration = registrationAttempt;
+    artifact.registrationDigest = registrationDigest;
     checkpoint();
     verify();
     artifact.rawControls = { baseline: await measureBrowserRawControls(browser, origin, adapters.baseline, out, 'baseline') };
@@ -676,6 +712,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     const engineMeasure = dependencies.engineMeasure ?? measureServerEngine;
     const browserMeasure = dependencies.browserMeasure ?? measureServerBrowser;
     const runStage = async (name, runs) => {
+      verify();
       checkpoint();
       const stage = { name, rows: [], blocks: [] }; artifact[name] = stage; artifact.stages.push(name);
       let resourceBefore;
@@ -721,6 +758,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     checkpoint();
     await loadImplementation('candidate');
     checkpoint();
+    verify();
     artifact.rawControls.candidate = await measureBrowserRawControls(browser, origin, adapters.candidate, out, 'candidate');
     journal('raw-controls-candidate-after-calibration', artifact.rawControls.candidate);
     checkpoint();
@@ -758,6 +796,8 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     artifact.verdict = artifact.comparison.every((cell) => cell.p95.bounded && cell.p95.high <= SERVER_PROFILE.nonInferiorityUpper) ? 'PASS' : 'NO-GO';
     return artifact;
   } catch (error) {
+    if (!artifact.registration && registrationAttempt) error.raw = { ...error.raw,
+      clockBuildEvidence: error.raw?.clockBuildEvidence ?? registrationAttempt.machine.identity.clockBuildEvidence };
     interruptionRecorded = dependencies.signal?.aborted && error === dependencies.signal.reason;
     artifact.failures.push({ stage: artifact.stages.at(-1) ?? 'preparation', at: new Date().toISOString(), error: errorRecord(error) });
     journal('failure', artifact.failures.at(-1)); return artifact;

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, type TestContext } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
+import * as filesystem from 'node:fs';
+import * as childProcess from 'node:child_process';
+import * as nodeModule from 'node:module';
+import * as provenanceOwner from '../bench/compare/provenance.mjs';
+import * as compareOwner from '../bench/compare/bench.mjs';
 import path from 'node:path';
 import { createContext, runInContext } from 'node:vm';
 import { createHash } from 'node:crypto';
@@ -9,14 +14,61 @@ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPo
 import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
   compactServerCpuEvidence, expandServerCpuEvidence, compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
   parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal,
-  validateServerResourceIdentity, verifyServerClockRegistration } from '../bench/profile/server-profile-contract.mjs';
+  serverResourceBinding, validateServerResourceIdentity, verifyServerClockBuildEvidence, verifyServerClockRegistration } from '../bench/profile/server-profile-contract.mjs';
 import { writeServerArtifact } from '../bench/profile/server-profile-artifact.mjs';
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
-import { measureServerBrowser, measureServerEngine, runServerProfile, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
+import { captureServerClockBuildEvidence, measureServerBrowser, measureServerEngine, runServerProfile, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
 import * as threadCpuClock from '../bench/profile/server-thread-cpu-clock.mjs';
 
 const hash = 'a'.repeat(64);
 const clone = <T>(value: T): T => structuredClone(value);
+const qualifiedConfig = readFileSync(new URL('./fixtures/server-profile-azure.config', import.meta.url), 'utf8');
+function healthyClockBuildEvidence() {
+  const model = SERVER_PROFILE.clockError, build = model.kernelBuild;
+  const namespaces = { '/proc/self/ns/time': { target: 'time:[4026531834]' },
+    '/proc/self/ns/time_for_children': { target: 'time:[4026531834]' },
+    '/proc/1/ns/time': { error: { code: 'EACCES', message: 'not required by model' } } };
+  return { files: { '/proc/version': { text: 'qualified kernel diagnostics' }, '/proc/cmdline': { text: 'unrelated boot diagnostics' },
+    '/proc/version_signature': { text: `Ubuntu ${build.sourceVersion}-azure ${build.upstreamVersion}\n` },
+    [`/boot/config-${model.kernelRelease}`]: { text: qualifiedConfig },
+    '/proc/self/timens_offsets': { text: 'monotonic           0         0\nboottime            0         0\n' },
+    '/proc/1/timens_offsets': { text: 'monotonic           0         0\nboottime            0         0\n' } }, namespaces,
+    packages: ['image', 'modules'].map(kind => {
+      const name = `linux-${kind}-${model.kernelRelease}`;
+      const source = kind === 'modules' ? build.sourcePackage : build.sourcePackage.replace(/^linux-/, 'linux-signed-');
+      return { command: 'dpkg-query', args: ['-W', '-f=${binary:Package} ${Version} ${source:Package} ${source:Version}\n', name],
+        status: 0, signal: null, stdout: `${name} ${build.sourceVersion} ${source} ${build.sourceVersion}\n`, stderr: '' };
+    }) };
+}
+const buildFaults = ['config', 'signature', 'modules-package', 'image-package', 'missing-witness', 'missing-config', 'read-error',
+  'query-error', 'query-signal', 'missing-package', 'duplicate-package', 'missing-signature', 'missing-namespace', 'namespace-error',
+  'children-namespace', 'self-offset', 'init-offset', 'missing-offset', 'malformed-offset'] as const;
+function mutateClockBuild(evidence: any, fault: typeof buildFaults[number]) {
+  const config = `/boot/config-${SERVER_PROFILE.clockError.kernelRelease}`;
+  switch (fault) {
+    case 'config': evidence.files[config].text += '\n# different same-release config\n'; break;
+    case 'signature': evidence.files['/proc/version_signature'].text = 'Ubuntu same-release-wrong-build'; break;
+    case 'modules-package': evidence.packages[1].stdout = evidence.packages[1].stdout.replace('linux-azure-7.0', 'linux-other'); break;
+    case 'image-package': evidence.packages[0].stdout = evidence.packages[0].stdout.replace('7.0.0-1017.17', '7.0.0-1017.18'); break;
+    case 'missing-witness': return undefined;
+    case 'missing-config': delete evidence.files[config]; break;
+    case 'read-error': evidence.files[config] = { error: { code: 'EIO', message: 'config unreadable' } }; break;
+    case 'query-error': Object.assign(evidence.packages[1], { status: 1, error: { code: 'EIO', message: 'query failed' } }); break;
+    case 'query-signal': Object.assign(evidence.packages[1], { status: null, signal: 'SIGTERM' }); break;
+    case 'missing-package': evidence.packages.pop(); break;
+    case 'duplicate-package': evidence.packages.push(clone(evidence.packages[1])); break;
+    case 'missing-signature': delete evidence.files['/proc/version_signature']; break;
+    case 'missing-namespace': delete evidence.namespaces['/proc/self/ns/time']; break;
+    case 'namespace-error': evidence.namespaces['/proc/self/ns/time'] = { error: { code: 'EACCES', message: 'not readable' } }; break;
+    case 'children-namespace': evidence.namespaces['/proc/self/ns/time_for_children'].target = 'time:[4026539999]'; break;
+    case 'self-offset': evidence.files['/proc/self/timens_offsets'].text = 'monotonic 1 0\nboottime 0 0'; break;
+    case 'init-offset': evidence.files['/proc/1/timens_offsets'].text = 'monotonic 0 0\nboottime 0 1'; break;
+    case 'missing-offset': delete evidence.files['/proc/1/timens_offsets']; break;
+    case 'malformed-offset': evidence.files['/proc/self/timens_offsets'].text = 'monotonic 0 0'; break;
+    default: { const exhaustive: never = fault; throw new Error(String(exhaustive)); }
+  }
+  return evidence;
+}
 const syntheticCpuIdentity = { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 12345, tid: 12345 };
 function syntheticNativeEndpoint(ns: bigint, identity = syntheticCpuIdentity) {
   return { ...identity, seconds: String(ns / 1_000_000_000n), nanoseconds: Number(ns % 1_000_000_000n), valueNs: String(ns) };
@@ -178,7 +230,7 @@ function registeredRefusal() {
     environment: { node: SERVER_PROFILE.clockError.nodeVersion, nodeExecutableSha256: SERVER_PROFILE.clockError.nodeExecutableSha256, pnpm: '11.11.0',
       packages: Object.fromEntries(['esbuild', 'playwright', 'motion', 'gsap', 'animejs'].map((name) => [name, packageInfo])),
       rootPackages: Object.fromEntries(['tsup', 'typescript', 'esbuild'].map((name) => [name, packageInfo])) } };
-  const machineIdentity = { ...resourceMachine(), platform: 'linux', release: SERVER_PROFILE.clockError.kernelRelease, node: SERVER_PROFILE.clockError.nodeVersion,
+  const machineIdentity = { ...resourceMachine(), clockBuildEvidence: healthyClockBuildEvidence(), arch: 'x64', platform: 'linux', release: SERVER_PROFILE.clockError.kernelRelease, node: SERVER_PROFILE.clockError.nodeVersion,
     nodeExecutableSha256: SERVER_PROFILE.clockError.nodeExecutableSha256 };
   const consumer = { tarballSha256: hash, treeSha256: hash };
   const registration = { protocolDigest: serverProfileDigest(SERVER_PROFILE), candidateSamplesObserved: false,
@@ -1319,6 +1371,56 @@ describe('серверный PROFILE: независимые sabotage controls',
     expect(block.delta.nr_throttled).toBe(0);
   });
 
+  it('посторонний mount не меняет resource admission, но меняет raw digest', () => {
+    // Given
+    const value = stage(), block = value.blocks[0];
+    if (!block) throw new Error('missing fixture block');
+    const beforeDigest = serverArtifactDigest(value);
+    block.after.resource.mountinfo.text += '\n38 31 0:32 / /unrelated rw - tmpfs tmpfs rw';
+    // When
+    const reasons = serverResourceReasons([value], resourceMachine());
+    // Then
+    expect(reasons).toEqual([]);
+    expect(serverArtifactDigest(value)).not.toBe(beforeDigest);
+    expect(block.after.resource.mountinfo.text).not.toBe(block.before.resource.mountinfo.text);
+  });
+
+  it.each(['overmount', 'alias', 'mount-swap'] as const)('resource admission различает %s от постороннего mount', (fault) => {
+    // Given
+    const value = stage(), block = value.blocks[0];
+    if (!block) throw new Error('missing fixture block');
+    const resource = block.after.resource;
+    switch (fault) {
+      case 'overmount': resource.mountinfo.text += '\n38 37 0:32 / /sys/fs/cgroup/system.slice rw - tmpfs tmpfs rw'; break;
+      case 'alias': resource.mountinfo.text += '\n38 31 0:31 / /alias rw - cgroup2 cgroup2 rw'; break;
+      case 'mount-swap': resource.mount.id = '38'; resource.mountinfo.text = resource.mountinfo.text.replace(/^37 /, '38 '); break;
+      default: { const exhaustive: never = fault; throw new Error(String(exhaustive)); }
+    }
+    // When / Then
+    if (fault === 'mount-swap') expect(serverResourceReasons([value], resourceMachine()).length).toBeGreaterThan(0);
+    else expect(() => serverResourceReasons([value], resourceMachine())).toThrow();
+  });
+
+  it.each(['missing-before', 'missing-after', 'missing-delta', 'forged-path'] as const)(
+    'повреждённые scope %s не становятся валидным отказом через topology continue', (fault) => {
+      // Given: identity валидна; повреждены только обязательные counters/deltas.
+      const value = stage(), block = value.blocks[0];
+      if (!block) throw new Error('missing fixture block');
+      switch (fault) {
+        case 'missing-before': block.before.scopes.pop(); break;
+        case 'missing-after': block.after.scopes.pop(); break;
+        case 'missing-delta': block.scopeDeltas.pop(); break;
+        case 'forged-path': {
+          const delta = block.scopeDeltas[1];
+          if (!delta) throw new Error('missing fixture delta');
+          delta.path = '/forged'; break;
+        }
+        default: { const exhaustive: never = fault; throw new Error(String(exhaustive)); }
+      }
+      // When / Then
+      expect(() => serverResourceReasons([value], resourceMachine())).toThrow();
+    });
+
   it.each(['history', 'reset', 'forged', 'missing-parent', 'parent-quota', 'parent-burst', 'inode'])(
     'independent resource validator различает %s', (fault) => {
       // Given
@@ -1401,20 +1503,239 @@ describe('серверный PROFILE: независимые sabotage controls',
   });
 });
 
+describe('PROFILE: current-run clock build binding', () => {
+  it.each(['read-EIO', 'registration-rejected', 'healthy-admitted'] as const)
+  ('реальный runner finalize/validator сохраняет atomic admission %s', async (mode) => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'profile-admission-'));
+    const out = path.join(directory, 'out'), controller = new AbortController();
+    const registration: any = registeredRefusal().registration;
+    const clock = healthyClockBuildEvidence(), resource = resourceIdentity();
+    const realRead = filesystem.readFileSync, realAppend = filesystem.appendFileSync, realRequire = nodeModule.createRequire, realPath = filesystem.realpathSync,
+      realStat = filesystem.statSync, realExists = filesystem.existsSync;
+    const nodeVersion = Object.getOwnPropertyDescriptor(process, 'version')!;
+    Object.defineProperty(process, 'version', { ...nodeVersion, value: SERVER_PROFILE.clockError.nodeVersion });
+    let admissionReadArmed = false, injectedReads = 0;
+    const controls = vi.fn(), closeBrowser = vi.fn(async () => {}), closeOrigin = vi.fn(async () => {});
+    const nativeVerify = vi.fn(), provenanceVerify = vi.fn();
+    const browser = { version: () => { admissionReadArmed = true; return mode === 'registration-rejected' ? 'unqualified' : SERVER_PROFILE.clockError.browserVersion; },
+      close: closeBrowser, newPage: controls };
+    const spies: Array<{ mockRestore(): void }> = [];
+    const spy = (value: any) => { spies.push(value); return value; };
+    try {
+      spy(vi.spyOn(filesystem, 'readFileSync')).mockImplementation(((file: any, ...args: any[]) => {
+        const name = String(file);
+        if (name.startsWith(out)) return (realRead as any)(file, ...args);
+        if (name === `/boot/config-${SERVER_PROFILE.clockError.kernelRelease}` && admissionReadArmed && mode === 'read-EIO') {
+          injectedReads++; throw Object.assign(new Error('fresh admission config read'), { code: 'EIO' });
+        }
+        if (clock.files[name as keyof typeof clock.files]) return clock.files[name as keyof typeof clock.files].text;
+        if (name === '/proc/self/status') return 'Cpus_allowed_list:\t0\nvoluntary_ctxt_switches:\t0\nnonvoluntary_ctxt_switches:\t0\n';
+        if (name === '/proc/self/cgroup') return resource.membership.text;
+        if (name === '/proc/self/mountinfo') return resource.mountinfo.text;
+        if (name === '/proc/self/stat') return '123 (fixture) ' + ['S', ...Array(50).fill('0')].join(' ');
+        if (name === '/sys/kernel/sched_ext/state') return 'disabled';
+        for (const scope of resource.scopes) for (const [suffix, field] of [['cgroup.type', 'type'], ['cpu.max', 'cpuMax'], ['cpu.max.burst', 'burst'],
+          ['memory.max', 'memoryMax'], ['cgroup.controllers', 'controllers'], ['cgroup.subtree_control', 'subtreeControl']]) {
+          if (name === scope.directory + '/' + suffix) {
+            const value = (scope as any)[field];
+            if (value.text !== undefined) return value.text;
+            throw Object.assign(new Error('fixture absent root interface'), { code: value.error?.code ?? 'ENOENT' });
+          }
+        }
+        if (name.endsWith('/cpu.stat')) return 'usage_usec 100\nuser_usec 70\nsystem_usec 30\nnr_periods 20\nnr_throttled 2\nthrottled_usec 50';
+        if (name.replaceAll('\\', '/').endsWith('/package.json')) return JSON.stringify({ name: path.basename(path.dirname(name)), version: '1.0.0' });
+        if (name.endsWith('.entry.mjs')) return 'export const fixture = true;';
+        if (name.startsWith('/proc/') || name.startsWith('/sys/')) throw Object.assign(new Error('unexpected boundary read: ' + name), { code: 'ENOENT' });
+        return (realRead as any)(file, ...args);
+      }) as any);
+      spy(vi.spyOn(filesystem, 'readlinkSync')).mockImplementation(((file: keyof typeof clock.namespaces) => {
+        const value = clock.namespaces[file];
+        if ('error' in value) throw Object.assign(new Error(value.error.message), { code: value.error.code });
+        return value.target;
+      }) as any);
+      spy(vi.spyOn(filesystem, 'realpathSync')).mockImplementation(((file: any, ...args: any[]) => {
+        const name = String(file);
+        return name === path.join(directory, 'baseline') || name === path.join(directory, 'candidate') || name.replaceAll('\\', '/').includes('/bench/compare/node_modules/')
+          ? name : (realPath as any)(file, ...args);
+      }) as any);
+      spy(vi.spyOn(filesystem, 'statSync')).mockImplementation(((file: any, ...args: any[]) => {
+        const scope = resource.scopes.find(item => item.directory === String(file));
+        return scope ? { dev: BigInt(scope.dev), ino: BigInt(scope.ino), isDirectory: () => true } : (realStat as any)(file, ...args);
+      }) as any);
+      spy(vi.spyOn(filesystem, 'existsSync')).mockImplementation(((file: any) => String(file).startsWith('/sys/') ? false : realExists(file)) as any);
+      spy(vi.spyOn(filesystem, 'statfsSync')).mockReturnValue({ type: 0x63677270n } as any);
+      spy(vi.spyOn(filesystem, 'symlinkSync')).mockImplementation(() => {});
+      spy(vi.spyOn(filesystem, 'appendFileSync')).mockImplementation(((file: any, text: any, options: any) => {
+        realAppend(file, text, options);
+        if (mode === 'healthy-admitted' && JSON.parse(String(text)).type === 'registration-before-any-sample') controller.abort(new Error('stop after healthy publication'));
+      }) as any);
+      spy(vi.spyOn(childProcess, 'spawnSync')).mockImplementation(((_command: string, args: string[]) => clock.packages.find(item => item.args[2] === args[2])) as any);
+      spy(vi.spyOn(childProcess, 'execFileSync')).mockReturnValue('' as any);
+      spy(vi.spyOn(os, 'release')).mockReturnValue(SERVER_PROFILE.clockError.kernelRelease);
+      spy(vi.spyOn(os, 'arch')).mockReturnValue('x64');
+      spy(vi.spyOn(os, 'platform')).mockReturnValue('linux');
+      spy(vi.spyOn(os, 'cpus')).mockReturnValue([{ model: 'fixture' }] as any);
+      const hashFile = (file: string) => file === process.execPath ? SERVER_PROFILE.clockError.nodeExecutableSha256 :
+        file === '/fixture/chromium' ? SERVER_PROFILE.clockError.browserExecutableSha256 : hash;
+      vi.doMock('../bench/compare/provenance.mjs', () => ({ ...provenanceOwner,
+        prepareBenchmarkCheckout: ({ root }: any) => path.basename(root) === 'baseline' ? registration.provenance.baseline : registration.provenance.candidate,
+        hashFileTree: () => ({ sha256: hash, files: 1 }), sha256File: hashFile,
+        assertCheckoutUnchanged: provenanceVerify, assertInstalledPackageTreesUnchanged: provenanceVerify, assertFileHashesUnchanged: provenanceVerify }));
+      vi.doMock('../bench/profile/server-thread-cpu-clock.mjs', () => ({ ...threadCpuClock,
+        prepareServerThreadCpuClock: () => ({ metadata: registration.engineClock, assertUnchanged: nativeVerify }) }));
+      vi.doMock('../bench/compare/bench.mjs', () => ({ ...compareOwner, startBenchmarkOrigin: async () => ({ close: closeOrigin }) }));
+      spy(vi.spyOn(nodeModule, 'createRequire')).mockImplementation(((file: any) => String(file).replaceAll('\\', '/').endsWith('/bench/compare/package.json')
+        ? (name: string) => name === 'esbuild' ? { buildSync: vi.fn() } : { chromium: { executablePath: () => '/fixture/chromium', launch: async () => browser } }
+        : realRequire(file)) as any);
+      vi.resetModules();
+      const owner = await import('../bench/profile/server-profile-runner.mjs');
+      const artifact = await owner.runServerProfile({ baseline: path.join(directory, 'baseline'), candidate: path.join(directory, 'candidate'), browser: 'chromium', out },
+        { signal: controller.signal, engineMeasure: controls, browserMeasure: controls });
+      const bytes = realRead(path.join(out, 'server-profile.json'));
+      const stored = parseServerJsonBytes(bytes), records = parseServerJournalBytes(realRead(path.join(out, 'journal.ndjson')));
+      expect(stored).toEqual(JSON.parse(JSON.stringify(artifact)));
+      expect(validateServerArtifact(stored)).toMatchObject({ verification: mode === 'healthy-admitted' ? 'recorded-refusal-only' : 'preparation-refused', verdict: 'UNPROVEN' });
+      expect(() => validateServerJournal(stored, records)).not.toThrow();
+      expect(controls).not.toHaveBeenCalled(); expect(artifact.stages).toEqual([]);
+      expect(closeBrowser).toHaveBeenCalledTimes(1); expect(closeOrigin).toHaveBeenCalledTimes(1);
+      expect(nativeVerify).toHaveBeenCalled(); expect(provenanceVerify).toHaveBeenCalled();
+      if (mode === 'healthy-admitted') {
+        expect(artifact.registrationDigest).toBe(serverProfileDigest(artifact.registration));
+        expect(records[0].type).toBe('registration-before-any-sample');
+      } else {
+        expect(artifact.registration).toBeNull(); expect(artifact.registrationDigest).toBeNull();
+        expect(artifact.failures[0].error.raw.clockBuildEvidence).toBeDefined();
+        expect(records.map((record: any) => record.type)).toEqual(['failure', 'finished']);
+        if (mode === 'read-EIO') {
+          expect(injectedReads).toBe(1);
+          expect(artifact.failures[0].error.raw.clockBuildEvidence.files[`/boot/config-${SERVER_PROFILE.clockError.kernelRelease}`].error.code).toBe('EIO');
+        }
+      }
+    } finally {
+      for (const value of spies.reverse()) value.mockRestore();
+      vi.doUnmock('../bench/compare/provenance.mjs'); vi.doUnmock('../bench/profile/server-thread-cpu-clock.mjs'); vi.doUnmock('../bench/compare/bench.mjs');
+      vi.resetModules(); Object.defineProperty(process, 'version', nodeVersion); rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('реальный ESM collector читает healthy namespace через собственный import binding', () => {
+    const evidence = healthyClockBuildEvidence();
+    const read = vi.spyOn(filesystem, 'readFileSync').mockImplementation(((file: string) => {
+      const value = evidence.files[file as keyof typeof evidence.files];
+      if (!value) throw Object.assign(new Error('fixture missing read'), { code: 'ENOENT' });
+      return value.text;
+    }) as any);
+    const link = vi.spyOn(filesystem, 'readlinkSync').mockImplementation(((file: keyof typeof evidence.namespaces) => {
+      const value = evidence.namespaces[file];
+      if ('error' in value) throw Object.assign(new Error(value.error.message), { code: value.error.code });
+      return value.target;
+    }) as any);
+    const query = vi.spyOn(childProcess, 'spawnSync').mockImplementation(((_command: string, args: string[]) =>
+      evidence.packages.find(record => record.args[2] === args[2])) as any);
+    const release = vi.spyOn(os, 'release').mockReturnValue(SERVER_PROFILE.clockError.kernelRelease);
+    try {
+      const captured = captureServerClockBuildEvidence();
+      expect(verifyServerClockBuildEvidence(captured, { release: SERVER_PROFILE.clockError.kernelRelease, arch: 'x64' }))
+        .toMatchObject({ configSha256: SERVER_PROFILE.clockError.kernelBuild.configSha256, active: 'time:[4026531834]', children: 'time:[4026531834]' });
+      expect(link).toHaveBeenCalledTimes(3); expect(query).toHaveBeenCalledTimes(2);
+      expect(captured.namespaces['/proc/1/ns/time'].error.code).toBe('EACCES');
+    } finally { read.mockRestore(); link.mockRestore(); query.mockRestore(); release.mockRestore(); }
+  });
+
+  it.each(buildFaults)('реальная registration admission отвергает %s при прежнем release', (fault) => {
+    const registration: any = registeredRefusal().registration;
+    expect(() => verifyServerClockRegistration(registration)).not.toThrow();
+    registration.machine.identity.clockBuildEvidence = mutateClockBuild(registration.machine.identity.clockBuildEvidence, fault);
+    registration.machine.sha256 = serverProfileDigest(registration.machine.identity);
+    expect(() => verifyServerClockRegistration(registration)).toThrow(/clock build/);
+  });
+
+  it('реальные timing stage и candidate control не вызывают callback при невалидной verify boundary', async () => {
+    const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+    const begin = source.indexOf('    const runStage = async (name, runs) => {');
+    const end = source.indexOf('    if (!await runServerProfileCalibration(', begin);
+    const rawStart = source.indexOf('    verify();\n    artifact.rawControls.candidate =');
+    const rawEnd = source.indexOf("    journal('raw-controls-candidate-after-calibration'", rawStart);
+    expect(begin).toBeGreaterThan(0); expect(end).toBeGreaterThan(begin);
+    expect(rawStart).toBeGreaterThan(0); expect(rawEnd).toBeGreaterThan(rawStart);
+    const registration: any = registeredRefusal().registration;
+    const current = mutateClockBuild(healthyClockBuildEvidence(), 'config');
+    const verify = () => verifyServerClockBuildEvidence(current, registration.machine.identity);
+    const callback = vi.fn(), artifact: any = { stages: [], rawControls: {} };
+    const context = createContext({ verify, artifact, SERVER_PROFILE, checkpoint: vi.fn(),
+      captureServerLoad: callback, engineMeasure: callback, browserMeasure: callback, serverOrders,
+      process: { stderr: { write: vi.fn() } }, measureBrowserRawControls: callback });
+    const runStage = runInContext(`(() => { ${source.slice(begin, end)} return runStage; })()`, context);
+    await expect(runStage('warmup', 2)).rejects.toThrow(/clock build/);
+    const candidateControl = runInContext(`(async () => { ${source.slice(rawStart, rawEnd)} })`, context);
+    await expect(candidateControl()).rejects.toThrow(/clock build/);
+    expect(callback).not.toHaveBeenCalled();
+    expect(artifact.stages).toEqual([]); expect(artifact.rawControls).toEqual({});
+  });
+
+  it('здоровый witness допускает другой namespace нового run и unrelated diagnostics/init link EACCES', () => {
+    const registration: any = registeredRefusal().registration, evidence = registration.machine.identity.clockBuildEvidence;
+    const original = verifyServerClockBuildEvidence(evidence, registration.machine.identity);
+    evidence.files['/proc/version'].text = 'different harmless diagnostic';
+    evidence.files['/proc/cmdline'].text = 'different harmless boot args';
+    evidence.namespaces['/proc/1/ns/time'].error.message = 'different permission diagnostic';
+    expect(verifyServerClockBuildEvidence(evidence, registration.machine.identity)).toEqual(original);
+    evidence.namespaces['/proc/self/ns/time'].target = evidence.namespaces['/proc/self/ns/time_for_children'].target = 'time:[5555]';
+    expect(() => verifyServerClockRegistration(registration)).not.toThrow();
+  });
+
+  it.each(['config', 'modules-package', 'children-namespace', 'self-offset', 'active-namespace-drift', 'unrelated'] as const)
+  ('реальная verify boundary %s до registration journal/raw controls и callbacks', (fault) => {
+    const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+    const begin = source.indexOf('  const verify = (registration = artifact.registration) => {'), end = source.indexOf('\n  try {\n    checkpoint();', begin);
+    const registration: any = registeredRefusal().registration, current: any = clone(registration.machine.identity.clockBuildEvidence);
+    const journal = vi.fn(), measure = vi.fn(async () => ({}));
+    const context = createContext({ engineClock: undefined, artifact: { registration },
+      captureServerClockBuildEvidence: () => current, verifyServerClockBuildEvidence,
+      release: () => SERVER_PROFILE.clockError.kernelRelease, arch: () => 'x64', serverProfileDigest,
+      captureServerLoad: () => ({ affinity: registration.machine.identity.affinity, resource: registration.machine.identity.resource }),
+      serverResourceBinding, prepared: {}, packages: {}, harness: {}, assertFileHashesUnchanged: vi.fn(),
+      // Stable consumer bytes remain real verify conditions, their reads are boundary fakes.
+      sha256File: () => hash, hashFileTree: () => ({ sha256: hash }),
+      checkpoint: vi.fn(), journal, measureBrowserRawControls: measure, browser: {}, origin: {}, adapters: { baseline: {} }, out: '/fixture',
+      verifyServerClockRegistration, registrationAttempt: registration });
+    const verify = runInContext(`(() => { ${source.slice(begin, end)} return verify; })()`, context);
+    context.verify = verify;
+    if (fault === 'unrelated') {
+      current.files['/proc/cmdline'].text += ' unrelated';
+      current.namespaces['/proc/1/ns/time'].error.message = 'other diagnostic';
+    } else if (fault === 'active-namespace-drift') {
+      current.namespaces['/proc/self/ns/time'].target = current.namespaces['/proc/self/ns/time_for_children'].target = 'time:[5555]';
+    } else mutateClockBuild(current, fault);
+    const admissionStart = source.indexOf('    verifyServerClockRegistration(registrationAttempt);');
+    const admissionEnd = source.indexOf("    journal('raw-controls-baseline'", admissionStart);
+    expect(begin).toBeGreaterThan(0); expect(end).toBeGreaterThan(begin);
+    expect(admissionStart).toBeGreaterThan(0); expect(admissionEnd).toBeGreaterThan(admissionStart);
+    const admit = runInContext(`(async () => { ${source.slice(admissionStart, admissionEnd)} })`, context);
+    if (fault === 'unrelated') {
+      return admit().then(() => { expect(journal).toHaveBeenCalledTimes(1); expect(measure).toHaveBeenCalledTimes(1); });
+    }
+    return expect(admit()).rejects.toThrow(/clock build/).then(() => {
+      expect(journal).not.toHaveBeenCalled(); expect(measure).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe('PROFILE: ресурсный контракт проверяется до регистрации и samples', () => {
   const keys = ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'];
   const healthy = { usage_usec: 100, user_usec: 70, system_usec: 30, nr_periods: 20, nr_throttled: 2, throttled_usec: 50 };
   function machine(quota: string | null = '400000 100000', counters: Record<string, number> = healthy) {
     const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
     const common = source.slice(source.indexOf('function readOptional('), source.indexOf('async function withBrowserTimeout('));
-    const capture = source.slice(source.indexOf('export function captureServerMachine('), source.indexOf('export function createServerJournal(')).replace(/^export /, '');
+    const capture = source.slice(source.indexOf('export function captureServerClockBuildEvidence('), source.indexOf('export function createServerJournal(')).replace(/^export /gm, '');
     const leaf = '/sys/fs/cgroup/system.slice/hosted-compute-agent.service';
-    const identity = resourceIdentity();
+    const identity = resourceIdentity(), clockEvidence = healthyClockBuildEvidence();
     const files: Record<string, string> = {
       '/proc/self/status': 'Cpus_allowed_list:\t0\nvoluntary_ctxt_switches:\t2\nnonvoluntary_ctxt_switches:\t3\n',
       '/proc/self/cgroup': identity.membership.text, '/proc/self/mountinfo': identity.mountinfo.text,
       '/proc/self/stat': '123 (fixture with spaces) ' + ['S', ...Array(50).fill('0')].join(' '),
       '/sys/kernel/sched_ext/state': 'disabled\n',
+      ...Object.fromEntries(Object.entries(clockEvidence.files).map(([file, value]) => [file, value.text])),
     };
     for (const scope of identity.scopes) {
       files[scope.directory + '/cgroup.controllers'] = 'cpu memory';
@@ -1436,17 +1757,53 @@ describe('PROFILE: ресурсный контракт проверяется д
         if (errors[file] || !Object.hasOwn(files, file)) throw Object.assign(new Error('fixture read: ' + file), { code: errors[file] ?? 'ENOENT' });
         return files[file];
       },
+      readlinkSync(file: keyof typeof clockEvidence.namespaces) {
+        const value = clockEvidence.namespaces[file];
+        if (!value) throw Object.assign(new Error('fixture link: ' + file), { code: 'ENOENT' });
+        if ('error' in value) throw Object.assign(new Error(value.error.message), { code: value.error.code });
+        return value.target;
+      },
+      spawnSync(_command: string, args: string[]) { return clockEvidence.packages.find(record => record.args[2] === args[2]); },
+      verifyServerClockBuildEvidence: (value: unknown, machine: unknown) => verifyServerClockBuildEvidence(JSON.parse(JSON.stringify(value)), machine),
       statSync: (file: string) => ({ dev: 31n, ino: inodes[file] ?? BigInt(file.length), isDirectory: () => true }),
       statfsSync: () => ({ type: 0x63677270n }), path,
       errorRecord: (error: Error & { code?: string }) => ({ message: error.message, code: error.code }),
       validateServerResourceIdentity: (value: unknown) => validateServerResourceIdentity(JSON.parse(JSON.stringify(value))),
+      serverResourceBinding: (value: unknown) => serverResourceBinding(JSON.parse(JSON.stringify(value))),
       existsSync: (file: string) => Object.hasOwn(files, file), loadavg: () => [0, 0, 0],
-      platform: () => 'linux', release: () => '6.18.44', arch: () => 'x64', hostname: () => 'fixture',
+      platform: () => 'linux', release: () => SERVER_PROFILE.clockError.kernelRelease, arch: () => 'x64', hostname: () => 'fixture',
       cpus: () => [{ model: 'fixture' }], totalmem: () => 1024, sha256File: hashBinary, serverProfileDigest,
       process: { version: 'v24.19.0', execPath: '/fixture/node', execArgv: [], memoryUsage: () => ({ heapUsed: 1 }) },
     });
-    return { capture: runInContext(common + '\n' + capture + '\ncaptureServerMachine;', realm), hashBinary, files, errors, inodes, reads, leaf, onRead };
+    const owner = runInContext(common + '\n' + capture + '\n({ captureServerMachine, captureServerClockBuildEvidence });', realm);
+    return { capture: owner.captureServerMachine, collect: owner.captureServerClockBuildEvidence, hashBinary, files, errors, inodes, reads, leaf, onRead, clockEvidence };
   }
+
+  it.each(['config', 'signature', 'modules-package', 'read-error', 'children-namespace', 'self-offset'] as const)
+  ('реальный machine capture отвергает current-run %s до identity/resource sampling', (fault) => {
+    const fixture = machine();
+    if (fault === 'modules-package' || fault === 'children-namespace') mutateClockBuild(fixture.clockEvidence, fault);
+    else if (fault === 'read-error') fixture.errors[`/boot/config-${SERVER_PROFILE.clockError.kernelRelease}`] = 'EIO';
+    else {
+      const evidence = mutateClockBuild(healthyClockBuildEvidence(), fault);
+      for (const [file, value] of Object.entries(evidence.files) as [string, { text: string }][]) fixture.files[file] = value.text;
+    }
+    let caught: any;
+    try { fixture.capture(); } catch (error) { caught = error; }
+    expect(caught?.message).toContain('clock build');
+    expect(caught.raw.clockBuildEvidence).toBeDefined();
+    expect(fixture.hashBinary).not.toHaveBeenCalled();
+    expect(fixture.reads).not.toContain('/proc/self/status');
+  });
+
+  it('capture самостоятельно собирает witness без supplied historical evidence', () => {
+    const fixture = machine(), captured = fixture.capture();
+    expect(captured.identity.clockBuildEvidence.files[`/boot/config-${SERVER_PROFILE.clockError.kernelRelease}`].text).toBe(qualifiedConfig);
+    expect(verifyServerClockBuildEvidence(JSON.parse(JSON.stringify(captured.identity.clockBuildEvidence)), captured.identity).configSha256)
+      .toBe(SERVER_PROFILE.clockError.kernelBuild.configSha256);
+    expect(captured.identity.clockBuildEvidence.namespaces['/proc/1/ns/time'].error.code).toBe('EACCES');
+    expect(fixture.reads.filter(file => file === '/proc/version_signature')).toHaveLength(1);
+  });
 
   it('разрешает наблюдённую service membership и сохраняет квоту предка без округления', () => {
     // Given: root не имеет cpu.max, service unlimited, parent имеет 1/2 CPU.
@@ -1575,7 +1932,45 @@ describe('PROFILE: ресурсный контракт проверяется д
       expect(fixture.hashBinary).not.toHaveBeenCalled();
     });
 
-  it.each(['membership', 'inode', 'quota', 'burst'])('отвергает %s drift во время snapshot', (fault) => {
+  it('посторонний mount во время snapshot не прерывает захват машины', () => {
+    // Given: изменение происходит точно между двумя configuration reads.
+    const fixture = machine();
+    fixture.onRead[fixture.leaf + '/cpu.stat'] = () => {
+      fixture.files['/proc/self/mountinfo'] += '\n38 31 0:32 / /unrelated rw - tmpfs tmpfs rw';
+    };
+    // When
+    const captured = fixture.capture();
+    // Then
+    expect(captured.identity.affinity).toBe('0');
+    expect(captured.identity.resource.scopes).toHaveLength(3);
+    expect(fixture.hashBinary).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['unrelated', 'mount-swap', 'ancestor'] as const)('реальный verify привязывает %s к регистрации', (change) => {
+    // Given: исполнено тело verify из runner, внешние provenance effects пусты.
+    const fixture = machine(), registered = fixture.capture().identity;
+    switch (change) {
+      case 'unrelated': fixture.files['/proc/self/mountinfo'] += '\n38 31 0:32 / /unrelated rw - tmpfs tmpfs rw'; break;
+      case 'mount-swap': fixture.files['/proc/self/mountinfo'] = resourceIdentity().mountinfo.text.replace(/^37 /, '38 '); break;
+      case 'ancestor': fixture.files['/sys/fs/cgroup/system.slice/cpu.max'] = '50000 100000'; break;
+      default: { const exhaustive: never = change; throw new Error(String(exhaustive)); }
+    }
+    const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
+    const begin = source.indexOf('  const verify = (registration = artifact.registration) => {');
+    const end = source.indexOf('\n  try {\n    checkpoint();', begin);
+    if (begin < 0 || end <= begin) throw new Error('missing runner verify body');
+    const context = createContext({ engineClock: undefined, artifact: { registration: { machine: { identity: registered } } },
+      captureServerClockBuildEvidence: () => healthyClockBuildEvidence(), release: () => SERVER_PROFILE.clockError.kernelRelease, arch: () => 'x64',
+      verifyServerClockBuildEvidence, captureServerLoad: () => fixture.capture().observation.resource, serverProfileDigest,
+      serverResourceBinding: (value: unknown) => serverResourceBinding(JSON.parse(JSON.stringify(value))),
+      registrationAttempt: { machine: { identity: registered } }, prepared: {}, packages: {}, harness: {}, assertFileHashesUnchanged: vi.fn() });
+    const verify = runInContext(`(() => { ${source.slice(begin, end)} return verify; })()`, context);
+    // When / Then
+    if (change === 'unrelated') expect(() => verify()).not.toThrow();
+    else expect(() => verify()).toThrow();
+  });
+
+  it.each(['membership', 'inode', 'quota', 'burst', 'mount-swap', 'overmount'])('отвергает %s drift во время snapshot', (fault) => {
     // Given: событие чтения счётчика меняет следующий configuration snapshot.
     const fixture = machine();
     fixture.onRead[fixture.leaf + '/cpu.stat'] = () => {
@@ -1584,6 +1979,8 @@ describe('PROFILE: ресурсный контракт проверяется д
         case 'inode': fixture.inodes[fixture.leaf] = 9000n; break;
         case 'quota': fixture.files['/sys/fs/cgroup/system.slice/cpu.max'] = '50000 100000'; break;
         case 'burst': fixture.files['/sys/fs/cgroup/system.slice/cpu.max.burst'] = '1000'; break;
+        case 'mount-swap': fixture.files['/proc/self/mountinfo'] = resourceIdentity().mountinfo.text.replace(/^37 /, '38 '); break;
+        case 'overmount': fixture.files['/proc/self/mountinfo'] += '\n38 37 0:32 / /sys/fs/cgroup/system.slice rw - tmpfs tmpfs rw'; break;
         default: throw new Error('unknown fixture mutation: ' + fault);
       }
     };

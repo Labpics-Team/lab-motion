@@ -1,9 +1,11 @@
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { createContext, runInContext } from 'node:vm';
+import { describe, expect, it, vi } from 'vitest';
+import { SERVER_PROFILE, serverProfileDigest } from '../bench/profile/server-profile-registration.mjs';
 import { isMap, isScalar, isSeq, parse, parseDocument, stringify } from 'yaml';
 import vitestConfig from '../vitest.config.js';
 
@@ -515,6 +517,54 @@ function assertNativeGraph(files: Map<string, string>) {
 
 describe('нативный граф CI', () => {
   it('проверяет любой PR через явные обязательные jobs', () => assertNativeGraph(sources()));
+
+  it.each(['success', 'owned-failure', 'foreign-failure'] as const)('реальное тело PROFILE preparation сохраняет identity или отказ capture=%s', async (mode) => {
+    const captureFails = mode !== 'success';
+    // Given: извлекается выполняемое тело YAML; заменены только внешние эффекты.
+    const workflow: Workflow = parse(readFileSync(join(directory, 'profile-01.yml'), 'utf8'));
+    const script = workflow.jobs.probe?.steps?.find(item => item.run?.includes('HOSTED_PROFILE_PREPARATION'))?.run;
+    const body = script?.match(/<<'NODE'\r?\n([\s\S]*?)\r?\nNODE(?:\r?\n|$)/)?.[1];
+    if (!body) throw new Error('missing preparation heredoc');
+    const clockBuildEvidence = { files: { '/proc/version_signature': { text: 'fixture signature' } }, namespaces: {}, packages: [] };
+    const collect = vi.fn(() => clockBuildEvidence);
+    const machine = { identity: { platform: 'linux', affinity: '0', clockBuildEvidence }, sha256: 'a'.repeat(64), observation: { at: 'fixture' } };
+    const metadata = { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 17, tid: 17 };
+    const failure = Object.assign(new Error('fixture capture failed'), { raw: { file: '/fixture/cpu.max', code: 'EIO', ...(mode === 'owned-failure' ? { clockBuildEvidence } : {}) } });
+    const journal = vi.fn<(type: string, value: unknown) => void>(), output = vi.fn<(line: string) => void>();
+    const close = vi.fn(async () => {}), assertUnchanged = vi.fn();
+    const executable = '/fixture/chromium', executableSha256 = 'b'.repeat(64), tree = { sha256: 'c'.repeat(64), files: 3 };
+    const processState = { exitCode: 0, cwd: () => '/fixture', env: { RUNNER_TEMP: '/fixture/tmp', PROFILE_SOURCE_SHA: 'd'.repeat(40) } };
+    const context = createContext({
+      join, dirname, SERVER_PROFILE, serverProfileDigest, process: processState, console: { log: output },
+      platform: () => 'linux', arch: () => 'x64', release: () => 'fixture-kernel',
+      readFileSync: (file: string) => 'observed:' + file,
+      captureServerClockBuildEvidence: collect,
+      createServerJournal: () => journal, prepareServerThreadCpuClock: () => ({ metadata, assertUnchanged }),
+      captureServerMachine: () => { if (captureFails) throw failure; return machine; },
+      sha256File: () => executableSha256, hashFileTree: () => tree,
+      createRequire: () => () => ({ chromium: { executablePath: () => executable,
+        launch: async () => ({ version: () => 'fixture-browser', close }) } }),
+    });
+    // When: catch/finally, receipt, журнал и exitCode остаются кодом workflow.
+    await runInContext(`(async () => {\n${body.replace(/^import .*;\r?$/gm, '')}\n})()`, context, { timeout: 1000 });
+    // Then
+    expect(journal).toHaveBeenCalledTimes(1);
+    const payload = journal.mock.calls[0]?.[1];
+    expect(payload).toMatchObject({ receipt: { engineClock: metadata, clockBuildEvidence,
+      browser: { name: 'chromium', executableSha256, tree: { directory: dirname(executable), ...tree }, version: 'fixture-browser' },
+      failures: captureFails ? [expect.objectContaining({ message: failure.message, raw: failure.raw,
+        topology: expect.objectContaining({ '/proc/self/cgroup': { text: 'observed:/proc/self/cgroup' } }) })] : [],
+      ...(captureFails ? {} : { machine }) } });
+    expect(collect).toHaveBeenCalledTimes(mode === 'foreign-failure' ? 1 : 0);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(assertUnchanged).toHaveBeenCalledTimes(1);
+    expect(output).toHaveBeenCalledTimes(1);
+    const printed = output.mock.calls[0]?.[0];
+    if (!printed) throw new Error('missing preparation output');
+    expect(JSON.parse(printed.slice(printed.indexOf(' ') + 1))).toEqual(payload);
+    if (captureFails) expect(processState.exitCode).not.toBe(0);
+    else expect(processState.exitCode).toBe(0);
+  });
 
   it.each([
     ['workflow_dispatch', undefined, undefined, false, false],

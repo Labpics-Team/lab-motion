@@ -142,6 +142,51 @@ function validateNormalMotion(evidence, scene, monotonicHostUpperNs) {
     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, calls), 'normal-motion oracle отверг intermediate/stagger/topology');
 }
 
+/** Current-run build premise; raw diagnostics outside this projection do not pin an epoch. */
+export function verifyServerClockBuildEvidence(evidence, identity) {
+  const model = SERVER_PROFILE.clockError, build = model.kernelBuild;
+  const fail = (message) => {
+    throw Object.assign(new Error(`server profile: clock build ${message}`), { raw: { clockBuildEvidence: evidence } });
+  };
+  if (!build || identity?.release !== model.kernelRelease || identity.arch !== 'x64' || build.architecture !== 'amd64') fail('kernel/architecture не совпадает');
+  const text = (file) => {
+    const read = evidence?.files?.[file];
+    if (typeof read?.text !== 'string' || read.error) fail(`нет обязательного чтения ${file}`);
+    return read.text;
+  };
+  const flavor = model.kernelRelease.slice(model.kernelRelease.lastIndexOf('-') + 1);
+  const signature = text('/proc/version_signature').trim();
+  if (signature !== `Ubuntu ${build.sourceVersion}-${flavor} ${build.upstreamVersion}`) fail('version_signature не совпадает');
+  const configSha256 = createHash('sha256').update(text(`/boot/config-${model.kernelRelease}`), 'utf8').digest('hex');
+  if (configSha256 !== build.configSha256) fail('config bytes не совпадают');
+  if (!Array.isArray(evidence?.packages)) fail('нет package observations');
+  const packages = [];
+  for (const kind of ['image', 'modules']) {
+    const name = `linux-${kind}-${model.kernelRelease}`;
+    const records = evidence.packages.filter(record => record?.command === 'dpkg-query' &&
+      isDeepStrictEqual(record.args, ['-W', '-f=${binary:Package} ${Version} ${source:Package} ${source:Version}\n', name]));
+    if (records?.length !== 1) fail(`нет однозначного package ${name}`);
+    const record = records[0];
+    if (record.status !== 0 || record.signal !== null || record.error || typeof record.stdout !== 'string') fail(`package query отказал ${name}`);
+    const fields = record.stdout.trim().split(/\s+/);
+    const source = kind === 'modules' ? build.sourcePackage : build.sourcePackage.replace(/^linux-/, 'linux-signed-');
+    if (!isDeepStrictEqual(fields, [name, build.sourceVersion, source, build.sourceVersion])) fail(`package/source не совпадает ${name}`);
+    packages.push(fields);
+  }
+  const namespace = (file) => {
+    const read = evidence?.namespaces?.[file];
+    if (typeof read?.target !== 'string' || read.error || !/^time:\[[1-9]\d*\]$/.test(read.target)) fail(`нет time namespace ${file}`);
+    return read.target;
+  };
+  const active = namespace('/proc/self/ns/time'), children = namespace('/proc/self/ns/time_for_children');
+  if (active !== children) fail('self active/children namespace отличаются');
+  for (const file of ['/proc/self/timens_offsets', '/proc/1/timens_offsets']) {
+    const rows = text(file).trim().split(/\r?\n/).map(row => row.trim().split(/\s+/));
+    if (!isDeepStrictEqual(rows, [['monotonic', '0', '0'], ['boottime', '0', '0']])) fail(`offset premise не доказана ${file}`);
+  }
+  return { release: identity.release, architecture: build.architecture, signature, configSha256, packages, active, children };
+}
+
 export function verifyServerClockRegistration(registration) {
   const model = SERVER_PROFILE.clockError;
   invariant(registration.browser === model.browser && registration.browserVersion === model.browserVersion &&
@@ -150,6 +195,7 @@ export function verifyServerClockRegistration(registration) {
   const identity = registration.machine?.identity;
   invariant(identity?.platform === 'linux' && identity.release === model.kernelRelease && identity.node === model.nodeVersion && identity.nodeExecutableSha256 === model.nodeExecutableSha256,
     'Node binary/platform не сертифицированы clock model');
+  verifyServerClockBuildEvidence(identity.clockBuildEvidence, identity);
   for (const provenance of Object.values(registration.provenance ?? {})) invariant(provenance.environment?.node === model.nodeVersion &&
     provenance.environment.nodeExecutableSha256 === model.nodeExecutableSha256, 'source toolchain не совпадает с clock model');
   const clock = registration.engineClock;
@@ -622,11 +668,19 @@ export function validateServerResourceIdentity(resource) {
     memoryCeiling: memoryKnown ? memory === null ? 'max' : String(memory) : 'unknown' };
 }
 
+// Полный mountinfo проверяется до проекции и остаётся в raw artifact/journal.
+// Привязка epoch не зависит от посторонних mounts вне cgroup hierarchy.
+export function serverResourceBinding(resource) {
+  validateServerResourceIdentity(resource);
+  return { membership: resource.membership, mount: resource.mount, scheduler: resource.scheduler,
+    schedExtState: resource.schedExtState, scopes: resource.scopes };
+}
+
 export function serverResourceReasons(stages, identity) {
   const reasons = [];
   invariant(/^\d+$/.test(identity?.affinity) && identity.cgroupCpuMax === identity.resource?.scopes?.[0]?.cpuMax?.text,
     'ресурсные observations не связаны с зарегистрированным machine');
-  validateServerResourceIdentity(identity.resource);
+  const registeredResource = serverResourceBinding(identity.resource);
   for (const stage of stages) {
     const rowsPerBlock = (SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length) * 2;
     invariant(Array.isArray(stage.blocks) && stage.blocks.length === stage.rows.length / rowsPerBlock, 'нет наблюдений ресурсов каждого парного блока');
@@ -635,8 +689,8 @@ export function serverResourceReasons(stages, identity) {
       invariant(block.block === index && block.before?.cpuStat && block.after?.cpuStat && /^\d+$/.test(block.before.affinity), 'невалидный ресурсный блок');
       if (block.before.affinity !== block.after.affinity || block.before.cpuMax !== block.after.cpuMax) reasons.push(stage.name + ': affinity/quota изменились');
       for (const snapshot of [block.before, block.after]) {
-        validateServerResourceIdentity(snapshot.resource);
-        if (snapshot.affinity !== identity.affinity || snapshot.cpuMax !== identity.cgroupCpuMax || !isDeepStrictEqual(snapshot.resource, identity.resource)) {
+        const resource = serverResourceBinding(snapshot.resource);
+        if (snapshot.affinity !== identity.affinity || snapshot.cpuMax !== identity.cgroupCpuMax || !isDeepStrictEqual(resource, registeredResource)) {
           reasons.push(stage.name + ': block ' + index + ' отличается от зарегистрированных affinity/quota');
         }
         invariant(Array.isArray(snapshot.scopes) && snapshot.scopes.length === snapshot.resource.scopes.length - 1 &&
