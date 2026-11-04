@@ -70,7 +70,15 @@ internal sealed class ScalarBinding : IDisposable
             var binding = new ScalarBinding(dispatcher, visual, property, path, expression, owners, released);
             owners[property] = binding;
             // StartAnimation уже заменил выражение: прежний владелец больше не останавливает свойство.
-            previous?.Release();
+            try { previous?.Release(); }
+            catch (Exception error)
+            {
+                var primary = ExceptionDispatchInfo.Capture(error);
+                // Новый владелец ещё не возвращён: rollback не зависит от освобождения прежнего.
+                try { binding.Dispose(); }
+                catch { } // Отказ rollback не заменяет исходную ошибку замены.
+                primary.Throw();
+            }
             return binding;
         }
     }

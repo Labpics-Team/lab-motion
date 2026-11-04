@@ -2,7 +2,46 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const read = path => readFileSync(new URL(path, import.meta.url), 'utf8');
+const normalizeSourceText = source => source.replace(/\r\n/g, '\n');
+const read = path => normalizeSourceText(readFileSync(new URL(path, import.meta.url), 'utf8'));
+
+function replacementViolations(source) {
+  const create = source.slice(source.indexOf('internal static ScalarBinding Create'), source.indexOf('public void Dispose()'));
+  return /try\s*\{\s*previous\?\.Release\(\);\s*\}\s*catch \(Exception error\)\s*\{\s*var primary = ExceptionDispatchInfo.Capture\(error\);\s*try \{ binding.Dispose\(\); \}\s*catch \{ \}\s*primary.Throw\(\);\s*\}\s*return binding;/.test(create.replace(/\/\/[^\n]*/g, ''))
+    ? [] : ['failed previous release independently disposes unreturned successor and retains primary'];
+}
+
+test('замена binding не оставляет unreturned successor при отказе прежнего Release', () => {
+  const healthy = `internal static ScalarBinding Create()
+    { try { previous?.Release(); }
+      catch (Exception error) {
+        var primary = ExceptionDispatchInfo.Capture(error);
+        try { binding.Dispose(); } catch { }
+        primary.Throw();
+      }
+      return binding;
+    }
+    public void Dispose()`;
+  assert.deepEqual(replacementViolations(healthy), []);
+  for (const mutant of [healthy.replace('binding.Dispose();', ''), healthy.replace('catch { }', 'catch { throw; }'),
+    healthy.replace('primary.Throw();', 'return binding;')]) assert.equal(replacementViolations(mutant).length, 1);
+  assert.deepEqual(replacementViolations(read('../../native/windows/ScalarBinding.cs')), []);
+  const controls = read('./binding-tests.cs');
+  assert(controls.includes('ReplacementReleaseFailure(rollback);'));
+  assert(controls.includes('new[] { "healthy", "stop", "expression", "compound" }'));
+  assert(controls.includes('ReferenceEquals(error, primary)'));
+  assert(controls.includes('successor.DisposeCount == 1'));
+  assert(controls.includes('visual.Stops == 1 && previous.DisposeCount == 1 && successor.DisposeCount == 1'));
+  assert.equal([...controls.matchAll(/Test\("[^"]+",/g)].length, 11);
+  for (const projection of ['OffsetX', 'OffsetY', 'Opacity'])
+    assert(controls.includes(`(ScalarProperty.${projection},`), projection);
+  assert(controls.includes('Test($"projection-{property}",'));
+  assert(/Test\("replacement-old-owner-dispose",[\s\S]*?ReplacementReleaseFailure\(rollback\);/.test(controls));
+  const runner = read('./runner.cs');
+  assert(/var bindings = BindingTests.Run\(\);\s*passed &= bindings.All\(result => result.Passed\);/.test(runner));
+  const verify = read('./verify.ps1');
+  assert(verify.includes('$unitResult.bindings.Count -ne 14 -or @($unitResult.bindings | Where-Object { !$_.Passed }).Count -ne 0'));
+});
 function ownerViolations(source) {
   const body = source.slice(source.indexOf('    public void Dispose()'), source.indexOf('    private void CheckAccess()'));
   return [
@@ -26,6 +65,17 @@ test('Dispose владельца пытается закрыть все ресу
     ['finally { Observed = null; }', 'Observed = null;', 'observer always cleared'],
     ['failure ??= ExceptionDispatchInfo.Capture(error);', 'failure = ExceptionDispatchInfo.Capture(error);', 'first error and stack retained'],
   ]) assert(ownerViolations(source.replaceAll(before, after)).includes(name), name);
+});
+
+test('LF и Windows CRLF сохраняют чувствительность source mutation Dispose', () => {
+  const original = read('../../native/windows/ScalarMotion.cs');
+  for (const raw of [original, original.replaceAll('\n', '\r\n')]) {
+    const source = normalizeSourceText(raw);
+    assert.deepEqual(ownerViolations(source), []);
+    const mutant = source.replaceAll('CheckAccess();\n        disposed = true;', 'disposed = true;\n        CheckAccess();');
+    assert.notEqual(mutant, source);
+    assert(ownerViolations(mutant).includes('admission before disposal'));
+  }
 });
 
 test('binding сохраняет Stop/выражение primary и обязательно вызывает released', () => {

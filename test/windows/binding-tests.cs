@@ -52,6 +52,8 @@ internal static class BindingTests
                 "Прежний владелец остановил новую анимацию.");
             Require(prior.Source.DisposeCount == 1 && successor.Source.DisposeCount == 0,
                 "Lifetime выражений не соответствует замене.");
+            foreach (var rollback in new[] { "healthy", "stop", "expression", "compound" })
+                ReplacementReleaseFailure(rollback);
         });
 
         Test("replacement-old-handle-dispose", () =>
@@ -256,6 +258,44 @@ internal static class BindingTests
             try { action(); results.Add(new(name, true, null)); }
             catch (Exception error) { results.Add(new(name, false, error.ToString())); }
         }
+    }
+
+    private static void ReplacementReleaseFailure(string rollback)
+    {
+        var compositor = new Compositor();
+        var visual = new Visual(compositor);
+        using var first = new ScalarMotion(compositor, -1000, 1000);
+        using var second = new ScalarMotion(compositor, -1000, 1000);
+        first.BindOffsetX(visual);
+        var previous = visual.Animations["Offset.X"].Source;
+        var primary = new InvalidOperationException("Первичный отказ прежнего Release.");
+        var secondary = new InvalidOperationException("Отказ rollback нового binding.");
+        previous.DisposeFailure = primary;
+        if (rollback is "stop" or "compound") visual.StopFailure = secondary;
+        visual.OnStop = () =>
+        {
+            if (rollback is "expression" or "compound")
+                visual.Animations["Offset.X"].Source.DisposeFailure = secondary;
+        };
+        Exception? error = null;
+        try { second.BindOffsetX(visual); }
+        catch (Exception caught) { error = caught; }
+        var successor = compositor.Expressions[^1];
+        Require(ReferenceEquals(error, primary) && previous.DisposeCount == 1 && successor.DisposeCount == 1
+            && visual.Starts == 2 && visual.Stops == 1, $"Замена потеряла primary или cleanup successor: {rollback}.");
+        if (rollback is "healthy" or "expression")
+            Require(visual.Animations.Count == 0, "Невозвращённая привязка осталась на visual после успешного Stop.");
+        visual.StopFailure = null;
+        visual.OnStop = null;
+        using var third = new ScalarMotion(compositor, -1000, 1000);
+        third.BindOffsetX(visual);
+        first.Dispose();
+        second.Dispose();
+        Require(visual.Stops == 1 && previous.DisposeCount == 1 && successor.DisposeCount == 1,
+            "Rollback оставил orphan в registry или owner bindings.");
+        third.Dispose();
+        Require(visual.Stops == 2 && visual.Animations.Count == 0,
+            "Новая здоровая привязка не восстановила ownership после rollback.");
     }
 
     private static void Require(bool condition, string message)
