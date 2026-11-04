@@ -292,10 +292,83 @@ jobs:
   browser-static:
     uses: ./.github/workflows/browser.yml
 
+  native-windows:
+    name: Windows native motion
+    runs-on: windows-2025
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: "false"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.0.403"
+
+      - name: Build and run native consumer
+        shell: pwsh
+        run: |
+          pwsh -File test/windows/verify.ps1 -OutputDirectory "$env:RUNNER_TEMP/native-windows"
+
+      - name: Native result
+        shell: pwsh
+        run: |
+          Get-Content "$env:RUNNER_TEMP/native-windows/result.json" | Add-Content $env:GITHUB_STEP_SUMMARY
+
+      - name: Verify native input
+        shell: pwsh
+        run: |
+          pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input" -ConfigureHostedAnimations
+
+      # Проверяем полный бюджет после finally, включая поздние cleanup-файлы.
+      # Подготовленный набор остаётся только в одноразовом каталоге runner.
+      - name: Prepare native input evidence
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          node test/windows/prepare-input.mjs "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"
+
+      # Малый контекст отказа остаётся в логе: без кадров, архивов и полного дампа.
+      - name: Native failure diagnostics
+        if: ${{ failure() && !cancelled() }}
+        shell: pwsh
+        run: |
+          $stopMarker = [Guid]::NewGuid().ToString("N")
+          Write-Output "::stop-commands::$stopMarker"
+          try {
+              foreach ($relative in @("native-windows/process.json", "native-input/evidence/failure.txt", "native-input/evidence/close.json")) {
+                  Write-Output "native-diagnostic: $relative"
+                  $path = Join-Path $env:RUNNER_TEMP $relative
+                  if (!(Test-Path -LiteralPath $path -PathType Leaf)) {
+                      Write-Output "[missing]"
+                      continue
+                  }
+                  try {
+                      $reader = [IO.File]::OpenText($path)
+                      try {
+                          $buffer = [char[]]::new(4096)
+                          $count = $reader.ReadBlock($buffer, 0, $buffer.Length)
+                          $lines = @([regex]::Split([string]::new($buffer, 0, $count), "\r\n|\n|\r"))
+                          Write-Output (($lines | Select-Object -First 64) -join "`n")
+                          if ($reader.Peek() -ne -1 -or $lines.Length -gt 64) { Write-Output "[truncated: 4096 chars / 64 lines]" }
+                      } finally { $reader.Dispose() }
+                  } catch {
+                      Write-Output ("[unreadable: {0}]" -f $_.Exception.GetType().Name)
+                  }
+              }
+          } finally { Write-Output "::${stopMarker}::" }
+
   CI:
     name: CI
     if: ${{ always() }}
-    needs: [verify, tests, mutation, browser-static, documentation, security]
+    needs: [verify, tests, mutation, browser-static, documentation, security, native-windows]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -309,6 +382,7 @@ jobs:
           BROWSER_RESULT: ${{ needs.browser-static.result }}
           DOCS_RESULT: ${{ needs.documentation.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
+          WINDOWS_RESULT: ${{ needs.native-windows.result }}
         run: |
           set -euo pipefail
           [[ "$VERIFY_RESULT" == success ]]
@@ -317,3 +391,4 @@ jobs:
           [[ "$BROWSER_RESULT" == success ]]
           [[ "$DOCS_RESULT" == success ]]
           [[ "$SECURITY_RESULT" == success ]]
+          [[ "$WINDOWS_RESULT" == success ]]
