@@ -344,8 +344,8 @@ jobs:
           if-no-files-found: error
           include-hidden-files: false
 
-      - name: Keep failed native diagnostics
-        if: ${{ failure() || cancelled() }}
+      - name: Keep native evidence
+        if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: native-windows-diagnostics
@@ -354,7 +354,7 @@ jobs:
             ${{ runner.temp }}/native-windows/*.log
             ${{ runner.temp }}/native-windows/*.txt
           retention-days: 1
-          if-no-files-found: warn
+          if-no-files-found: error
           include-hidden-files: false
 
   CI:

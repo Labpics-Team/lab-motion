@@ -53,7 +53,10 @@ WinUI x64 unpackaged и масштаб 1.5. Проверка запускает 
 сценарии в WinUI Window: движение до ±200, retarget после ±40 к ∓100,
 сохранение ненулевой скорости против варианта со сбросом, спокойную пружину,
 начальную скорость 600, Stop, SnapTo и Dispose. События берут значение из
-`InteractionTrackerValuesChangedArgs.Position`.
+`InteractionTrackerValuesChangedArgs.Position`; `ReadbackPosition` отдельно
+читает `InteractionTracker.Position.X`. Эти сценарии проверяют координату
+tracker и завершение операций. Видимое смещение привязанного `Visual` требует
+отдельной проверки кадров.
 
 Это не публикуемый пакет (`IsPackable=false`). Жесты sheet, смена DPI/геометрии
 и производственные потребительские гарантии ещё требуют реализации и проверки.
@@ -64,14 +67,17 @@ WinUI x64 unpackaged и масштаб 1.5. Проверка запускает 
 В репозитории находятся настоящий WinUI-потребитель
 [`examples/windows`](../../examples/windows/) и
 [`test/windows/verify.ps1`](../../test/windows/verify.ps1). Нужны Windows с
-доступным Composition, .NET SDK 10 и PowerShell. Из корня репозитория:
+доступным Composition, .NET SDK 10.0.403 и PowerShell. Точная версия SDK и
+`rollForward: disable` закреплены в [`global.json`](../../test/windows/global.json).
+Из корня репозитория:
 
 ```powershell
 pwsh -File test/windows/verify.ps1 -OutputDirectory "$env:TEMP/motion-windows-run"
 ```
 
-Каталог результата должен быть новым. Проверка собирает lifecycle-пробы
-и запускает одиннадцать сценариев в настоящем WinUI Window. В lifecycle-пробах
+Каталог результата должен быть новым. Проверка собирает девять lifecycle-проб
+и четырнадцать проверок привязок и единиц прогресса, затем запускает одиннадцать
+сценариев в настоящем WinUI Window. В lifecycle-пробах
 подменена только граница Composition; интегрирование проверяется отдельным
 WinUI-потребителем. Сброс скорости служит контролем для retarget, а вызовы
 из Idle observer проверяют окончательность результата завершённого движения.
