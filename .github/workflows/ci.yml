@@ -11,6 +11,10 @@ on:
         description: 'Снять зарегистрированный размерный baseline PROFILE-01'
         type: boolean
         default: false
+      profile_prepare:
+        description: 'Снять только hosted identity до регистрации server epoch, без samples'
+        type: boolean
+        default: false
       performance_baseline:
         description: 'Commit для парного сравнения полной стоимости движения'
         type: string
@@ -39,8 +43,10 @@ jobs:
   # Только явный baseline-запрос: обычный кандидат может менять runtime и
   # не обязан совпадать с зарегистрированным старым источником PROFILE-01.
   profile-baseline:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}
+    if: ${{ github.event_name == 'workflow_dispatch' && (inputs.profile_baseline || inputs.profile_prepare) }}
     uses: ./.github/workflows/profile-01.yml
+    with:
+      prepare_only: ${{ inputs.profile_prepare }}
 
   verify:
     name: typecheck · build · size · package

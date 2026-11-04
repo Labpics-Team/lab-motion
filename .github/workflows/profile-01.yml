@@ -4,6 +4,11 @@ name: PROFILE-01 — проверка размерного протокола
 # публичного репозитория. Время/GPU/энергия этой машины не являются device proof.
 on:
   workflow_call:
+    inputs:
+      prepare_only:
+        description: 'Только identity до регистрации server epoch; без SUT samples'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -28,7 +33,7 @@ jobs:
       - name: Настроить Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24'
+          node-version: ${{ inputs.prepare_only && '24.19.0' || '24' }}
 
       - name: Активировать закреплённый pnpm
         run: |
@@ -52,7 +57,62 @@ jobs:
       - name: Установить зависимости
         run: pnpm install --frozen-lockfile
 
+      - name: Подготовить закреплённый браузер без samples
+        if: ${{ inputs.prepare_only }}
+        run: |
+          pnpm --dir bench/compare install --frozen-lockfile
+          pnpm --dir bench/compare exec playwright install --with-deps chromium
+
+      - name: Сохранить фактическую hosted identity до выбора нового epoch
+        if: ${{ inputs.prepare_only }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CPU=$(awk '/^Cpus_allowed_list:/ { split($2, parts, /[,-]/); print parts[1] }' /proc/self/status)
+          test -n "$CPU"
+          taskset -c "$CPU" node --input-type=module <<'NODE'
+          import { createRequire } from 'node:module';
+          import { join, dirname } from 'node:path';
+          import { arch, platform, release } from 'node:os';
+          import { captureServerMachine, createServerJournal } from './bench/profile/server-profile-runner.mjs';
+          import { prepareServerThreadCpuClock } from './bench/profile/server-thread-cpu-clock.mjs';
+          import { SERVER_PROFILE, serverProfileDigest } from './bench/profile/server-profile-registration.mjs';
+          import { hashFileTree, sha256File } from './bench/compare/provenance.mjs';
+          const out = join(process.env.RUNNER_TEMP, 'server-profile-preparation');
+          const journal = createServerJournal(out);
+          const receipt = { schema: 1, scope: 'metadata-only; no SUT samples; not clock qualification or performance PASS',
+            source: process.env.PROFILE_SOURCE_SHA, protocolDigest: serverProfileDigest(SERVER_PROFILE),
+            hosted: { runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
+              imageOS: process.env.ImageOS, imageVersion: process.env.ImageVersion },
+            observed: { platform: platform(), arch: arch(), kernelRelease: release() }, failures: [] };
+          let browser;
+          try {
+            const clock = prepareServerThreadCpuClock({ directory: out });
+            receipt.engineClock = clock.metadata;
+            try { receipt.machine = captureServerMachine(); }
+            catch (error) { receipt.failures.push({ boundary: 'machine-resource-prerequisite', message: error.message, raw: error.raw ?? null }); }
+            const requireBench = createRequire(join(process.cwd(), 'bench/compare/package.json'));
+            const browserType = requireBench('playwright').chromium;
+            const executable = browserType.executablePath();
+            receipt.browser = { name: 'chromium', executableSha256: sha256File(executable),
+              tree: { directory: dirname(executable), ...hashFileTree(dirname(executable)) } };
+            browser = await browserType.launch({ headless: SERVER_PROFILE.headless, executablePath: executable });
+            receipt.browser.version = browser.version();
+            clock.assertUnchanged();
+          } catch (error) {
+            receipt.failures.push({ boundary: 'identity-preparation', message: error.message, raw: error.raw ?? null });
+          } finally {
+            try { await browser?.close(); }
+            catch (error) { receipt.failures.push({ boundary: 'browser-cleanup', message: error.message }); }
+          }
+          const digest = serverProfileDigest(receipt);
+          journal('hosted-identity-before-epoch-and-samples', { receipt, digest });
+          console.log(`HOSTED_PROFILE_PREPARATION ${JSON.stringify({ receipt, digest })}`);
+          process.exitCode = receipt.failures.length ? 1 : 0;
+          NODE
+
       - name: Измерить прежний размерный вектор
+        if: ${{ !inputs.prepare_only }}
         id: probe
         shell: bash
         run: |
