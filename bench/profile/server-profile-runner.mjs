@@ -1,7 +1,7 @@
 // Расширение существующего bench owner: общие сборка, origin, адаптеры и законы
 // round-robin. Ни одного вывода о физическом мобильном устройстве здесь нет.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, statfsSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { arch, cpus, hostname, loadavg, platform, release, totalmem } from 'node:os';
 import path from 'node:path';
@@ -16,7 +16,7 @@ import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPack
 import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
 import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './server-thread-cpu-clock.mjs';
 import { compactServerCpuEvidence, compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
-  serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration } from './server-profile-contract.mjs';
+  serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerResourceIdentity, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration } from './server-profile-contract.mjs';
 import { writeServerArtifact } from './server-profile-artifact.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -46,16 +46,82 @@ function errorRecord(error) {
     ...(error?.raw ? { raw: preserveRawNumbers(error.raw) } : {}), ...(error?.timerEvidence ? { timerEvidence: preserveRawNumbers(error.timerEvidence) } : {}) };
 }
 function readOptional(file) { return existsSync(file) ? readFileSync(file, 'utf8').trim() : null; }
+function resourceRead(file, trim = true) {
+  try { const text = readFileSync(file, 'utf8'); return { text: trim ? text.trim() : text }; }
+  catch (error) { return { error: errorRecord(error) }; }
+}
+function captureResourceConfiguration() {
+  const membership = resourceRead('/proc/self/cgroup', false), mountinfo = resourceRead('/proc/self/mountinfo', false);
+  const raw = { membership, mountinfo };
+  const refuse = (message) => { throw Object.assign(new Error('server profile: ' + message + '; до samples'), { raw }); };
+  const entries = membership.text?.split('\n').filter((line) => line.startsWith('0::')) ?? [];
+  const absolute = (value) => typeof value === 'string' && value.startsWith('/') &&
+    (value === '/' || value.split('/').slice(1).every((part) => part !== '' && part !== '.' && part !== '..')) && !/[\x00-\x1f]/.test(value);
+  if (entries.length !== 1 || !absolute(entries[0].slice(3)) || entries[0].includes(' (deleted)')) refuse('невалидная process cgroup membership');
+  const member = entries[0].slice(3);
+  const decode = (value) => value.replace(/\\(040|011|012|134)/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)));
+  const mounts = (mountinfo.text ?? '').split('\n').filter(Boolean).map((line) => {
+    const halves = line.split(' - '), fields = halves[0].split(' '), tail = halves[1]?.split(' ');
+    if (halves.length !== 2 || fields.length < 6 || !tail || tail.length < 3) refuse('невалидный mountinfo');
+    return { id: fields[0], root: decode(fields[3]), point: decode(fields[4]), filesystem: tail[0] };
+  });
+  const candidates = mounts.filter((mount) => mount.filesystem === 'cgroup2');
+  if (candidates.length !== 1) refuse('неподдержанная неоднозначность cgroup2 mounts');
+  const mount = candidates[0]; raw.mount = mount;
+  if (mount.root !== '/' || !absolute(mount.point) || mount.point === '/') refuse('неполное ancestor coverage: bind/namespace mount');
+  if (mounts.some((other) => other !== mount && (other.point === mount.point || other.point.startsWith(mount.point + '/')))) refuse('маскирующий cgroup mount');
+  const stat = resourceRead('/proc/self/stat'); raw.scheduler = stat;
+  const scheduler = stat.text?.slice(stat.text.lastIndexOf(')') + 2).split(/\s+/)[38];
+  if (scheduler !== '0') refuse('поддерживается только SCHED_OTHER');
+  const scopes = [];
+  for (let current = member; ; current = path.posix.dirname(current)) {
+    const directory = mount.point + (current === '/' ? '' : current);
+    let object;
+    try {
+      const info = statSync(directory, { bigint: true }), fs = statfsSync(directory, { bigint: true });
+      object = { dev: String(info.dev), ino: String(info.ino), fsType: String(fs.type) };
+      if (!info.isDirectory() || fs.type !== 0x63677270n) refuse('объект не cgroup2 directory');
+    } catch (error) { throw Object.assign(new Error('server profile: cgroup object недоступен; до samples'), { raw: { ...raw, directory, error: errorRecord(error) } }); }
+    scopes.push({ path: current, directory, ...object, type: resourceRead(directory + '/cgroup.type'),
+      cpuMax: resourceRead(directory + '/cpu.max'), burst: resourceRead(directory + '/cpu.max.burst'),
+      memoryMax: resourceRead(directory + '/memory.max'), controllers: resourceRead(directory + '/cgroup.controllers'),
+      subtreeControl: resourceRead(directory + '/cgroup.subtree_control') });
+    if (current === '/') break;
+  }
+  // Linux v6.18.44/v7.0 sched-ext: policy 0 alone also permits full-switch ext.
+  // Keep the explicit state read, not volatile /proc/self/sched counters.
+  const schedExtState = { model: 'linux-v6.18.44-v7.0-sched-ext-state', ...resourceRead('/sys/kernel/sched_ext/state') };
+  const resource = { membership, mountinfo, mount, scheduler, schedExtState, scopes };
+  try { validateServerResourceIdentity(resource); }
+  catch (error) { throw Object.assign(new Error(error.message + '; до samples'), { raw: { resource, cgroupCpuMax: scopes[0].cpuMax.text ?? null } }); }
+  return resource;
+}
 function contextSwitches() {
   const status = readFileSync('/proc/self/status', 'utf8');
   return Object.fromEntries(['voluntary_ctxt_switches', 'nonvoluntary_ctxt_switches'].map((name) =>
     [name, Number(new RegExp(`^${name}:\\s*(\\d+)$`, 'm').exec(status)?.[1])]));
 }
 function captureServerLoad() {
-  const raw = readFileSync('/sys/fs/cgroup/cpu.stat', 'utf8');
-  const cpuStat = Object.fromEntries(raw.trim().split('\n').map((line) => { const [key, value] = line.split(/\s+/); return [key, Number(value)]; }));
-  return { at: new Date().toISOString(), affinity: /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1],
-    cpuMax: readOptional('/sys/fs/cgroup/cpu.max'), cpuStat, loadavg: loadavg(), contextSwitches: contextSwitches(), scope: 'весь cgroup, включая возможные фоновые процессы' };
+  const resource = captureResourceConfiguration();
+  const affinity = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
+  const scopes = resource.scopes.slice(0, -1).map((scope) => {
+    const raw = resourceRead(scope.directory + '/cpu.stat');
+    const entries = (raw.text ?? '').split('\n').map((line) => line.trim().split(/\s+/));
+    const cpuStat = Object.fromEntries(entries.map(([key, value]) => [key, Number(value)]));
+    if (raw.error || entries.some((entry) => entry.length !== 2) || new Set(entries.map(([key]) => key)).size !== entries.length ||
+      !['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'].every((key) => Number.isSafeInteger(cpuStat[key]) && cpuStat[key] >= 0)) {
+      throw Object.assign(new Error('server profile: cpu.stat требует шесть безопасных счётчиков; до samples'),
+        { raw: { resource: { path: scope.path, cpuMax: scope.cpuMax.text, cpuStat, read: raw } } });
+    }
+    return { path: scope.path, cpuStat };
+  });
+  const after = captureResourceConfiguration();
+  const affinityAfter = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
+  if (serverProfileDigest(resource) !== serverProfileDigest(after) || affinity !== affinityAfter) {
+    throw Object.assign(new Error('server profile: cgroup/affinity изменились при snapshot'), { raw: { resource, after, affinity, affinityAfter } });
+  }
+  return { at: new Date().toISOString(), affinity, resource, scopes, cpuMax: resource.scopes[0].cpuMax.text,
+    cpuStat: scopes[0].cpuStat, loadavg: loadavg(), contextSwitches: contextSwitches(), scope: 'process cgroup; каждый non-root ancestor отдельно' };
 }
 async function withBrowserTimeout(promise, label) {
   let timeout;
@@ -68,24 +134,16 @@ async function withBrowserTimeout(promise, label) {
 export function captureServerMachine() {
   const affinity = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
   if (!/^\d+$/.test(affinity ?? '')) throw new Error('server profile: нужен один CPU через taskset, общий scheduler не закреплён');
-  const cgroupCpuMax = readOptional('/sys/fs/cgroup/cpu.max');
-  if (typeof cgroupCpuMax !== 'string' || cgroupCpuMax.length === 0) {
-    throw Object.assign(new Error('server profile: нет cgroup v2 cpu.max; ресурсный контракт невыполним до samples'),
-      { raw: { affinity, cgroupCpuMax } });
-  }
   const resource = captureServerLoad();
-  const resourceKeys = ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'];
-  if (!resourceKeys.every((key) => Number.isSafeInteger(resource.cpuStat[key]) && resource.cpuStat[key] >= 0)) {
-    throw Object.assign(new Error('server profile: cpu.stat не содержит шесть безопасных неотрицательных счётчиков; ресурсный контракт невыполним до samples'),
-      { raw: { resource } });
-  }
+  if (resource.affinity !== affinity) throw Object.assign(new Error('server profile: affinity изменилась до регистрации'), { raw: { affinity, resource } });
+  const cgroupCpuMax = resource.cpuMax;
   const identity = { platform: platform(), release: release(), arch: arch(), host: hostname(),
     cpu: cpus()[Number(affinity)]?.model, logicalCpus: cpus().length, totalMemoryBytes: totalmem(), affinity,
-    cgroupCpuMax, cgroupMemoryMax: readOptional('/sys/fs/cgroup/memory.max'),
+    cgroupCpuMax, resource: resource.resource, cgroupMemoryMax: resource.resource.scopes[0].memoryMax,
     governor: readOptional(`/sys/devices/system/cpu/cpu${affinity}/cpufreq/scaling_governor`),
     display: 'headless; физический экран отсутствует', power: 'среда сервера; не устройство', thermal: 'не измеряется',
     node: process.version, nodeExecutableSha256: sha256File(process.execPath), execArgv: process.execArgv };
-  return { identity, sha256: serverProfileDigest(identity), observation: { at: new Date().toISOString(), loadavg: loadavg(), memory: process.memoryUsage() } };
+  return { identity, sha256: serverProfileDigest(identity), observation: { at: new Date().toISOString(), resource, loadavg: loadavg(), memory: process.memoryUsage() } };
 }
 
 export function createServerJournal(out) {
@@ -541,7 +599,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     engineClock?.assertUnchanged();
     if (artifact.registration) {
       const current = captureServerLoad(), registered = artifact.registration.machine.identity;
-      if (current.affinity !== registered.affinity || current.cpuMax !== registered.cgroupCpuMax) {
+      if (current.affinity !== registered.affinity || serverProfileDigest(current.resource) !== serverProfileDigest(registered.resource)) {
         throw Object.assign(new Error('server profile: machine affinity/quota изменились после регистрации'), { raw: { current, registered } });
       }
     }
@@ -650,7 +708,9 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
         if (run % 2 === 1) {
           const after = captureServerLoad();
           const block = { block: Math.floor(run / 2), before: resourceBefore, after,
-            delta: Object.fromEntries(['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'].map((key) => [key, after.cpuStat[key] - resourceBefore.cpuStat[key]])) };
+            delta: Object.fromEntries(['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'].map((key) => [key, after.cpuStat[key] - resourceBefore.cpuStat[key]])),
+            scopeDeltas: resourceBefore.scopes.map((scope, index) => ({ path: scope.path,
+              delta: Object.fromEntries(['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'].map((key) => [key, after.scopes[index]?.cpuStat[key] - scope.cpuStat[key]])) })) };
           stage.blocks.push(block); journal('resources-block', { stage: name, ...block });
         }
         process.stderr.write(`server profile ${name}: ${run + 1}/${runs}\n`);

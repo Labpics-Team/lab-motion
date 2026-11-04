@@ -560,26 +560,99 @@ export function serverCalibrationVerdict(aa, positiveControl, samplePlan) {
   return { verdict: reasons.length ? 'UNPROVEN' : 'PASS', reasons };
 }
 
+// Проверяет сохранённые исходные наблюдения, не digest/summary сборщика.
+export function validateServerResourceIdentity(resource) {
+  const absolute = (value) => typeof value === 'string' && value.startsWith('/') &&
+    (value === '/' || value.split('/').slice(1).every((part) => part && part !== '.' && part !== '..')) && !/[\x00-\x1f]/.test(value);
+  const lines = resource?.membership?.text?.split('\n').filter((line) => line.startsWith('0::')) ?? [];
+  invariant(lines.length === 1 && absolute(lines[0].slice(3)) && !lines[0].includes(' (deleted)'), 'невалидная resource membership');
+  const member = lines[0].slice(3), mount = resource.mount;
+  invariant(mount?.root === '/' && absolute(mount.point) && mount.point !== '/' && mount.filesystem === 'cgroup2' && /^\d+$/.test(mount.id), 'неполное ancestor coverage');
+  invariant(typeof resource.mountinfo?.text === 'string', 'нет mountinfo');
+  const mounts = resource.mountinfo.text.split('\n').filter(Boolean).map((line) => {
+    const halves = line.split(' - '), fields = halves[0].split(' '), tail = halves[1]?.split(' ');
+    invariant(halves.length === 2 && fields.length >= 6 && tail?.length >= 3, 'невалидный mountinfo');
+    const decode = (value) => value.replace(/\\(040|011|012|134)/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)));
+    return { id: fields[0], root: decode(fields[3]), point: decode(fields[4]), filesystem: tail[0] };
+  });
+  const candidates = mounts.filter((item) => item.filesystem === 'cgroup2');
+  invariant(candidates.length === 1 && isDeepStrictEqual(candidates[0], mount) &&
+    !mounts.some((item) => item !== candidates[0] && (item.point === mount.point || item.point.startsWith(mount.point + '/'))), 'неоднозначный/маскирующий cgroup mount');
+  invariant(resource.scheduler === '0', 'ресурсный контракт требует SCHED_OTHER');
+  // Linux v6.18.44/v7.0 sched-ext.rst + ext.c scx_attr_state_show:
+  // only an explicit disabled state rules out full-switch for policy 0.
+  const schedExt = resource.schedExtState;
+  invariant(schedExt?.model === 'linux-v6.18.44-v7.0-sched-ext-state' && schedExt.error === undefined && typeof schedExt.text === 'string' &&
+    ['disabled', 'enabling', 'enabled', 'disabling'].includes(schedExt.text), 'sched_ext applicability unknown: нет однозначного state read');
+  invariant(schedExt.text === 'disabled', 'sched_ext не disabled: fair-class applicability не доказана');
+  const chain = [member];
+  while (chain.at(-1) !== '/') { const current = chain.at(-1); chain.push(current.slice(0, current.lastIndexOf('/')) || '/'); }
+  invariant(chain.length > 1 && Array.isArray(resource.scopes) && resource.scopes.length === chain.length, 'неполная resource ancestor chain');
+  let numerator = 1n, denominator = 1n, memory = null, memoryKnown = true;
+  const readEvidence = (value) => value && ((typeof value.text === 'string' && value.error === undefined) ||
+    (value.text === undefined && typeof value.error?.message === 'string' && typeof value.error?.code === 'string'));
+  for (let index = 0; index < chain.length; index++) {
+    const scope = resource.scopes[index], root = index === chain.length - 1;
+    invariant(scope?.path === chain[index] && scope.directory === mount.point + (root ? '' : chain[index]) &&
+      /^[0-9]+$/.test(scope.dev) && /^[1-9][0-9]*$/.test(scope.ino) && scope.fsType === '1667723888' && scope.dev === resource.scopes[0].dev &&
+      resource.scopes.findIndex((item) => item.ino === scope.ino) === index, 'resource object/chain не воспроизводится');
+    invariant(['type', 'cpuMax', 'burst', 'memoryMax', 'controllers', 'subtreeControl'].every((key) => readEvidence(scope[key])), 'нет исходных resource reads');
+    invariant(typeof scope.controllers.text === 'string' && typeof scope.subtreeControl.text === 'string', 'нечитаемые cgroup core files');
+    if (root) {
+      // Linux cgroup_addrm_files: CFTYPE_NOT_ON_ROOT зависит от cgroup_parent,
+      // а не от namespace root. Маскирующие mounts отвергнуты выше.
+      invariant(scope.type.error?.code === 'ENOENT' && scope.cpuMax.error?.code === 'ENOENT' &&
+        scope.controllers.text.split(/\s+/).includes('cpu') && scope.subtreeControl.text.split(/\s+/).includes('cpu'), 'не доказан реальный hierarchy root');
+      continue;
+    }
+    invariant(scope.type.text === 'domain', 'неподдержанная threaded cgroup topology');
+    invariant(resource.scopes[index + 1].subtreeControl.text?.split(/\s+/).includes('cpu'), 'CPU controller не включён у предка');
+    const quota = /^(max|[1-9][0-9]*) ([1-9][0-9]*)$/.exec(scope.cpuMax.text ?? '');
+    invariant(quota && quota.slice(1).every((value) => value === 'max' || BigInt(value) <= 18446744073709551615n), 'невалидный cpu.max');
+    if (quota[1] !== 'max' && BigInt(quota[1]) * denominator < numerator * BigInt(quota[2])) {
+      numerator = BigInt(quota[1]); denominator = BigInt(quota[2]);
+    }
+    invariant(scope.burst.error?.code === 'ENOENT' || (/^(0|[1-9][0-9]*)$/.test(scope.burst.text ?? '') && BigInt(scope.burst.text) <= 18446744073709551615n), 'невалидный cpu.max.burst');
+    if (scope.memoryMax.text === 'max') continue;
+    if (/^(0|[1-9][0-9]*)$/.test(scope.memoryMax.text ?? '') && BigInt(scope.memoryMax.text) <= 18446744073709551615n) {
+      const limit = BigInt(scope.memoryMax.text); if (memory === null || limit < memory) memory = limit;
+    } else memoryKnown = false;
+  }
+  return { cpuCeiling: { numerator: String(numerator), denominator: String(denominator) },
+    memoryCeiling: memoryKnown ? memory === null ? 'max' : String(memory) : 'unknown' };
+}
+
 export function serverResourceReasons(stages, identity) {
   const reasons = [];
-  invariant(/^\d+$/.test(identity?.affinity) && typeof identity.cgroupCpuMax === 'string' && identity.cgroupCpuMax.length > 0,
+  invariant(/^\d+$/.test(identity?.affinity) && identity.cgroupCpuMax === identity.resource?.scopes?.[0]?.cpuMax?.text,
     'ресурсные observations не связаны с зарегистрированным machine');
+  validateServerResourceIdentity(identity.resource);
   for (const stage of stages) {
     const rowsPerBlock = (SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length) * 2;
     invariant(Array.isArray(stage.blocks) && stage.blocks.length === stage.rows.length / rowsPerBlock, 'нет наблюдений ресурсов каждого парного блока');
     for (let index = 0; index < stage.blocks.length; index++) {
       const block = stage.blocks[index];
       invariant(block.block === index && block.before?.cpuStat && block.after?.cpuStat && /^\d+$/.test(block.before.affinity), 'невалидный ресурсный блок');
-      if (block.before.affinity !== block.after.affinity || block.before.cpuMax !== block.after.cpuMax) reasons.push(`${stage.name}: affinity/quota изменились`);
-      if ([block.before, block.after].some((snapshot) => snapshot.affinity !== identity.affinity || snapshot.cpuMax !== identity.cgroupCpuMax)) {
-        reasons.push(`${stage.name}: block ${index} отличается от зарегистрированных affinity/quota`);
+      if (block.before.affinity !== block.after.affinity || block.before.cpuMax !== block.after.cpuMax) reasons.push(stage.name + ': affinity/quota изменились');
+      for (const snapshot of [block.before, block.after]) {
+        validateServerResourceIdentity(snapshot.resource);
+        if (snapshot.affinity !== identity.affinity || snapshot.cpuMax !== identity.cgroupCpuMax || !isDeepStrictEqual(snapshot.resource, identity.resource)) {
+          reasons.push(stage.name + ': block ' + index + ' отличается от зарегистрированных affinity/quota');
+        }
+        invariant(Array.isArray(snapshot.scopes) && snapshot.scopes.length === snapshot.resource.scopes.length - 1 &&
+          isDeepStrictEqual(snapshot.cpuStat, snapshot.scopes[0].cpuStat), 'неполные resource scope counters');
       }
-      for (const key of ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec']) {
-        const before = block.before.cpuStat[key], after = block.after.cpuStat[key];
-        invariant(Number.isSafeInteger(before) && Number.isSafeInteger(after) && before >= 0 && after >= before && block.delta[key] === after - before,
-          'resource delta не воспроизводится');
+      invariant(Array.isArray(block.scopeDeltas) && block.scopeDeltas.length === block.before.scopes.length &&
+        isDeepStrictEqual(block.delta, block.scopeDeltas[0].delta), 'неполные resource scope delta');
+      for (let scopeIndex = 0; scopeIndex < block.scopeDeltas.length; scopeIndex++) {
+        const before = block.before.scopes[scopeIndex], after = block.after.scopes[scopeIndex], delta = block.scopeDeltas[scopeIndex];
+        invariant(before.path === identity.resource.scopes[scopeIndex].path && after.path === before.path && delta.path === before.path, 'resource scope identity изменилась');
+        for (const key of ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec']) {
+          invariant(Number.isSafeInteger(before.cpuStat[key]) && Number.isSafeInteger(after.cpuStat[key]) && before.cpuStat[key] >= 0 &&
+            after.cpuStat[key] >= before.cpuStat[key] && delta.delta[key] === after.cpuStat[key] - before.cpuStat[key], 'resource delta не воспроизводится');
+        }
+        if (delta.delta.nr_throttled !== 0 || delta.delta.throttled_usec !== 0) reasons.push(stage.name + ': block ' + index + ' содержит cgroup CPU throttling: ' + before.path);
       }
-      if (block.delta.nr_throttled !== 0 || block.delta.throttled_usec !== 0) reasons.push(`${stage.name}: block ${index} содержит cgroup CPU throttling`);
     }
   }
   return reasons;
@@ -622,6 +695,8 @@ export function validateServerArtifact(artifact) {
     /^\d+$/.test(artifact.registration.machine.identity.affinity) && artifact.registration.machine.identity.platform === 'linux' &&
     typeof artifact.registration.machine.identity.cgroupCpuMax === 'string' && artifact.registration.machine.identity.cgroupCpuMax.length > 0 &&
     SHA256.test(artifact.registration.machine.identity.nodeExecutableSha256), 'machine identity не закреплена');
+  validateServerResourceIdentity(artifact.registration.machine.identity.resource);
+  invariant(artifact.registration.machine.identity.cgroupCpuMax === artifact.registration.machine.identity.resource.scopes[0].cpuMax.text, 'machine quota не относится к process cgroup');
   invariant(SHA256.test(artifact.registration.browserTree?.sha256) && Number.isSafeInteger(artifact.registration.browserTree?.files) &&
     artifact.registration.browserTree.files > 0, 'потерян browser tree hash');
   verifyServerClockRegistration(artifact.registration);

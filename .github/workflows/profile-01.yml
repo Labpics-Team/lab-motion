@@ -72,7 +72,8 @@ jobs:
           test -n "$CPU"
           taskset -c "$CPU" node --input-type=module <<'NODE'
           import { createRequire } from 'node:module';
-          import { readFileSync } from 'node:fs';
+          import { readFileSync, readlinkSync } from 'node:fs';
+          import { spawnSync } from 'node:child_process';
           import { join, dirname } from 'node:path';
           import { arch, platform, release } from 'node:os';
           import { captureServerMachine, createServerJournal } from './bench/profile/server-profile-runner.mjs';
@@ -86,6 +87,24 @@ jobs:
             hosted: { runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
               imageOS: process.env.ImageOS, imageVersion: process.env.ImageVersion },
             observed: { platform: platform(), arch: arch(), kernelRelease: release() }, failures: [] };
+          // Все чтения выполняются до native/browser preparation, вне timing.
+          receipt.clockBuildEvidence = { files: {}, namespaces: {}, packages: [] };
+          for (const file of ['/proc/version', '/proc/version_signature', '/proc/cmdline', '/proc/self/timens_offsets',
+            '/proc/1/timens_offsets', '/boot/config-' + release()]) {
+            try { receipt.clockBuildEvidence.files[file] = { text: readFileSync(file, 'utf8') }; }
+            catch (error) { receipt.clockBuildEvidence.files[file] = { error: { code: error.code, message: error.message } }; }
+          }
+          for (const file of ['/proc/self/ns/time', '/proc/self/ns/time_for_children', '/proc/1/ns/time']) {
+            try { receipt.clockBuildEvidence.namespaces[file] = { target: readlinkSync(file) }; }
+            catch (error) { receipt.clockBuildEvidence.namespaces[file] = { error: { code: error.code, message: error.message } }; }
+          }
+          for (const name of ['linux-image-' + release(), 'linux-modules-' + release()]) {
+            const args = ['-W', '-f=${binary:Package} ${Version} ${source:Package} ${source:Version}\n', name];
+            const result = spawnSync('dpkg-query', args, { encoding: 'utf8', timeout: 10_000, maxBuffer: 1024 * 1024 });
+            receipt.clockBuildEvidence.packages.push({ command: 'dpkg-query', args, status: result.status, signal: result.signal,
+              stdout: result.stdout, stderr: result.stderr,
+              ...(result.error ? { error: { code: result.error.code, message: result.error.message } } : {}) });
+          }
           let browser;
           try {
             const clock = prepareServerThreadCpuClock({ directory: out });

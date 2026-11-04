@@ -9,7 +9,7 @@ import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPo
 import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serverMetricCells, serverOrders,
   compactServerCpuEvidence, expandServerCpuEvidence, compactServerSemanticEvidence, serverArtifactChunks, serverArtifactDigest, serverBrowserClockBounds, serverBrowserSemanticClockErrorMs, serverOrderStatisticBounds, serverResourceReasons,
   parseServerJsonBytes, parseServerJournalBytes, validateServerArtifact, validateServerBrowserSample, validateServerEngineSample, validateServerJournal,
-  verifyServerClockRegistration } from '../bench/profile/server-profile-contract.mjs';
+  validateServerResourceIdentity, verifyServerClockRegistration } from '../bench/profile/server-profile-contract.mjs';
 import { writeServerArtifact } from '../bench/profile/server-profile-artifact.mjs';
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
 import { measureServerBrowser, measureServerEngine, runServerProfile, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
@@ -91,6 +91,24 @@ function stockRaw(scene: any, multiplier = 1, timed = true, repetition = 0) {
     outcomes: { encoding: 'runs', count: calls, runs: [{ from: 0, count: calls, value: 100, frames: 47 }] } } };
 }
 
+type ResourceReadFixture = { text: string; error?: never } | { text?: never; error: { code: string; message: string } };
+type ResourceScopeFixture = { path: string; directory: string; dev: string; ino: string; fsType: string;
+  type: ResourceReadFixture; cpuMax: ResourceReadFixture; burst: ResourceReadFixture; memoryMax: ResourceReadFixture;
+  controllers: ResourceReadFixture; subtreeControl: ResourceReadFixture };
+function resourceIdentity() {
+  const membership = { text: '0::/system.slice/hosted-compute-agent.service' };
+  const mountinfo = { text: '37 31 0:31 / /sys/fs/cgroup rw,nosuid,nodev,noexec,relatime shared:8 - cgroup2 cgroup2 rw,nsdelegate,memory_recursiveprot' };
+  const absent = { error: { code: 'ENOENT', message: 'absent' } };
+  return { membership, mountinfo, mount: { id: '37', root: '/', point: '/sys/fs/cgroup', filesystem: 'cgroup2' }, scheduler: '0',
+    schedExtState: { model: 'linux-v6.18.44-v7.0-sched-ext-state', text: 'disabled' },
+    scopes: ['/system.slice/hosted-compute-agent.service', '/system.slice', '/'].map((name, index): ResourceScopeFixture => ({
+      path: name, directory: '/sys/fs/cgroup' + (name === '/' ? '' : name), dev: '31', ino: String(index + 1), fsType: '1667723888',
+      type: index === 2 ? absent : { text: 'domain' }, cpuMax: index === 2 ? absent : { text: '400000 100000' },
+      burst: absent, memoryMax: { text: 'max' }, controllers: { text: 'cpu memory' }, subtreeControl: { text: index === 0 ? '' : 'cpu memory' },
+    })) };
+}
+const resourceMachine = () => ({ affinity: '0', cgroupCpuMax: '400000 100000', resource: resourceIdentity() });
+
 function stage(name = 'aa', runs = 2) {
   const rows: any[] = [];
   for (let run = 0; run < runs; run++) for (const [kind, scenes] of [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]] as const) {
@@ -139,8 +157,16 @@ function stage(name = 'aa', runs = 2) {
   }
   const blocks = Array.from({ length: runs / 2 }, (_, block) => {
     const cpuStat = { usage_usec: 10 + block * 10, user_usec: 10 + block * 10, system_usec: 0, nr_periods: 0, nr_throttled: 0, throttled_usec: 0 };
-    return { block, before: { cpuStat, affinity: '0', cpuMax: '400000 100000' }, after: { cpuStat: { ...cpuStat, usage_usec: cpuStat.usage_usec + 10, user_usec: cpuStat.user_usec + 10 }, affinity: '0', cpuMax: '400000 100000' },
-      delta: { usage_usec: 10, user_usec: 10, system_usec: 0, nr_periods: 0, nr_throttled: 0, throttled_usec: 0 } };
+    const after = { ...cpuStat, usage_usec: cpuStat.usage_usec + 10, user_usec: cpuStat.user_usec + 10 };
+    const delta = { usage_usec: 10, user_usec: 10, system_usec: 0, nr_periods: 0, nr_throttled: 0, throttled_usec: 0 };
+    const parent = { ...cpuStat };
+    const parentDelta = { usage_usec: 0, user_usec: 0, system_usec: 0, nr_periods: 0, nr_throttled: 0, throttled_usec: 0 };
+    const paths = ['/system.slice/hosted-compute-agent.service', '/system.slice'];
+    return { block, before: { cpuStat, affinity: '0', cpuMax: '400000 100000', resource: resourceIdentity(),
+      scopes: [{ path: paths[0], cpuStat }, { path: paths[1], cpuStat: parent }] },
+    after: { cpuStat: after, affinity: '0', cpuMax: '400000 100000', resource: resourceIdentity(),
+      scopes: [{ path: paths[0], cpuStat: after }, { path: paths[1], cpuStat: { ...parent } }] },
+    delta, scopeDeltas: [{ path: paths[0], delta }, { path: paths[1], delta: parentDelta }] };
   });
   return { name, rows, blocks };
 }
@@ -152,7 +178,7 @@ function registeredRefusal() {
     environment: { node: SERVER_PROFILE.clockError.nodeVersion, nodeExecutableSha256: SERVER_PROFILE.clockError.nodeExecutableSha256, pnpm: '11.11.0',
       packages: Object.fromEntries(['esbuild', 'playwright', 'motion', 'gsap', 'animejs'].map((name) => [name, packageInfo])),
       rootPackages: Object.fromEntries(['tsup', 'typescript', 'esbuild'].map((name) => [name, packageInfo])) } };
-  const machineIdentity = { affinity: '0', cgroupCpuMax: '400000 100000', platform: 'linux', release: SERVER_PROFILE.clockError.kernelRelease, node: SERVER_PROFILE.clockError.nodeVersion,
+  const machineIdentity = { ...resourceMachine(), platform: 'linux', release: SERVER_PROFILE.clockError.kernelRelease, node: SERVER_PROFILE.clockError.nodeVersion,
     nodeExecutableSha256: SERVER_PROFILE.clockError.nodeExecutableSha256 };
   const consumer = { tarballSha256: hash, treeSha256: hash };
   const registration = { protocolDigest: serverProfileDigest(SERVER_PROFILE), candidateSamplesObserved: false,
@@ -1260,7 +1286,7 @@ describe('серверный PROFILE: независимые sabotage controls',
     for (const block of value.blocks) {
       block.before.cpuStat.nr_throttled = 7755; block.after.cpuStat.nr_throttled = 7755;
     }
-    const identity = { affinity: '0', cgroupCpuMax: '400000 100000' };
+    const identity = resourceMachine();
     expect(serverResourceReasons([value], identity)).toEqual([]);
     value.blocks[0].after.cpuStat.nr_throttled += 1; value.blocks[0].delta.nr_throttled = 1;
     expect(serverResourceReasons([value], identity)[0]).toMatch(/throttling/);
@@ -1269,7 +1295,7 @@ describe('серверный PROFILE: независимые sabotage controls',
   });
 
   it('stable drift между блоками/стадиями не заменяет зарегистрированные CPU/quota', () => {
-    const value = stage('aa', 4), identity = { affinity: '0', cgroupCpuMax: '400000 100000' };
+    const value = stage('aa', 4), identity = resourceMachine();
     value.blocks[1].before.affinity = '1'; value.blocks[1].after.affinity = '1';
     expect(serverResourceReasons([value], identity)).toContain('aa: block 1 отличается от зарегистрированных affinity/quota');
     value.blocks[1].before.affinity = '0'; value.blocks[1].after.affinity = '0';
@@ -1277,6 +1303,61 @@ describe('серверный PROFILE: независимые sabotage controls',
     expect(serverResourceReasons([value], identity)).toContain('aa: block 1 отличается от зарегистрированных affinity/quota');
     const later = stage('positive'); later.blocks[0].before.cpuMax = 'max 100000'; later.blocks[0].after.cpuMax = 'max 100000';
     expect(serverResourceReasons([stage(), later], identity)).toContain('positive: block 0 отличается от зарегистрированных affinity/quota');
+  });
+
+  it('leaf-zero не скрывает throttling предка и не суммирует usage', () => {
+    // Given
+    const value = stage(), block = value.blocks[0];
+    if (!block || !block.after.scopes[1] || !block.scopeDeltas[1]) throw new Error('missing fixture scope');
+    block.after.scopes[1].cpuStat.nr_throttled++;
+    block.scopeDeltas[1].delta.nr_throttled = 1;
+    // When
+    const reasons = serverResourceReasons([value], resourceMachine());
+    // Then
+    expect(reasons.some((reason: string) => reason.includes('throttling: /system.slice'))).toBe(true);
+    expect(block.delta.usage_usec).toBe(10);
+    expect(block.delta.nr_throttled).toBe(0);
+  });
+
+  it.each(['history', 'reset', 'forged', 'missing-parent', 'parent-quota', 'parent-burst', 'inode'])(
+    'independent resource validator различает %s', (fault) => {
+      // Given
+      const value = stage(), block = value.blocks[0];
+      if (!block) throw new Error('missing fixture block');
+      const before = block.before.scopes[1], after = block.after.scopes[1], delta = block.scopeDeltas[1];
+      if (!before || !after || !delta) throw new Error('missing fixture scope');
+      before.cpuStat.nr_throttled = 20; after.cpuStat.nr_throttled = 20;
+      switch (fault) {
+        case 'history': break;
+        case 'reset': after.cpuStat.nr_throttled = 19; delta.delta.nr_throttled = -1; break;
+        case 'forged': after.cpuStat.nr_throttled = 21; break;
+        case 'missing-parent': block.before.resource.scopes.splice(1, 1); block.after.resource.scopes.splice(1, 1); break;
+        case 'parent-quota':
+        case 'parent-burst':
+        case 'inode':
+          for (const snapshot of [block.before, block.after]) {
+            const scope = snapshot.resource.scopes[1]; if (!scope) throw new Error('missing parent');
+            if (fault === 'parent-quota') scope.cpuMax = { text: '50000 100000' };
+            else if (fault === 'parent-burst') scope.burst = { text: '1000' };
+            else scope.ino = '9000';
+          }
+          break;
+        default: throw new Error('unknown fixture mutation: ' + fault);
+      }
+      // When / Then
+      if (fault === 'history') expect(serverResourceReasons([value], resourceMachine())).toEqual([]);
+      else if (['parent-quota', 'parent-burst', 'inode'].includes(fault)) expect(serverResourceReasons([value], resourceMachine()).length).toBeGreaterThan(0);
+      else expect(() => serverResourceReasons([value], resourceMachine())).toThrow(/resource|ancestor|delta/);
+    });
+
+  it('пересчитанный artifact digest не скрывает удаление ancestor', () => {
+    // Given
+    const value = registeredRefusal();
+    value.registration.machine.identity.resource.scopes.splice(1, 1);
+    value.registration.machine.sha256 = serverProfileDigest(value.registration.machine.identity);
+    value.registrationDigest = serverProfileDigest(value.registration);
+    // When / Then
+    expect(() => validateServerArtifact(value)).toThrow(/ancestor|chain/);
   });
 
   it('потерянные provenance и неопределённая calibration не становятся PASS', () => {
@@ -1327,23 +1408,201 @@ describe('PROFILE: ресурсный контракт проверяется д
     const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
     const common = source.slice(source.indexOf('function readOptional('), source.indexOf('async function withBrowserTimeout('));
     const capture = source.slice(source.indexOf('export function captureServerMachine('), source.indexOf('export function createServerJournal(')).replace(/^export /, '');
+    const leaf = '/sys/fs/cgroup/system.slice/hosted-compute-agent.service';
+    const identity = resourceIdentity();
     const files: Record<string, string> = {
       '/proc/self/status': 'Cpus_allowed_list:\t0\nvoluntary_ctxt_switches:\t2\nnonvoluntary_ctxt_switches:\t3\n',
-      '/sys/fs/cgroup/cpu.stat': Object.entries(counters).map(([key, value]) => `${key} ${value}`).join('\n') + '\n',
+      '/proc/self/cgroup': identity.membership.text, '/proc/self/mountinfo': identity.mountinfo.text,
+      '/proc/self/stat': '123 (fixture with spaces) ' + ['S', ...Array(50).fill('0')].join(' '),
+      '/sys/kernel/sched_ext/state': 'disabled\n',
     };
-    if (quota !== null) files['/sys/fs/cgroup/cpu.max'] = quota;
-    const hashBinary = vi.fn(() => hash);
-    // Исполняем точные функции владельца. Независимый FS задаёт отсутствующие
-    // controller/counters; VM не запускает пакеты, браузер или измерение CPU.
+    for (const scope of identity.scopes) {
+      files[scope.directory + '/cgroup.controllers'] = 'cpu memory';
+      files[scope.directory + '/cgroup.subtree_control'] = scope.path === '/system.slice/hosted-compute-agent.service' ? '' : 'cpu memory';
+      if (scope.path !== '/') {
+        files[scope.directory + '/cgroup.type'] = 'domain';
+        files[scope.directory + '/cpu.max'] = '400000 100000';
+        files[scope.directory + '/cpu.stat'] = Object.entries(healthy).map(([key, value]) => key + ' ' + value).join('\n');
+      }
+    }
+    files[leaf + '/cpu.stat'] = Object.entries(counters).map(([key, value]) => key + ' ' + value).join('\n');
+    if (quota === null) delete files[leaf + '/cpu.max']; else files[leaf + '/cpu.max'] = quota;
+    const hashBinary = vi.fn(() => hash), reads: string[] = [];
+    const errors: Record<string, string> = {}, inodes: Record<string, bigint> = {}, onRead: Record<string, () => void> = {};
+    // Точные функции owner, независимые файлы; без пакетов, CPU и браузера.
     const realm = createContext({
-      readFileSync(file: string) { if (!Object.hasOwn(files, file)) throw new Error('нет файла фикстуры ' + file); return files[file]; },
+      readFileSync(file: string) {
+        reads.push(file); onRead[file]?.();
+        if (errors[file] || !Object.hasOwn(files, file)) throw Object.assign(new Error('fixture read: ' + file), { code: errors[file] ?? 'ENOENT' });
+        return files[file];
+      },
+      statSync: (file: string) => ({ dev: 31n, ino: inodes[file] ?? BigInt(file.length), isDirectory: () => true }),
+      statfsSync: () => ({ type: 0x63677270n }), path,
+      errorRecord: (error: Error & { code?: string }) => ({ message: error.message, code: error.code }),
+      validateServerResourceIdentity: (value: unknown) => validateServerResourceIdentity(JSON.parse(JSON.stringify(value))),
       existsSync: (file: string) => Object.hasOwn(files, file), loadavg: () => [0, 0, 0],
       platform: () => 'linux', release: () => '6.18.44', arch: () => 'x64', hostname: () => 'fixture',
       cpus: () => [{ model: 'fixture' }], totalmem: () => 1024, sha256File: hashBinary, serverProfileDigest,
       process: { version: 'v24.19.0', execPath: '/fixture/node', execArgv: [], memoryUsage: () => ({ heapUsed: 1 }) },
     });
-    return { capture: runInContext(`${common}\n${capture}\ncaptureServerMachine;`, realm), hashBinary };
+    return { capture: runInContext(common + '\n' + capture + '\ncaptureServerMachine;', realm), hashBinary, files, errors, inodes, reads, leaf, onRead };
   }
+
+  it('разрешает наблюдённую service membership и сохраняет квоту предка без округления', () => {
+    // Given: root не имеет cpu.max, service unlimited, parent имеет 1/2 CPU.
+    const fixture = machine('max 100000');
+    fixture.files['/sys/fs/cgroup/system.slice/cpu.max'] = '50000 100000';
+    // When
+    const captured = fixture.capture();
+    // Then
+    expect(captured.identity.resource.scopes.map((scope: { path: string }) => scope.path)).toEqual([
+      '/system.slice/hosted-compute-agent.service', '/system.slice', '/',
+    ]);
+    expect(validateServerResourceIdentity(JSON.parse(JSON.stringify(captured.identity.resource))).cpuCeiling).toEqual({ numerator: '50000', denominator: '100000' });
+    expect(fixture.reads).toContain(fixture.leaf + '/cpu.stat');
+    expect(fixture.reads).not.toContain('/sys/fs/cgroup/cpu.stat');
+  });
+
+  it('принимает policy 0 с явным disabled и пустым subtree_control populated leaf', () => {
+    // Given
+    const fixture = machine();
+    // When
+    const captured = fixture.capture();
+    // Then
+    expect(captured.identity.resource.scheduler).toBe('0');
+    expect(captured.identity.resource.schedExtState).toEqual({ model: 'linux-v6.18.44-v7.0-sched-ext-state', text: 'disabled' });
+    expect(captured.identity.resource.scopes[0].subtreeControl).toEqual({ text: '' });
+    expect(() => validateServerResourceIdentity(JSON.parse(JSON.stringify(captured.identity.resource)))).not.toThrow();
+  });
+
+  it.each(['enabled', 'enabling', 'disabling', 'unknown', '', 'disabled\nenabled'])(
+    'отказывает policy 0 при sched_ext state=%j до hashing/setup', (state) => {
+      // Given: политика не меняется при full-switch sched_ext.
+      const fixture = machine(); fixture.files['/sys/kernel/sched_ext/state'] = state;
+      // When / Then
+      expect(() => fixture.capture()).toThrow(/sched_ext/);
+      expect(fixture.hashBinary).not.toHaveBeenCalled();
+    });
+
+  it.each(['ENOENT', 'EACCES', 'EIO'])('сохраняет sched_ext read %s как unknown, не disabled', (code) => {
+    // Given
+    const fixture = machine(); fixture.errors['/sys/kernel/sched_ext/state'] = code;
+    // When / Then
+    expect(() => fixture.capture()).toThrow(/sched_ext applicability unknown/);
+    expect(fixture.hashBinary).not.toHaveBeenCalled();
+  });
+
+  it.each(['enabled', 'unknown', 'missing', 'wrong-model', 'read-error'])(
+    'независимый artifact validator отвергает sched_ext %s даже с новым digest', (fault) => {
+      // Given
+      const value = registeredRefusal();
+      const witness = fault === 'missing' ? undefined : fault === 'read-error'
+        ? { model: 'linux-v6.18.44-v7.0-sched-ext-state', text: 'disabled', error: { code: 'EIO', message: 'unreadable' } }
+        : { model: fault === 'wrong-model' ? 'unqualified' : 'linux-v6.18.44-v7.0-sched-ext-state',
+          text: fault === 'wrong-model' ? 'disabled' : fault };
+      Object.assign(value.registration.machine.identity.resource, { schedExtState: witness });
+      value.registration.machine.sha256 = serverProfileDigest(value.registration.machine.identity);
+      value.registrationDigest = serverProfileDigest(value.registration);
+      // When / Then
+      expect(() => validateServerArtifact(value)).toThrow(/sched_ext/);
+    });
+
+  it('отвергает sched_ext включение на точном событии чтения counters', () => {
+    // Given
+    const fixture = machine();
+    fixture.onRead[fixture.leaf + '/cpu.stat'] = () => { fixture.files['/sys/kernel/sched_ext/state'] = 'enabled'; };
+    // When / Then
+    expect(() => fixture.capture()).toThrow(/sched_ext/);
+    expect(fixture.hashBinary).not.toHaveBeenCalled();
+  });
+
+  it('owner передаёт ancestor throttle при неизменном leaf независимому validator', () => {
+    // Given
+    const fixture = machine(), before = fixture.capture(), value = stage();
+    const block = value.blocks[0]; if (!block) throw new Error('missing fixture block');
+    fixture.files['/sys/fs/cgroup/system.slice/cpu.stat'] = Object.entries({ ...healthy, nr_throttled: 3 })
+      .map(([key, count]) => key + ' ' + count).join('\n');
+    // When
+    const after = fixture.capture();
+    block.before = JSON.parse(JSON.stringify(before.observation.resource));
+    block.after = JSON.parse(JSON.stringify(after.observation.resource));
+    block.delta = { usage_usec: 0, user_usec: 0, system_usec: 0, nr_periods: 0, nr_throttled: 0, throttled_usec: 0 };
+    block.scopeDeltas = [{ path: '/system.slice/hosted-compute-agent.service', delta: { ...block.delta } },
+      { path: '/system.slice', delta: { ...block.delta, nr_throttled: 1 } }];
+    const reasons = serverResourceReasons([value], JSON.parse(JSON.stringify(before.identity)));
+    // Then
+    expect(reasons).toHaveLength(1);
+    expect(reasons[0]).toMatch(/throttling: \/system\.slice$/);
+    expect(block.before.cpuStat).toEqual(block.after.cpuStat);
+  });
+
+  it('перенос mountpoint остаётся частным знанием owner', () => {
+    // Given
+    const fixture = machine(), before = fixture.capture().identity.resource;
+    for (const [file, value] of Object.entries(fixture.files)) if (file.startsWith('/sys/fs/cgroup/')) {
+      fixture.files[file.replace('/sys/fs/cgroup', '/run/cgroup space')] = value; delete fixture.files[file];
+    }
+    fixture.files['/proc/self/mountinfo'] = resourceIdentity().mountinfo.text.replace('/sys/fs/cgroup', '/run/cgroup\\040space');
+    // When
+    const result = fixture.capture().identity.resource;
+    // Then
+    expect(result.scopes.map((scope: { path: string }) => scope.path)).toEqual(before.scopes.map((scope: { path: string }) => scope.path));
+    expect(result.scopes[0].directory).toBe('/run/cgroup space/system.slice/hosted-compute-agent.service');
+  });
+
+  it.each(['bind', 'alias', 'overmount', 'missing-membership', 'duplicate-membership', 'parent-traversal', 'namespace-root', 'threaded', 'cpu-disabled', 'denied', 'period-zero', 'duplicate-counter', 'scheduler'])(
+    'отказывает unsupported topology %s до hashing/setup', (fault) => {
+      // Given
+      const fixture = machine();
+      switch (fault) {
+        case 'bind': fixture.files['/proc/self/mountinfo'] = resourceIdentity().mountinfo.text.replace('0:31 / ', '0:31 /system.slice '); break;
+        case 'alias': fixture.files['/proc/self/mountinfo'] += '\n38 31 0:31 / /alias rw - cgroup2 cgroup2 rw'; break;
+        case 'overmount': fixture.files['/proc/self/mountinfo'] += '\n38 37 0:32 / /sys/fs/cgroup/system.slice rw - tmpfs tmpfs rw'; break;
+        case 'missing-membership': fixture.files['/proc/self/cgroup'] = '1:cpu:/service'; break;
+        case 'duplicate-membership': fixture.files['/proc/self/cgroup'] += '\n0::/other'; break;
+        case 'parent-traversal': fixture.files['/proc/self/cgroup'] = '0::/../service'; break;
+        case 'namespace-root': fixture.files['/sys/fs/cgroup/cgroup.type'] = 'domain'; break;
+        case 'threaded': fixture.files[fixture.leaf + '/cgroup.type'] = 'domain threaded'; break;
+        case 'cpu-disabled': fixture.files['/sys/fs/cgroup/system.slice/cgroup.subtree_control'] = 'memory'; break;
+        case 'denied': fixture.errors[fixture.leaf + '/cpu.max'] = 'EACCES'; break;
+        case 'period-zero': fixture.files[fixture.leaf + '/cpu.max'] = '100000 0'; break;
+        case 'duplicate-counter': fixture.files[fixture.leaf + '/cpu.stat'] += '\nnr_throttled 0'; break;
+        case 'scheduler': fixture.files['/proc/self/stat'] = '123 (fixture) ' + Array(51).fill('1').join(' '); break;
+        default: throw new Error('unknown fixture mutation: ' + fault);
+      }
+      // When / Then
+      expect(() => fixture.capture()).toThrow(/до samples/);
+      expect(fixture.hashBinary).not.toHaveBeenCalled();
+    });
+
+  it.each(['membership', 'inode', 'quota', 'burst'])('отвергает %s drift во время snapshot', (fault) => {
+    // Given: событие чтения счётчика меняет следующий configuration snapshot.
+    const fixture = machine();
+    fixture.onRead[fixture.leaf + '/cpu.stat'] = () => {
+      switch (fault) {
+        case 'membership': fixture.files['/proc/self/cgroup'] = '0::/other'; break;
+        case 'inode': fixture.inodes[fixture.leaf] = 9000n; break;
+        case 'quota': fixture.files['/sys/fs/cgroup/system.slice/cpu.max'] = '50000 100000'; break;
+        case 'burst': fixture.files['/sys/fs/cgroup/system.slice/cpu.max.burst'] = '1000'; break;
+        default: throw new Error('unknown fixture mutation: ' + fault);
+      }
+    };
+    // When / Then
+    expect(() => fixture.capture()).toThrow();
+    expect(fixture.hashBinary).not.toHaveBeenCalled();
+  });
+
+  it('stable parent limit drift не заменяет регистрацию', () => {
+    // Given
+    const fixture = machine(), initial = fixture.capture().identity.resource;
+    fixture.files['/sys/fs/cgroup/system.slice/cpu.max'] = '200000 400000';
+    // When
+    const changed = fixture.capture().identity.resource;
+    // Then
+    expect(changed.scopes[0].cpuMax).toEqual(initial.scopes[0].cpuMax);
+    expect(serverProfileDigest(changed)).not.toBe(serverProfileDigest(initial));
+    expect(validateServerResourceIdentity(JSON.parse(JSON.stringify(changed))).cpuCeiling).toEqual({ numerator: '200000', denominator: '400000' });
+  });
 
   it('принимает шесть полных счётчиков, включая честное историческое throttling', () => {
     const fixture = machine(), captured = fixture.capture();

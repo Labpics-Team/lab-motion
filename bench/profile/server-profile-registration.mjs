@@ -79,7 +79,7 @@ export const SERVER_PROFILE = freeze({
   unproven: ['mobile Android/iOS', 'physical 60/120 Hz', 'whole-page energy', 'GPU', 'M-04 physical-device envelope', 'M-05 product scene families'],
   forcedGc: 'только отдельный retention child process после host turn, затем два GC у каждого heap snapshot; в timing отсутствует',
   rawControls: 'baseline no-motion: два одинаковых PNG; reduced-motion: endpoint без rAF/WAAPI; candidate controls только после PASS calibration',
-  resourcePolicy: 'весь cgroup: до/после каждого парного блока; affinity неизменна, nr_throttled/throttled_usec delta=0; все samples сохраняются, нарушение даёт UNPROVEN без post-hoc исключений',
+  resourcePolicy: 'process domain cgroup v2 SCHED_OTHER с явным /sys/kernel/sched_ext/state=disabled (Linux v6.18.44/v7.0 sched-ext state ABI; ошибка/отсутствие означает unknown, не disabled) и каждый non-root ancestor отдельно: один немаскированный mount с доказанным hierarchy root, неизвестное покрытие/aliases/threaded отвергаются; topology/limits/affinity связаны с регистрацией и до/после каждого парного блока; nr_throttled/throttled_usec delta=0 каждого scope, usage не суммируется; endpoint readback не исключает ABA, внешняя переконфигурация epoch запрещена; все samples сохраняются, нарушение даёт UNPROVEN без post-hoc исключений',
   browserOperationTimeoutMs: 30_000,
   clockError: {
     id: 'linux-thread-scheduled-runtime-node24.19-chromium149-isolated',
