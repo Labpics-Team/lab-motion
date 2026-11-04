@@ -56,12 +56,18 @@ function Start-Tool([string]$Name, [string[]]$Arguments) {
 }
 
 function Finish-Tool($Tool, [int]$Timeout = 30000) {
+    $toolClock = [Diagnostics.Stopwatch]::StartNew()
+    $waitCompleted = $false
+    $killAttempted = $false
+    $finishFailure = $null
+    $result = $null
     try {
-        if (!$Tool.process.WaitForExit($Timeout)) {
-            $Tool.process.Kill($true)
-            $Tool.process.WaitForExit()
-            throw "Таймаут winapp: $($Tool.name)"
-        }
+        if ($Timeout -lt 0) { throw 'Finish-Tool требует конечный неотрицательный Timeout.' }
+        $remaining = [int][Math]::Max(0, $Timeout - $toolClock.ElapsedMilliseconds)
+        $waitResult = $Tool.process.WaitForExit($remaining)
+        if ($waitResult -isnot [bool]) { throw 'winapp не вернул bool после ожидания.' }
+        $waitCompleted = $waitResult
+        if (!$waitCompleted) { throw "Таймаут winapp: $($Tool.name)" }
         $text = $Tool.stdout.GetAwaiter().GetResult()
         $errors = $Tool.prefix + $Tool.stderr.GetAwaiter().GetResult()
         [IO.File]::WriteAllText((Join-Path $evidence "$($Tool.name).stderr.log"), $errors)
@@ -70,8 +76,27 @@ function Finish-Tool($Tool, [int]$Timeout = 30000) {
         $exitCode = Read-ProcessExitCode $Tool.process
         $commands.Add(@{ name = $Tool.name; arguments = $Tool.arguments; exitCode = $exitCode })
         if ($exitCode -ne 0) { throw "winapp $($Tool.name): exit $exitCode" }
-        return $text | ConvertFrom-Json
-    } finally { $Tool.ended = $true; $Tool.process.Dispose() }
+        $result = $text | ConvertFrom-Json
+    } catch { $finishFailure = $_ }
+    finally {
+        # Ошибка ожидания не отменяет единственную попытку остановить свой child.
+        if (!$waitCompleted -and !$killAttempted) {
+            $killAttempted = $true
+            try { $Tool.process.Kill($true) } catch { Save-CleanupFailure $_ ([ref]$finishFailure) }
+            try {
+                # Остановка расходует только остаток исходного Timeout, не новый срок.
+                $remaining = [int][Math]::Max(0, $Timeout - $toolClock.ElapsedMilliseconds)
+                $stopped = $Tool.process.WaitForExit($remaining)
+                if ($stopped -isnot [bool]) { throw 'winapp не вернул bool после остановки.' }
+                $stopConfirmed = Read-ProcessHasExited $Tool.process
+                if (!$stopped -or !$stopConfirmed) { throw 'Остановка winapp не подтвердила завершение.' }
+            } catch { Save-CleanupFailure $_ ([ref]$finishFailure) }
+        }
+        $Tool.ended = $true
+        try { $Tool.process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$finishFailure) }
+    }
+    if ($null -ne $finishFailure) { throw $finishFailure }
+    return $result
 }
 
 function Invoke-Ui([string]$Name, [string[]]$Arguments) {

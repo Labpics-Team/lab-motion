@@ -379,6 +379,37 @@ test('unowned healthy cleanup resets the injected invalid environment map', () =
   assert.match(control, /\$saved = @\{ LAB_MOTION_PRESS_TRACE = 'previous-trace' \}[\s\S]*& \$cleanup/);
 });
 
+function finishToolViolations(source) {
+  const finish = source.slice(source.indexOf('function Finish-Tool'), source.indexOf('function Invoke-Ui')).replace(/\/\/[^\n]*/g, '');
+  return [
+    ['wait fault retains primary before fallback', !/catch \{ \$finishFailure = \$_ \}\s+finally/.test(finish)],
+    ['independent once-only kill before disposal', !/if \(!\$waitCompleted -and !\$killAttempted\) \{\s+\$killAttempted = \$true\s+try \{ \$Tool.process.Kill\(\$true\) \}/.test(finish)
+      || (finish.match(/\$Tool.process.Kill\(\$true\)/g) ?? []).length !== 1],
+    ['bounded original wait budget', !finish.includes('$Tool.process.WaitForExit($remaining)')
+      || !finish.includes('$Timeout - $toolClock.ElapsedMilliseconds') || finish.includes('$Tool.process.WaitForExit()')],
+    ['dispose cannot replace primary', !finish.includes('try { $Tool.process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$finishFailure) }')
+      || !finish.includes('if ($null -ne $finishFailure) { throw $finishFailure }')],
+    ['actual AST Finish-Tool controls', !readSource(new URL('./cleanup.test.ps1', import.meta.url)).includes("'Finish-Tool'")],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('Finish-Tool WaitForExit exception retains one independent bounded Kill before ended/Dispose', () => {
+  const source = readSource(new URL('./verify-input.ps1', import.meta.url));
+  assert.deepEqual(finishToolViolations(source), []);
+  for (const [before, after, named] of [
+    ['$finishFailure = $_', '$finishFailure = $null', 'wait fault retains primary before fallback'],
+    ['if (!$waitCompleted -and !$killAttempted)', 'if ($false)', 'independent once-only kill before disposal'],
+    ['$killAttempted = $true', '$killAttempted = $false', 'independent once-only kill before disposal'],
+    ['$Tool.process.WaitForExit($remaining)', '$Tool.process.WaitForExit()', 'bounded original wait budget'],
+    ['throw $finishFailure', 'throw', 'dispose cannot replace primary'],
+  ]) assert(finishToolViolations(source.replaceAll(before, after)).includes(named), named);
+  const controls = readSource(new URL('./cleanup.test.ps1', import.meta.url));
+  for (const name of ['tool-finish-healthy-control', 'tool-finish-primary-control', 'tool-finish-before-dispose-control',
+    'tool-finish-once-only-control', 'tool-finish-original-budget-control', 'tool-finish-secondary-control']) {
+    assert(controls.includes(name), name);
+  }
+});
+
 function inputPhaseDiagnosticViolations(source) {
   const guard = source.slice(source.indexOf("if ($Name -in @('disable-animation', 'system-disable-animation'))"), source.indexOf('$after = @(Read-Trace)[-1].sequence'));
   return [

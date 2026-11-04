@@ -30,6 +30,11 @@ $readers = @($ast.EndBlock.Statements | Where-Object {
 if ($readers.Count -ne 5) { throw 'Missing actual completion readers/arbitration/phase projection' }
 $completionReaders = [scriptblock]::Create(($readers | ForEach-Object { $_.Extent.Text }) -join "`n")
 . $completionReaders
+$finishDefinition = @($ast.EndBlock.Statements | Where-Object {
+    $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -eq 'Finish-Tool'
+})
+if ($finishDefinition.Count -ne 1) { throw 'Missing actual Finish-Tool' }
+. ([scriptblock]::Create($finishDefinition[0].Extent.Text))
 $outer = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.TryStatementAst] })[-1]
 $cleanup = [scriptblock]::Create($outer.Finally.Extent.Text.Substring(1, $outer.Finally.Extent.Text.Length - 2))
 
@@ -335,6 +340,135 @@ try {
     Save-CleanupFailure $secondControl ([ref]$first)
     if (![object]::ReferenceEquals($first, $firstControl) -or $script:warnings.Count -ne 1 -or
         $script:warnings[0] -notmatch 'second-cleanup-control') { throw 'First-error arbitration/reference changed' }
+
+    # Настоящий Finish-Tool из AST, без child: ждём, останавливаем и освобождаем независимо.
+    $toolCases = 0
+    foreach ($toolFault in @('healthy', 'wait', 'timeout', 'wait-null', 'wait-invalid', 'wait-kill',
+        'wait-stop-wait', 'wait-stop-false', 'wait-stop-null', 'wait-stop-running', 'wait-stop-has-null',
+        'wait-dispose', 'wait-all', 'exhausted', 'stdout', 'stderr', 'evidence', 'json', 'exit',
+        'stdout-dispose', 'stderr-dispose', 'evidence-dispose', 'json-dispose', 'exit-dispose', 'dispose')) {
+        $script:toolFault = $toolFault
+        $script:toolWaits = [Collections.Generic.List[int]]::new()
+        $script:toolKills = 0
+        $script:toolDisposes = 0
+        $script:toolStopReads = 0
+        $script:toolOrder = [Collections.Generic.List[string]]::new()
+        $script:warnings.Clear()
+        $toolProcess = [pscustomobject]@{ IsExited = $false }
+        $toolProcess | Add-Member ScriptMethod WaitForExit {
+            param([int]$Timeout = -1)
+            if ($Timeout -lt 0) { throw 'tool-unbounded-wait' }
+            $script:toolWaits.Add($Timeout)
+            $script:toolOrder.Add('wait')
+            if ($script:toolWaits.Count -eq 1) {
+                if ($script:toolFault.StartsWith('wait')) {
+                    if ($script:toolFault -eq 'wait-null') { return $null }
+                    if ($script:toolFault -eq 'wait-invalid') { return 'false' }
+                    throw [IO.IOException]::new('tool-primary-wait')
+                }
+                if ($script:toolFault -in @('timeout', 'exhausted')) { return $false }
+            } else {
+                if ($script:toolFault -in @('wait-stop-wait', 'wait-all')) { throw [IO.IOException]::new('tool-secondary-stop-wait') }
+                if ($script:toolFault -eq 'wait-stop-null') { return $null }
+                if ($script:toolFault -eq 'wait-stop-false') { return $false }
+            }
+            $this.IsExited = $script:toolFault -ne 'wait-stop-running'
+            return $true
+        }
+        $toolProcess | Add-Member ScriptMethod Kill {
+            param([bool]$EntireProcessTree)
+            $script:toolKills++
+            $script:toolOrder.Add('kill')
+            if (!$EntireProcessTree -or $script:tool.ended) { throw 'tool-finish-before-dispose-control' }
+            if ($script:toolFault -in @('wait-kill', 'wait-all')) { throw [IO.IOException]::new('tool-secondary-kill') }
+        }
+        $toolProcess | Add-Member ScriptProperty HasExited {
+            if ($script:toolWaits.Count -gt 1) { $script:toolStopReads++ }
+            if ($script:toolFault -eq 'wait-stop-has-null') { return $null }
+            return $this.IsExited
+        }
+        $toolProcess | Add-Member ScriptProperty ExitCode {
+            if ($script:toolFault.StartsWith('exit')) { return 7 }
+            return 0
+        }
+        $toolProcess | Add-Member ScriptMethod Dispose {
+            $script:toolDisposes++
+            $script:toolOrder.Add('dispose')
+            if (!$script:tool.ended) { throw 'tool-ended-not-recorded' }
+            if ($script:toolFault.EndsWith('dispose') -or $script:toolFault -eq 'wait-all') {
+                throw [IO.IOException]::new('tool-secondary-dispose')
+            }
+        }
+        $toolStdout = [pscustomobject]@{ Stream = 'stdout' }
+        $toolStderr = [pscustomobject]@{ Stream = 'stderr' }
+        foreach ($stream in @($toolStdout, $toolStderr)) {
+            $stream | Add-Member ScriptMethod GetAwaiter { return $this }
+            $stream | Add-Member ScriptMethod GetResult {
+                if ($script:toolFault.StartsWith($this.Stream)) { throw [IO.IOException]::new('tool-primary-' + $this.Stream) }
+                if ($this.Stream -eq 'stderr') { return '' }
+                if ($script:toolFault.StartsWith('json')) { return '{invalid' }
+                return '{"finished":true}'
+            }
+        }
+        $name = if ($toolFault.StartsWith('evidence')) { 'missing-parent/tool' } else { 'finish-control' }
+        $script:tool = @{ name = $name; arguments = @(); process = $toolProcess; stdout = $toolStdout;
+            stderr = $toolStderr; prefix = ''; ended = $false }
+        $commands = [Collections.Generic.List[object]]::new()
+        $toolTimeout = if ($toolFault -eq 'exhausted') { 0 } else { 100 }
+        $toolObserved = $null
+        $toolResult = $null
+        try { $toolResult = Finish-Tool $script:tool $toolTimeout } catch { $toolObserved = $_ }
+        $needsStop = $toolFault.StartsWith('wait') -or $toolFault -in @('timeout', 'exhausted')
+        if ($script:toolKills -ne [int]$needsStop -or $script:toolDisposes -ne 1 -or
+            $script:toolWaits.Count -ne (1 + [int]$needsStop)) { throw 'tool-finish-once-only-control' }
+        if ($needsStop -and ($script:toolOrder[1] -ne 'kill' -or $script:toolOrder[-1] -ne 'dispose')) {
+            throw 'tool-finish-before-dispose-control'
+        }
+        if (@($script:toolWaits | Where-Object { $_ -lt 0 -or $_ -gt $toolTimeout }).Count -or
+            ($needsStop -and $script:toolWaits[1] -gt $script:toolWaits[0])) { throw 'tool-finish-original-budget-control' }
+        if ($toolFault -eq 'exhausted' -and ($script:toolWaits[1] -ne 0 -or $script:toolStopReads -ne 1)) {
+            throw 'tool-finish-original-budget-control'
+        }
+        if ($toolFault -eq 'healthy') {
+            if ($toolObserved -or !$toolResult.finished -or $commands.Count -ne 1 -or $script:warnings.Count) {
+                throw 'tool-finish-healthy-control'
+            }
+        } else {
+            $expectedPrimary = switch -Wildcard ($toolFault) {
+                'wait-null' { 'bool после ожидания' }
+                'wait-invalid' { 'bool после ожидания' }
+                'wait*' { 'tool-primary-wait' }
+                'timeout' { 'Таймаут winapp' }
+                'exhausted' { 'Таймаут winapp' }
+                'stdout*' { 'tool-primary-stdout' }
+                'stderr*' { 'tool-primary-stderr' }
+                'exit*' { 'exit 7' }
+                'dispose' { 'tool-secondary-dispose' }
+                default { $null }
+            }
+            if (!$toolObserved -or ($expectedPrimary -and $toolObserved.Exception.Message -notmatch [regex]::Escape($expectedPrimary)) -or
+                (!$expectedPrimary -and $toolObserved.Exception.Message -match 'tool-secondary-dispose')) {
+                throw 'tool-finish-primary-control'
+            }
+        }
+        $expectedSecondary = switch ($toolFault) {
+            'wait-kill' { 'tool-secondary-kill' }
+            'wait-stop-wait' { 'tool-secondary-stop-wait' }
+            'wait-stop-false' { 'не подтвердила завершение' }
+            'wait-stop-null' { 'bool после остановки' }
+            'wait-stop-running' { 'не подтвердила завершение' }
+            'wait-stop-has-null' { 'bool HasExited' }
+            'wait-all' { 'tool-secondary-kill', 'tool-secondary-stop-wait', 'tool-secondary-dispose' }
+            default { if ($toolFault -ne 'dispose' -and $toolFault.EndsWith('dispose')) { 'tool-secondary-dispose' } }
+        }
+        foreach ($message in @($expectedSecondary)) {
+            if ($message -and !@($script:warnings | Where-Object { $_ -match [regex]::Escape($message) }).Count) {
+                throw 'tool-finish-secondary-control'
+            }
+        }
+        $toolCases++
+    }
+    "tool finish: $toolCases synthetic controls PASS"
 
     # Настоящая проекция и failure-ветка из AST: синтетические случаи, не WinUI/runtime RCA.
     $phaseEvents = @(
