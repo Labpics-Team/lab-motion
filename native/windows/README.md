@@ -202,7 +202,9 @@ enqueue наблюдаем как ошибка, а не заменяется п�
 делегат перечитывает тот же `UISettings`; unrelated/repeated notifications при
 неизменном значении не запускают новые команды движения. Начальное чтение и все
 предметные реакции обновляют последний принятый snapshot в одном владельце.
-Снятие подписки при Unloaded/Closed и destroy отменяет старые queued delegates;
+Снятие подписки при Unloaded/Closed и destroy не отменяет уже queued delegates;
+они не применяют preference к странице и не выдают команды движения, хотя
+диагностическая запись начала Delegate может сохраниться.
 Reload не получает вторую route, пока прежний subclass не снят. Managed delegate
 удерживается до подтверждённого Remove или собственного WM_NCDESTROY, каждый
 native callback сохраняет DefSubclassProc forwarding. Ошибка регистрации видима;
