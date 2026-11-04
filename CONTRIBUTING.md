@@ -1,5 +1,7 @@
 # Вклад в @labpics/motion
 
+**Diátaxis:** how-to
+
 ## Цель изменений
 
 Каждое изменение должно улучшать наблюдаемое поведение потребителя и сохранять инварианты движка. GitHub Issues описывают задачи и их статус. Планы выполнения, handoff и отчёты рабочих сессий хранятся вне продуктового репозитория. Документация описывает действующие контракты.
@@ -115,6 +117,32 @@ pnpm mutation
 
 Каденцию и break-порог планового mutation-прогона держат
 `.github/workflows/mutation.yml` и `stryker.config.mjs` — не документация.
+
+Сборка, тесты и измерения доверенного исходника выполняются на self-hosted
+Linux/X64. PR из внешнего fork использует hosted runner. Отдельный hosted
+publish сохраняет защищённое окружение npm и provenance; он получает уже
+проверенный архив. Маршруты задают workflow, полноту проверяет
+`test/ci-workflow-contract.test.ts`.
+
+Версию pnpm задаёт `packageManager` извлечённого исходника.
+После checkout и Setup Node `scripts/setup-pnpm.mjs` устанавливает точную версию
+через npm в уникальный каталог внутри `RUNNER_TEMP`, с отдельным cache и без
+lifecycle scripts. Сам CLI проверяется до добавления его bin в `GITHUB_PATH`.
+Для парного benchmark читается `candidate/package.json` — оба дерева извлечены
+в подкаталоги. [pnpm поддерживает установку через npm](https://pnpm.io/installation);
+[`--prefix` задаёт каталог глобальной установки](https://docs.npmjs.com/cli/v11/configuring-npm/folders).
+Такой путь сохраняет неизменяемые инструменты раннера и не требует стороннего
+setup-action. Corepack тоже позволяет создавать shims в отдельном каталоге через
+[`--install-directory`](https://github.com/nodejs/corepack/blob/d4dcb1f89741603e776bba9d457425750fa26987/README.md#corepack-enable--name),
+но прямая установка pnpm обходится без дополнительного посредника выбора версии.
+
+При release replay старый исходник может предшествовать установщику. Поэтому
+release-job извлекает только его Git blob из неизменяемого
+[`github.workflow_sha`](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts#github-context)
+в отдельный временный файл, а pin читает из `package.json` проверяемого релиза.
+Отсутствующий SHA или установщик завершает job до установки; другой ref вместо
+ревизии workflow не используется. Существующие checkout с `fetch-depth: 0` и
+`git fetch origin main` предоставляют историю; второе рабочее дерево не требуется.
 
 ## Требования к PR
 

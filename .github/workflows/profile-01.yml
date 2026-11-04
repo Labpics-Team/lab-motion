@@ -15,7 +15,7 @@ env:
 
 jobs:
   probe:
-    runs-on: ubuntu-latest
+    runs-on: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","Linux","X64"]') || 'ubuntu-latest' }}
     timeout-minutes: 45
     steps:
       - name: Получить точный источник измерителя
@@ -31,9 +31,7 @@ jobs:
           node-version: '24'
 
       - name: Активировать закреплённый pnpm
-        run: |
-          corepack enable
-          corepack install --global pnpm@11.11.0
+        run: node scripts/setup-pnpm.mjs
 
       - name: Проверить точную версию протокола
         shell: bash

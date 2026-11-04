@@ -103,6 +103,9 @@ interface Track {
   readonly _group: Surface;
   readonly _value: number[];
   readonly _velocity: number[];
+  readonly _rendered: number[];
+  readonly _renderedVelocity: number[];
+  _renderedElapsed: number | undefined;
   _owner: Run | undefined;
   _elapsed: number;
   _rate: number;
@@ -207,6 +210,7 @@ class Surface {
   _nativeTime = 0;
   private _written: string | undefined;
   private _token: Promise<Animation> | undefined;
+  private _nativePending = false;
   constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string) {
     this._transforms = {};
     this._stamp = number(_engine._host.now(), 'clock');
@@ -223,7 +227,12 @@ class Surface {
   }
   _read(key: string): Point & { readonly _velocity: readonly number[] } {
     const track = this._tracks.get(key);
-    if (track) return { _coordinates: [...track._value], _unit: track._program._unit, _velocity: [...track._velocity] };
+    if (track) {
+      // Native поза приходит от compositor; JS-модель может опережать CSS-запись.
+      const live = this._native || track._renderedElapsed === undefined;
+      return { _coordinates: [...(live ? track._value : track._rendered)], _unit: track._program._unit,
+        _velocity: [...(live ? track._velocity : track._renderedVelocity)] };
+    }
     if (isTransform(key)) return { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], _unit: '', _velocity: [0] };
     let initial = this._rest;
     if (!initial) {
@@ -258,11 +267,12 @@ class Surface {
   _ended(track: Track): boolean {
     return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
   }
-  private _text(at: 0 | 1 | 2 = 0): string {
+  private _text(at: 0 | 1 | 2 = 0, rendered = false, selected?: readonly Track[]): string {
     if (this._key === 'transform') {
       const state = this._transforms;
       for (const track of this._tracks.values()) {
-        const value = (at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value)[0]!;
+        const value = (at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to
+          : rendered && track._renderedElapsed !== undefined && !selected?.includes(track) ? track._rendered : track._value)[0]!;
         state[track._program._key] = value;
       }
       let identity = !at, translationOnly = !!at;
@@ -277,15 +287,26 @@ class Surface {
     if (!track) {
       const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
-    return format(track._program._key, at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value, track._program._unit);
+    return format(track._program._key, at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to
+      : rendered && track._renderedElapsed !== undefined && !selected?.includes(track) ? track._rendered : track._value, track._program._unit);
   }
-  _render(): void {
+  _render(rendered = false, selected?: readonly Track[]): void {
     if (this._busy) failMotion('style: повторная запись');
     this._lock(true);
     try {
-      const text = this._text();
+      // У transform-поверхности семь каналов, у остальных один; временный Set не нужен.
+      const text = this._text(0, rendered, selected);
       (this._element as HTMLElement).style.setProperty(this._key, text);
       this._written = text;
+      // Снимок обновляется только после успешной записи, без повторного easing.
+      for (const track of this._tracks.values()) {
+        if (rendered && track._renderedElapsed !== undefined && !selected?.includes(track)) continue;
+        for (let i = 0; i < track._value.length; i++) {
+          track._rendered[i] = track._value[i]!;
+          track._renderedVelocity[i] = track._velocity[i]!;
+        }
+        track._renderedElapsed = track._elapsed;
+      }
     }
     finally { this._lock(false); }
   }
@@ -312,8 +333,9 @@ class Surface {
     if (!owner) return;
     track._owner = undefined;
     if (this._tracks.get(track._program._key) === track) this._tracks.delete(track._program._key);
-    if (this._key !== 'transform') this._rest = { _coordinates: [...track._value], _unit: track._program._unit };
-    if (isTransform(track._program._key)) this._transforms[track._program._key] = track._value[0]!;
+    const held = track._renderedElapsed === undefined ? track._value : track._rendered;
+    if (this._key !== 'transform') this._rest = { _coordinates: [...held], _unit: track._program._unit };
+    if (isTransform(track._program._key)) this._transforms[track._program._key] = held[0]!;
     if (this._tracks.size === 0) {
       try { this._engine._idle(this); } catch (error) { failure ??= { _error: error }; }
     }
@@ -330,15 +352,20 @@ class Surface {
     }
   }
   _reconcile(): void {
+    this._nativePending = false;
     if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
     const active = [...this._tracks.values()];
     if (!active.some(moving)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
     const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
+      active.every(track => !track._paused && !this._ended(track) && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
         track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
+    // Compositor не должен материализовать фазу, которую JS ещё не записал.
+    if (active.some(track => track._renderedElapsed !== track._elapsed)) {
+      this._nativePending = true; this._engine._wake(this); return;
+    }
     try {
       this._lock(true);
       const effect = this._element.animate([{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
@@ -391,6 +418,10 @@ class Surface {
     try {
       this._sync();
       if (!selected.some(owns)) return;
+      // Контролы меняют записанную JS-позу; соседние каналы сохраняют свою шкалу.
+      if (!this._native) for (const track of selected) {
+        if (owns(track) && track._renderedElapsed !== undefined) track._elapsed = track._renderedElapsed;
+      }
       if (typeof action === 'function') {
         action(this, selected.filter(owns));
       } else {
@@ -403,7 +434,7 @@ class Surface {
           else if (action === 'finish') track._elapsed = track._program._duration;
           this._sample(track);
         }
-        this._render();
+        this._render(true, selected);
         for (const track of selected) {
           if (!owns(track)) continue;
           if (action === 'stop') this._end(track, false);
@@ -425,6 +456,7 @@ class Surface {
       for (const track of [...this._tracks.values()]) {
         if (moving(track) && this._ended(track)) this._end(track, true);
       }
+      if (this._nativePending) { this._reconcile(); return; }
       for (const track of this._tracks.values()) if (moving(track)) return;
       this._engine._idle(this);
     } catch (error) { this._fail(error); }
@@ -567,13 +599,17 @@ export class Runtime {
         if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!._from;
         const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: first.map(() => 0),
+          _rendered: [...first], _renderedVelocity: first.map(() => 0), _renderedElapsed: undefined,
           _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _rate: 1, _paused: false };
         group._sample(track);
         run._own(track, draft._reduced); group._attach(track);
       }
       for (const group of touched) {
-        group._render();
-        for (const track of [...group._tracks.values()]) if (track._elapsed >= track._program._duration) group._end(track, true);
+        // Принятие новой цели не материализует скрытое продвижение её соседей.
+        group._render(true);
+        for (const track of [...group._tracks.values()]) {
+          if (moving(track) && group._ended(track) && track._renderedElapsed === track._elapsed) group._end(track, true);
+        }
         group._reconcile();
       }
       run._complete();

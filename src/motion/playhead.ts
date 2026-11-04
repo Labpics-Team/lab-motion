@@ -76,6 +76,6 @@ function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<Co
     track._rate = rate ?? -track._rate;
     group._sample(track);
   }
-  group._render();
+  group._render(true, tracks);
   for (const track of tracks) if (!track._paused && group._ended(track)) group._end(track, true);
 }

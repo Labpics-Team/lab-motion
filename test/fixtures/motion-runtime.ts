@@ -35,6 +35,9 @@ export function harness(native = false) {
     effects.push(effect); return effect;
   } } : {}) } as unknown as HTMLElement;
   return { host, runtime, element, effects, writes, values, updates, renders,
+    setClock(at: number) { time = at; },
+    update(at: number) { time = at; for (const cb of [...updates]) cb(); },
+    paint() { for (const cb of [...renders]) cb(); },
     step(at: number) { time = at; for (const cb of [...updates]) cb(); for (const cb of [...renders]) cb(); },
     x() { return Number(/translate\(([^p]+)px/.exec(values.get('transform') ?? '')?.[1] ?? 0); },
     y() { return Number(/translate\([^,]+,([^p]+)px/.exec(values.get('transform') ?? '')?.[1] ?? 0); },

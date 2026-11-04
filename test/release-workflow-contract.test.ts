@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -243,6 +244,54 @@ cat "$GITHUB_OUTPUT"
   });
 }
 
+function gitFile(sha: string, path: string): string {
+  const result = spawnSync('git', ['show', `${sha}:${path}`], { cwd: repositoryRoot, encoding: 'utf8' });
+  if (result.status !== 0) throw new Error(result.stderr);
+  return result.stdout;
+}
+
+function executePnpmActivation(sourceSha: string, workflowSha = mainSourceSha,
+  program = stepRun('verify', 'Activate pinned pnpm')) {
+  const workspace = mkdtempSync(join(tmpdir(), 'labmotion-release-pnpm-'));
+  const captured = join(workspace, 'captured-installer.mjs');
+  const manifest = gitFile(sourceSha, 'package.json');
+  const expectedInstaller = gitFile(mainSourceSha, 'scripts/setup-pnpm.mjs');
+  writeFileSync(join(workspace, 'package.json'), manifest);
+  writeFileSync(join(workspace, 'expected-installer.mjs'), expectedInstaller);
+  try {
+    // Настоящие Git blobs обеих ревизий; node подставлен, npm не запускается.
+    const script = `
+RUNNER_TEMP=$(mktemp -d "$TEST_TEMP_ROOT/run.XXXXXXXX")
+export RUNNER_TEMP
+git() { command git -C "$OBJECT_REPO" "$@"; }
+node() {
+  [[ "$#" -eq 2 && "$2" == package.json ]] || return 90
+  cmp -s "$1" "$EXPECTED_INSTALLER" || { echo 'installer execution preceded binding' >&2; return 91; }
+  cp "$1" "$CAPTURED_INSTALLER"
+  echo activated_manifest=package.json
+}
+${program}
+`;
+    const result = spawnSync(bashExecutable(), ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script], {
+      cwd: workspace, encoding: 'utf8',
+      env: {
+        ...process.env,
+        TEST_TEMP_ROOT: workspace.replaceAll('\\', '/'),
+        OBJECT_REPO: repositoryRoot.replaceAll('\\', '/'),
+        EXPECTED_INSTALLER: join(workspace, 'expected-installer.mjs').replaceAll('\\', '/'),
+        CAPTURED_INSTALLER: captured.replaceAll('\\', '/'),
+        EXPECTED_SOURCE_SHA: sourceSha,
+        WORKFLOW_SHA: workflowSha,
+      },
+    });
+    return { ...result, manifest,
+      installer: existsSync(captured) ? readFileSync(captured, 'utf8') : undefined,
+      temporaryFiles: readdirSync(workspace).filter(name => name.startsWith('run.'))
+        .flatMap(name => readdirSync(join(workspace, name))),
+    };
+  } finally { rmSync(workspace, { recursive: true, force: true }); }
+}
+
 function assertVitestDiagnostics(source: string): void {
   const vitestStep = namedStep(source, 'Vitest');
   const id = /^        id: ([a-z][a-z0-9_-]*)$/m.exec(vitestStep)?.[1];
@@ -449,6 +498,46 @@ describe('release workflow: граница тега и npm OIDC', () => {
 
     const check = executeTaggedReleaseCheck(supportedReplayTag);
     expect(check.status, `${check.stdout}\n${check.stderr}`).toBe(0);
+  });
+
+  it.each([['current', mainSourceSha], ['historical v0.3.0', releaseReplayProtocolBase]])(
+    '%s использует установщик workflow и manifest выпускаемого source', (_, sourceSha) => {
+      const result = executePnpmActivation(sourceSha!);
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(result.installer).toBe(gitFile(mainSourceSha, 'scripts/setup-pnpm.mjs'));
+      expect(result.manifest).toBe(gitFile(sourceSha!, 'package.json'));
+      expect(JSON.parse(result.manifest).packageManager).toMatch(/^pnpm@\d+\.\d+\.\d+$/);
+      expect(outputs(result.stdout)).toMatchObject({ activated_manifest: 'package.json' });
+      expect(result.temporaryFiles).toEqual([]);
+      if (sourceSha === releaseReplayProtocolBase) {
+        expect(() => gitFile(sourceSha, 'scripts/setup-pnpm.mjs')).toThrow();
+      }
+    },
+  );
+
+  it.each(['main', '0'.repeat(40), releaseReplayProtocolBase])(
+    'не исполняет установщик при неверной или неподдержанной ревизии workflow: %s', (workflowSha) => {
+      const result = executePnpmActivation(releaseReplayProtocolBase, workflowSha);
+      expect(result.status).not.toBe(0);
+      expect(result.installer).toBeUndefined();
+      expect(outputs(result.stdout)).not.toHaveProperty('activated_manifest');
+      expect(result.temporaryFiles).toEqual([]);
+    },
+  );
+
+  it('отвергает подмену ревизии source, отсутствующий helper и исполнение до привязки bytes', () => {
+    const program = stepRun('verify', 'Activate pinned pnpm');
+    for (const mutant of [
+      program.replaceAll('$WORKFLOW_SHA', '$EXPECTED_SOURCE_SHA'),
+      program.replaceAll('scripts/setup-pnpm.mjs', 'scripts/missing-pnpm.mjs'),
+      program.replace('git show "$WORKFLOW_SHA:scripts/setup-pnpm.mjs" > "$installer"\n', ''),
+    ]) {
+      const result = executePnpmActivation(releaseReplayProtocolBase, mainSourceSha, mutant);
+      expect(result.status).not.toBe(0);
+      expect(result.installer).toBeUndefined();
+      expect(outputs(result.stdout)).not.toHaveProperty('activated_manifest');
+      expect(result.temporaryFiles).toEqual([]);
+    }
   });
 
   it('до setup/install отклоняет настоящий v0.2.0 checkout с неподдерживаемым протоколом', { timeout: 15000 }, () => {
