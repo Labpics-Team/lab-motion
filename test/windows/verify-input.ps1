@@ -297,7 +297,7 @@ try {
     # Подменная ClientAreaAnimation теста живёт в отдельном процессе.
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'cleanup.test.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Проверка восстановления после ошибки не прошла.' }
-    & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs')
+    & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Проверки различающей силы input oracle не прошли.' }
     $env:LAB_MOTION_PROBE_OUTPUT = $null
     $env:LAB_MOTION_PRESS_TRACE = $trace

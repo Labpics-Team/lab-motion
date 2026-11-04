@@ -4,6 +4,26 @@ import { readFileSync } from 'node:fs';
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
+function inputSuiteWiringViolations(source) {
+  const invocations = [...source.matchAll(/^    & node --test (.+)\n    if \(\$LASTEXITCODE -ne 0\) \{ throw 'Проверки различающей силы input oracle не прошли\.' \}/gm)];
+  const wanted = "(Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs')";
+  return invocations.length === 1 && invocations[0][1] === wanted
+    && (source.match(/& node --test/g) ?? []).length === 1 ? [] : ['one mandatory invocation executes both suites and retains failure guard'];
+}
+
+test('mandatory input entry executes both source suites exactly once in the existing Node guard', () => {
+  const healthy = "    & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs')\n"
+    + "    if ($LASTEXITCODE -ne 0) { throw 'Проверки различающей силы input oracle не прошли.' }";
+  assert.deepEqual(inputSuiteWiringViolations(healthy), []);
+  for (const mutant of [
+    healthy.replace(" (Join-Path $PSScriptRoot 'system-preference.test.mjs')", ''),
+    healthy.replace('$LASTEXITCODE -ne 0', '$false'),
+    healthy + "\n    & node --test (Join-Path $PSScriptRoot 'system-preference.test.mjs')",
+  ]) assert.equal(inputSuiteWiringViolations(mutant).length, 1);
+  assert.deepEqual(inputSuiteWiringViolations(read('./verify-input.ps1')), []);
+  assert(!read('./assert-input.test.mjs').includes("from './system-preference.test.mjs'"));
+});
+
 function routeViolations(page, app) {
   const callback = page.slice(page.indexOf('private void ApplySystemPreference('), page.indexOf('private void ObserveSystemNotification'));
   return [
