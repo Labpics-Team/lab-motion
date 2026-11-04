@@ -17,7 +17,7 @@ import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serve
   serverResourceBinding, validateServerResourceIdentity, verifyServerClockBuildEvidence, verifyServerClockRegistration } from '../bench/profile/server-profile-contract.mjs';
 import { writeServerArtifact } from '../bench/profile/server-profile-artifact.mjs';
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
-import { captureServerClockBuildEvidence, measureServerBrowser, measureServerEngine, runServerProfile, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
+import { measureServerBrowser, measureServerEngine, runServerProfile, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
 import * as threadCpuClock from '../bench/profile/server-thread-cpu-clock.mjs';
 
 const hash = 'a'.repeat(64);
@@ -1512,6 +1512,7 @@ describe('PROFILE: current-run clock build binding', () => {
     const clock = healthyClockBuildEvidence(), resource = resourceIdentity();
     const realRead = filesystem.readFileSync, realAppend = filesystem.appendFileSync, realRequire = nodeModule.createRequire, realPath = filesystem.realpathSync,
       realStat = filesystem.statSync, realExists = filesystem.existsSync;
+    const fsBoundary = { ...filesystem }, processBoundary = { ...childProcess }, moduleBoundary = { ...nodeModule }, osBoundary = { ...os };
     const nodeVersion = Object.getOwnPropertyDescriptor(process, 'version')!;
     Object.defineProperty(process, 'version', { ...nodeVersion, value: SERVER_PROFILE.clockError.nodeVersion });
     let admissionReadArmed = false, injectedReads = 0;
@@ -1522,7 +1523,7 @@ describe('PROFILE: current-run clock build binding', () => {
     const spies: Array<{ mockRestore(): void }> = [];
     const spy = (value: any) => { spies.push(value); return value; };
     try {
-      spy(vi.spyOn(filesystem, 'readFileSync')).mockImplementation(((file: any, ...args: any[]) => {
+      spy(vi.spyOn(fsBoundary, 'readFileSync')).mockImplementation(((file: any, ...args: any[]) => {
         const name = String(file);
         if (name.startsWith(out)) return (realRead as any)(file, ...args);
         if (name === `/boot/config-${SERVER_PROFILE.clockError.kernelRelease}` && admissionReadArmed && mode === 'read-EIO') {
@@ -1548,33 +1549,33 @@ describe('PROFILE: current-run clock build binding', () => {
         if (name.startsWith('/proc/') || name.startsWith('/sys/')) throw Object.assign(new Error('unexpected boundary read: ' + name), { code: 'ENOENT' });
         return (realRead as any)(file, ...args);
       }) as any);
-      spy(vi.spyOn(filesystem, 'readlinkSync')).mockImplementation(((file: keyof typeof clock.namespaces) => {
+      spy(vi.spyOn(fsBoundary, 'readlinkSync')).mockImplementation(((file: keyof typeof clock.namespaces) => {
         const value = clock.namespaces[file];
         if ('error' in value) throw Object.assign(new Error(value.error.message), { code: value.error.code });
         return value.target;
       }) as any);
-      spy(vi.spyOn(filesystem, 'realpathSync')).mockImplementation(((file: any, ...args: any[]) => {
+      spy(vi.spyOn(fsBoundary, 'realpathSync')).mockImplementation(((file: any, ...args: any[]) => {
         const name = String(file);
         return name === path.join(directory, 'baseline') || name === path.join(directory, 'candidate') || name.replaceAll('\\', '/').includes('/bench/compare/node_modules/')
           ? name : (realPath as any)(file, ...args);
       }) as any);
-      spy(vi.spyOn(filesystem, 'statSync')).mockImplementation(((file: any, ...args: any[]) => {
+      spy(vi.spyOn(fsBoundary, 'statSync')).mockImplementation(((file: any, ...args: any[]) => {
         const scope = resource.scopes.find(item => item.directory === String(file));
         return scope ? { dev: BigInt(scope.dev), ino: BigInt(scope.ino), isDirectory: () => true } : (realStat as any)(file, ...args);
       }) as any);
-      spy(vi.spyOn(filesystem, 'existsSync')).mockImplementation(((file: any) => String(file).startsWith('/sys/') ? false : realExists(file)) as any);
-      spy(vi.spyOn(filesystem, 'statfsSync')).mockReturnValue({ type: 0x63677270n } as any);
-      spy(vi.spyOn(filesystem, 'symlinkSync')).mockImplementation(() => {});
-      spy(vi.spyOn(filesystem, 'appendFileSync')).mockImplementation(((file: any, text: any, options: any) => {
+      spy(vi.spyOn(fsBoundary, 'existsSync')).mockImplementation(((file: any) => String(file).startsWith('/sys/') ? false : realExists(file)) as any);
+      spy(vi.spyOn(fsBoundary, 'statfsSync')).mockReturnValue({ type: 0x63677270n } as any);
+      spy(vi.spyOn(fsBoundary, 'symlinkSync')).mockImplementation(() => {});
+      spy(vi.spyOn(fsBoundary, 'appendFileSync')).mockImplementation(((file: any, text: any, options: any) => {
         realAppend(file, text, options);
         if (mode === 'healthy-admitted' && JSON.parse(String(text)).type === 'registration-before-any-sample') controller.abort(new Error('stop after healthy publication'));
       }) as any);
-      spy(vi.spyOn(childProcess, 'spawnSync')).mockImplementation(((_command: string, args: string[]) => clock.packages.find(item => item.args[2] === args[2])) as any);
-      spy(vi.spyOn(childProcess, 'execFileSync')).mockReturnValue('' as any);
-      spy(vi.spyOn(os, 'release')).mockReturnValue(SERVER_PROFILE.clockError.kernelRelease);
-      spy(vi.spyOn(os, 'arch')).mockReturnValue('x64');
-      spy(vi.spyOn(os, 'platform')).mockReturnValue('linux');
-      spy(vi.spyOn(os, 'cpus')).mockReturnValue([{ model: 'fixture' }] as any);
+      spy(vi.spyOn(processBoundary, 'spawnSync')).mockImplementation(((_command: string, args: string[]) => clock.packages.find(item => item.args[2] === args[2])) as any);
+      spy(vi.spyOn(processBoundary, 'execFileSync')).mockReturnValue('' as any);
+      spy(vi.spyOn(osBoundary, 'release')).mockReturnValue(SERVER_PROFILE.clockError.kernelRelease);
+      spy(vi.spyOn(osBoundary, 'arch')).mockReturnValue('x64');
+      spy(vi.spyOn(osBoundary, 'platform')).mockReturnValue('linux');
+      spy(vi.spyOn(osBoundary, 'cpus')).mockReturnValue([{ model: 'fixture' }] as any);
       const hashFile = (file: string) => file === process.execPath ? SERVER_PROFILE.clockError.nodeExecutableSha256 :
         file === '/fixture/chromium' ? SERVER_PROFILE.clockError.browserExecutableSha256 : hash;
       vi.doMock('../bench/compare/provenance.mjs', () => ({ ...provenanceOwner,
@@ -1584,9 +1585,13 @@ describe('PROFILE: current-run clock build binding', () => {
       vi.doMock('../bench/profile/server-thread-cpu-clock.mjs', () => ({ ...threadCpuClock,
         prepareServerThreadCpuClock: () => ({ metadata: registration.engineClock, assertUnchanged: nativeVerify }) }));
       vi.doMock('../bench/compare/bench.mjs', () => ({ ...compareOwner, startBenchmarkOrigin: async () => ({ close: closeOrigin }) }));
-      spy(vi.spyOn(nodeModule, 'createRequire')).mockImplementation(((file: any) => String(file).replaceAll('\\', '/').endsWith('/bench/compare/package.json')
+      spy(vi.spyOn(moduleBoundary, 'createRequire')).mockImplementation(((file: any) => String(file).replaceAll('\\', '/').endsWith('/bench/compare/package.json')
         ? (name: string) => name === 'esbuild' ? { buildSync: vi.fn() } : { chromium: { executablePath: () => '/fixture/chromium', launch: async () => browser } }
         : realRequire(file)) as any);
+      vi.doMock('node:fs', () => fsBoundary);
+      vi.doMock('node:child_process', () => processBoundary);
+      vi.doMock('node:module', () => moduleBoundary);
+      vi.doMock('node:os', () => ({ ...osBoundary, default: osBoundary }));
       vi.resetModules();
       const owner = await import('../bench/profile/server-profile-runner.mjs');
       const artifact = await owner.runServerProfile({ baseline: path.join(directory, 'baseline'), candidate: path.join(directory, 'candidate'), browser: 'chromium', out },
@@ -1614,32 +1619,43 @@ describe('PROFILE: current-run clock build binding', () => {
     } finally {
       for (const value of spies.reverse()) value.mockRestore();
       vi.doUnmock('../bench/compare/provenance.mjs'); vi.doUnmock('../bench/profile/server-thread-cpu-clock.mjs'); vi.doUnmock('../bench/compare/bench.mjs');
+      for (const name of ['node:fs', 'node:child_process', 'node:module', 'node:os']) vi.doUnmock(name);
       vi.resetModules(); Object.defineProperty(process, 'version', nodeVersion); rmSync(directory, { recursive: true, force: true });
     }
   });
 
-  it('реальный ESM collector читает healthy namespace через собственный import binding', () => {
+  it('реальный ESM collector читает healthy namespace через собственный import binding', async () => {
     const evidence = healthyClockBuildEvidence();
-    const read = vi.spyOn(filesystem, 'readFileSync').mockImplementation(((file: string) => {
+    const fsBoundary = { ...filesystem }, processBoundary = { ...childProcess }, osBoundary = { ...os };
+    const read = vi.spyOn(fsBoundary, 'readFileSync').mockImplementation(((file: string) => {
       const value = evidence.files[file as keyof typeof evidence.files];
       if (!value) throw Object.assign(new Error('fixture missing read'), { code: 'ENOENT' });
       return value.text;
     }) as any);
-    const link = vi.spyOn(filesystem, 'readlinkSync').mockImplementation(((file: keyof typeof evidence.namespaces) => {
+    const link = vi.spyOn(fsBoundary, 'readlinkSync').mockImplementation(((file: keyof typeof evidence.namespaces) => {
       const value = evidence.namespaces[file];
       if ('error' in value) throw Object.assign(new Error(value.error.message), { code: value.error.code });
       return value.target;
     }) as any);
-    const query = vi.spyOn(childProcess, 'spawnSync').mockImplementation(((_command: string, args: string[]) =>
+    const query = vi.spyOn(processBoundary, 'spawnSync').mockImplementation(((_command: string, args: string[]) =>
       evidence.packages.find(record => record.args[2] === args[2])) as any);
-    const release = vi.spyOn(os, 'release').mockReturnValue(SERVER_PROFILE.clockError.kernelRelease);
+    const release = vi.spyOn(osBoundary, 'release').mockReturnValue(SERVER_PROFILE.clockError.kernelRelease);
     try {
-      const captured = captureServerClockBuildEvidence();
+      vi.doMock('node:fs', () => fsBoundary);
+      vi.doMock('node:child_process', () => processBoundary);
+      vi.doMock('node:os', () => ({ ...osBoundary, default: osBoundary }));
+      vi.resetModules();
+      const owner = await import('../bench/profile/server-profile-runner.mjs');
+      const captured = owner.captureServerClockBuildEvidence();
       expect(verifyServerClockBuildEvidence(captured, { release: SERVER_PROFILE.clockError.kernelRelease, arch: 'x64' }))
         .toMatchObject({ configSha256: SERVER_PROFILE.clockError.kernelBuild.configSha256, active: 'time:[4026531834]', children: 'time:[4026531834]' });
       expect(link).toHaveBeenCalledTimes(3); expect(query).toHaveBeenCalledTimes(2);
       expect(captured.namespaces['/proc/1/ns/time'].error.code).toBe('EACCES');
-    } finally { read.mockRestore(); link.mockRestore(); query.mockRestore(); release.mockRestore(); }
+    } finally {
+      read.mockRestore(); link.mockRestore(); query.mockRestore(); release.mockRestore();
+      for (const name of ['node:fs', 'node:child_process', 'node:os']) vi.doUnmock(name);
+      vi.resetModules();
+    }
   });
 
   it.each(buildFaults)('реальная registration admission отвергает %s при прежнем release', (fault) => {
@@ -1949,6 +1965,9 @@ describe('PROFILE: ресурсный контракт проверяется д
   it.each(['unrelated', 'mount-swap', 'ancestor'] as const)('реальный verify привязывает %s к регистрации', (change) => {
     // Given: исполнено тело verify из runner, внешние provenance effects пусты.
     const fixture = machine(), registered = fixture.capture().identity;
+    const expectedArgs = healthyClockBuildEvidence().packages[0].args;
+    expect(isDeepStrictEqual(registered.clockBuildEvidence.packages[0].args, expectedArgs)).toBe(false);
+    expect(isDeepStrictEqual(JSON.parse(JSON.stringify(registered.clockBuildEvidence.packages[0].args)), expectedArgs)).toBe(true);
     switch (change) {
       case 'unrelated': fixture.files['/proc/self/mountinfo'] += '\n38 31 0:32 / /unrelated rw - tmpfs tmpfs rw'; break;
       case 'mount-swap': fixture.files['/proc/self/mountinfo'] = resourceIdentity().mountinfo.text.replace(/^37 /, '38 '); break;
@@ -1961,7 +1980,8 @@ describe('PROFILE: ресурсный контракт проверяется д
     if (begin < 0 || end <= begin) throw new Error('missing runner verify body');
     const context = createContext({ engineClock: undefined, artifact: { registration: { machine: { identity: registered } } },
       captureServerClockBuildEvidence: () => healthyClockBuildEvidence(), release: () => SERVER_PROFILE.clockError.kernelRelease, arch: () => 'x64',
-      verifyServerClockBuildEvidence, captureServerLoad: () => fixture.capture().observation.resource, serverProfileDigest,
+      verifyServerClockBuildEvidence: (value: unknown, identity: unknown) => verifyServerClockBuildEvidence(JSON.parse(JSON.stringify(value)), identity),
+      captureServerLoad: () => fixture.capture().observation.resource, serverProfileDigest,
       serverResourceBinding: (value: unknown) => serverResourceBinding(JSON.parse(JSON.stringify(value))),
       registrationAttempt: { machine: { identity: registered } }, prepared: {}, packages: {}, harness: {}, assertFileHashesUnchanged: vi.fn() });
     const verify = runInContext(`(() => { ${source.slice(begin, end)} return verify; })()`, context);
