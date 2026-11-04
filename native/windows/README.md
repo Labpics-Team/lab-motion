@@ -175,6 +175,37 @@ systemAnimation, reason, end, isCurrent, notification, queued, diagnosticFailed.
 настоящий `WM_SETTINGCHANGE` callback собственного окна, возвращённый `TryEnqueue`
 bool и начало managed делегата. В trace источник явно указан как `WM_SETTINGCHANGE`;
 это не receipt события `UISettings`. Прежняя ограниченная проекция сохраняет 13 полей.
+Для различения timing исхода добавлены отдельные `setter` и `timing`, не новые
+условия приёмки. `setter` — снимок именно запрещающего вызова: абсолютные QPC
+на входе native SET и после его возврата, `SetSucceeded`, QPC после уже существующего
+проверочного GET, его bool и частота QPC. Возврат SET и проверенный GET — разные
+границы. Этот снимок снимается сразу после `Write(false)` в существующий
+`animation-system-disabled.json`; восстановление не заменяет его в failure summary.
+`timing` содержит строки sequence, phase, qpc, qpcFrequency, notification,
+clientAreaAnimation, outcome, enabled, observed. Для WM `clientAreaAnimation=true`
+означает `wParam==SPI_SETCLIENTAREAANIMATION`, а не подтверждённый GET или применение.
+Прочие WM сообщения по-прежнему доставляются: эта bool не фильтрует callback.
+`systemApply` сообщает Missing/Stale/Detached admission либо Deduplicated/Update
+с уже прочитанными bool текущего UISettings и прошлого наблюдения. Дополнительного
+getter нет; Update обозначает выбранный вызов, не успешное завершение эффекта.
+Запись и её редкий Flush идут после решения dedup/admission или вызова Update.
+Так поздний dedup не зависит от будущего completed/Update для записи на диск.
+Ошибка диагностики только выставляет прежний sticky flag, не меняет policy outcome.
+В completed QPC относится к записи после await, а systemAnimation остаётся отдельным
+поздним getter: ни одно поле не устанавливает время effective preference change
+или точный native idle. Новых timestamps/Flush в callback кадра нет.
+
+Сравнение допускается только в том же системном/VM запуске с доступными положительными
+QPC и совпадающей частотой. Это `Stopwatch.GetTimestamp()`, а не относительные epochs
+двух stopwatch. [Контракт Microsoft](https://learn.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps)
+указывает фиксированную частоту в пределах boot и неопределённый порядок
+межпоточных выборок с разницей не более одного tick. Missing/null, разные частоты
+или такое соседство не подтверждают порядок; никаких выводов по ним harness не делает.
+Дополнительные sparse timestamps, запись outcome и Flush имеют observer effect:
+могут сдвинуть расписание. Исчезновение отказа после instrumentation не является RCA.
+`timingCount/timingOmitted` отдельно учитывают обрезку новых строк в том же общем
+лимите 1800 ASCII-символов; null означает недоступное/неверное поле. Отсутствие
+receipt при пропуске строк или sticky failure не доказывает отсутствие callback.
 `notification` связывает три фазы одного callback; в `completed` тот же счётчик
 читается как last-issued snapshot, не как receipt для конкретного SPI. Snapshot
 счётчика и sticky flag не атомарны. Последующий `systemPreference`

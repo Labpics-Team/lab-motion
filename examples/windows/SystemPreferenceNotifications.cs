@@ -8,18 +8,19 @@ namespace NativeWindow;
 internal sealed class SystemPreferenceNotifications : IDisposable
 {
     private const uint SettingChange = 0x001A;
+    private const nuint ClientAreaAnimation = 0x1043;
     private const uint NonClientDestroy = 0x0082;
     private readonly uint ownerThread;
     private readonly SubclassProcedure procedure;
     private readonly Action<Exception> reportFailure;
-    private Action? notify;
+    private Action<bool>? notify;
     private nint handle;
     private GCHandle keepAlive;
     private bool retired;
     private ExceptionDispatchInfo? failure;
     private ExceptionDispatchInfo? reportingFailure;
 
-    internal SystemPreferenceNotifications(Window window, Action notify, Action<Exception> reportFailure)
+    internal SystemPreferenceNotifications(Window window, Action<bool> notify, Action<Exception> reportFailure)
     {
         if (!window.DispatcherQueue.HasThreadAccess)
             throw new InvalidOperationException("Подписка требует поток собственного окна.");
@@ -94,7 +95,7 @@ internal sealed class SystemPreferenceNotifications : IDisposable
             else if (window == handle && id == 1 && !retired && message == SettingChange)
             {
                 // Только доставка; getter и реакция остаются в прежней managed очереди.
-                notify?.Invoke();
+                notify?.Invoke(wParam == ClientAreaAnimation);
             }
         }
         catch (Exception error) { CaptureFailure(error); }

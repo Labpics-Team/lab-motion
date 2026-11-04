@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using System.Threading;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using Windows.UI.ViewManagement;
 
@@ -26,6 +27,7 @@ public sealed partial class PressPage : Page
     private long systemNotification;
     private int notificationDiagnosticFailed;
     private enum SystemNotificationPhase { Received, Queued, Delegate }
+    private enum SystemPreferenceOutcome { Missing, Stale, Detached, Deduplicated, Update }
     private List<(RoutedEvent Event, Delegate Handler)>? inputHandlers;
 
     public PressPage(Window window)
@@ -62,7 +64,7 @@ public sealed partial class PressPage : Page
     private void Changed(DependencyObject sender, DependencyProperty property)
         => Update(property == ButtonBase.IsPressedProperty ? "pressed" : "enabled");
     private void PreferenceChanged(object sender, RoutedEventArgs args) => Update("localPreference");
-    private void SystemPreferenceChanged()
+    private void SystemPreferenceChanged(bool clientAreaAnimation)
     {
         var subscription = notifications;
         if (trace is null)
@@ -72,24 +74,36 @@ public sealed partial class PressPage : Page
             return;
         }
         var notification = Interlocked.Increment(ref systemNotification);
-        ObserveSystemNotification(notification, SystemNotificationPhase.Received);
+        ObserveSystemNotification(notification, SystemNotificationPhase.Received, clientAreaAnimation: clientAreaAnimation);
         var queued = DispatcherQueue.TryEnqueue(() =>
         {
-            ObserveSystemNotification(notification, SystemNotificationPhase.Delegate);
-            ApplySystemPreference(subscription);
+            ObserveSystemNotification(notification, SystemNotificationPhase.Delegate, clientAreaAnimation: clientAreaAnimation);
+            ApplySystemPreference(subscription, notification);
         });
         // Отказ очереди не имеет будущего Update/Flush; фиксируем также его bool.
-        ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true);
+        ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true, clientAreaAnimation: clientAreaAnimation);
         if (!queued) throw new InvalidOperationException("Очередь отказала системному уведомлению.");
     }
 
-    private void ApplySystemPreference(SystemPreferenceNotifications? subscription)
+    private void ApplySystemPreference(SystemPreferenceNotifications? subscription, long? notification = null)
     {
-        if (subscription is null || !ReferenceEquals(notifications, subscription) || !subscription.IsAttached) return;
+        if (subscription is null || !ReferenceEquals(notifications, subscription) || !subscription.IsAttached)
+        {
+            var outcome = subscription is null ? SystemPreferenceOutcome.Missing
+                : !ReferenceEquals(notifications, subscription) ? SystemPreferenceOutcome.Stale : SystemPreferenceOutcome.Detached;
+            ObserveSystemApply(notification, outcome, null, null);
+            return;
+        }
         subscription.ThrowIfFaulted();
         var enabled = settings.AnimationsEnabled;
-        if (observedSystemAnimation == enabled) return;
+        var observed = observedSystemAnimation;
+        if (observed == enabled)
+        {
+            ObserveSystemApply(notification, SystemPreferenceOutcome.Deduplicated, enabled, observed);
+            return;
+        }
         Update("systemPreference");
+        ObserveSystemApply(notification, SystemPreferenceOutcome.Update, enabled, observed);
     }
 
     private void NotificationFailed(Exception error)
@@ -103,7 +117,7 @@ public sealed partial class PressPage : Page
         finally { State.Text = message; }
     }
 
-    private void ObserveSystemNotification(long notification, SystemNotificationPhase phase, bool? queued = null, bool flush = false)
+    private void ObserveSystemNotification(long notification, SystemNotificationPhase phase, bool? queued = null, bool flush = false, bool? clientAreaAnimation = null)
     {
         if (trace is null) return;
         var validIdentity = notification > 0 && notification <= 9007199254740991;
@@ -113,6 +127,7 @@ public sealed partial class PressPage : Page
             // Настоящий WM callback: запись не утверждает изменение preference или исполнение queue.
             trace.Add("systemNotification", new
             {
+                qpc = ReadQpcForTrace(), qpcFrequency = ReadQpcFrequencyForTrace(), clientAreaAnimation,
                 notification = validIdentity ? (long?)notification : null,
                 source = "WM_SETTINGCHANGE", phase = phase.ToString(), queued,
                 diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0,
@@ -125,6 +140,39 @@ public sealed partial class PressPage : Page
             Interlocked.Exchange(ref notificationDiagnosticFailed, 1);
         }
     }
+
+    private void ObserveSystemApply(long? notification, SystemPreferenceOutcome outcome, bool? enabled, bool? observed)
+    {
+        if (trace is null) return;
+        try
+        {
+            trace.Add("systemApply", new
+            {
+                qpc = ReadQpcForTrace(), qpcFrequency = ReadQpcFrequencyForTrace(),
+                notification = notification > 0 && notification <= 9007199254740991 ? notification : null,
+                outcome = outcome.ToString(), enabled, observed,
+                diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0,
+            });
+            // Dedup может быть позднее последнего completed: будущий Update не обязан выполнить Flush.
+            trace.Flush();
+        }
+        catch { Interlocked.Exchange(ref notificationDiagnosticFailed, 1); }
+    }
+
+    private long? ReadQpcForTrace()
+    {
+        try
+        {
+            if (!Stopwatch.IsHighResolution) return null;
+            var value = Stopwatch.GetTimestamp();
+            return value > 0 && value <= 9007199254740991 ? value : null;
+        }
+        catch { return null; }
+    }
+
+    private long? ReadQpcFrequencyForTrace()
+        => Stopwatch.IsHighResolution && Stopwatch.Frequency > 0 && Stopwatch.Frequency <= 9007199254740991
+            ? Stopwatch.Frequency : null;
 
     private void Observe(MotionObservation value)
     {
@@ -204,6 +252,7 @@ public sealed partial class PressPage : Page
                 var result = await pending;
                 trace?.Add("completed", new
                 {
+                    qpc = ReadQpcForTrace(), qpcFrequency = ReadQpcFrequencyForTrace(),
                     operation = id, nativeOperation = result.Operation,
                     end = result.End.ToString(), reason = result.Reason,
                     isCurrent = id == operation && ReferenceEquals(current, motion),

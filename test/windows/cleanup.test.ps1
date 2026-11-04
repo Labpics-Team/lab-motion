@@ -6,6 +6,12 @@ class ClientAreaAnimation {
     static [bool] $FailRead = $false
     static [bool] $FailNextWrite = $false
     static [int] $Writes = 0
+    static [long] $SetEnteredQpc = 100
+    static [long] $SetReturnedQpc = 110
+    static [bool] $SetSucceeded = $true
+    static [long] $ReadbackQpc = 120
+    static [object] $ReadbackEnabled = $null
+    static [long] $QpcFrequency = 10000000
     static [void] Write([bool]$value) {
         if ([ClientAreaAnimation]::FailNextWrite) {
             [ClientAreaAnimation]::FailNextWrite = $false
@@ -13,6 +19,7 @@ class ClientAreaAnimation {
         }
         [ClientAreaAnimation]::Writes = [ClientAreaAnimation]::Writes + 1
         [ClientAreaAnimation]::Current = $value
+        [ClientAreaAnimation]::ReadbackEnabled = $value
     }
     static [bool] Read() {
         if ([ClientAreaAnimation]::FailRead) { throw [IO.IOException]::new('cleanup-setting-read') }
@@ -616,6 +623,7 @@ try {
     "system release: $releaseCases synthetic controls PASS"
 
     # Настоящая проекция и failure-ветка из AST: синтетические случаи, не WinUI/runtime RCA.
+    $systemSetterReceipt = $null
     $phaseEvents = @(
         [pscustomobject]@{ sequence = 10; kind = 'intent'; data = [pscustomobject]@{ operation = 2; trigger = 'pressed'; pressed = $false; localAnimation = $true; systemAnimation = $true } },
         [pscustomobject]@{ sequence = 11; kind = 'motion'; data = [pscustomobject]@{ pageOperation = 2; nativeOperation = 20; phase = 'requested' } },
@@ -810,6 +818,64 @@ try {
         $summary.count -ne 100 -or $summary.omitted -ne (100 - $summary.rows.Count) -or
         $summary.rows[0][0] -ne 1 -or $summary.rows[-1][0] -ne 100) { throw 'phase-notification-bounded-control' }
     $phaseCases += 7
+    # Истинные helper-функции из AST; timestamps здесь синтетические, не Windows receipt.
+    $setterControl = [pscustomobject]@{ SetEnteredQpc = 100L; SetReturnedQpc = 110L; SetSucceeded = $true;
+        ReadbackQpc = 120L; ReadbackEnabled = $false; QpcFrequency = 10000000L }
+    $timingEvents = @(
+        [pscustomobject]@{ sequence = 10; kind = 'systemNotification'; data = [pscustomobject]@{
+            notification = 7; phase = 'Received'; clientAreaAnimation = $true; qpc = 105L; qpcFrequency = 10000000L } },
+        [pscustomobject]@{ sequence = 11; kind = 'systemNotification'; data = [pscustomobject]@{
+            notification = 7; phase = 'Queued'; queued = $true; qpc = 106L; qpcFrequency = 10000000L } },
+        [pscustomobject]@{ sequence = 12; kind = 'systemNotification'; data = [pscustomobject]@{
+            notification = 7; phase = 'Delegate'; qpc = 130L; qpcFrequency = 10000000L } },
+        [pscustomobject]@{ sequence = 13; kind = 'systemApply'; data = [pscustomobject]@{
+            notification = 7; outcome = 'Deduplicated'; enabled = $true; observed = $true; qpc = 131L; qpcFrequency = 10000000L } },
+        [pscustomobject]@{ sequence = 14; kind = 'completed'; data = [pscustomobject]@{
+            operation = 17; systemAnimation = $false; qpc = 140L; qpcFrequency = 10000000L } }
+    )
+    $timingText = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events $timingEvents -Setter $setterControl
+    $timingSummary = $timingText | ConvertFrom-Json
+    if (($timingSummary.setter -join ',') -cne '100,110,True,120,False,10000000' -or
+        $timingSummary.timingCount -ne 5 -or $timingSummary.timingOmitted -ne 0 -or
+        $timingSummary.timing[0][5] -isnot [bool] -or !$timingSummary.timing[0][5] -or
+        $timingSummary.timing[3][1] -cne 'systemApply' -or $timingSummary.timing[3][6] -cne 'Deduplicated' -or
+        $timingSummary.timing[3][7] -isnot [bool] -or !$timingSummary.timing[3][7] -or
+        $timingSummary.rows[-1][6] -isnot [bool] -or $timingSummary.rows[-1][6]) { throw 'phase-qpc-healthy-control' }
+    foreach ($outcome in @('Missing', 'Stale', 'Detached', 'Deduplicated', 'Update')) {
+        $timingEvents[3].data.outcome = $outcome
+        $timingSummary = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($timingEvents[3]) | ConvertFrom-Json
+        if ($timingSummary.timing[0][6] -cne $outcome -or @($timingSummary.setter | Where-Object { $null -ne $_ }).Count) {
+            throw 'phase-qpc-outcome-or-unavailable-control'
+        }
+    }
+    $timingEvents[0].data.clientAreaAnimation = $false
+    $timingEvents[0].data.qpc = $null
+    $timingEvents[0].data.qpcFrequency = 1000L
+    $timingSummary = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($timingEvents[0]) -Setter $setterControl | ConvertFrom-Json
+    if ($timingSummary.timing[0][5] -isnot [bool] -or $timingSummary.timing[0][5] -or
+        $null -ne $timingSummary.timing[0][2] -or $timingSummary.timing[0][3] -ne 1000 -or
+        $timingSummary.setter[5] -ne 10000000) { throw 'phase-qpc-unrelated-unavailable-frequency-control' }
+    $badTiming = [pscustomobject]@{ sequence = 10; kind = 'systemApply'; data = [pscustomobject]@{
+        qpc = 9007199254740992L; qpcFrequency = 0; notification = 'secret'; outcome = 'secret'; enabled = 'false'; observed = 1;
+        arbitrary = '::error::secret' } }
+    $badSetter = [pscustomobject]@{ SetEnteredQpc = -1; SetReturnedQpc = 'secret'; SetSucceeded = 'true';
+        ReadbackQpc = 9007199254740992L; ReadbackEnabled = 'false'; QpcFrequency = 0 }
+    $timingText = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($badTiming) -Setter $badSetter
+    $timingSummary = $timingText | ConvertFrom-Json
+    if ($timingText -match 'secret|arbitrary|::error::' -or @($timingSummary.setter | Where-Object { $null -ne $_ }).Count -or
+        @($timingSummary.timing[0][2..8] | Where-Object { $null -ne $_ }).Count) { throw 'phase-qpc-malformed-control' }
+    $manyTiming = @(1..100 | ForEach-Object {
+        [pscustomobject]@{ sequence = $_; kind = 'completed'; data = [pscustomobject]@{
+            operation = 9007199254740991L; qpc = 9007199254740991L; qpcFrequency = 10000000L } }
+    })
+    $timingText = Get-InputPhaseSummary -Name 'system-disable-animation' -After 0 -Events $manyTiming -Setter $setterControl
+    $timingSummary = $timingText | ConvertFrom-Json
+    if ([Text.Encoding]::UTF8.GetByteCount($timingText) -gt 1800 -or $timingSummary.count -ne 100 -or
+        $timingSummary.timingCount -ne 100 -or $timingSummary.omitted -ne (100 - $timingSummary.rows.Count) -or
+        $timingSummary.timingOmitted -ne (100 - $timingSummary.timing.Count) -or
+        $timingSummary.rows[0][0] -ne 1 -or $timingSummary.rows[-1][0] -ne 100 -or
+        $timingSummary.timing[0][0] -ne 1 -or $timingSummary.timing[-1][0] -ne 100) { throw 'phase-qpc-bounded-control' }
+    $phaseCases += 9
     $scenarioAst = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -eq 'Scenario' })[0]
     $failureAst = @($scenarioAst.FindAll({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and
         $node.Extent.Text.StartsWith('if (!$stopped.Count)') }, $true))[0]

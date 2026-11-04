@@ -505,9 +505,9 @@ function systemNotificationSourceViolations(source) {
   return [
     ['no-trace callback retains managed admission', !/if \(trace is null\)\s*\{\s*if \(!DispatcherQueue.TryEnqueue\(\(\) => ApplySystemPreference\(subscription\)\)\)\s*throw new InvalidOperationException\("Очередь отказала системному уведомлению\."\);\s*return;\s*\}/.test(callback)],
     ['genuine callback identity and receipt', !callback.includes('Interlocked.Increment(ref systemNotification)')
-      || !callback.includes('ObserveSystemNotification(notification, SystemNotificationPhase.Received)')],
-    ['actual enqueue result and delegate', !/var queued = DispatcherQueue.TryEnqueue\(\(\) =>\s*\{\s*ObserveSystemNotification\(notification, SystemNotificationPhase.Delegate\);\s*ApplySystemPreference\(subscription\);\s*\}\);/.test(callback)
-      || !callback.includes('ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true)')
+      || !callback.includes('ObserveSystemNotification(notification, SystemNotificationPhase.Received, clientAreaAnimation: clientAreaAnimation)')],
+    ['actual enqueue result and delegate', !/var queued = DispatcherQueue.TryEnqueue\(\(\) =>\s*\{\s*ObserveSystemNotification\(notification, SystemNotificationPhase.Delegate, clientAreaAnimation: clientAreaAnimation\);\s*ApplySystemPreference\(subscription, notification\);\s*\}\);/.test(callback)
+      || !callback.includes('ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true, clientAreaAnimation: clientAreaAnimation)')
       || !callback.includes('if (!queued) throw new InvalidOperationException("Очередь отказала системному уведомлению.");')],
     ['typed bounded diagnostic fields', !source.includes('enum SystemNotificationPhase { Received, Queued, Delegate }')
       || !callback.includes('notification > 0 && notification <= 9007199254740991')
@@ -525,13 +525,15 @@ test('настоящий WM callback сохраняет managed queue, набл�
   const observation = source.slice(source.indexOf('private void ObserveSystemNotification'), source.indexOf('private void Observe(MotionObservation')).replace(/\/\/[^\n]*/g, '');
   assert(!callback.includes('catch'), 'ошибка настоящего enqueue не перехватывается диагностикой');
   assert(!/Press\.|Animation\.|motion\.|sender\.|args\.|AnimationsEnabled|State\./.test(observation), 'фоновая диагностика не читает XAML или preference getter');
-  assert.equal((observation.match(/trace\.Flush\(\)/g) ?? []).length, 1);
+  assert.equal((observation.match(/trace\.Flush\(\)/g) ?? []).length, 2);
+  const applyObservation = observation.slice(observation.indexOf('private void ObserveSystemApply'), observation.indexOf('private long? ReadQpcForTrace'));
+  assert.equal((applyObservation.match(/trace\.Flush\(\)/g) ?? []).length, 1, 'редкий Apply/dedup durable без per-frame Flush');
   assert(!observation.includes('error.Message'));
   for (const [before, after, name] of [
     ['if (trace is null)', 'if (false)', 'no-trace callback retains managed admission'],
-    ['SystemNotificationPhase.Received)', 'SystemNotificationPhase.Queued)', 'genuine callback identity and receipt'],
+    ['SystemNotificationPhase.Received,', 'SystemNotificationPhase.Queued,', 'genuine callback identity and receipt'],
     ['var queued = DispatcherQueue.TryEnqueue', 'var queued = true; DispatcherQueue.TryEnqueue', 'actual enqueue result and delegate'],
-    ['SystemNotificationPhase.Delegate);', 'SystemNotificationPhase.Received);', 'actual enqueue result and delegate'],
+    ['SystemNotificationPhase.Delegate,', 'SystemNotificationPhase.Received,', 'actual enqueue result and delegate'],
     ['notification <= 9007199254740991', 'true', 'typed bounded diagnostic fields'],
     ['Interlocked.Exchange(ref notificationDiagnosticFailed, 1);', 'return;', 'diagnostic errors isolated and observable'],
   ]) assert(systemNotificationSourceViolations(source.replaceAll(before, after)).includes(name), name);
@@ -662,7 +664,7 @@ test('completed trace читает тот же UISettings только на owne
     ['catch { return null; }', 'catch { return false; }', 'isolated nullable read with no state mutation'],
     ['return settings.AnimationsEnabled;', 'Update("systemPreference"); return settings.AnimationsEnabled;', 'isolated nullable read with no state mutation'],
     ['systemAnimation = ReadSystemAnimationForTrace()', 'systemAnimation = settings.AnimationsEnabled', 'sample only in existing conditional completed payload'],
-  ]) assert(completedGetterViolations(source.replace(before, after)).includes(violation), violation);
+  ]) assert(completedGetterViolations(source.replaceAll(before, after)).includes(violation), violation);
 });
 
 test('nullable completed getter использует прежнюю bool проекцию и подготовленные controls настоящего helper', () => {

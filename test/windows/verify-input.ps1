@@ -144,17 +144,27 @@ function Read-InputPhaseField($Data, [string]$Field, [string]$Type) {
     $value = $property.Value
     switch ($Type) {
         'number' { if (($value -is [int] -or $value -is [long]) -and $value -ge 0 -and $value -le 9007199254740991) { return $value } }
+        'positive' { if (($value -is [int] -or $value -is [long]) -and $value -gt 0 -and $value -le 9007199254740991) { return $value } }
         'bool' { if ($value -is [bool]) { return $value } }
         'reason' { if ($value -is [string] -and $value -cin @('settled', 'snap', 'replaced', 'stopped', 'disposed', 'interaction')) { return $value } }
         'end' { if ($value -is [string] -and $value -cin @('Finished', 'Stopped')) { return $value } }
+        'outcome' { if ($value -is [string] -and $value -cin @('Missing', 'Stale', 'Detached', 'Deduplicated', 'Update')) { return $value } }
     }
     return $null
 }
 
-function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events) {
+function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $Setter = $null) {
     # Только фиксированные enums/bool/числа; никакие data, args или тексты ошибок не сериализуются.
     $scenario = if ($Name -cin @('disable-animation', 'system-disable-animation')) { $Name } else { 'unknown' }
     $rows = [Collections.Generic.List[object]]::new()
+    $timing = [Collections.Generic.List[object]]::new()
+    # Снимок именно запретившего SET; позднее восстановление не заменяет его.
+    $setterSummary = @((Read-InputPhaseField $Setter 'SetEnteredQpc' 'positive'),
+        (Read-InputPhaseField $Setter 'SetReturnedQpc' 'positive'),
+        (Read-InputPhaseField $Setter 'SetSucceeded' 'bool'),
+        (Read-InputPhaseField $Setter 'ReadbackQpc' 'positive'),
+        (Read-InputPhaseField $Setter 'ReadbackEnabled' 'bool'),
+        (Read-InputPhaseField $Setter 'QpcFrequency' 'positive'))
     $invalid = 0
     foreach ($event in $Events) {
         $sequence = Read-InputPhaseField $event 'sequence' 'number'
@@ -164,6 +174,24 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events) {
         $dataProperty = $event.PSObject.Properties['data']
         if ($null -eq $kindProperty -or $null -eq $dataProperty) { $invalid++; continue }
         $data = $dataProperty.Value
+        $timingPhase = $null
+        switch -CaseSensitive ($kindProperty.Value) {
+            'completed' { $timingPhase = 'completed' }
+            'systemApply' { $timingPhase = 'systemApply' }
+            'systemNotification' {
+                $phaseProperty = if ($null -ne $data) { $data.PSObject.Properties['phase'] } else { $null }
+                if ($null -ne $phaseProperty -and $phaseProperty.Value -is [string] -and
+                    $phaseProperty.Value -cin @('Received', 'Queued', 'Delegate')) { $timingPhase = $phaseProperty.Value }
+            }
+        }
+        if ($null -ne $timingPhase) {
+            $timing.Add(@($sequence, $timingPhase, (Read-InputPhaseField $data 'qpc' 'positive'),
+                (Read-InputPhaseField $data 'qpcFrequency' 'positive'),
+                (Read-InputPhaseField $data 'notification' 'positive'),
+                (Read-InputPhaseField $data 'clientAreaAnimation' 'bool'),
+                (Read-InputPhaseField $data 'outcome' 'outcome'),
+                (Read-InputPhaseField $data 'enabled' 'bool'), (Read-InputPhaseField $data 'observed' 'bool')))
+        }
         $phase = $null
         switch -CaseSensitive ($kindProperty.Value) {
             'intent' {
@@ -205,18 +233,24 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events) {
             (Read-InputPhaseField $data 'queued' 'bool'), (Read-InputPhaseField $data 'diagnosticFailed' 'bool')))
     }
     $count = $rows.Count
+    $timingCount = $timing.Count
     # Сохраняем начало и конец в исходном порядке; пропуск явно учитывается, не означает отсутствия фазы.
     while ($rows.Count -gt 12) { $rows.RemoveAt([int][Math]::Floor($rows.Count / 2)) }
+    while ($timing.Count -gt 12) { $timing.RemoveAt([int][Math]::Floor($timing.Count / 2)) }
     do {
         $summary = [ordered]@{ schema = 2; scenario = $scenario; after = $After; count = $count;
-            omitted = $count - $rows.Count; invalid = $invalid; rows = @($rows.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
+            omitted = $count - $rows.Count; invalid = $invalid; rows = @($rows.ToArray()); setter = $setterSummary;
+            timingCount = $timingCount; timingOmitted = $timingCount - $timing.Count; timing = @($timing.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
         if ($summary.Length -le 1800) { return $summary }
-        $rows.RemoveAt([int][Math]::Floor($rows.Count / 2))
-    } while ($rows.Count)
+        if ($rows.Count -gt 2) { $rows.RemoveAt([int][Math]::Floor($rows.Count / 2)) }
+        elseif ($timing.Count -gt 2) { $timing.RemoveAt([int][Math]::Floor($timing.Count / 2)) }
+        else { break }
+    } while ($true)
     throw 'Диагностика фаз превысила свой фиксированный предел.'
 }
 
 function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArguments = @()) {
+    $systemSetterReceipt = $null
     Wait-Rest
     $before = @(Read-Trace)[-1].sequence
     if ($BeforeArguments.Count) { Invoke-Ui "$Name-press" $BeforeArguments }
@@ -248,7 +282,15 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
             # Значения кадра буферизуются; итоговая проверка подтвердит движение до preference и snap.
             # Между незавершённым request и Write нет ожидания CLI, value или покоя.
             [ClientAreaAnimation]::Write($false)
-            @{ enabled = [ClientAreaAnimation]::Read() } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
+            $systemSetterReceipt = [pscustomobject]@{
+                SetEnteredQpc = [ClientAreaAnimation]::SetEnteredQpc
+                SetReturnedQpc = [ClientAreaAnimation]::SetReturnedQpc
+                SetSucceeded = [ClientAreaAnimation]::SetSucceeded
+                ReadbackQpc = [ClientAreaAnimation]::ReadbackQpc
+                ReadbackEnabled = [ClientAreaAnimation]::ReadbackEnabled
+                QpcFrequency = [ClientAreaAnimation]::QpcFrequency
+            }
+            @{ enabled = [ClientAreaAnimation]::Read(); timing = $systemSetterReceipt } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
         } catch { $releaseFailure = $_ }
         finally {
             if ($null -ne $releaseTool) {
@@ -277,7 +319,7 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
                 [InvalidOperationException]::new(('Переключатель не прервал движение: completed/snap не наблюдался. [scenario={0}]' -f $Name)),
                 'InputSnapNotObserved', [Management.Automation.ErrorCategory]::InvalidResult, $null)
             try {
-                $summary = Get-InputPhaseSummary -Name $Name -After $before -Events $events
+                $summary = Get-InputPhaseSummary -Name $Name -After $before -Events $events -Setter $systemSetterReceipt
                 $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`ninput-phase: " + $summary)
             } catch { # Ошибка диагностической проекции не заменяет сохранённый отказ ввода.
                 try { $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`ninput-phase: unavailable") }

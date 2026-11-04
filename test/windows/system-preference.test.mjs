@@ -4,6 +4,57 @@ import { readFileSync } from 'node:fs';
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
+function timingViolations({ setter, adapter, page, harness }) {
+  return [
+    ['native SET boundaries and existing GET receipt', !/SetEnteredQpc = ReadQpc\(\);\s*var success = Set\(0x1043, 0, new IntPtr\(enabled \? 1 : 0\), 2\);/.test(setter)
+      || !setter.includes('SetReturnedQpc = ReadQpc();') || !setter.includes('ReadbackEnabled = Read();')
+      || !setter.includes('ReadbackQpc = ReadQpc();') || !setter.includes('SetSucceeded = success;')
+      || !/var error = success \? 0 : Marshal.GetLastWin32Error\(\);\s*SetReturnedQpc = ReadQpc\(\);/.test(setter)],
+    ['no-profile and unchanged getter count', (setter.match(/Get\(0x1042/g) ?? []).length !== 1
+      || (setter.match(/\bRead\(\)/g) ?? []).length !== 2 || setter.includes('new IntPtr(enabled ? 1 : 0), 3')],
+    ['qualifying WM receipt does not filter delivery', !adapter.includes('private Action<bool>? notify;')
+      || !adapter.includes('notify?.Invoke(wParam == ClientAreaAnimation);')
+      || /message == SettingChange\s*&&/.test(adapter)],
+    ['actual sparse QPC and closed Apply outcomes', !page.includes('SystemPreferenceOutcome { Missing, Stale, Detached, Deduplicated, Update }')
+      || !page.includes('Stopwatch.GetTimestamp()') || !page.includes('Stopwatch.IsHighResolution')
+      || !page.includes('qpcFrequency = ReadQpcFrequencyForTrace()')
+      || !page.includes('ObserveSystemApply(notification, SystemPreferenceOutcome.Deduplicated, enabled, observed);')
+      || !page.includes('ObserveSystemApply(notification, SystemPreferenceOutcome.Update, enabled, observed);')],
+    ['completed uses absolute timestamp, not frame sampling', !/trace\?\.Add\("completed", new\s*\{\s*qpc = ReadQpcForTrace\(\)/.test(page)
+      || /private void Observe\(MotionObservation[^]*?qpc/.test(page.slice(page.indexOf('private void Observe(MotionObservation'), page.indexOf('private void Input(')))],
+    ['existing failure projection carries setter and sparse timing', !harness.includes('-Setter $systemSetterReceipt')
+      || !harness.includes('timingOmitted = $timingCount - $timing.Count')
+      || !harness.includes("'systemApply' { $timingPhase = 'systemApply' }")
+      || !harness.includes("Read-InputPhaseField $data 'outcome' 'outcome'")
+      || !harness.includes('SetEnteredQpc = [ClientAreaAnimation]::SetEnteredQpc')
+      || !harness.includes('$summary.Length -le 1800')],
+    ['outcome logging cannot become policy or per-frame effect', !/Update\("systemPreference"\);\s*ObserveSystemApply\(notification, SystemPreferenceOutcome.Update, enabled, observed\);/.test(page)
+      || !/catch \{ Interlocked.Exchange\(ref notificationDiagnosticFailed, 1\); \}/.test(page)
+      || !page.includes('trace.Flush();')],
+  ].filter(([, bad]) => bad).map(([name]) => name);
+}
+
+test('существующие SET/WM/Apply/completed точки дают различающую QPC проекцию без нового поведения', () => {
+  const actual = { setter: read('./animation-settings.cs'), adapter: read('../../examples/windows/SystemPreferenceNotifications.cs'),
+    page: read('../../examples/windows/PressPage.xaml.cs'), harness: read('./verify-input.ps1') };
+  assert.deepEqual(timingViolations(actual), []);
+  for (const [file, before, after, violation] of [
+    ['setter', 'SetEnteredQpc = ReadQpc();', 'SetEnteredQpc = null;', 'native SET boundaries and existing GET receipt'],
+    ['setter', 'SetSucceeded = success;', 'SetSucceeded = true;', 'native SET boundaries and existing GET receipt'],
+    ['setter', 'new IntPtr(enabled ? 1 : 0), 2', 'new IntPtr(enabled ? 1 : 0), 3', 'no-profile and unchanged getter count'],
+    ['adapter', 'notify?.Invoke(wParam == ClientAreaAnimation);', 'notify?.Invoke(true);', 'qualifying WM receipt does not filter delivery'],
+    ['page', 'Stopwatch.GetTimestamp()', 'Stopwatch.StartNew().ElapsedTicks', 'actual sparse QPC and closed Apply outcomes'],
+    ['page', 'SystemPreferenceOutcome.Deduplicated, enabled, observed', 'SystemPreferenceOutcome.Update, enabled, observed', 'actual sparse QPC and closed Apply outcomes'],
+    ['page', 'qpc = ReadQpcForTrace()', 'qpc = null', 'completed uses absolute timestamp, not frame sampling'],
+    ['harness', '-Setter $systemSetterReceipt', '', 'existing failure projection carries setter and sparse timing'],
+    ['harness', "Read-InputPhaseField $data 'outcome' 'outcome'", '$data.outcome', 'existing failure projection carries setter and sparse timing'],
+    ['page', 'Update("systemPreference");\n        ObserveSystemApply', 'ObserveSystemApply', 'outcome logging cannot become policy or per-frame effect'],
+  ]) assert(timingViolations({ ...actual, [file]: actual[file].replaceAll(before, after) }).includes(violation), violation);
+  const controls = read('./cleanup.test.ps1');
+  for (const name of ['phase-qpc-healthy-control', 'phase-qpc-outcome-or-unavailable-control',
+    'phase-qpc-unrelated-unavailable-frequency-control', 'phase-qpc-malformed-control', 'phase-qpc-bounded-control']) assert(controls.includes(name), name);
+});
+
 function inputSuiteWiringViolations(source) {
   const invocations = [...source.matchAll(/^    & node --test (.+)\n    if \(\$LASTEXITCODE -ne 0\) \{ throw 'Проверки различающей силы input oracle не прошли\.' \}/gm)];
   const wanted = "(Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs') (Join-Path $PSScriptRoot 'dispose.test.mjs')";
@@ -27,10 +78,11 @@ test('mandatory input entry executes all three source suites exactly once in the
 
 function routeViolations(page, app) {
   const callback = page.slice(page.indexOf('private void ApplySystemPreference('), page.indexOf('private void ObserveSystemNotification'));
+  const stripped = callback.replace(/ObserveSystemApply\([^;]*\);/g, '').replace(/\/\/[^\n]*/g, '');
   return [
     ['one own-window notification source', !page.includes('new SystemPreferenceNotifications(window, SystemPreferenceChanged, NotificationFailed)')
       || page.includes('settings.AnimationsEnabledChanged') || !app.includes('new PressPage(window)')],
-    ['unchanged preference does not issue animation command', !/var enabled = settings\.AnimationsEnabled;\s*if \(observedSystemAnimation == enabled\) return;\s*Update\("systemPreference"\);/.test(callback)
+    ['unchanged preference does not issue animation command', !/var enabled = settings\.AnimationsEnabled;\s*var observed = observedSystemAnimation;\s*if \(observed == enabled\)\s*\{\s*return;\s*\}\s*Update\("systemPreference"\);/.test(stripped)
       || !page.includes('observedSystemAnimation = systemAnimation;')],
     ['honest WM origin and retained managed queue', !page.includes('source = "WM_SETTINGCHANGE"')
       || !page.includes('DispatcherQueue.TryEnqueue') || !page.includes('ApplySystemPreference(subscription)')],
@@ -50,7 +102,8 @@ test('WM route source oracle accepts healthy witness and rejects old/duplicate/b
     {
       if (subscription is null || !ReferenceEquals(notifications, subscription) || !subscription.IsAttached) return;
       var enabled = settings.AnimationsEnabled;
-      if (observedSystemAnimation == enabled) return;
+      var observed = observedSystemAnimation;
+      if (observed == enabled) { return; }
       Update("systemPreference");
     }
     private void ObserveSystemNotification()`;
@@ -58,7 +111,7 @@ test('WM route source oracle accepts healthy witness and rejects old/duplicate/b
   assert.deepEqual(routeViolations(healthy, app), []);
   for (const [before, after, violation] of [
     ['notifications =', 'settings.AnimationsEnabledChanged += SystemPreferenceChanged; notifications =', 'one own-window notification source'],
-    ['if (observedSystemAnimation == enabled) return;', '', 'unchanged preference does not issue animation command'],
+    ['if (observed == enabled) { return; }', '', 'unchanged preference does not issue animation command'],
     ['observedSystemAnimation = systemAnimation;', '', 'unchanged preference does not issue animation command'],
     ['source = "WM_SETTINGCHANGE"', 'source = "UISettings"', 'honest WM origin and retained managed queue'],
     ['DispatcherQueue.TryEnqueue', 'RunInline', 'honest WM origin and retained managed queue'],
@@ -133,7 +186,7 @@ test('actual adapter source retains native callback ownership, forwarding and fa
       ['if (destroying && keepAlive.IsAllocated) keepAlive.Free();', '', 'destroy revokes address before forwarding and releases afterwards'],
       ['return DefSubclassProc(window, message, wParam, lParam);', 'return 0;', 'all callbacks forward without getter or test-only filter'],
       ['message == SettingChange', 'message == SettingChange && wParam == 0x1043', 'all callbacks forward without getter or test-only filter'],
-      ['notify?.Invoke();', 'var value = settings.AnimationsEnabled; notify?.Invoke();', 'all callbacks forward without getter or test-only filter'],
+      ['notify?.Invoke(wParam == ClientAreaAnimation);', 'var value = settings.AnimationsEnabled; notify?.Invoke(wParam == ClientAreaAnimation);', 'all callbacks forward without getter or test-only filter'],
       ['if (failure is not null) return;', '', 'managed delivery exceptions retained inside reverse PInvoke'],
     ]) assert(adapterViolations(healthy.replace(before, after)).includes(violation), violation);
   }
@@ -143,7 +196,7 @@ test('managed lifecycle source rejects stale/reloaded/window-closed notification
   const source = read('../../examples/windows/PressPage.xaml.cs');
   assert(source.includes('if (windowClosed) throw new InvalidOperationException'));
   assert(source.includes('if (notifications is not null) throw new InvalidOperationException'));
-  assert(source.includes('if (subscription is null || !ReferenceEquals(notifications, subscription) || !subscription.IsAttached) return;'));
+  assert.match(source, /if \(subscription is null \|\| !ReferenceEquals\(notifications, subscription\) \|\| !subscription.IsAttached\)\s*\{[^]*?ObserveSystemApply\(notification, outcome, null, null\);\s*return;/);
   assert(source.includes('Attempt(subscription.Dispose);'));
   assert(source.includes('if (!subscription.IsAttached && ReferenceEquals(notifications, subscription)) notifications = null;'));
   assert(source.includes('Attempt(motion.Dispose);'));
