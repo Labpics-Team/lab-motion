@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.ExceptionServices;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Composition.Interactions;
 using Microsoft.UI.Dispatching;
@@ -135,14 +136,26 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         if (disposed) return;
         CheckAccess();
         disposed = true;
-        Finish(MotionEnd.Stopped, "disposed");
-        foreach (var binding in bindings.ToArray()) binding.Dispose();
-        tracker.Dispose();
-        modifier.Dispose();
-        condition.Dispose();
-        force.Dispose();
-        settings.Dispose();
-        Observed = null;
+        ExceptionDispatchInfo? failure = null;
+        try
+        {
+            Attempt(() => Finish(MotionEnd.Stopped, "disposed"));
+            // Release удаляет binding из набора; отказ одного не отменяет остальные.
+            foreach (var binding in bindings.ToArray()) Attempt(binding.Dispose);
+            Attempt(tracker.Dispose);
+            Attempt(modifier.Dispose);
+            Attempt(condition.Dispose);
+            Attempt(force.Dispose);
+            Attempt(settings.Dispose);
+        }
+        finally { Observed = null; }
+        failure?.Throw();
+
+        void Attempt(Action cleanup)
+        {
+            try { cleanup(); }
+            catch (Exception error) { failure ??= ExceptionDispatchInfo.Capture(error); }
+        }
     }
 
     private void CheckAccess()

@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Composition.Interactions;
 using Microsoft.UI.Dispatching;
@@ -80,6 +81,7 @@ internal sealed class ScalarBinding : IDisposable
         {
             if (disposed) return;
             CheckAccess();
+            ExceptionDispatchInfo? failure = null;
             try
             {
                 if (owners.TryGetValue(property, out var owner) && ReferenceEquals(owner, this))
@@ -88,7 +90,14 @@ internal sealed class ScalarBinding : IDisposable
                     visual.StopAnimation(path);
                 }
             }
-            finally { Release(); }
+            catch (Exception error) { failure = ExceptionDispatchInfo.Capture(error); }
+            finally
+            {
+                // Stop и освобождение выражения независимы; сохраняем первый отказ.
+                try { Release(); }
+                catch (Exception error) { failure ??= ExceptionDispatchInfo.Capture(error); }
+            }
+            failure?.Throw();
         }
     }
 
@@ -99,8 +108,17 @@ internal sealed class ScalarBinding : IDisposable
 
     private void Release()
     {
+        // StopAnimation может синхронно вернуть управление в Dispose этой привязки.
+        if (disposed) return;
         disposed = true;
+        ExceptionDispatchInfo? failure = null;
         try { expression.Dispose(); }
-        finally { released(this); }
+        catch (Exception error) { failure = ExceptionDispatchInfo.Capture(error); }
+        finally
+        {
+            try { released(this); }
+            catch (Exception error) { failure ??= ExceptionDispatchInfo.Capture(error); }
+        }
+        failure?.Throw();
     }
 }

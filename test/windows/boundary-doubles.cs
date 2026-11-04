@@ -1,4 +1,5 @@
 using System.Numerics;
+using Microsoft.UI.Composition.Interactions;
 
 // Подменяется только native-граница. ScalarMotion компилируется без изменений.
 namespace Microsoft.UI.Dispatching
@@ -18,6 +19,7 @@ namespace Microsoft.UI.Composition
     {
         public List<ExpressionAnimation> Expressions { get; } = [];
         public List<CompositionPropertySet> PropertySets { get; } = [];
+        public List<InteractionTrackerInertiaMotion> Modifiers { get; } = [];
         public CompositionPropertySet CreatePropertySet()
         {
             var properties = new CompositionPropertySet();
@@ -36,7 +38,13 @@ namespace Microsoft.UI.Composition
     {
         public Dictionary<string, float> Scalars { get; } = [];
         public void InsertScalar(string name, float value) => Scalars[name] = value;
-        public void Dispose() { }
+        public int DisposeCount { get; private set; }
+        public Exception? DisposeFailure { get; set; }
+        public void Dispose()
+        {
+            DisposeCount++;
+            if (DisposeFailure is { } error) throw error;
+        }
     }
     public sealed class ExpressionAnimation : IDisposable
     {
@@ -45,9 +53,14 @@ namespace Microsoft.UI.Composition
         public Dictionary<string, object> References { get; } = [];
         public Dictionary<string, float> Scalars { get; } = [];
         public int DisposeCount { get; private set; }
+        public Exception? DisposeFailure { get; set; }
         public void SetReferenceParameter(string name, object value) => References[name] = value;
         public void SetScalarParameter(string name, float value) => Scalars[name] = value;
-        public void Dispose() => DisposeCount++;
+        public void Dispose()
+        {
+            DisposeCount++;
+            if (DisposeFailure is { } error) throw error;
+        }
     }
     // StartAnimation копирует параметры; закрытие исходного ExpressionAnimation
     // не останавливает установленную анимацию. Выражение здесь не вычисляется.
@@ -62,6 +75,8 @@ namespace Microsoft.UI.Composition
         public int Starts { get; private set; }
         public int Stops { get; private set; }
         public bool FailNextStart { get; set; }
+        public Exception? StopFailure { get; set; }
+        public Action? OnStop { get; set; }
         public void StartAnimation(string name, ExpressionAnimation animation)
         {
             StartAttempts++;
@@ -77,6 +92,8 @@ namespace Microsoft.UI.Composition
         public void StopAnimation(string name)
         {
             Stops++;
+            OnStop?.Invoke();
+            if (StopFailure is { } error) throw error;
             Animations.Remove(name);
         }
     }
@@ -94,6 +111,9 @@ namespace Microsoft.UI.Composition.Interactions
         public Vector3 Position { get; set; }
         public int LastRequest { get; private set; }
         public Vector3 LastAdditionalVelocity { get; private set; }
+        public int DisposeCount { get; private set; }
+        public Exception? DisposeFailure { get; set; }
+        public Action? OnDispose { get; set; }
         public static InteractionTracker CreateWithOwner(Compositor compositor, IInteractionTrackerOwner owner)
             => LastCreated = new() { Compositor = compositor };
         public void ConfigurePositionXInertiaModifiers(InteractionTrackerInertiaMotion[] modifiers) { }
@@ -104,14 +124,30 @@ namespace Microsoft.UI.Composition.Interactions
             LastAdditionalVelocity = value;
             return ++LastRequest;
         }
-        public void Dispose() { }
+        public void Dispose()
+        {
+            DisposeCount++;
+            OnDispose?.Invoke();
+            if (DisposeFailure is { } error) throw error;
+        }
     }
     public sealed class InteractionTrackerInertiaMotion : IDisposable
     {
         public ExpressionAnimation Condition { get; set; } = null!;
         public ExpressionAnimation Motion { get; set; } = null!;
-        public static InteractionTrackerInertiaMotion Create(Compositor compositor) => new();
-        public void Dispose() { }
+        public int DisposeCount { get; private set; }
+        public Exception? DisposeFailure { get; set; }
+        public static InteractionTrackerInertiaMotion Create(Compositor compositor)
+        {
+            var modifier = new InteractionTrackerInertiaMotion();
+            compositor.Modifiers.Add(modifier);
+            return modifier;
+        }
+        public void Dispose()
+        {
+            DisposeCount++;
+            if (DisposeFailure is { } error) throw error;
+        }
     }
     public sealed class InteractionTrackerValuesChangedArgs
     {

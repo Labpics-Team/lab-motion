@@ -129,5 +129,7 @@ using (var motion = new ScalarMotion(new Compositor(), -1000, 1000))
 }
 var bindings = BindingTests.Run();
 passed &= bindings.All(result => result.Passed);
-Console.WriteLine(JsonSerializer.Serialize(new { passed, results, bindings }, new JsonSerializerOptions { WriteIndented = true }));
+var disposals = DisposeTests.Run();
+passed &= disposals.Count == 11 && disposals.All(result => result.Passed);
+Console.WriteLine(JsonSerializer.Serialize(new { passed, results, bindings, disposals }, new JsonSerializerOptions { WriteIndented = true }));
 return passed ? 0 : 1;
