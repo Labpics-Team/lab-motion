@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { parse } from 'yaml';
 
 const workflowUrl = new URL('../.github/workflows/release.yml', import.meta.url);
 const workflow = readFileSync(workflowUrl, 'utf8').replace(
@@ -248,7 +249,8 @@ function assertVitestDiagnostics(source: string): void {
   const id = /^        id: ([a-z][a-z0-9_-]*)$/m.exec(vitestStep)?.[1];
   if (id === undefined) throw new Error('Vitest diagnostics: id шага отсутствует');
   const artifactPath = 'vitest.log';
-  if (/uses:\s*actions\/upload-artifact@/.test(source)) {
+  const testsJob = (parse(source) as { jobs: { tests: { steps: { uses?: string }[] } } }).jobs.tests;
+  if (testsJob.steps.some(step => /^actions\/upload-artifact@/.test(step.uses ?? ''))) {
     throw new Error('Vitest diagnostics: журнал обычного CI не требует повторного архива');
   }
 
@@ -362,7 +364,8 @@ describe('release workflow: граница тега и npm OIDC', () => {
       ciWorkflow.replace(' 2>&1 | tee vitest.log', ''),
       ciWorkflow.replace('status=${PIPESTATUS[0]}', 'status=0'),
       ciWorkflow.replace('exit "$status"', 'exit 0'),
-      ciWorkflow + '\n# producer\nuses: actions/upload-artifact@0123456789012345678901234567890123456789\n',
+      ciWorkflow.replace('      - name: Vitest\n',
+        '      - name: Duplicate Vitest log\n        uses: actions/upload-artifact@0123456789012345678901234567890123456789\n      - name: Vitest\n'),
     ];
     for (const mutant of mutants) {
       expect(() => assertVitestDiagnostics(mutant)).toThrow(/Vitest diagnostics/);
