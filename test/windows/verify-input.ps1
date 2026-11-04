@@ -23,6 +23,19 @@ $animationBefore = $null
 $commands = [Collections.Generic.List[object]]::new()
 $scenarios = [Collections.Generic.List[object]]::new()
 
+function Read-ProcessHasExited($Process) {
+    # PowerShell может подавить исключение getter и вернуть null: не приводим его к bool.
+    $exited = $Process.HasExited
+    if ($exited -isnot [bool]) { throw 'Процесс не вернул bool HasExited.' }
+    return $exited
+}
+
+function Read-ProcessExitCode($Process) {
+    $exitCode = $Process.ExitCode
+    if ($exitCode -isnot [int]) { throw 'Процесс не вернул int ExitCode.' }
+    return $exitCode
+}
+
 function Start-Tool([string]$Name, [string[]]$Arguments) {
     $info = [Diagnostics.ProcessStartInfo]::new($script:cli)
     $info.UseShellExecute = $false
@@ -47,8 +60,10 @@ function Finish-Tool($Tool, [int]$Timeout = 30000) {
         $errors = $Tool.prefix + $Tool.stderr.GetAwaiter().GetResult()
         [IO.File]::WriteAllText((Join-Path $evidence "$($Tool.name).stderr.log"), $errors)
         [IO.File]::WriteAllText((Join-Path $evidence "$($Tool.name).json"), $text)
-        $commands.Add(@{ name = $Tool.name; arguments = $Tool.arguments; exitCode = $Tool.process.ExitCode })
-        if ($Tool.process.ExitCode -ne 0) { throw "winapp $($Tool.name): exit $($Tool.process.ExitCode)" }
+        if (!(Read-ProcessHasExited $Tool.process)) { throw 'winapp не подтвердил завершение после ожидания.' }
+        $exitCode = Read-ProcessExitCode $Tool.process
+        $commands.Add(@{ name = $Tool.name; arguments = $Tool.arguments; exitCode = $exitCode })
+        if ($exitCode -ne 0) { throw "winapp $($Tool.name): exit $exitCode" }
         return $text | ConvertFrom-Json
     } finally { $Tool.ended = $true; $Tool.process.Dispose() }
 }
@@ -169,7 +184,7 @@ try {
     $deadline = [DateTime]::UtcNow.AddSeconds(20)
     do {
         $process.Refresh()
-        if ($process.HasExited) { throw 'Приложение завершилось до появления окна.' }
+        if (Read-ProcessHasExited $process) { throw 'Приложение завершилось до появления окна.' }
         if ($process.MainWindowHandle -ne 0) { break }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
@@ -191,7 +206,7 @@ try {
     $started = $false
     $lineTask = $recording.process.StandardError.ReadLineAsync()
     do {
-        if ($recording.process.HasExited) { throw 'Запись завершилась до подтверждения первого кадра.' }
+        if (Read-ProcessHasExited $recording.process) { throw 'Запись завершилась до подтверждения первого кадра.' }
         if (!$lineTask.Wait(100)) { continue }
         $line = $lineTask.GetAwaiter().GetResult()
         if ($null -eq $line) { throw 'Поток записи закрыт до первого кадра.' }
@@ -254,7 +269,14 @@ try {
             try {
                 if ($recording -and !$recording.ended) {
                     try {
-                        if (!$recording.process.HasExited) { $recording.process.Kill($true); $recording.process.WaitForExit() }
+                        $completionFailure = $null
+                        $needsStop = $true
+                        try { $needsStop = !(Read-ProcessHasExited $recording.process) }
+                        catch { $completionFailure = $_ }
+                        # Неизвестное завершение не отменяет попытку остановить свою запись.
+                        if ($needsStop) { $recording.process.Kill($true); $recording.process.WaitForExit() }
+                        if ($null -ne $completionFailure) { throw $completionFailure }
+                        if (!(Read-ProcessHasExited $recording.process)) { throw 'Запись не подтвердила завершение после очистки.' }
                         $remaining = if ($recording.stderr) { $recording.stderr.GetAwaiter().GetResult() } else { '' }
                         [IO.File]::WriteAllText((Join-Path $evidence 'record.stderr.log'), $recording.prefix + $remaining)
                     } finally { $recording.process.Dispose() }
@@ -263,13 +285,22 @@ try {
                 if ($process) {
                     try {
                         $forced = $false
-                        if (!$process.HasExited) {
+                        $completionFailure = $null
+                        $needsClose = $true
+                        try { $needsClose = !(Read-ProcessHasExited $process) }
+                        catch { $completionFailure = $_ }
+                        # Ошибка чтения остаётся ошибкой после попытки завершить свой процесс.
+                        if ($needsClose) {
                             $null = $process.CloseMainWindow()
                             if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
                         }
+                        if ($null -ne $completionFailure) { throw $completionFailure }
                         $process.Refresh()
-                        $closed = !$forced -and $process.HasExited -and $process.ExitCode -eq 0
-                        @{ exited = $process.HasExited; forced = $forced; exitCode = $process.ExitCode } | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
+                        $exited = Read-ProcessHasExited $process
+                        if (!$exited) { throw 'Приложение не подтвердило завершение после очистки.' }
+                        $exitCode = Read-ProcessExitCode $process
+                        $closed = !$forced -and $exited -and $exitCode -eq 0
+                        @{ exited = $exited; forced = $forced; exitCode = $exitCode } | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
                     } finally { $process.Dispose() }
                 }
             }

@@ -250,6 +250,11 @@ test('возвращённые bool без здорового движения �
 
 function inputCleanupViolations(source) {
   return [
+    ['completion bool validated before use', !/\$exited = \$Process\.HasExited\s+if \(\$exited -isnot \[bool\]\)/.test(source)],
+    ['exit code int validated before use', !/\$exitCode = \$Process\.ExitCode\s+if \(\$exitCode -isnot \[int\]\)/.test(source)],
+    ['only qualified completion getters', (source.match(/\.HasExited\b/g) ?? []).length !== 1 || (source.match(/\.ExitCode\b/g) ?? []).length !== 1],
+    ['post-refresh qualified evidence', !/\$process\.Refresh\(\)\s+\$exited = Read-ProcessHasExited \$process\s+if \(!\$exited\) \{ throw '[^']+' \}\s+\$exitCode = Read-ProcessExitCode \$process/.test(source)
+      || !source.includes('@{ exited = $exited; forced = $forced; exitCode = $exitCode }')],
     ['primary captured before evidence', !/\$primaryFailure = \$_\s+try \{ \$primaryFailure \| Out-String \| Set-Content/.test(source)],
     ['application disposal encloses process boundary', !/if \(\$process\) \{\s+try \{\s+\$forced = \$false/.test(source)],
     ['cleanup retains primary', !/catch \{\s+if \(\$null -eq \$primaryFailure\) \{ throw \}/.test(source)],
@@ -261,11 +266,31 @@ test('input source captures primary before evidence and disposes across process 
   const source = readFileSync(new URL('./verify-input.ps1', import.meta.url), 'utf8');
   assert.deepEqual(inputCleanupViolations(source), []);
   for (const [before, after, expected] of [
+    ['$exited -isnot [bool]', '$false', 'completion bool validated before use'],
+    ['$exitCode -isnot [int]', '$false', 'exit code int validated before use'],
+    ['$needsClose = !(Read-ProcessHasExited $process)', '$needsClose = !$process.HasExited', 'only qualified completion getters'],
+    ['$exited = Read-ProcessHasExited $process', '$exited = $true', 'post-refresh qualified evidence'],
     ['$primaryFailure = $_', '$primaryFailure = $null', 'primary captured before evidence'],
     ['try {\n                        $forced = $false', '$forced = $false', 'application disposal encloses process boundary'],
     ['if ($null -eq $primaryFailure) { throw }', 'throw', 'cleanup retains primary'],
     ["Write-Warning 'Очистка после ошибки не завершена.' -WarningAction Continue", '$null', 'fixed observable warning'],
   ]) assert(inputCleanupViolations(source.replaceAll(before, after)).includes(expected), expected);
+});
+
+test('input witness preserves getter negatives, late reads and actual helper loading', () => {
+  const source = readFileSync(new URL('./cleanup.test.ps1', import.meta.url), 'utf8');
+  for (const fault of ['has-exited', 'has-null', 'has-invalid', 'has-exited-late', 'has-null-late', 'has-invalid-late',
+    'exit-code', 'exit-code-null', 'exit-code-invalid', 'post-refresh-running', 'record-healthy',
+    'record-has-exited', 'record-has-null', 'record-has-invalid', 'record-has-exited-late', 'record-has-null-late', 'record-has-invalid-late']) {
+    assert(source.includes(`'${fault}'`), fault);
+  }
+  assert(source.includes('FunctionDefinitionAst'));
+  assert(source.includes('. $completionReaders'));
+  assert(source.includes('!$script:closeReached -or !$script:closeWaitReached -or $script:exitCodeReached'));
+  assert(source.includes('!$script:recorderKillReached -or !$script:recorderWaitReached'));
+  assert(source.includes('$unassociated.HasExited'));
+  assert(source.includes('finally { $unassociated.Dispose() }'));
+  assert(!source.includes('$unassociated.Start('));
 });
 
 test('повреждённый JSON даёт exit1 и отрицательный result.json', () => {
