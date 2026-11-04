@@ -220,29 +220,48 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
     Wait-Rest
     $before = @(Read-Trace)[-1].sequence
     if ($BeforeArguments.Count) { Invoke-Ui "$Name-press" $BeforeArguments }
-    Invoke-Ui $Name $Arguments
     if ($Name -eq 'system-disable-animation') {
-        $deadline = [DateTime]::UtcNow.AddSeconds(8)
-        $active = $false
-        do {
-            $events = @(Read-Trace)
-            if (@($events | Where-Object { $_.kind -in @('error', 'truncated') }).Count) { throw 'Трасса ввода содержит ошибку или обрезана.' }
-            $released = @($events | Where-Object { $_.sequence -gt $before -and $_.kind -eq 'intent' -and
-                $_.data.trigger -eq 'pressed' -and !$_.data.pressed -and $_.data.localAnimation -and $_.data.systemAnimation })
-            if ($released.Count) {
-                $operation = $released[-1].data.operation
-                $requested = @($events | Where-Object { $_.kind -eq 'motion' -and $_.data.pageOperation -eq $operation -and $_.data.phase -eq 'requested' })
-                $completed = @($events | Where-Object { $_.kind -eq 'completed' -and $_.data.operation -eq $operation })
-                if ($completed.Count) { throw 'Операция завершилась до системного запрета.' }
-                if ($requested.Count) { $active = $true; break }
+        $releaseTool = $null
+        $releaseFailure = $null
+        $releaseClock = [Diagnostics.Stopwatch]::StartNew()
+        try {
+            # Выход CLI не подтверждает обработку release приложением и может опоздать к settled.
+            $releaseTool = Start-Tool $Name (@('ui') + $Arguments + @('-w', $script:window, '--json'))
+            $deadline = [DateTime]::UtcNow.AddSeconds(8)
+            $active = $false
+            do {
+                $events = @(Read-Trace)
+                if (@($events | Where-Object { $_.kind -in @('error', 'truncated') }).Count) { throw 'Трасса ввода содержит ошибку или обрезана.' }
+                $released = @($events | Where-Object { $_.sequence -gt $before -and $_.kind -eq 'intent' -and
+                    $_.data.trigger -eq 'pressed' -and !$_.data.pressed -and $_.data.localAnimation -and $_.data.systemAnimation })
+                if ($released.Count) {
+                    $operation = $released[-1].data.operation
+                    $requested = @($events | Where-Object { $_.kind -eq 'motion' -and $_.data.pageOperation -eq $operation -and $_.data.phase -eq 'requested' })
+                    $completed = @($events | Where-Object { $_.kind -eq 'completed' -and $_.data.operation -eq $operation })
+                    if ($completed.Count) { throw 'Операция завершилась до системного запрета.' }
+                    if ($requested.Count) { $active = $true; break }
+                }
+                Start-Sleep -Milliseconds 50
+            } while ([DateTime]::UtcNow -lt $deadline -and $releaseClock.ElapsedMilliseconds -lt 30000)
+            if (!$active) { throw 'Нет незавершённой операции перед системным запретом.' }
+            if ($releaseClock.ElapsedMilliseconds -ge 30000) { throw 'Таймаут winapp до системного запрета.' }
+            # Значения кадра буферизуются; итоговая проверка подтвердит движение до preference и snap.
+            # Между незавершённым request и Write нет ожидания CLI, value или покоя.
+            [ClientAreaAnimation]::Write($false)
+            @{ enabled = [ClientAreaAnimation]::Read() } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
+        } catch { $releaseFailure = $_ }
+        finally {
+            if ($null -ne $releaseTool) {
+                try {
+                    # Наблюдение расходует исходные 30s; Finish-Tool не получает новый полный срок.
+                    $remaining = [int][Math]::Max(0, 30000 - $releaseClock.ElapsedMilliseconds)
+                    Finish-Tool $releaseTool $remaining | Out-Null
+                } catch { Save-CleanupFailure $_ ([ref]$releaseFailure) }
             }
-            Start-Sleep -Milliseconds 50
-        } while ([DateTime]::UtcNow -lt $deadline)
-        if (!$active) { throw 'Нет незавершённой операции перед системным запретом.' }
-        # Значения кадра буферизуются; oracle после Flush проверит движение до события.
-        # Между незавершённым request и Write нет ожидания покоя.
-        [ClientAreaAnimation]::Write($false)
-        @{ enabled = [ClientAreaAnimation]::Read() } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
+        }
+        if ($null -ne $releaseFailure) { throw $releaseFailure }
+    } else {
+        Invoke-Ui $Name $Arguments
     }
     Wait-Rest $before
     if ($Name -in @('disable-animation', 'system-disable-animation')) {

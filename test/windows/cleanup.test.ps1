@@ -470,6 +470,151 @@ try {
     }
     "tool finish: $toolCases synthetic controls PASS"
 
+    # Настоящие Scenario/Invoke-Ui/Finish-Tool; подменены только trace, системная настройка и child.
+    $releaseDefinitions = @($ast.EndBlock.Statements | Where-Object {
+        $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -in @('Scenario', 'Invoke-Ui')
+    })
+    if ($releaseDefinitions.Count -ne 2) { throw 'Missing actual release Scenario/Invoke-Ui' }
+    $releaseFunctions = [scriptblock]::Create(($releaseDefinitions | ForEach-Object { $_.Extent.Text }) -join "`n")
+    $releaseCases = 0
+    foreach ($releaseFault in @('healthy', 'delayed-exit', 'settled', 'race', 'read', 'setter', 'readback',
+        'read-finish', 'setter-finish', 'finish', 'start', 'budget', 'local')) {
+        & {
+            param([string]$Probe)
+            . $releaseFunctions
+            $script:releaseProbe = $Probe
+            $script:releaseProbeReads = 0
+            $script:releaseProbeStarts = 0
+            $script:releaseProbeWaits = [Collections.Generic.List[int]]::new()
+            $script:releaseProbeKills = 0
+            $script:releaseProbeDisposes = 0
+            $script:releaseProbeReadBeforeFinish = $false
+            $script:releaseProbeSettled = $Probe -eq 'settled'
+            $script:releaseProbeTool = $null
+            $script:releaseProbeArguments = @()
+            $script:window = 'fixture-window'
+            $script:warnings.Clear()
+            $commands = [Collections.Generic.List[object]]::new()
+            $scenarios = [Collections.Generic.List[object]]::new()
+            [ClientAreaAnimation]::Current = $true
+            [ClientAreaAnimation]::Writes = 0
+            [ClientAreaAnimation]::FailNextWrite = $Probe -in @('setter', 'setter-finish')
+            [ClientAreaAnimation]::FailRead = $Probe -eq 'readback'
+            function Wait-Rest { param([long]$After = 0) }
+            function Read-Trace {
+                $script:releaseProbeReads++
+                if ($script:releaseProbeReads -eq 1) {
+                    return [pscustomobject]@{ sequence = 9; kind = 'completed'; data = [pscustomobject]@{ reason = 'settled'; operation = 1 } }
+                }
+                if ($script:releaseProbeStarts -gt 0 -and $script:releaseProbeWaits.Count -eq 0) {
+                    $script:releaseProbeReadBeforeFinish = $true
+                }
+                if ($script:releaseProbe -in @('read', 'read-finish')) { throw [IO.IOException]::new('release-primary-read') }
+                $rows = @(
+                    [pscustomobject]@{ sequence = 10; kind = 'intent'; data = [pscustomobject]@{
+                        operation = 2; trigger = 'pressed'; pressed = $false; localAnimation = $true; systemAnimation = $true } },
+                    [pscustomobject]@{ sequence = 11; kind = 'motion'; data = [pscustomobject]@{
+                        pageOperation = 2; nativeOperation = 20; phase = 'requested' } }
+                )
+                if ($script:releaseProbeSettled) {
+                    $rows += [pscustomobject]@{ sequence = 12; kind = 'completed'; data = [pscustomobject]@{ operation = 2; reason = 'settled' } }
+                } elseif (![ClientAreaAnimation]::Current) {
+                    $rows += [pscustomobject]@{ sequence = 12; kind = 'completed'; data = [pscustomobject]@{ operation = 2; reason = 'snap' } }
+                }
+                # Setter может опоздать уже после допустимого snapshot: настоящий snap guard обязан отказать.
+                if ($script:releaseProbe -eq 'race') { $script:releaseProbeSettled = $true }
+                return $rows
+            }
+            function Start-Tool {
+                param([string]$Name, [string[]]$Arguments)
+                $script:releaseProbeStarts++
+                $script:releaseProbeArguments = $Arguments
+                if ($script:releaseProbe -eq 'start') { throw [IO.IOException]::new('release-primary-start') }
+                if ($script:releaseProbe -eq 'budget') { [Threading.Thread]::Sleep(30) }
+                $owned = [pscustomobject]@{ IsExited = $false }
+                $owned | Add-Member ScriptMethod WaitForExit {
+                    param([int]$Timeout)
+                    if ($Timeout -lt 0 -or $Timeout -gt 30000) { throw 'release-unbounded-wait' }
+                    $script:releaseProbeWaits.Add($Timeout)
+                    if ($script:releaseProbeWaits.Count -eq 1 -and $script:releaseProbe -in @('read-finish', 'setter-finish', 'finish')) {
+                        throw [IO.IOException]::new('release-secondary-finish')
+                    }
+                    # В delayed-exit приложение settles, пока прежний sync consumer ждёт CLI.
+                    if ($script:releaseProbe -eq 'delayed-exit' -and [ClientAreaAnimation]::Current) { $script:releaseProbeSettled = $true }
+                    $this.IsExited = $true
+                    return $true
+                }
+                $owned | Add-Member ScriptMethod Kill {
+                    param([bool]$EntireProcessTree)
+                    if (!$EntireProcessTree -or ![object]::ReferenceEquals($this, $script:releaseProbeTool.process)) { throw 'release-wrong-child' }
+                    $script:releaseProbeKills++
+                }
+                $owned | Add-Member ScriptProperty HasExited { return $this.IsExited }
+                $owned | Add-Member ScriptProperty ExitCode { return 0 }
+                $owned | Add-Member ScriptMethod Dispose {
+                    if (!$script:releaseProbeTool.ended) { throw 'release-disposed-before-finish' }
+                    $script:releaseProbeDisposes++
+                }
+                $stdout = [pscustomobject]@{ Stream = 'stdout' }
+                $stderr = [pscustomobject]@{ Stream = 'stderr' }
+                foreach ($stream in @($stdout, $stderr)) {
+                    $stream | Add-Member ScriptMethod GetAwaiter { return $this }
+                    $stream | Add-Member ScriptMethod GetResult {
+                        if ($this.Stream -eq 'stderr') { return '' }
+                        return '{"finished":true}'
+                    }
+                }
+                $script:releaseProbeTool = @{ process = $owned; stdout = $stdout; stderr = $stderr; prefix = '';
+                    ended = $false; name = $Name; arguments = $Arguments }
+                return $script:releaseProbeTool
+            }
+            try {
+                $observed = $null
+                $name = if ($Probe -eq 'local') { 'mouse-hold' } else { 'system-disable-animation' }
+                try { Scenario $name @('drag', 'Press', 'Press', '--hold-ms', '0') } catch { $observed = $_ }
+                $expectedPrimary = switch ($Probe) {
+                    'settled' { 'Операция завершилась до системного запрета.' }
+                    'race' { 'completed/snap не наблюдался' }
+                    'read' { 'release-primary-read' }
+                    'read-finish' { 'release-primary-read' }
+                    'setter' { 'primary-system-preference' }
+                    'setter-finish' { 'primary-system-preference' }
+                    'readback' { 'cleanup-setting-read' }
+                    'finish' { 'release-secondary-finish' }
+                    'start' { 'release-primary-start' }
+                    default { $null }
+                }
+                if ($null -eq $expectedPrimary) {
+                    if ($null -ne $observed -or $scenarios.Count -ne 1) { throw "release-healthy-control: $Probe $observed" }
+                } elseif ($null -eq $observed -or !$observed.Exception.Message.Contains($expectedPrimary) -or $scenarios.Count -ne 0) {
+                    throw "release-primary-control: $Probe $observed"
+                }
+                $writes = if ($Probe -in @('settled', 'read', 'read-finish', 'setter', 'setter-finish', 'start', 'local')) { 0 } else { 1 }
+                if ([ClientAreaAnimation]::Writes -ne $writes -or $script:releaseProbeStarts -ne 1) { throw "release-effect-control: $Probe" }
+                if ($Probe -ne 'start') {
+                    $waits = if ($Probe -in @('read-finish', 'setter-finish', 'finish')) { 2 } else { 1 }
+                    $kills = if ($waits -eq 2) { 1 } else { 0 }
+                    if ($script:releaseProbeWaits.Count -ne $waits -or $script:releaseProbeKills -ne $kills -or
+                        $script:releaseProbeDisposes -ne 1 -or !$script:releaseProbeTool.ended) { throw "release-owned-finish-control: $Probe" }
+                    if ($Probe -ne 'local' -and !$script:releaseProbeReadBeforeFinish) { throw "release-delayed-observation-control: $Probe" }
+                } elseif ($script:releaseProbeWaits.Count -ne 0 -or $script:releaseProbeDisposes -ne 0) { throw 'release-failed-start-control' }
+                if ($Probe -eq 'budget' -and $script:releaseProbeWaits[0] -gt 29980) { throw 'release-original-deadline-control' }
+                if ($Probe -in @('read-finish', 'setter-finish') -and @($script:warnings | Where-Object { $_ -match 'release-secondary-finish' }).Count -ne 1) {
+                    throw 'release-secondary-observable-control'
+                }
+                if (($script:releaseProbeArguments -join "`n") -cne (@('ui', 'drag', 'Press', 'Press', '--hold-ms', '0', '-w', 'fixture-window', '--json') -join "`n")) {
+                    throw 'release-arguments-control'
+                }
+            } finally {
+                [ClientAreaAnimation]::FailRead = $false
+                [ClientAreaAnimation]::FailNextWrite = $false
+                [ClientAreaAnimation]::Current = $true
+            }
+        } $releaseFault
+        $releaseCases++
+    }
+    "system release: $releaseCases synthetic controls PASS"
+
     # Настоящая проекция и failure-ветка из AST: синтетические случаи, не WinUI/runtime RCA.
     $phaseEvents = @(
         [pscustomobject]@{ sequence = 10; kind = 'intent'; data = [pscustomobject]@{ operation = 2; trigger = 'pressed'; pressed = $false; localAnimation = $true; systemAnimation = $true } },

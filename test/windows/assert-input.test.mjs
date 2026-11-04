@@ -379,6 +379,72 @@ test('unowned healthy cleanup resets the injected invalid environment map', () =
   assert.match(control, /\$saved = @\{ LAB_MOTION_PRESS_TRACE = 'previous-trace' \}[\s\S]*& \$cleanup/);
 });
 
+function systemReleaseViolations(source) {
+  const scenario = source.slice(source.indexOf('function Scenario('), source.indexOf('\ntry {\n    if (!$ConfigureHostedAnimations)'));
+  const dispatch = scenario.slice(0, scenario.indexOf('    Wait-Rest $before'));
+  return [
+    ['system-only asynchronous release', !dispatch.includes("if ($Name -eq 'system-disable-animation') {")
+      || !dispatch.includes("$releaseTool = Start-Tool $Name (@('ui') + $Arguments + @('-w', $script:window, '--json'))")
+      || !/\} else \{\s+Invoke-Ui \$Name \$Arguments\s+\}/.test(dispatch)
+      || dispatch.indexOf('Invoke-Ui $Name $Arguments') < dispatch.indexOf("if ($Name -eq 'system-disable-animation')")],
+    ['original absolute tool cap', !dispatch.includes('$releaseClock = [Diagnostics.Stopwatch]::StartNew()')
+      || !dispatch.includes('30000 - $releaseClock.ElapsedMilliseconds')
+      || !dispatch.includes('$releaseClock.ElapsedMilliseconds -ge 30000')],
+    ['active request before setter', !dispatch.includes('$deadline = [DateTime]::UtcNow.AddSeconds(8)')
+      || !dispatch.includes("if ($completed.Count) { throw 'Операция завершилась до системного запрета.' }")
+      || !dispatch.includes("if ($requested.Count) { $active = $true; break }")
+      || dispatch.indexOf('[ClientAreaAnimation]::Write($false)') > dispatch.indexOf('Finish-Tool $releaseTool')
+      || /\$_.data.phase -eq 'value'/.test(dispatch)],
+    ['one finally owner and first primary', !/catch \{ \$releaseFailure = \$_ \}\s+finally \{/.test(dispatch)
+      || !dispatch.includes('if ($null -ne $releaseTool)')
+      || (dispatch.match(/Finish-Tool \$releaseTool/g) ?? []).length !== 1
+      || !dispatch.includes('catch { Save-CleanupFailure $_ ([ref]$releaseFailure) }')
+      || !dispatch.includes('if ($null -ne $releaseFailure) { throw $releaseFailure }')
+      || /\.Kill\(|\.Dispose\(|Get-Process/.test(dispatch)],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('system release observes app request before delayed CLI exit and finishes the same child once', () => {
+  const source = readSource(new URL('./verify-input.ps1', import.meta.url));
+  assert.deepEqual(systemReleaseViolations(source), []);
+  for (const [before, after, name] of [
+    ["$releaseTool = Start-Tool $Name", "$releaseTool = Invoke-Ui $Name", 'system-only asynchronous release'],
+    ['30000 - $releaseClock.ElapsedMilliseconds', '30000', 'original absolute tool cap'],
+    ["if ($completed.Count) { throw 'Операция завершилась до системного запрета.' }", '', 'active request before setter'],
+    ['catch { Save-CleanupFailure $_ ([ref]$releaseFailure) }', 'catch { throw }', 'one finally owner and first primary'],
+  ]) assert(systemReleaseViolations(source.replaceAll(before, after)).includes(name), name);
+});
+
+test('system release keeps actual intermediate and settled-race rejection in the unchanged final oracle', () => {
+  const healthy = fixture();
+  assert.equal(verify(healthy).find(row => row.name === 'system-disable-animation').passed, true);
+  const beforeSetter = fixture();
+  const system = beforeSetter.find(row => row.name === 'system-disable-animation');
+  const preference = system.events.findIndex(row => row.kind === 'intent' && row.data.trigger === 'systemPreference');
+  const up = system.events.find(row => row.kind === 'intent' && row.data.trigger === 'pressed' && !row.data.pressed);
+  system.events.splice(preference, 0, {kind:'completed', data:{operation:up.data.operation, nativeOperation:up.data.operation,
+    end:'Finished', reason:'settled', isCurrent:true}});
+  assert.throws(() => verify(beforeSetter), /операция завершилась до системного запрета/);
+  const noIntermediate = fixture();
+  const block = noIntermediate.find(row => row.name === 'system-disable-animation');
+  block.events = block.events.filter(row => row.kind !== 'motion' || row.data.phase !== 'value');
+  assert.throws(() => verify(noIntermediate), /отпускание не двигалось/);
+});
+
+test('system release witness loads actual Scenario and Invoke-Ui and retains delayed/settled/fault controls', () => {
+  const source = readSource(new URL('./cleanup.test.ps1', import.meta.url));
+  const witness = source.slice(source.indexOf('$releaseDefinitions ='), source.indexOf('# Настоящая проекция и failure-ветка'));
+  assert(witness.includes("$_.Name -in @('Scenario', 'Invoke-Ui')"));
+  assert(witness.includes('. $releaseFunctions'));
+  assert(witness.includes("Scenario $name @('drag', 'Press', 'Press', '--hold-ms', '0')"));
+  for (const name of ['healthy', 'delayed-exit', 'settled', 'race', 'read', 'setter', 'readback',
+    'read-finish', 'setter-finish', 'finish', 'start', 'budget', 'local']) assert(witness.includes(`'${name}'`), name);
+  for (const text of ['$script:releaseProbeWaits.Count -ne $waits', '$script:releaseProbeDisposes -ne 1',
+    '$script:releaseProbeWaits[0] -gt 29980', 'release-secondary-observable-control',
+    'release-delayed-observation-control', 'release-arguments-control']) assert(witness.includes(text), text);
+  assert(witness.includes('[object]::ReferenceEquals($this, $script:releaseProbeTool.process)'));
+});
+
 function finishToolViolations(source) {
   const finish = source.slice(source.indexOf('function Finish-Tool'), source.indexOf('function Invoke-Ui')).replace(/\/\/[^\n]*/g, '');
   return [
