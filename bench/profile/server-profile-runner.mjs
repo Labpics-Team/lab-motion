@@ -274,13 +274,14 @@ export async function buildAdapter(id, consumerRoot, esbuild, out) {
   const entry = path.join(BENCH, `entries/${owner === 'waapi-ctl' ? 'waapi-control' : owner}.entry.mjs`);
   const contents = readFileSync(entry, 'utf8');
   const artifact = path.join(out, `${id}.iife.js`);
-  const buildResult = await esbuild.build({ ...PRODUCTION_ADAPTER_PROFILE, metafile: true, stdin: { contents, resolveDir: consumerRoot, sourcefile: path.basename(entry) },
+  const buildResult = await esbuild.build({ ...PRODUCTION_ADAPTER_PROFILE, absWorkingDir: consumerRoot, metafile: true, stdin: { contents, resolveDir: consumerRoot, sourcefile: path.basename(entry) },
     nodePaths: [path.join(consumerRoot, 'node_modules')], format: 'iife', globalName: '__adapterModule', outfile: artifact, logLevel: 'silent',
     plugins: lineage ? [{ name: 'packed-participant-entry', setup(build) {
       build.onResolve({ filter: /^\.\.\/\.\.\/\.\.\/dist\/(motion\/|animate\/)?index\.js$/ }, () => ({ path: lineage.browser.path }));
     } }] : [] });
   return { path: artifact, sha256: sha256File(artifact), ownerEntry: entry, ownerEntrySha256: sha256File(entry),
-    inputs: Object.keys(buildResult.metafile.inputs).filter(name => name !== path.basename(entry)).map(name => path.resolve(name)),
+    inputs: Object.keys(buildResult.metafile.inputs).map(name => path.resolve(consumerRoot, name))
+      .filter(name => name !== path.resolve(consumerRoot, path.basename(entry))),
     ...(lineage ? { participantImports: lineage } : {}) };
 }
 

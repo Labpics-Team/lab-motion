@@ -1544,7 +1544,9 @@ describe('PROFILE: current-run clock build binding', () => {
           }
         }
         if (name.endsWith('/cpu.stat')) return 'usage_usec 100\nuser_usec 70\nsystem_usec 30\nnr_periods 20\nnr_throttled 2\nthrottled_usec 50';
-        if (name.replaceAll('\\', '/').endsWith('/package.json')) return JSON.stringify({ name: path.basename(path.dirname(name)), version: '1.0.0' });
+        if (name.replaceAll('\\', '/').endsWith('/package.json')) return JSON.stringify({ name: path.basename(path.dirname(name)), version: '1.0.0',
+          exports: { '.': { import: { default: './dist/index.js' } }, './animate': { import: { default: './dist/animate/index.js' } },
+            './driver': { import: { default: './dist/driver/index.js' } } } });
         if (name.endsWith('.entry.mjs')) return 'export const fixture = true;';
         if (name.startsWith('/proc/') || name.startsWith('/sys/')) throw Object.assign(new Error('unexpected boundary read: ' + name), { code: 'ENOENT' });
         return (realRead as any)(file, ...args);
@@ -1557,6 +1559,7 @@ describe('PROFILE: current-run clock build binding', () => {
       spy(vi.spyOn(fsBoundary, 'realpathSync')).mockImplementation(((file: any, ...args: any[]) => {
         const name = String(file);
         return name === path.join(directory, 'baseline') || name === path.join(directory, 'candidate') || name.replaceAll('\\', '/').includes('/bench/compare/node_modules/')
+          || name.startsWith(path.join(out, 'consumer-')) || name.startsWith(path.join(out, 'package-'))
           ? name : (realPath as any)(file, ...args);
       }) as any);
       spy(vi.spyOn(fsBoundary, 'statSync')).mockImplementation(((file: any, ...args: any[]) => {
@@ -1586,7 +1589,7 @@ describe('PROFILE: current-run clock build binding', () => {
         prepareServerThreadCpuClock: () => ({ metadata: registration.engineClock, assertUnchanged: nativeVerify }) }));
       vi.doMock('../bench/compare/bench.mjs', () => ({ ...compareOwner, startBenchmarkOrigin: async () => ({ close: closeOrigin }) }));
       spy(vi.spyOn(moduleBoundary, 'createRequire')).mockImplementation(((file: any) => String(file).replaceAll('\\', '/').endsWith('/bench/compare/package.json')
-        ? (name: string) => name === 'esbuild' ? { buildSync: vi.fn() } : { chromium: { executablePath: () => '/fixture/chromium', launch: async () => browser } }
+        ? (name: string) => name === 'esbuild' ? { build: vi.fn(async () => ({ metafile: { inputs: {} } })) } : { chromium: { executablePath: () => '/fixture/chromium', launch: async () => browser } }
         : realRequire(file)) as any);
       vi.doMock('node:fs', () => fsBoundary);
       vi.doMock('node:child_process', () => processBoundary);

@@ -295,7 +295,7 @@ const requiredActions = {
       }
     },
     {
-      "index": 6,
+      "index": 7,
       "name": "Setup registered native-clock Node",
       "uses": "actions/setup-node@<sha>",
       "with": {
