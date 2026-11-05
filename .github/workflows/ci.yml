@@ -12,11 +12,11 @@ on:
         type: boolean
         default: false
       profile_prepare:
-        description: 'Снять только hosted identity до регистрации server epoch, без samples; имеет приоритет над profile_baseline'
+        description: 'Снять только идентичность hosted-среды до регистрации серверной эпохи, без образцов; имеет приоритет над profile_baseline'
         type: boolean
         default: false
       profile_server:
-        description: 'Полный server PROFILE-01; отдельно от metadata, size и performance inputs'
+        description: 'Полный серверный PROFILE-01; отдельно от входов метаданных, размера и производительности'
         type: boolean
         default: false
       profile_diagnostic:
@@ -52,7 +52,7 @@ jobs:
     with:
       baseline: ${{ inputs.performance_baseline }}
 
-  # Два явных маршрута: подготовка hosted identity или размерный baseline.
+  # Два явных маршрута: подготовка идентичности hosted-среды или размерный baseline.
   # При обоих входах profile_prepare имеет приоритет: baseline не измеряется.
   # Обычный кандидат не обязан совпадать с зарегистрированным старым источником PROFILE-01.
   profile-baseline:
@@ -216,7 +216,7 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Chromium для actual packed consumer controls
+      - name: Chromium для проверок реального потребителя установленного пакета
         run: pnpm exec playwright install --with-deps chromium
 
       - name: Vitest

@@ -6,12 +6,12 @@ on:
   workflow_call:
     inputs:
       prepare_only:
-        description: 'Только identity до регистрации server epoch; без SUT samples'
+        description: 'Только идентичность среды до регистрации серверной эпохи; без образцов SUT'
         type: boolean
         default: false
 
       server_timing:
-        description: 'Явный полный server runner; не metadata и не размерный baseline'
+        description: 'Явный полный запуск серверного измерителя; не метаданные и не размерный baseline'
         type: boolean
         default: false
       baseline_diagnostic:
@@ -23,7 +23,7 @@ on:
         type: boolean
         default: false
       conflicting_inputs:
-        description: 'Отказ при смешении server timing с прежними режимами'
+        description: 'Отказ при смешении серверного тайминга с прежними режимами'
         type: boolean
         default: false
 
@@ -99,7 +99,7 @@ jobs:
           import { hashFileTree, sha256File } from './bench/compare/provenance.mjs';
           const out = join(process.env.RUNNER_TEMP, 'server-profile-preparation');
           const journal = createServerJournal(out);
-          const receipt = { schema: 1, scope: 'metadata-only; no SUT samples; not clock qualification or performance PASS',
+          const receipt = { schema: 1, scope: 'только метаданные, без образцов SUT; не квалификация часов и не performance PASS',
             source: process.env.PROFILE_SOURCE_SHA, protocolDigest: serverProfileDigest(SERVER_PROFILE),
             hosted: { runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
               imageOS: process.env.ImageOS, imageVersion: process.env.ImageVersion },

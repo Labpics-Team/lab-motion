@@ -627,8 +627,8 @@ export function validateServerResourceIdentity(resource) {
   invariant(candidates.length === 1 && isDeepStrictEqual(candidates[0], mount) &&
     !mounts.some((item) => item !== candidates[0] && (item.point === mount.point || item.point.startsWith(mount.point + '/'))), 'неоднозначный/маскирующий cgroup mount');
   invariant(resource.scheduler === '0', 'ресурсный контракт требует SCHED_OTHER');
-  // Linux v6.18.44/v7.0 sched-ext.rst + ext.c scx_attr_state_show:
-  // only an explicit disabled state rules out full-switch for policy 0.
+  // Linux v6.18.44/v7.0 sched-ext.rst и ext.c scx_attr_state_show:
+  // только явный disabled исключает полное переключение при policy 0.
   const schedExt = resource.schedExtState;
   invariant(schedExt?.model === 'linux-v6.18.44-v7.0-sched-ext-state' && schedExt.error === undefined && typeof schedExt.text === 'string' &&
     ['disabled', 'enabling', 'enabled', 'disabling'].includes(schedExt.text), 'sched_ext applicability unknown: нет однозначного state read');

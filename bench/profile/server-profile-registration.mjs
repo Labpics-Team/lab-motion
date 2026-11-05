@@ -163,7 +163,7 @@ export const SERVER_PROFILE = freeze({
   stationarityAssumption: 'независимые одинаково распределённые средние paired blocks при закреплённой среде; A/A и ресурсные controls проверяют разрешимость, перенос за пределы этой клетки не доказан',
 });
 
-// JSON number -0 сохраняет Object.is witness без новой coordinate schema.
+// Число -0 в JSON сохраняет свидетельство Object.is без новой схемы координат.
 export function serverProfileStringify(value) {
   return JSON.stringify(value, (_key, number) => Object.is(number, -0) ? JSON.rawJSON('-0') : number);
 }

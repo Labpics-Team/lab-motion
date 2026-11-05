@@ -36,4 +36,4 @@ try {
   process.exitCode = 1;
 }
 process.stdout.write(`${JSON.stringify({ verdict: failure ? 'UNPROVEN' : 'COMPLETE', failure,
-  lineage, scope: 'legacy packed animate/stock-C + oracle; observational retained heap после host turn и двух GC; не тайминг и не точная атрибуция утечки', rows })}\n`);
+  lineage, scope: 'прежние animate/stock-C из установленного пакета и oracle; наблюдение удержанной кучи после оборота цикла событий хоста и двух GC, не тайминг и не точная атрибуция утечки', rows })}\n`);

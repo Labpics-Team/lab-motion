@@ -1,5 +1,5 @@
-// Temporary diagnostic H1 arm. Not selected by qualification measurements.
-// Three passes preserve the existing observer's DOM read and exception order.
+// Диагностическое плечо H1 не используется для квалификации.
+// Три прохода сохраняют порядок DOM-чтений и исключений прежнего наблюдателя.
 const seed = 0x4f425331;
 let state = seed;
 const first = ['left', 'left', 'left', 'left', 'right', 'right', 'right', 'right'];
