@@ -75,13 +75,13 @@ jobs:
       - name: Установить зависимости
         run: pnpm install --frozen-lockfile
 
-      - name: Подготовить закреплённый браузер без samples
+      - name: Подготовить закреплённый браузер без образцов
         if: ${{ inputs.prepare_only }}
         run: |
           pnpm --dir bench/compare install --frozen-lockfile
           pnpm --dir bench/compare exec playwright install --with-deps chromium
 
-      - name: Сохранить фактическую hosted identity до выбора нового epoch
+      - name: Сохранить фактическую идентичность среды CI до выбора новой эпохи
         if: ${{ inputs.prepare_only }}
         shell: bash
         run: |
@@ -230,7 +230,7 @@ jobs:
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$EXPECTED_CANDIDATE" "$CONFLICTING_INPUTS" \
             > "$SERVER_RECEIPTS/attempt.txt"
 
-      - name: Отклонить смешанные режимы до подготовки и samples
+      - name: Отклонить смешанные режимы до подготовки и сбора образцов
         timeout-minutes: 1
         env:
           CONFLICTING_INPUTS: ${{ inputs.conflicting_inputs || inputs.prepare_only }}
