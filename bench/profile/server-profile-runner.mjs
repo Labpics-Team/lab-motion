@@ -60,7 +60,7 @@ function captureResourceConfiguration() {
   const entries = membership.text?.split('\n').filter((line) => line.startsWith('0::')) ?? [];
   const absolute = (value) => typeof value === 'string' && value.startsWith('/') &&
     (value === '/' || value.split('/').slice(1).every((part) => part !== '' && part !== '.' && part !== '..')) && !/[\x00-\x1f]/.test(value);
-  if (entries.length !== 1 || !absolute(entries[0].slice(3)) || entries[0].includes(' (deleted)')) refuse('невалидная process cgroup membership');
+  if (entries.length !== 1 || !absolute(entries[0].slice(3)) || entries[0].includes(' (deleted)')) refuse('некорректная принадлежность процесса к cgroup');
   const member = entries[0].slice(3);
   const decode = (value) => value.replace(/\\(040|011|012|134)/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)));
   const mounts = (mountinfo.text ?? '').split('\n').filter(Boolean).map((line) => {
@@ -69,10 +69,10 @@ function captureResourceConfiguration() {
     return { id: fields[0], root: decode(fields[3]), point: decode(fields[4]), filesystem: tail[0] };
   });
   const candidates = mounts.filter((mount) => mount.filesystem === 'cgroup2');
-  if (candidates.length !== 1) refuse('неподдержанная неоднозначность cgroup2 mounts');
+  if (candidates.length !== 1) refuse('неподдерживаемая неоднозначность монтирований cgroup2');
   const mount = candidates[0]; raw.mount = mount;
-  if (mount.root !== '/' || !absolute(mount.point) || mount.point === '/') refuse('неполное ancestor coverage: bind/namespace mount');
-  if (mounts.some((other) => other !== mount && (other.point === mount.point || other.point.startsWith(mount.point + '/')))) refuse('маскирующий cgroup mount');
+  if (mount.root !== '/' || !absolute(mount.point) || mount.point === '/') refuse('неполное покрытие предков: привязочное монтирование или монтирование пространства имён');
+  if (mounts.some((other) => other !== mount && (other.point === mount.point || other.point.startsWith(mount.point + '/')))) refuse('маскирующее монтирование cgroup');
   const stat = resourceRead('/proc/self/stat'); raw.scheduler = stat;
   const scheduler = stat.text?.slice(stat.text.lastIndexOf(')') + 2).split(/\s+/)[38];
   if (scheduler !== '0') refuse('поддерживается только SCHED_OTHER');
@@ -161,9 +161,9 @@ export function captureServerMachine() {
   let machine;
   try {
     const affinity = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
-    if (!/^\d+$/.test(affinity ?? '')) throw new Error('server profile: нужен один CPU через taskset, общий scheduler не закреплён');
+    if (!/^\d+$/.test(affinity ?? '')) throw new Error('server profile: нужен один CPU через taskset, общий планировщик не закреплён');
     const resource = captureServerLoad();
-    if (resource.affinity !== affinity) throw Object.assign(new Error('server profile: affinity изменилась до регистрации'), { raw: { affinity, resource } });
+    if (resource.affinity !== affinity) throw Object.assign(new Error('server profile: привязка CPU изменилась до регистрации'), { raw: { affinity, resource } });
     const cgroupCpuMax = resource.cpuMax;
     const identity = { platform: platform(), release: release(), arch: arch(), host: hostname(),
       cpu: cpus()[Number(affinity)]?.model, logicalCpus: cpus().length, totalMemoryBytes: totalmem(), affinity,
@@ -280,7 +280,7 @@ function packageClosure(name, out, nodeModules, packed = new Map()) {
       const entry = resolver.resolve(dependency);
       let cursor = path.dirname(realpathSync(entry));
       while (!existsSync(path.join(cursor, 'package.json')) || JSON.parse(readFileSync(path.join(cursor, 'package.json'), 'utf8')).name !== dependency) {
-        const parent = path.dirname(cursor); if (parent === cursor) throw new Error('server profile: не разрешён transitive package'); cursor = parent;
+        const parent = path.dirname(cursor); if (parent === cursor) throw new Error('server profile: не найдена транзитивная зависимость пакета'); cursor = parent;
       }
       packDependency(cursor);
     }
@@ -313,10 +313,10 @@ function threadCpuNs(reads) {
   if (acquired.clock !== 'CLOCK_THREAD_CPUTIME_ID' || acquired.pid !== process.pid || acquired.tid !== process.pid ||
       typeof acquired.seconds !== 'string' || !/^(0|[1-9]\d*)$/.test(acquired.seconds) ||
       !Number.isSafeInteger(acquired.nanoseconds) || acquired.nanoseconds < 0 || acquired.nanoseconds >= 1_000_000_000) {
-    throw Object.assign(new Error('server profile: unsafe native scheduled CPU endpoint вне clock model'), { raw: acquired });
+    throw Object.assign(new Error('server profile: небезопасная конечная отметка CPU нативного потока вне модели часов'), { raw: acquired });
   }
   const valueNs = BigInt(acquired.seconds) * 1_000_000_000n + BigInt(acquired.nanoseconds);
-  if (acquired.valueNs !== String(valueNs)) throw Object.assign(new Error('server profile: native CPU value не пересчитывается из sec/nsec'), { raw: acquired });
+  if (acquired.valueNs !== String(valueNs)) throw Object.assign(new Error('server profile: значение CPU нативного потока не пересчитывается из sec/nsec'), { raw: acquired });
   return valueNs;
 }
 
@@ -329,7 +329,7 @@ function compactSampleCpuEvidence(sample) {
   // При отказе кодировщика частичной замены нет: исходные массивы остаются в error.raw.
   let encoded;
   try { encoded = sample.raw.map((measured) => compactServerCpuEvidence(measured.raw.cpuReads)); }
-  catch (error) { throw Object.assign(new AggregateError([error], 'server profile: native CPU carrier не завершён'), { raw: sample }); }
+  catch (error) { throw Object.assign(new AggregateError([error], 'server profile: носитель отметки CPU нативного потока не завершён'), { raw: sample }); }
   for (let index = 0; index < sample.raw.length; index++) sample.raw[index].raw.cpuReads = encoded[index];
 }
 
@@ -358,24 +358,24 @@ export async function measureServerEngine(animate, scene, workMultiplier = 1) {
       cancelDrainNs: aggregate((sample) => sample.cancelDrainNs), semantic: raw.every((sample) => sample.semantic.valid),
       repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
       cpuClock: sampleCpuClock(raw),
-      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; timing использует только CPU текущего потока' },
-      allocationObservation: { before, after: process.memoryUsage(), scope: 'пакет + независимый oracle + harness; allocator/GC не разложены' }, raw };
+      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'процесс Node; время измеряется только по CPU текущего потока' },
+      allocationObservation: { before, after: process.memoryUsage(), scope: 'пакет, независимая эталонная проверка и испытательная обвязка; аллокатор и GC не разделены' }, raw };
     validateServerEngineSample(sampleResult, scene, workMultiplier);
     return sampleResult;
   } catch (error) {
-    throw Object.assign(new AggregateError([error], 'server profile: engine sample не завершён'), { raw: sampleResult ?? {
+    throw Object.assign(new AggregateError([error], 'server profile: образец движка не завершён'), { raw: sampleResult ?? {
       completed: raw, failedRepetition: preserveRawNumbers(error?.raw ? { ...error.raw, cpuReads } : { cpuReads }), before, after: process.memoryUsage() } });
   }
 }
 
-/** Штатный stock C: per-call evidence stores внутри CPU, oracle/RLE снаружи. */
+/** Штатный stock C: запись свидетельств каждого вызова внутри CPU-измерения, эталонная проверка и RLE снаружи. */
 export async function measureServerStockC(MotionValue, scene, workMultiplier = 1) {
   const raw = [], warmup = [];
   const before = process.memoryUsage(), contextBefore = contextSwitches();
   let current = null;
   let sampleResult;
   try {
-    if (typeof MotionValue !== 'function' || ![1, 2].includes(workMultiplier)) throw new Error('stock C: неизвестный constructor/work multiplier');
+    if (typeof MotionValue !== 'function' || ![1, 2].includes(workMultiplier)) throw new Error('stock C: неизвестный конструктор или множитель работы');
     const macro = createMotionValueDefaultBenchmark(MotionValue, scene.spring);
     const batch = (timed, multiplier) => {
       const calls = scene.callsPerRepetition * multiplier;
@@ -415,8 +415,8 @@ export async function measureServerStockC(MotionValue, scene, workMultiplier = 1
       semantic: true, repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
       cpuScope: SERVER_PROFILE.stockCpuScope, warmup, raw,
       cpuClock: sampleCpuClock(raw),
-      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; CPU только текущего потока' },
-      allocationObservation: { before, after: process.memoryUsage(), scope: 'whole macro + recorder + oracle + harness; retained отдельно' } };
+      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'процесс Node; CPU только текущего потока' },
+      allocationObservation: { before, after: process.memoryUsage(), scope: 'полный макросценарий, запись, эталонная проверка и испытательная обвязка; удержания проверяются отдельно' } };
     validateServerEngineSample(sampleResult, scene, workMultiplier);
     return sampleResult;
   } catch (error) {
@@ -430,7 +430,7 @@ export async function measureServerStockC(MotionValue, scene, workMultiplier = 1
       current.raw.values = acquired(current.raw.values, completed + Number(valueAcquired));
       current.raw.frames = acquired(current.raw.frames, completed + Number(frameAcquired));
     }
-    throw Object.assign(new AggregateError([error], 'server profile: stock C sample не завершён'), { raw: sampleResult ?? preserveRawNumbers({
+    throw Object.assign(new AggregateError([error], 'server profile: образец stock C не завершён'), { raw: sampleResult ?? preserveRawNumbers({
       warmup, completed: raw, failedRepetition: current, before, after: process.memoryUsage() }) });
   }
 }
@@ -444,31 +444,31 @@ async function browserTimerProbe(page, phase) {
       if (end > begin) deltas.push(end - begin);
     }
     return { timeOriginMs: performance.timeOrigin, performanceNowDeltasMs: deltas };
-  }), 'browser timer probe');
+  }), 'проверка таймера браузера');
   return { phase, ...raw };
 }
 
 export async function measureServerBrowser(browser, origin, adapter, scene, workMultiplier = 1, _observation, diagnosticObserver) {
   const sampleBeginNs = diagnosticObserver ? process.hrtime.bigint() : null;
-  const context = await withBrowserTimeout(browser.newContext({ viewport: SERVER_PROFILE.viewport, deviceScaleFactor: SERVER_PROFILE.deviceScaleFactor }), 'browser context');
+  const context = await withBrowserTimeout(browser.newContext({ viewport: SERVER_PROFILE.viewport, deviceScaleFactor: SERVER_PROFILE.deviceScaleFactor }), 'контекст браузера');
   const partial = [];
   let before, sampleResult, failure;
   try {
     const page = await context.newPage(); await page.goto(origin.url, { waitUntil: 'load' });
     await page.exposeFunction('__serverSavePartial', (value) => { partial.push(preserveRawNumbers(value)); });
-    if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('server profile: отсутствует изоляция realm часов');
+    if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('server profile: отсутствует изоляция среды исполнения часов');
     const source = readFileSync(adapter.path, 'utf8');
     const coldImportMs = await withBrowserTimeout(page.evaluate((source) => {
       const begin = performance.now(); (0, eval)(source); return performance.now() - begin;
-    }, source), 'browser cold import');
+    }, source), 'холодный импорт браузера');
     partial.push({ phase: 'cold-import', coldImportMs });
     const semanticClockErrorMs = serverBrowserSemanticClockErrorMs(process.hrtime.bigint().toString());
     const semanticConfig = { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
       durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx };
     const semanticEvidence = compactServerSemanticEvidence(await withBrowserTimeout(
-      runSemanticStartCheck(page, semanticConfig, SERVER_PROFILE.browserSemanticCalls), 'browser normal-motion semantic control'));
+      runSemanticStartCheck(page, semanticConfig, SERVER_PROFILE.browserSemanticCalls), 'семантический контроль обычного движения в браузере'));
     partial.push({ phase: 'normal-motion', evidence: semanticEvidence });
-    if (!semanticEvidence.valid) throw Object.assign(new Error('server profile: normal motion/topology не доказаны существующим oracle'), { raw: { partial, semanticEvidence } });
+    if (!semanticEvidence.valid) throw Object.assign(new Error('server profile: обычное движение и топология не доказаны существующей эталонной проверкой'), { raw: { partial, semanticEvidence } });
     before = await browserTimerProbe(page, 'before');
     const result = await withBrowserTimeout(page.evaluate(async (config) => {
       const A = window.__adapterModule;
@@ -504,7 +504,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
         if (witness.connectedTargets !== targets || witness.activeWaapiBefore !== 0 ||
             witness.frames.some((frame) => frame.connectedTargets !== targets || frame.activeWaapi !== 0 ||
               expand(frame.transforms).some((value, index) => !Number.isFinite(value) || Math.abs(value - before[index]) > config.cancellation.transformTolerancePx))) {
-          throw new Error('cancel не достиг наблюдаемой неподвижности attached targets после двух rAF');
+          throw new Error('отмена не достигла наблюдаемой неподвижности присоединённых целей после двух rAF');
         }
       };
       const create = () => Array.from({ length: config.scene.targetsPerCall }, () => {
@@ -526,7 +526,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       await window.__serverSavePartial({ phase: 'endpoint', controlStartMs, controlCancelMs, endpoints, controlCancelWitness });
       assertCancellation(controlCancelWitness, config.scene.targetsPerCall);
       witness.forEach((element) => element.remove());
-      if (endpoints.some((value) => !Number.isFinite(value) || Math.abs(value - config.toPx) > 2)) throw new Error('не совпал endpoint oracle');
+      if (endpoints.some((value) => !Number.isFinite(value) || Math.abs(value - config.toPx) > 2)) throw new Error('не совпала эталонная конечная позиция');
       const raw = [], warmup = [];
       for (let repetition = -1; repetition < config.repetitions; repetition++) {
           const calls = config.batchCalls * config.workMultiplier;
@@ -568,7 +568,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
           await window.__serverSavePartial({ phase: repetition < 0 ? 'warmup' : 'timing', repetition, ...row });
           assertCancellation(row.cancelWitness, calls * config.scene.targetsPerCall);
           if (expand(startWitness.leadingPositions).some((value) => !Number.isFinite(value) || value < -2 || value >= config.toPx - 2)) {
-            throw new Error('timed owner не сохранил окно до endpoint');
+            throw new Error('измеряемый владелец не сохранил окно до конечной позиции');
           }
           targets.forEach((element) => element.remove()); await Promise.resolve();
           if (config.diagnosticObserver) row.fullBatchClock = { beginMs: batchBeginMs, endMs: performance.now() };
@@ -577,7 +577,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
         heapObservation: performance.memory ? { usedJSHeapSize: performance.memory.usedJSHeapSize, totalJSHeapSize: performance.memory.totalJSHeapSize } : null };
     }, { scene, workMultiplier, repetitions: SERVER_PROFILE.repetitions, durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx,
       batchCalls: SERVER_PROFILE.browserBatchCalls, cancellation: SERVER_PROFILE.browserCancellationWitness,
-      ...(diagnosticObserver ? { diagnosticObserver } : {}) }), 'browser API sample');
+      ...(diagnosticObserver ? { diagnosticObserver } : {}) }), 'образец API браузера');
     const after = await browserTimerProbe(page, 'after');
     const timerEvidence = { crossOriginIsolated: true, probes: [before, after] };
     const timerStepMs = deriveRealmTimerStep('server browser', timerEvidence);
@@ -589,11 +589,11 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator, semantic: true };
     validateServerBrowserSample(sampleResult, scene, workMultiplier);
   } catch (error) {
-    failure = Object.assign(new AggregateError([error], 'server profile: browser sample не завершён'), {
+    failure = Object.assign(new AggregateError([error], 'server profile: образец браузера не завершён'), {
       raw: sampleResult ?? error?.raw ?? { partial, timerBefore: before, scene, workMultiplier }, timerEvidence: error?.timerEvidence });
   } finally {
-    try { await withBrowserTimeout(context.close(), 'browser context cleanup'); } catch (error) {
-      failure = Object.assign(new AggregateError([...(failure ? [failure] : []), error], 'server profile: browser cleanup не завершён'),
+    try { await withBrowserTimeout(context.close(), 'очистка контекста браузера'); } catch (error) {
+      failure = Object.assign(new AggregateError([...(failure ? [failure] : []), error], 'server profile: очистка браузера не завершена'),
         { raw: sampleResult ?? failure?.raw ?? { partial, timerBefore: before, scene, workMultiplier } });
     }
   }
@@ -603,7 +603,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
 }
 
 async function measureBrowserRawControls(browser, origin, adapter, out, id) {
-  const context = await withBrowserTimeout(browser.newContext({ viewport: SERVER_PROFILE.viewport, deviceScaleFactor: SERVER_PROFILE.deviceScaleFactor, reducedMotion: 'reduce' }), 'raw-control browser context');
+  const context = await withBrowserTimeout(browser.newContext({ viewport: SERVER_PROFILE.viewport, deviceScaleFactor: SERVER_PROFILE.deviceScaleFactor, reducedMotion: 'reduce' }), 'контекст браузера для контроля исходных данных');
   let result, failure;
   const partial = {};
   try {
@@ -621,7 +621,7 @@ async function measureBrowserRawControls(browser, origin, adapter, out, id) {
     const firstFile = path.join(out, `${id}-no-motion-before.png`), secondFile = path.join(out, `${id}-no-motion-after.png`);
     writeFileSync(firstFile, first, { flag: 'wx' }); writeFileSync(secondFile, second, { flag: 'wx' });
     partial.noMotion = { firstFile, secondFile, beforeSha256: sha256File(firstFile), afterSha256: sha256File(secondFile), equal: first.equals(second) };
-    if (!first.equals(second)) throw Object.assign(new Error('server profile: no-motion PNG различаются'), {
+    if (!first.equals(second)) throw Object.assign(new Error('server profile: PNG без движения различаются'), {
       raw: { firstFile, secondFile, beforeSha256: sha256File(firstFile), afterSha256: sha256File(secondFile) } });
     const reduced = await withBrowserTimeout(page.evaluate(async (config) => {
       const el = document.getElementById('static-control'); const before = window.__serverRafCount;
@@ -630,17 +630,17 @@ async function measureBrowserRawControls(browser, origin, adapter, out, id) {
       const x = new DOMMatrixReadOnly(getComputedStyle(el).transform).e;
       const rafRequests = window.__serverRafCount - before; const activeWaapi = el.getAnimations().length;
       owner.cancel(); return { x, rafRequests, activeWaapi, prefersReducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches };
-    }, SERVER_PROFILE), 'browser reduced-motion control');
+    }, SERVER_PROFILE), 'контроль reduced-motion в браузере');
     partial.reduced = reduced;
     if (!reduced.prefersReducedMotion || Math.abs(reduced.x - SERVER_PROFILE.toPx) > 2 || reduced.rafRequests !== 0 || reduced.activeWaapi !== 0) {
-      throw Object.assign(new Error('server profile: reduced-motion не выполнил snap без движущего владельца'), { raw: reduced });
+      throw Object.assign(new Error('server profile: reduced-motion не выполнил мгновенный переход без движущего владельца'), { raw: reduced });
     }
     result = partial;
   } catch (error) {
-    failure = Object.assign(new AggregateError([error], 'server profile: raw control не завершён'), { raw: { ...partial, failureRaw: error.raw ?? null } });
+    failure = Object.assign(new AggregateError([error], 'server profile: контроль исходных данных не завершён'), { raw: { ...partial, failureRaw: error.raw ?? null } });
   } finally {
-    try { await withBrowserTimeout(context.close(), 'raw-control context cleanup'); } catch (error) {
-      failure = Object.assign(new AggregateError([...(failure ? [failure] : []), error], 'server profile: raw-control cleanup не завершён'), { raw: result ?? failure?.raw ?? partial });
+    try { await withBrowserTimeout(context.close(), 'очистка контекста контроля исходных данных'); } catch (error) {
+      failure = Object.assign(new AggregateError([...(failure ? [failure] : []), error], 'server profile: очистка контроля исходных данных не завершена'), { raw: result ?? failure?.raw ?? partial });
     }
   }
   if (failure) throw failure;
@@ -651,7 +651,7 @@ function makeRetention(packageDirectory, participant) {
   const result = spawnSync(process.execPath, ['--expose-gc', path.join(ROOT, 'bench/profile/server-profile-retention.mjs'), packageDirectory, participant],
     { encoding: 'utf8', timeout: 60_000 });
   let report;
-  try { report = JSON.parse(result.stdout); } catch { /* Даже malformed stdout сохраняется при отказе child. */ }
+  try { report = JSON.parse(result.stdout); } catch { /* Даже некорректный stdout сохраняется при отказе дочернего процесса. */ }
   if (result.status !== 0 || report?.verdict !== 'COMPLETE') throw Object.assign(new Error(`server profile retention: ${result.stderr || result.error?.message || result.status}`),
     { raw: { report, stdout: result.stdout, stderr: result.stderr, status: result.status, signal: result.signal } });
   return report;
@@ -661,7 +661,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
   const journal = createServerJournal(out);
   const artifact = { schema: 1, protocol: SERVER_PROFILE, registration: null, registrationDigest: null,
     verdict: 'UNPROVEN', failures: [], warmup: [], gc: [], stages: [],
-    jitObservation: { status: 'UNPROVEN', reason: 'GC events наблюдаются; точная JIT attribution требует отдельного intrusive trace и не подменяется гипотезой' } };
+    jitObservation: { status: 'UNPROVEN', reason: 'События GC наблюдаются; точное отнесение затрат к JIT требует отдельной трассировки с вмешательством и не заменяется гипотезой' } };
   if (dependencies.baselineOnlyDiagnostic === true) artifact.diagnostic = { kind: 'intrusive-baseline-trace', qualification: false };
   if (dependencies.observerAblation === true) artifact.diagnostic = { kind: OBSERVER_ABLATION.id, ...OBSERVER_ABLATION };
   let browser, origin, observer, engineClock, interruptionRecorded = false;
@@ -674,11 +674,11 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       const clockBuildEvidence = captureServerClockBuildEvidence();
       if (serverProfileDigest(verifyServerClockBuildEvidence(clockBuildEvidence, { release: release(), arch: arch() })) !==
         serverProfileDigest(verifyServerClockBuildEvidence(registered.clockBuildEvidence, registered))) {
-        throw Object.assign(new Error('server profile: clock build premise изменилась после регистрации'), { raw: { clockBuildEvidence } });
+        throw Object.assign(new Error('server profile: предпосылка модели часов для сборки изменилась после регистрации'), { raw: { clockBuildEvidence } });
       }
       const current = captureServerLoad();
       if (current.affinity !== registered.affinity || serverProfileDigest(serverResourceBinding(current.resource)) !== serverProfileDigest(serverResourceBinding(registered.resource))) {
-        throw Object.assign(new Error('server profile: machine affinity/quota изменились после регистрации'), { raw: { current, registered } });
+        throw Object.assign(new Error('server profile: привязка CPU или квота машины изменились после регистрации'), { raw: { current, registered } });
       }
     }
     for (const [id, provenance] of Object.entries(prepared)) {
@@ -688,16 +688,16 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     }
     assertFileHashesUnchanged(harness);
     for (const consumer of [...Object.values(packages), ...Object.values(registrationAttempt?.transitivePackages ?? {})]) {
-      if (sha256File(consumer.tarball) !== consumer.tarballSha256 || hashFileTree(consumer.directory).sha256 !== consumer.treeSha256) throw new Error('server profile: изменились consumer bytes');
+      if (sha256File(consumer.tarball) !== consumer.tarballSha256 || hashFileTree(consumer.directory).sha256 !== consumer.treeSha256) throw new Error('server profile: изменились байты пакета потребителя');
     }
-    if (registrationAttempt?.browserTree && hashFileTree(registrationAttempt.browserTree.directory).sha256 !== registrationAttempt.browserTree.sha256) throw new Error('server profile: изменились browser bytes');
+    if (registrationAttempt?.browserTree && hashFileTree(registrationAttempt.browserTree.directory).sha256 !== registrationAttempt.browserTree.sha256) throw new Error('server profile: изменились байты браузера');
   };
   try {
     checkpoint();
-    if (!SERVER_PROFILE.browsers.includes(browserName)) throw new Error('server profile: неизвестный browser');
-    if (browserName !== SERVER_PROFILE.clockError.browser) throw new Error('server profile: clock model этого browser пока UNPROVEN');
+    if (!SERVER_PROFILE.browsers.includes(browserName)) throw new Error('server profile: неизвестный браузер');
+    if (browserName !== SERVER_PROFILE.clockError.browser) throw new Error('server profile: модель часов этого браузера пока UNPROVEN');
     roots = { baseline: realpathSync(baseline), candidate: realpathSync(candidate) };
-    if (roots.baseline === roots.candidate) throw new Error('server profile: baseline/candidate требуют разных checkout');
+    if (roots.baseline === roots.candidate) throw new Error('server profile: базовая версия и кандидат требуют разных рабочих копий');
     engineClock = prepareServerThreadCpuClock({ directory: out });
     artifact.engineClockPreparation = engineClock.metadata;
     const machine = captureServerMachine();
@@ -712,7 +712,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       prepared[id] = prepareBenchmarkCheckout({ ...serverParticipantPreparation(roots[id], id),
         requiredInputs: Object.entries(harness).map(([key, info]) => [key, info.path]) });
     }
-    if (prepared.baseline.revision !== SERVER_PROFILE.baselineRevision) throw new Error('server profile: baseline отличается от регистрации');
+    if (prepared.baseline.revision !== SERVER_PROFILE.baselineRevision) throw new Error('server profile: базовая версия отличается от регистрации');
     const consumers = {};
     for (const id of ['baseline', 'candidate', 'comparators']) {
       consumers[id] = path.join(out, 'consumers', id); mkdirSync(path.join(consumers[id], 'node_modules'), { recursive: true });
@@ -730,7 +730,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError),
       registeredAt: new Date().toISOString(), browser: browserName, browserVersion: browser.version(), browserExecutableSha256, browserTree,
       machine, engineClock: engineClock.metadata, provenance: prepared, packages, transitivePackages: Object.fromEntries(closure), harness,
-      allocationScope: 'observational heap + GC; retained отдельным процессом после timing',
+      allocationScope: 'Наблюдаемые куча и GC; удержания проверяются отдельным процессом после измерения времени',
       ...(dependencies.observerAblation === true ? { diagnostic: { ...artifact.diagnostic,
         sourceIds: { H0: harness['bench/profile/server-profile-runner.mjs'].sha256, H1: harness['bench/profile/server-observer-ablation.mjs'].sha256 },
         adapterSha256: adapters.baseline.sha256, baselineTarballSha256: packages.baseline.tarballSha256 } } : {}) };
@@ -818,9 +818,9 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     for (const scene of SERVER_PROFILE.browserScenes) for (const id of SERVER_PROFILE.comparators) {
       checkpoint();
       if (scene.staggerGapMs > 0 && ['motion-mini', 'anime-waapi'].includes(id)) {
-        artifact.comparators.push({ scene: scene.id, id, status: 'UNPROVEN', reason: 'existing owner entry не реализует общий stagger API' }); continue;
+        artifact.comparators.push({ scene: scene.id, id, status: 'UNPROVEN', reason: 'существующая точка входа владельца не реализует общий API разнесения запусков' }); continue;
       }
-      const comparison = { scene: scene.id, id, rows: [], claim: 'raw API cost; descriptive only, без рейтинга и M-05 superiority' };
+      const comparison = { scene: scene.id, id, rows: [], claim: 'Исходная стоимость API; только описание, без рейтинга и утверждения о превосходстве M-05' };
       artifact.comparators.push(comparison);
       for (let run = 0; run < artifact.samplePlan.runs; run++) {
         checkpoint();
@@ -859,7 +859,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       artifact.failures.push(failure); journal('failure', failure);
     }
     for (const [resource, close] of [['browser', () => browser?.close()], ['origin', () => origin?.close()]]) {
-      try { await withBrowserTimeout(close(), `${resource} cleanup`); } catch (error) {
+      try { await withBrowserTimeout(close(), `${resource}: очистка`); } catch (error) {
         artifact.verdict = 'UNPROVEN'; const failure = { stage: 'cleanup', resource, error: errorRecord(error) };
         artifact.failures.push(failure); journal('failure', failure);
       }
