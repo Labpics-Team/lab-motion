@@ -20,11 +20,11 @@ on:
         type: boolean
         default: false
       profile_diagnostic:
-        description: 'Intrusive baseline-only trace; requires profile_server; never qualification'
+        description: 'Трассировка только baseline; требует profile_server, не даёт квалификации'
         type: boolean
         default: false
       profile_observer_ablation:
-        description: 'One fixed baseline H0/H1 observer diagnostic without tracing; requires profile_server; not qualification'
+        description: 'Фиксированная диагностика baseline H0/H1 без трассировки; требует profile_server, не даёт квалификации'
         type: boolean
         default: false
       performance_baseline:

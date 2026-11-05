@@ -15,11 +15,11 @@ on:
         type: boolean
         default: false
       baseline_diagnostic:
-        description: 'Intrusive baseline-only trace, not qualification'
+        description: 'Трассировка только baseline, без квалификации'
         type: boolean
         default: false
       observer_ablation:
-        description: 'One fixed baseline observer H0/H1 diagnostic; no tracing or qualification'
+        description: 'Фиксированная диагностика baseline H0/H1 без трассировки и квалификации'
         type: boolean
         default: false
       conflicting_inputs:

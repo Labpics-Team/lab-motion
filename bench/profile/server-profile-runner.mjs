@@ -94,8 +94,7 @@ function captureResourceConfiguration() {
       subtreeControl: resourceRead(directory + '/cgroup.subtree_control') });
     if (current === '/') break;
   }
-  // Linux v6.18.44/v7.0 sched-ext: policy 0 alone also permits full-switch ext.
-  // Keep the explicit state read, not volatile /proc/self/sched counters.
+  // Linux v6.18.44/v7.0: policy 0 допускает full-switch sched-ext; читаем его состояние, не счётчики /proc/self/sched.
   const schedExtState = { model: 'linux-v6.18.44-v7.0-sched-ext-state', ...resourceRead('/sys/kernel/sched_ext/state') };
   const resource = { membership, mountinfo, mount, scheduler, schedExtState, scopes };
   try { validateServerResourceIdentity(resource); }
