@@ -1783,7 +1783,10 @@ describe('PROFILE: ресурсный контракт проверяется д
         if ('error' in value) throw Object.assign(new Error(value.error.message), { code: value.error.code });
         return value.target;
       },
-      spawnSync(_command: string, args: string[]) { return clockEvidence.packages.find(record => record.args[2] === args[2]); },
+      spawnSync(_command: string, args: string[]) {
+        return clockEvidence.packages.find(record => record.args[2] === args[2])
+          ?? { status: 1, signal: null, stdout: '', stderr: 'package not found' };
+      },
       verifyServerClockBuildEvidence: (value: unknown, machine: unknown) => verifyServerClockBuildEvidence(JSON.parse(JSON.stringify(value)), machine),
       statSync: (file: string) => {
         if (objects[file]?.statError) throw Object.assign(new Error('fixture stat'), { code: objects[file]!.statError });
