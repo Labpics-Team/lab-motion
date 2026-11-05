@@ -212,7 +212,6 @@ export async function runServerProfileCalibration(artifact, runStage, journal, {
   artifact.pilot = await runStage('pilot', SERVER_PROFILE.pilotRuns);
   if (baselineOnlyDiagnostic) {
     artifact.diagnostic = { kind: 'intrusive-baseline-trace', qualification: false, stoppedBefore: 'sample-plan/AA/positive/AB' };
-    journal('diagnostic-baseline-only-stop', artifact.diagnostic);
     throw Object.assign(new Error('server profile: intrusive baseline diagnostic is not qualification'), { code: 'DIAGNOSTIC_ONLY', raw: artifact.diagnostic });
   }
   artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock));
