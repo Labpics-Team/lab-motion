@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,11 +20,13 @@ type Step = {
   env?: Record<string, string>;
   'working-directory'?: string;
   'continue-on-error'?: boolean;
+  'timeout-minutes'?: number;
 };
 type BrowserShard = { browser: string; shard: number; shards: number };
 type Job = {
   name?: string;
   'runs-on'?: string;
+  'timeout-minutes'?: number;
   if?: string | boolean;
   needs?: string[];
   uses?: string;
@@ -360,7 +362,20 @@ function assertNativeGraph(files: Map<string, string>) {
   // Diagnostic archives are never a requirement or a side effect of verification.
   for (const [name, workflow] of workflows) {
     if (name === 'release.yml') continue;
-    for (const job of Object.values(workflow.jobs)) {
+    for (const [id, job] of Object.entries(workflow.jobs)) {
+      if (name === 'profile-01.yml' && id === 'server') {
+        expect(job.if).toBe('${{ inputs.server_timing }}');
+        const exports = job.steps!.filter(item => item.uses?.startsWith('actions/upload-artifact@'));
+        expect(exports.map(item => item.id)).toEqual(['raw_export', 'receipt_export']);
+        for (const item of exports) {
+          expect(item.uses).toBe('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9');
+          expect(item.with?.['retention-days']).toBe(5);
+          expect(item.with?.['if-no-files-found']).toBe('error');
+          expect(item.if).toContain('always()');
+          expect(item['continue-on-error']).toBeUndefined();
+        }
+        continue;
+      }
       for (const item of job.steps ?? []) {
         expect(item.uses ?? '').not.toMatch(/^actions\/(upload-artifact|upload-pages-artifact)@/);
       }
@@ -386,20 +401,26 @@ function assertNativeGraph(files: Map<string, string>) {
     workflow_dispatch: { inputs: {
       profile_baseline: { type: 'boolean', default: false },
       profile_prepare: { type: 'boolean', default: false },
+      profile_server: { type: 'boolean', default: false },
       performance_baseline: { type: 'string', default: '' },
     } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'performance', 'profile-baseline', 'security', 'tests', 'verify']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'performance', 'profile-baseline', 'profile-server', 'security', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && (inputs.profile_baseline || inputs.profile_prepare) }}",
+    if: "${{ github.event_name == 'workflow_dispatch' && (inputs.profile_baseline || inputs.profile_prepare) && !inputs.profile_server }}",
     uses: './.github/workflows/profile-01.yml',
     with: { prepare_only: '${{ inputs.profile_prepare }}' },
   });
   expect(ci.jobs.performance).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' }}",
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !inputs.profile_server }}",
     uses: './.github/workflows/performance.yml',
     with: { baseline: '${{ inputs.performance_baseline }}' },
+  });
+  expect(ci.jobs['profile-server']).toEqual({
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_server }}",
+    uses: './.github/workflows/profile-01.yml',
+    with: { server_timing: true, conflicting_inputs: "${{ inputs.profile_baseline || inputs.profile_prepare || inputs.performance_baseline != '' }}" },
   });
   const performance = workflows.get('performance.yml')!;
   expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true } } } });
@@ -411,10 +432,12 @@ function assertNativeGraph(files: Map<string, string>) {
   const callInputs = Object.fromEntries(Object.entries(call.inputs)
     .map(([name, { description: _description, ...contract }]) => [name, contract]));
   expect({ ...profile.on, workflow_call: { ...call, inputs: callInputs } }).toEqual({
-    workflow_call: { inputs: { prepare_only: { type: 'boolean', default: false } } },
+    workflow_call: { inputs: { prepare_only: { type: 'boolean', default: false },
+      server_timing: { type: 'boolean', default: false }, conflicting_inputs: { type: 'boolean', default: false } } },
   });
   expect(profile.permissions).toEqual({ contents: 'read' });
   const probe = profile.jobs.probe!;
+  expect(probe.if).toBe('${{ !inputs.server_timing }}');
   expect(probe['continue-on-error']).toBeUndefined();
   const profileNode = probe.steps!.find(item => item.uses?.startsWith('actions/setup-node@'))!;
   expect(profileNode.with).toEqual({ 'node-version': "${{ inputs.prepare_only && '24.19.0' || '24' }}" });
@@ -567,6 +590,80 @@ describe('нативный граф CI', () => {
     else expect(processState.exitCode).toBe(0);
   });
 
+  it('server input matrix preserves legacy routes and rejects mixed opt-in modes', () => {
+    const files = sources();
+    assertNativeGraph(files);
+    const ci = parse(files.get('ci.yml')!) as Workflow;
+    const profile = parse(files.get('profile-01.yml')!) as Workflow;
+    const evaluate = (expression: unknown, event: string, inputs: Record<string, boolean | string>) =>
+      Function('github', 'inputs', 'return (' + String(expression).slice(3, -2).trim() + ');')({ event_name: event }, inputs) as boolean;
+    const guard = profile.jobs.server!.steps!.find(item => item.env?.CONFLICTING_INPUTS && item.run?.includes('test "$CONFLICTING_INPUTS"'))!;
+    for (const event of ['workflow_dispatch', 'pull_request', 'push', 'merge_group']) {
+      for (const server of [false, true]) for (const baseline of [false, true]) for (const prepare of [false, true]) for (const performance of ['', 'fixture']) {
+        const inputs = { profile_server: server, profile_baseline: baseline, profile_prepare: prepare, performance_baseline: performance };
+        expect(evaluate(ci.jobs['profile-server']!.if, event, inputs)).toBe(event === 'workflow_dispatch' && server);
+        expect(evaluate(ci.jobs['profile-baseline']!.if, event, inputs)).toBe(event === 'workflow_dispatch' && !server && (baseline || prepare));
+        expect(evaluate(ci.jobs.performance!.if, event, inputs)).toBe(event === 'workflow_dispatch' && !server && performance !== '');
+        const conflicts = evaluate(ci.jobs['profile-server']!.with!.conflicting_inputs, event, inputs);
+        expect(conflicts).toBe(baseline || prepare || performance !== '');
+        for (const directPrepare of [false, true]) {
+          const direct = { server_timing: server, prepare_only: directPrepare, conflicting_inputs: conflicts };
+          expect(evaluate(profile.jobs.probe!.if, event, direct)).toBe(!server);
+          expect(evaluate(profile.jobs.server!.if, event, direct)).toBe(server);
+          const refusal = evaluate(guard.env!.CONFLICTING_INPUTS, event, direct);
+          expect(refusal).toBe(conflicts || directPrepare);
+        }
+      }
+    }
+  });
+
+  it('server owned export guards preserve failed attempts and enforce both archives', () => {
+    const profile = parse(readFileSync(join(directory, 'profile-01.yml'), 'utf8')) as Workflow;
+    const server = profile.jobs.server!;
+    expect(server['timeout-minutes']).toBe(360);
+    expect(server.steps!.every(item => Number.isInteger(item['timeout-minutes']))).toBe(true);
+    expect(server.steps!.reduce((sum, item) => sum + item['timeout-minutes']!, 0)).toBeLessThan(360);
+    const init = server.steps!.find(item => item.id === 'receipt_init')!;
+    const conflict = server.steps!.find(item => item.run?.includes('test "$CONFLICTING_INPUTS"'))!;
+    const timing = server.steps!.find(item => item.id === 'timing')!;
+    const replay = server.steps!.find(item => item.run?.includes('--journal "$SERVER_RECEIPTS/journal.ndjson"'))!;
+    const final = server.steps!.find(item => item.env?.RECEIPT_OUTCOME)!;
+    expect(server.steps!.indexOf(init)).toBe(0);
+    expect(server.steps!.indexOf(conflict)).toBe(1);
+    expect(timing['timeout-minutes']).toBe(254);
+    expect(timing.run).toContain('timeout --signal=TERM --kill-after=90s 250m taskset');
+    expect(timing.run).toContain('node bench/profile/server-profile-runner.mjs');
+    const raw = server.steps!.find(item => item.id === 'raw_export')!;
+    expect(raw.with?.path).toBe("${{ env.SERVER_OUT }}");
+    expect(raw.with?.['include-hidden-files']).toBe(true);
+    expect(raw.if).toBe("${{ always() && steps.timing.outcome != 'skipped' }}");
+    const work = mkdtempSync(join(tmpdir(), 'profile-server-export-'));
+    const receipts = join(work, 'server-profile-receipts-17-2'), out = join(work, 'server-profile-17-2');
+    const execute = (run: string, extra: Record<string, string> = {}) => spawnSync(bash, ['-c', run], {
+      encoding: 'utf8', timeout: 1000, env: { ...process.env, RUNNER_TEMP: work, GITHUB_ENV: join(work, 'github-env'), SERVER_RECEIPTS: receipts, SERVER_OUT: out, ...extra },
+    });
+    try {
+      const started = execute(init.run!, { GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: '2', EXPECTED_CANDIDATE: 'a'.repeat(40), CONFLICTING_INPUTS: 'true' });
+      expect(started.error).toBeUndefined(); expect(started.status).toBe(0);
+      expect(readFileSync(join(work, 'github-env'), 'utf8')).toBe(`SERVER_OUT=${out}\nSERVER_RECEIPTS=${receipts}\n`);
+      expect(readFileSync(join(receipts, 'attempt.txt'), 'utf8')).toContain('candidate_requested=' + 'a'.repeat(40));
+      expect(execute(conflict.run!, { CONFLICTING_INPUTS: 'true' }).status).not.toBe(0);
+      expect(execute(conflict.run!, { CONFLICTING_INPUTS: 'false' }).status).toBe(0);
+      const env = { RAW_ID: '18', RAW_DIGEST: 'a'.repeat(64), RECEIPT_ID: '19', RECEIPT_DIGEST: 'b'.repeat(64), TIMING_OUTCOME: 'failure', RAW_OUTCOME: 'success', RECEIPT_OUTCOME: 'success' };
+      expect(execute(final.run!, env).status).toBe(0);
+      for (const key of ['RAW_ID', 'RAW_DIGEST', 'RECEIPT_ID', 'RECEIPT_DIGEST']) expect(execute(final.run!, { ...env, [key]: '' }).status).not.toBe(0);
+      expect(execute(final.run!, { ...env, RAW_OUTCOME: 'failure' }).status).not.toBe(0);
+      expect(execute(final.run!, { ...env, RECEIPT_OUTCOME: 'failure' }).status).not.toBe(0);
+      expect(execute(final.run!, { ...env, TIMING_OUTCOME: 'skipped', RAW_OUTCOME: 'skipped', RAW_ID: '', RAW_DIGEST: '' }).status).toBe(0);
+      mkdirSync(out);
+      writeFileSync(join(out, 'journal.ndjson'), 'partial journal\n');
+      writeFileSync(join(out, 'server-profile.sha256'), 'a'.repeat(64));
+      expect(execute(replay.run!).status).not.toBe(0);
+      expect(readFileSync(join(receipts, 'journal.ndjson'), 'utf8')).toBe('partial journal\n');
+      expect(readFileSync(join(receipts, 'server-profile.sha256'), 'utf8')).toBe('a'.repeat(64));
+    } finally { rmSync(work, { recursive: true, force: true }); }
+  });
+
   it.each([
     ['workflow_dispatch', undefined, undefined, false, false],
     ['workflow_dispatch', false, false, false, false],
@@ -594,6 +691,7 @@ describe('нативный граф CI', () => {
       const dispatchInputs = {
         profile_baseline: baseline ?? defaults.profile_baseline!.default,
         profile_prepare: prepare ?? defaults.profile_prepare!.default,
+        profile_server: false,
       };
       expect(evaluate(call.if, dispatchInputs)).toBe(invoked);
       const prepareOnly = evaluate(call.with!.prepare_only, dispatchInputs);
