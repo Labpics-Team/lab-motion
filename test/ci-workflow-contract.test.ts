@@ -403,6 +403,7 @@ function assertNativeGraph(files: Map<string, string>) {
       profile_prepare: { type: 'boolean', default: false },
       profile_server: { type: 'boolean', default: false },
       profile_diagnostic: { type: 'boolean', default: false },
+      profile_observer_ablation: { type: 'boolean', default: false },
       performance_baseline: { type: 'string', default: '' },
     } },
   });
@@ -422,7 +423,8 @@ function assertNativeGraph(files: Map<string, string>) {
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_server }}",
     uses: './.github/workflows/profile-01.yml',
     with: { server_timing: true, baseline_diagnostic: '${{ inputs.profile_diagnostic }}',
-      conflicting_inputs: "${{ inputs.profile_baseline || inputs.profile_prepare || inputs.performance_baseline != '' }}" },
+      observer_ablation: '${{ inputs.profile_observer_ablation }}',
+      conflicting_inputs: "${{ inputs.profile_baseline || inputs.profile_prepare || inputs.performance_baseline != '' || (inputs.profile_diagnostic && inputs.profile_observer_ablation) }}" },
   });
   const performance = workflows.get('performance.yml')!;
   expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true } } } });
@@ -436,6 +438,7 @@ function assertNativeGraph(files: Map<string, string>) {
   expect({ ...profile.on, workflow_call: { ...call, inputs: callInputs } }).toEqual({
     workflow_call: { inputs: { prepare_only: { type: 'boolean', default: false },
       server_timing: { type: 'boolean', default: false }, baseline_diagnostic: { type: 'boolean', default: false },
+      observer_ablation: { type: 'boolean', default: false },
       conflicting_inputs: { type: 'boolean', default: false } } },
   });
   expect(profile.permissions).toEqual({ contents: 'read' });
@@ -602,14 +605,15 @@ describe('нативный граф CI', () => {
       Function('github', 'inputs', 'return (' + String(expression).slice(3, -2).trim() + ');')({ event_name: event }, inputs) as boolean;
     const guard = profile.jobs.server!.steps!.find(item => item.env?.CONFLICTING_INPUTS && item.run?.includes('test "$CONFLICTING_INPUTS"'))!;
     for (const event of ['workflow_dispatch', 'pull_request', 'push', 'merge_group']) {
-      for (const server of [false, true]) for (const baseline of [false, true]) for (const prepare of [false, true]) for (const performance of ['', 'fixture']) for (const diagnostic of [false, true]) {
-        const inputs = { profile_server: server, profile_baseline: baseline, profile_prepare: prepare, performance_baseline: performance, profile_diagnostic: diagnostic };
+      for (const server of [false, true]) for (const baseline of [false, true]) for (const prepare of [false, true]) for (const performance of ['', 'fixture']) for (const diagnostic of [false, true]) for (const ablation of [false, true]) {
+        const inputs = { profile_server: server, profile_baseline: baseline, profile_prepare: prepare, performance_baseline: performance, profile_diagnostic: diagnostic, profile_observer_ablation: ablation };
+        expect(evaluate(ci.jobs['profile-server']!.with!.observer_ablation, event, inputs)).toBe(ablation);
         expect(evaluate(ci.jobs['profile-server']!.with!.baseline_diagnostic, event, inputs)).toBe(diagnostic);
         expect(evaluate(ci.jobs['profile-server']!.if, event, inputs)).toBe(event === 'workflow_dispatch' && server);
         expect(evaluate(ci.jobs['profile-baseline']!.if, event, inputs)).toBe(event === 'workflow_dispatch' && !server && (baseline || prepare));
         expect(evaluate(ci.jobs.performance!.if, event, inputs)).toBe(event === 'workflow_dispatch' && !server && performance !== '');
         const conflicts = evaluate(ci.jobs['profile-server']!.with!.conflicting_inputs, event, inputs);
-        expect(conflicts).toBe(baseline || prepare || performance !== '');
+        expect(conflicts).toBe(baseline || prepare || performance !== '' || (diagnostic && ablation));
         for (const directPrepare of [false, true]) {
           const direct = { server_timing: server, prepare_only: directPrepare, conflicting_inputs: conflicts, baseline_diagnostic: diagnostic };
           expect(evaluate(profile.jobs.probe!.if, event, direct)).toBe(!server);
@@ -635,7 +639,7 @@ describe('нативный граф CI', () => {
     expect(server.steps!.indexOf(init)).toBe(0);
     expect(server.steps!.indexOf(conflict)).toBe(1);
     expect(timing['timeout-minutes']).toBe(254);
-    expect(timing.env).toEqual({ BASELINE_DIAGNOSTIC: '${{ inputs.baseline_diagnostic }}' });
+    expect(timing.env).toEqual({ BASELINE_DIAGNOSTIC: '${{ inputs.baseline_diagnostic }}', PROFILE_OBSERVER_ABLATION: '${{ inputs.observer_ablation }}' });
     const raw = server.steps!.find(item => item.id === 'raw_export')!;
     expect(raw.with?.path).toBe("${{ env.SERVER_OUT }}");
     expect(raw.with?.['include-hidden-files']).toBe(true);
@@ -655,17 +659,18 @@ describe('нативный граф CI', () => {
       const bin = join(work, 'bin'), invocation = join(work, 'invocation.txt');
       mkdirSync(bin);
       writeFileSync(join(bin, 'timeout'), '#!/bin/bash\nprintf "%s\\n" "$@" > "$INVOCATION"\nexit 23\n', { mode: 0o755 });
-      for (const diagnostic of ['false', 'true']) {
-        const timed = execute(timing.run!, { BASELINE_DIAGNOSTIC: diagnostic, PATH: `${bin}:${process.env.PATH}`, INVOCATION: invocation,
+      for (const diagnostic of ['false', 'true']) for (const ablation of ['false', 'true']) {
+        const diagnosticMode = diagnostic === 'true' || ablation === 'true';
+        const timed = execute(timing.run!, { BASELINE_DIAGNOSTIC: diagnostic, PROFILE_OBSERVER_ABLATION: ablation, PATH: `${bin}:${process.env.PATH}`, INVOCATION: invocation,
           GITHUB_WORKSPACE: work });
         expect(timed.error).toBeUndefined(); expect(timed.status).toBe(23);
         const args = readFileSync(invocation, 'utf8').trim().split('\n');
-        expect(args.slice(0, 4)).toEqual(['--signal=TERM', '--kill-after=90s', diagnostic === 'true' ? '20m' : '250m', 'taskset']);
+        expect(args.slice(0, 4)).toEqual(['--signal=TERM', '--kill-after=90s', diagnosticMode ? '20m' : '250m', 'taskset']);
         expect(args.slice(4)).toEqual(['-c', readFileSync(join(receipts, 'cpu.txt'), 'utf8').trim(), 'node',
-          diagnostic === 'true' ? 'bench/profile/server-profile-diagnostic.mjs' : 'bench/profile/server-profile-runner.mjs',
+          diagnosticMode ? 'bench/profile/server-profile-diagnostic.mjs' : 'bench/profile/server-profile-runner.mjs',
           '--baseline', `${work}/server-baseline`, '--candidate', `${work}/server-candidate`, '--browser', 'chromium', '--out', out]);
         expect(readFileSync(join(receipts, 'runner-exit.txt'), 'utf8')).toBe('23\n');
-        expect(readFileSync(join(receipts, 'mode.txt'), 'utf8')).toContain(`diagnostic=${diagnostic}\n`);
+        expect(readFileSync(join(receipts, 'mode.txt'), 'utf8')).toContain(`diagnostic=${diagnostic}\nobserver_ablation=${ablation}\n`);
       }
       const env = { RAW_ID: '18', RAW_DIGEST: 'a'.repeat(64), RECEIPT_ID: '19', RECEIPT_DIGEST: 'b'.repeat(64), TIMING_OUTCOME: 'failure', RAW_OUTCOME: 'success', RECEIPT_OUTCOME: 'success' };
       expect(execute(final.run!, env).status).toBe(0);

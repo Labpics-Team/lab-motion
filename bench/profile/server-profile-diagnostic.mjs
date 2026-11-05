@@ -4,6 +4,13 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { measureServerBrowser, parseServerProfileArgs, runServerProfile, withServerProfileSignals } from './server-profile-runner.mjs';
+import { observerSnapshotH1 } from './server-observer-ablation.mjs';
+
+export function observerAblationMeasure(measure = measureServerBrowser) {
+  return (browser, origin, adapter, scene, multiplier, observation) => measure(browser, origin, adapter, scene, multiplier, observation,
+    { arm: observation.participant === 'right' ? 'H1' : 'H0',
+      ...(observation.participant === 'right' ? { snapshotSource: observerSnapshotH1.toString() } : {}) });
+}
 
 export async function boundedDiagnostic(promise, timeoutMs = 30_000) {
   let timer;
@@ -121,11 +128,13 @@ export function tracedBrowserMeasure(out, index, measure = measureServerBrowser)
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
   try {
     const options = parseServerProfileArgs(process.argv.slice(2)), index = [];
-    const artifact = await withServerProfileSignals(signal => runServerProfile(options,
-      { signal, baselineOnlyDiagnostic: true, browserMeasure: tracedBrowserMeasure(options.out, index) }));
+    const ablation = process.env.PROFILE_OBSERVER_ABLATION === 'true';
+    const artifact = await withServerProfileSignals(signal => runServerProfile(options, ablation
+      ? { signal, observerAblation: true, browserMeasure: observerAblationMeasure() }
+      : { signal, baselineOnlyDiagnostic: true, browserMeasure: tracedBrowserMeasure(options.out, index) }));
     const rows = ['warmup', 'pilot'].flatMap(stage => (artifact[stage]?.rows ?? []).filter(row => row.kind === 'browser').flatMap(row =>
       row.order.map(participant => ({ stage, run: row.run, scene: row.scene, participant, sample: row.samples[participant] }))));
-    const manifest = { diagnostic: true, qualification: false, registrationDigest: artifact.registrationDigest,
+    const manifest = { diagnostic: true, qualification: false, ...(ablation ? { plan: artifact.diagnostic, tracesDisabled: true } : {}), registrationDigest: artifact.registrationDigest,
       rawSha256: digest(readFileSync(path.join(options.out, 'server-profile.json'))),
       traces: index.map(trace => {
         const matching = rows.filter(row => trace.measurementTimeOriginMs !== null && row.scene === trace.scene &&

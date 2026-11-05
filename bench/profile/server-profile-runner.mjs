@@ -13,18 +13,19 @@ import { runSemanticStartCheck, startBenchmarkOrigin } from '../compare/bench.mj
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, PRODUCTION_ADAPTER_PROFILE, validateStockMotionValueBatch } from '../compare/methodology.mjs';
 import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged,
   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
-import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
+import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverProfileStringify } from './server-profile-registration.mjs';
 import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './server-thread-cpu-clock.mjs';
 import { compactServerCpuEvidence, compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
   serverFamilyIntervals, serverOrders, serverResourceBinding, serverResourceReasons, validateServerResourceIdentity, validateServerBrowserSample, validateServerEngineSample, verifyServerClockBuildEvidence, verifyServerClockRegistration } from './server-profile-contract.mjs';
 import { writeServerArtifact } from './server-profile-artifact.mjs';
 import { loadServerParticipant, serverParticipantImports, serverParticipantExportTargets } from './server-profile-consumer.mjs';
+import { OBSERVER_ABLATION } from './server-observer-ablation.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const BENCH = path.join(ROOT, 'bench/compare');
 const requireBench = createRequire(path.join(BENCH, 'package.json'));
 const HARNESS_FILES = ['bench/profile/server-profile-registration.mjs', 'bench/profile/server-profile-contract.mjs',
-  'bench/profile/server-profile-artifact.mjs',
+  'bench/profile/server-profile-artifact.mjs', 'bench/profile/server-observer-ablation.mjs',
   'bench/profile/server-profile-runner.mjs', 'bench/profile/server-profile-retention.mjs', 'bench/profile/server-profile-consumer.mjs',
   'bench/compare/entries/lab-legacy.entry.mjs',
   'bench/profile/server-thread-cpu-clock.mjs', ...Object.keys(SERVER_PROFILE.clockError.nativeSourceFiles),
@@ -187,7 +188,7 @@ export function createServerJournal(out) {
   return (type, value) => {
     const payload = { sequenceDigest: previous, type, value };
     const digest = serverProfileDigest(payload);
-    appendFileSync(file, `${JSON.stringify({ ...payload, digest })}\n`, { flag: 'a' });
+    appendFileSync(file, `${serverProfileStringify({ ...payload, digest })}\n`, { flag: 'a' });
     previous = digest;
     return digest;
   };
@@ -207,7 +208,11 @@ export async function withServerProfileSignals(run) {
   finally { process.off('SIGINT', interrupt); process.off('SIGTERM', terminate); }
 }
 
-export async function runServerProfileCalibration(artifact, runStage, journal, { baselineOnlyDiagnostic = false } = {}) {
+export async function runServerProfileCalibration(artifact, runStage, journal, { baselineOnlyDiagnostic = false, observerAblation = false } = {}) {
+  if (observerAblation) {
+    await runStage('observer-ablation', OBSERVER_ABLATION.pairs);
+    throw Object.assign(new Error('server profile: observer ablation is not qualification'), { code: 'DIAGNOSTIC_ONLY', raw: artifact.diagnostic });
+  }
   artifact.warmup = await runStage('warmup', SERVER_PROFILE.warmupRuns);
   artifact.pilot = await runStage('pilot', SERVER_PROFILE.pilotRuns);
   if (baselineOnlyDiagnostic) {
@@ -444,7 +449,8 @@ async function browserTimerProbe(page, phase) {
   return { phase, ...raw };
 }
 
-export async function measureServerBrowser(browser, origin, adapter, scene, workMultiplier = 1) {
+export async function measureServerBrowser(browser, origin, adapter, scene, workMultiplier = 1, _observation, diagnosticObserver) {
+  const sampleBeginNs = diagnosticObserver ? process.hrtime.bigint() : null;
   const context = await withBrowserTimeout(browser.newContext({ viewport: SERVER_PROFILE.viewport, deviceScaleFactor: SERVER_PROFILE.deviceScaleFactor }), 'browser context');
   const partial = [];
   let before, sampleResult, failure;
@@ -479,14 +485,20 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       };
       const expand = (values) => Array.isArray(values) ? values : values.encoding === 'repeat' ? Array(values.count).fill(values.value)
         : values.runs.flatMap(([length, value]) => Array(length).fill(value));
-      const snapshot = (els) => ({ connectedTargets: els.filter((element) => element.isConnected).length,
+      const snapshot = config.diagnosticObserver?.snapshotSource ? (0, eval)(`(${config.diagnosticObserver.snapshotSource})`) : (els) => ({ connectedTargets: els.filter((element) => element.isConnected).length,
         activeWaapi: els.reduce((sum, element) => sum + element.getAnimations().length, 0),
         transforms: compact(els.map((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).e)) });
       const cancellationWitness = async (els, cancelBegin) => {
-        const before = snapshot(els), frames = [];
-        for (let frame = 0; frame < config.cancellation.frames; frame++) { await drain(); frames.push(snapshot(els)); }
+        const collectorClocks = [];
+        const collect = config.diagnosticObserver ? () => {
+          const beginMs = performance.now(), value = snapshot(els), endMs = performance.now();
+          collectorClocks.push({ beginMs, endMs }); return value;
+        } : () => snapshot(els);
+        const before = collect(), frames = [];
+        for (let frame = 0; frame < config.cancellation.frames; frame++) { await drain(); frames.push(collect()); }
         return { connectedTargets: before.connectedTargets, activeWaapiBefore: before.activeWaapi,
-          transformsBefore: before.transforms, frames, cancelDrainMs: performance.now() - cancelBegin };
+          transformsBefore: before.transforms, frames, cancelDrainMs: performance.now() - cancelBegin,
+          ...(config.diagnosticObserver ? { collectorClocks } : {}) };
       };
       const assertCancellation = (witness, targets) => {
         const before = expand(witness.transformsBefore);
@@ -519,6 +531,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       const raw = [], warmup = [];
       for (let repetition = -1; repetition < config.repetitions; repetition++) {
           const calls = config.batchCalls * config.workMultiplier;
+          const batchBeginMs = config.diagnosticObserver ? performance.now() : null;
           const groups = Array.from({ length: calls }, create), owners = [];
           const beginMs = performance.now();
           try { for (const targets of groups) owners.push(start(targets)); } catch (error) {
@@ -557,11 +570,13 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
             throw new Error('timed owner не сохранил окно до endpoint');
           }
           targets.forEach((element) => element.remove()); await Promise.resolve();
+          if (config.diagnosticObserver) row.fullBatchClock = { beginMs: batchBeginMs, endMs: performance.now() };
       }
       return { raw, warmup, endpoints, controlStartMs, controlCancelMs, controlCancelWitness, measurementTimeOriginMs: performance.timeOrigin,
         heapObservation: performance.memory ? { usedJSHeapSize: performance.memory.usedJSHeapSize, totalJSHeapSize: performance.memory.totalJSHeapSize } : null };
     }, { scene, workMultiplier, repetitions: SERVER_PROFILE.repetitions, durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx,
-      batchCalls: SERVER_PROFILE.browserBatchCalls, cancellation: SERVER_PROFILE.browserCancellationWitness }), 'browser API sample');
+      batchCalls: SERVER_PROFILE.browserBatchCalls, cancellation: SERVER_PROFILE.browserCancellationWitness,
+      ...(diagnosticObserver ? { diagnosticObserver } : {}) }), 'browser API sample');
     const after = await browserTimerProbe(page, 'after');
     const timerEvidence = { crossOriginIsolated: true, probes: [before, after] };
     const timerStepMs = deriveRealmTimerStep('server browser', timerEvidence);
@@ -581,6 +596,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
         { raw: sampleResult ?? failure?.raw ?? { partial, timerBefore: before, scene, workMultiplier } });
     }
   }
+  if (sampleBeginNs !== null && sampleResult) sampleResult.fullSampleDurationNs = (process.hrtime.bigint() - sampleBeginNs).toString();
   if (failure) throw failure;
   return sampleResult;
 }
@@ -646,6 +662,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     verdict: 'UNPROVEN', failures: [], warmup: [], gc: [], stages: [],
     jitObservation: { status: 'UNPROVEN', reason: 'GC events наблюдаются; точная JIT attribution требует отдельного intrusive trace и не подменяется гипотезой' } };
   if (dependencies.baselineOnlyDiagnostic === true) artifact.diagnostic = { kind: 'intrusive-baseline-trace', qualification: false };
+  if (dependencies.observerAblation === true) artifact.diagnostic = { kind: OBSERVER_ABLATION.id, ...OBSERVER_ABLATION };
   let browser, origin, observer, engineClock, interruptionRecorded = false;
   const checkpoint = () => dependencies.signal?.throwIfAborted();
   let prepared = {}, roots = {}, harness = {}, packages = {}, registrationAttempt;
@@ -688,7 +705,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     const executable = browserType.executablePath();
     const browserExecutableSha256 = sha256File(executable);
     const browserTree = { directory: path.dirname(executable), ...hashFileTree(path.dirname(executable)) };
-    harness = Object.fromEntries([...HARNESS_FILES, ...(dependencies.baselineOnlyDiagnostic === true ? ['bench/profile/server-profile-diagnostic.mjs'] : []), ...ENTRIES.map((id) => `bench/compare/entries/${id === 'waapi-ctl' ? 'waapi-control' : id}.entry.mjs`)]
+    harness = Object.fromEntries([...HARNESS_FILES, ...(dependencies.baselineOnlyDiagnostic === true || dependencies.observerAblation === true ? ['bench/profile/server-profile-diagnostic.mjs'] : []), ...ENTRIES.map((id) => `bench/compare/entries/${id === 'waapi-ctl' ? 'waapi-control' : id}.entry.mjs`)]
       .map((file) => [file, { path: path.join(ROOT, file), sha256: sha256File(path.join(ROOT, file)) }]));
     for (const id of ['baseline', 'candidate']) {
       prepared[id] = prepareBenchmarkCheckout({ ...serverParticipantPreparation(roots[id], id),
@@ -712,13 +729,17 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError),
       registeredAt: new Date().toISOString(), browser: browserName, browserVersion: browser.version(), browserExecutableSha256, browserTree,
       machine, engineClock: engineClock.metadata, provenance: prepared, packages, transitivePackages: Object.fromEntries(closure), harness,
-      allocationScope: 'observational heap + GC; retained отдельным процессом после timing' };
+      allocationScope: 'observational heap + GC; retained отдельным процессом после timing',
+      ...(dependencies.observerAblation === true ? { diagnostic: { ...artifact.diagnostic,
+        sourceIds: { H0: harness['bench/profile/server-profile-runner.mjs'].sha256, H1: harness['bench/profile/server-observer-ablation.mjs'].sha256 },
+        adapterSha256: adapters.baseline.sha256, baselineTarballSha256: packages.baseline.tarballSha256 } } : {}) };
     verifyServerClockRegistration(registrationAttempt);
     verify(registrationAttempt);
     const registrationDigest = serverProfileDigest(registrationAttempt);
     journal('registration-before-any-sample', { registration: registrationAttempt, digest: registrationDigest });
     artifact.registration = registrationAttempt;
     artifact.registrationDigest = registrationDigest;
+    if (dependencies.observerAblation === true) artifact.diagnostic = registrationAttempt.diagnostic;
     checkpoint();
     verify();
     artifact.rawControls = { baseline: await measureBrowserRawControls(browser, origin, adapters.baseline, out, 'baseline') };
@@ -739,11 +760,13 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       verify();
       checkpoint();
       const stage = { name, rows: [], blocks: [] }; artifact[name] = stage; artifact.stages.push(name);
+      const ablation = name === 'observer-ablation';
       let resourceBefore;
       for (let run = 0; run < runs; run++) {
         if (run % 2 === 0) resourceBefore = captureServerLoad();
-        for (const [kind, scenes] of [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]]) {
-          const row = { kind, scene: scenes[0]?.id, run, order: serverOrders(runs)[run], samples: {} };
+        for (const [kind, scenes] of ablation ? [['browser', SERVER_PROFILE.browserScenes.filter(scene => OBSERVER_ABLATION.scenes.includes(scene.id))]]
+          : [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]]) {
+          const row = { kind, scene: scenes[0]?.id, run, order: ablation ? OBSERVER_ABLATION.orders[run] : serverOrders(runs)[run], samples: {} };
           for (const scene of scenes) {
             const current = { ...row, scene: scene.id, samples: {} };
             stage.rows.push(current);
@@ -778,7 +801,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       }
       verify(); return stage;
     };
-    if (!await runServerProfileCalibration(artifact, runStage, journal, { baselineOnlyDiagnostic: dependencies.baselineOnlyDiagnostic === true })) return artifact;
+    if (!await runServerProfileCalibration(artifact, runStage, journal, { baselineOnlyDiagnostic: dependencies.baselineOnlyDiagnostic === true, observerAblation: dependencies.observerAblation === true })) return artifact;
     checkpoint();
     await loadImplementation('candidate');
     checkpoint();

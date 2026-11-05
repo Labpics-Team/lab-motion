@@ -4,7 +4,9 @@ import { assertBalancedRunBlocks, assertRealmTimerStep, binary64Ulp, deriveRealm
   exactBinomialOrderStatisticBounds, makeRoundRobinOrders, nextDown, nextUp, summarizeSamples } from '../compare/methodology.mjs';
 import { validateStockMotionValueBatch } from '../compare/methodology.mjs';
 import { TRANSFORM_PAIR_PROFILE, createTransformLifecycleValidator, validateTransformLifecycleSample } from '../../scripts/bench-transform-support.mjs';
-import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from './server-profile-registration.mjs';
+import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverProfileStringify, serverTailPolicy, verifyServerProfile } from './server-profile-registration.mjs';
+
+import { OBSERVER_ABLATION } from './server-observer-ablation.mjs';
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const SHA1 = /^[a-f0-9]{40}$/;
@@ -768,6 +770,33 @@ export function validateServerArtifact(artifact) {
     SHA256.test(artifact.registration.packages[id]?.tarballSha256), 'потерян comparator package');
   invariant(Object.keys(artifact.registration.transitivePackages ?? {}).length >= 3 &&
     Object.values(artifact.registration.transitivePackages).every((pkg) => SHA256.test(pkg.treeSha256) && SHA256.test(pkg.tarballSha256)), 'потеряны transitive tarballs');
+  if (artifact.registration.diagnostic?.id === OBSERVER_ABLATION.id) {
+    const diagnostic = artifact.registration.diagnostic;
+    invariant(Object.entries(OBSERVER_ABLATION).every(([key, value]) => isDeepStrictEqual(diagnostic[key], value)) &&
+      isDeepStrictEqual(artifact.diagnostic, diagnostic), 'observer ablation plan изменён');
+    invariant(diagnostic.sourceIds?.H0 === artifact.registration.harness['bench/profile/server-profile-runner.mjs']?.sha256 &&
+      diagnostic.sourceIds?.H1 === artifact.registration.harness['bench/profile/server-observer-ablation.mjs']?.sha256 &&
+      diagnostic.adapterSha256 === artifact.registration.harness['adapter:baseline']?.sha256 &&
+      diagnostic.baselineTarballSha256 === artifact.registration.packages.baseline.tarballSha256, 'observer arms не связаны с baseline/source');
+    invariant(artifact.verdict === 'UNPROVEN' && artifact.failures.length > 0 &&
+      !artifact.samplePlan && !artifact.pilot && !artifact.aa && !artifact.positive && !artifact.ab,
+      'observer diagnostic изменил qualification');
+    for (const row of artifact['observer-ablation']?.rows ?? []) for (const sample of Object.values(row.samples ?? {})) {
+      const scene = SERVER_PROFILE.browserScenes.find(scene => scene.id === row.scene);
+      validateServerBrowserSample(sample, scene, 1);
+      invariant(/^\d+$/.test(sample.fullSampleDurationNs) && BigInt(sample.fullSampleDurationNs) > 0n, 'потерян full sample duration');
+      for (const batch of [...sample.warmup, ...sample.raw]) {
+        invariant(batch.fullBatchClock?.beginMs <= batch.startClock.beginMs && batch.fullBatchClock?.endMs >= batch.cancelClock.endMs &&
+          Number.isFinite(batch.fullBatchClock.endMs), 'потерян full batch duration');
+        for (const witness of [batch.cancelWitness, sample.controlCancelWitness]) {
+          invariant(witness.collectorClocks?.length === SERVER_PROFILE.browserCancellationWitness.frames + 1 &&
+            witness.collectorClocks.every(clock => Number.isFinite(clock.beginMs) && Number.isFinite(clock.endMs) && clock.endMs >= clock.beginMs),
+          'потерян collector duration');
+        }
+      }
+    }
+    return { verification: 'observer-ablation-refusal-only', verdict: 'UNPROVEN', qualification: false };
+  }
   if (!artifact.pilot || !artifact.calibration) {
     invariant(artifact.verdict === 'UNPROVEN' && artifact.failures.length > 0 && !artifact.ab, 'незавершённое измерение объявлено успехом');
     return { verification: 'recorded-refusal-only', verdict: 'UNPROVEN' };
@@ -847,7 +876,7 @@ export function* serverArtifactChunks(artifact) {
       yield '[';
       for (let index = 0; index < value.length; index++) {
         if (index) yield ',';
-        yield JSON.stringify(value[index]) ?? 'null';
+        yield serverProfileStringify(value[index]) ?? 'null';
       }
       yield ']';
     } else if (value !== null && typeof value === 'object' && typeof value.toJSON !== 'function') {
@@ -858,7 +887,7 @@ export function* serverArtifactChunks(artifact) {
         yield `${JSON.stringify(key)}:`; yield* valueChunks(child);
       }
       yield '}';
-    } else yield JSON.stringify(value);
+    } else yield serverProfileStringify(value);
   }
   yield* valueChunks(artifact); yield '\n';
 }
@@ -933,9 +962,12 @@ export function parseServerJournalBytes(bytes) {
 }
 
 export function serverStagePlan(stage, runs) {
-  const orders = serverOrders(runs), plan = [];
+  const ablation = stage === 'observer-ablation';
+  invariant(!ablation || runs === OBSERVER_ABLATION.pairs, 'observer pair count изменён');
+  const orders = ablation ? OBSERVER_ABLATION.orders : serverOrders(runs), plan = [];
   for (let run = 0; run < runs; run++) {
-    for (const [kind, scenes] of [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]]) {
+    for (const [kind, scenes] of ablation ? [['browser', SERVER_PROFILE.browserScenes.filter(scene => OBSERVER_ABLATION.scenes.includes(scene.id))]]
+      : [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]]) {
       for (const scene of scenes) for (const participant of orders[run]) plan.push({ stage, kind, scene: scene.id, run, participant,
         build: stage === 'ab' && participant === 'right' ? 'candidate' : 'baseline' });
     }
@@ -949,8 +981,9 @@ export function validateServerJournal(artifact, records, rawDigest) {
     artifact.samplePlan.runs >= SERVER_PROFILE.minRuns && artifact.samplePlan.runs <= SERVER_PROFILE.maxRuns, 'N журнала вне зарегистрированного ресурса');
   let previous = '0'.repeat(64), registration = false, frozen = false, calibration = false, calibrationRecorded = false, stopped = false;
   let baselineControl = false, candidateControl = false;
-  const phases = ['warmup', 'pilot', 'aa', 'positive', 'ab'];
-  const runsFor = (name) => name === 'warmup' ? SERVER_PROFILE.warmupRuns : name === 'pilot' ? SERVER_PROFILE.pilotRuns : artifact.samplePlan?.runs;
+  const ablation = artifact.registration?.diagnostic?.id === OBSERVER_ABLATION.id;
+  const phases = ablation ? ['observer-ablation'] : ['warmup', 'pilot', 'aa', 'positive', 'ab'];
+  const runsFor = (name) => name === 'observer-ablation' ? OBSERVER_ABLATION.pairs : name === 'warmup' ? SERVER_PROFILE.warmupRuns : name === 'pilot' ? SERVER_PROFILE.pilotRuns : artifact.samplePlan?.runs;
   const plans = Object.fromEntries(phases.map((name) => [name, runsFor(name) ? serverStagePlan(name, runsFor(name)) : []]));
   const counts = Object.fromEntries(phases.map((name) => [name, 0]));
   const resourceCounts = Object.fromEntries(phases.map((name) => [name, 0]));
@@ -992,8 +1025,8 @@ export function validateServerJournal(artifact, records, rawDigest) {
       else { seen.set(key, sample.value); counts[sample.stage]++; }
     } else if (record.type === 'resources-block') {
       const { stage, ...block } = record.value;
-      invariant(phases.includes(stage) && block.block === resourceCounts[stage] &&
-        counts[stage] === (block.block + 1) * (SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length) * 4 &&
+      invariant(registration && !stopped && phases.includes(stage) && block.block === resourceCounts[stage] &&
+        counts[stage] === (block.block + 1) * (ablation ? OBSERVER_ABLATION.scenes.length : SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length) * 4 &&
         isDeepStrictEqual(block, artifact[stage]?.blocks?.[block.block]), 'ресурсная квитанция не соответствует завершённому блоку');
       resourceCounts[stage]++;
     } else if (record.type === 'raw-controls-candidate-after-calibration') {
@@ -1029,13 +1062,15 @@ export function validateServerJournal(artifact, records, rawDigest) {
   invariant(isDeepStrictEqual(failures, artifact.failures), 'failures потеряны или добавлены вне журнала');
   for (const failed of failedSamples) invariant(failures.some((failure) => failure.stage === failed.stage && isDeepStrictEqual(failure.error, failed.error)), 'failed sample исключён из failure union');
   if (stopped) invariant(artifact.verdict === 'UNPROVEN', 'сохранённый отказ объявлен PASS');
-  for (const stage of ['warmup', 'pilot', 'aa', 'positive', 'ab']) {
+  for (const stage of phases) {
     for (const row of artifact[stage]?.rows ?? []) for (const [id, sample] of Object.entries(row.samples)) {
       const key = `${stage}:${row.scene}:${row.run}:${id}`;
       invariant(isDeepStrictEqual(seen.get(key), sample), 'raw sample расходится с журналом'); seen.delete(key);
     }
   }
   invariant(seen.size === 0, 'samples журнала исключены из результата');
+  if (ablation && failures.some(failure => failure.error?.code === 'DIAGNOSTIC_ONLY'))
+    invariant(complete('observer-ablation'), 'diagnostic stop скрывает неполные восемь пар');
   for (const comparator of artifact.comparators ?? []) for (let run = 0; run < (comparator.rows ?? []).length; run++) {
     const key = `${comparator.scene}:${comparator.id}:${run}`;
     invariant(isDeepStrictEqual(comparatorSamples.get(key), comparator.rows[run]), 'comparator sample расходится с журналом'); comparatorSamples.delete(key);

@@ -18,6 +18,10 @@ on:
         description: 'Intrusive baseline-only trace, not qualification'
         type: boolean
         default: false
+      observer_ablation:
+        description: 'One fixed baseline observer H0/H1 diagnostic; no tracing or qualification'
+        type: boolean
+        default: false
       conflicting_inputs:
         description: 'Отказ при смешении server timing с прежними режимами'
         type: boolean
@@ -323,6 +327,7 @@ jobs:
         working-directory: server-candidate
         env:
           BASELINE_DIAGNOSTIC: ${{ inputs.baseline_diagnostic }}
+          PROFILE_OBSERVER_ABLATION: ${{ inputs.observer_ablation }}
         run: |
           set -euo pipefail
           CPU=$(awk '/^Cpus_allowed_list:/ { split($2, parts, /[,-]/); print parts[1] }' /proc/self/status)
@@ -330,11 +335,11 @@ jobs:
           printf '%s\n' "$CPU" > "$SERVER_RECEIPTS/cpu.txt"
           ENTRY=bench/profile/server-profile-runner.mjs
           BUDGET=250m
-          if test "$BASELINE_DIAGNOSTIC" = true; then
+          if test "$BASELINE_DIAGNOSTIC" = true || test "$PROFILE_OBSERVER_ABLATION" = true; then
             ENTRY=bench/profile/server-profile-diagnostic.mjs
             BUDGET=20m
           fi
-          printf 'diagnostic=%s\nentry=%s\n' "$BASELINE_DIAGNOSTIC" "$ENTRY" > "$SERVER_RECEIPTS/mode.txt"
+          printf 'diagnostic=%s\nobserver_ablation=%s\nentry=%s\n' "$BASELINE_DIAGNOSTIC" "$PROFILE_OBSERVER_ABLATION" "$ENTRY" > "$SERVER_RECEIPTS/mode.txt"
           set +e
           timeout --signal=TERM --kill-after=90s "$BUDGET" taskset -c "$CPU" \
             node "$ENTRY" \

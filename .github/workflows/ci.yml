@@ -23,6 +23,10 @@ on:
         description: 'Intrusive baseline-only trace; requires profile_server; never qualification'
         type: boolean
         default: false
+      profile_observer_ablation:
+        description: 'One fixed baseline H0/H1 observer diagnostic without tracing; requires profile_server; not qualification'
+        type: boolean
+        default: false
       performance_baseline:
         description: 'Commit для парного сравнения полной стоимости движения'
         type: string
@@ -63,7 +67,8 @@ jobs:
     with:
       server_timing: true
       baseline_diagnostic: ${{ inputs.profile_diagnostic }}
-      conflicting_inputs: ${{ inputs.profile_baseline || inputs.profile_prepare || inputs.performance_baseline != '' }}
+      observer_ablation: ${{ inputs.profile_observer_ablation }}
+      conflicting_inputs: ${{ inputs.profile_baseline || inputs.profile_prepare || inputs.performance_baseline != '' || (inputs.profile_diagnostic && inputs.profile_observer_ablation) }}
 
   verify:
     name: typecheck · build · size · package
