@@ -18,13 +18,15 @@ import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './serv
 import { compactServerCpuEvidence, compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
   serverFamilyIntervals, serverOrders, serverResourceBinding, serverResourceReasons, validateServerResourceIdentity, validateServerBrowserSample, validateServerEngineSample, verifyServerClockBuildEvidence, verifyServerClockRegistration } from './server-profile-contract.mjs';
 import { writeServerArtifact } from './server-profile-artifact.mjs';
+import { loadServerParticipant, serverParticipantImports } from './server-profile-consumer.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const BENCH = path.join(ROOT, 'bench/compare');
 const requireBench = createRequire(path.join(BENCH, 'package.json'));
 const HARNESS_FILES = ['bench/profile/server-profile-registration.mjs', 'bench/profile/server-profile-contract.mjs',
   'bench/profile/server-profile-artifact.mjs',
-  'bench/profile/server-profile-runner.mjs', 'bench/profile/server-profile-retention.mjs',
+  'bench/profile/server-profile-runner.mjs', 'bench/profile/server-profile-retention.mjs', 'bench/profile/server-profile-consumer.mjs',
+  'bench/compare/entries/lab-legacy.entry.mjs',
   'bench/profile/server-thread-cpu-clock.mjs', ...Object.keys(SERVER_PROFILE.clockError.nativeSourceFiles),
   'scripts/bench-transform-support.mjs', 'scripts/bench-support.mjs', 'scripts/bench.mjs', 'bench/compare/bench.mjs',
   'bench/compare/methodology.mjs', 'bench/compare/provenance.mjs'];
@@ -228,7 +230,7 @@ function buildToStderr(root) {
 
 // Игнорирование publish scripts запрещает vendor prepack rebuild другим toolchain.
 // Фактический npm-consumer получает именно unpacked архив; workspace dist не импортируется.
-function packConsumer(packageRoot, directory, nodeModules) {
+export function packConsumer(packageRoot, directory, nodeModules) {
   mkdirSync(directory, { recursive: true });
   const metadata = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
   const tarball = path.join(directory, 'consumer.tgz');
@@ -265,15 +267,21 @@ function packageClosure(name, out, nodeModules, packed = new Map()) {
   }
 }
 
-function buildAdapter(id, consumerRoot, esbuild, out) {
-  const owner = id === 'baseline' || id === 'candidate' ? 'lab' : id;
+export async function buildAdapter(id, consumerRoot, esbuild, out) {
+  const participant = id === 'baseline' || id === 'candidate';
+  const lineage = participant ? serverParticipantImports(path.join(consumerRoot, 'node_modules/@labpics/motion'), id) : null;
+  const owner = lineage?.browserOwner ?? id;
   const entry = path.join(BENCH, `entries/${owner === 'waapi-ctl' ? 'waapi-control' : owner}.entry.mjs`);
-  const original = readFileSync(entry, 'utf8');
-  const contents = owner === 'lab' ? original.replace("'../../../dist/animate/index.js'", "'@labpics/motion/animate'") : original;
+  const contents = readFileSync(entry, 'utf8');
   const artifact = path.join(out, `${id}.iife.js`);
-  esbuild.buildSync({ ...PRODUCTION_ADAPTER_PROFILE, stdin: { contents, resolveDir: consumerRoot, sourcefile: path.basename(entry) },
-    nodePaths: [path.join(consumerRoot, 'node_modules')], format: 'iife', globalName: '__adapterModule', outfile: artifact, logLevel: 'silent' });
-  return { path: artifact, sha256: sha256File(artifact), ownerEntry: entry, ownerEntrySha256: sha256File(entry) };
+  const buildResult = await esbuild.build({ ...PRODUCTION_ADAPTER_PROFILE, metafile: true, stdin: { contents, resolveDir: consumerRoot, sourcefile: path.basename(entry) },
+    nodePaths: [path.join(consumerRoot, 'node_modules')], format: 'iife', globalName: '__adapterModule', outfile: artifact, logLevel: 'silent',
+    plugins: lineage ? [{ name: 'packed-participant-entry', setup(build) {
+      build.onResolve({ filter: /^\.\.\/\.\.\/\.\.\/dist\/(motion\/|animate\/)?index\.js$/ }, () => ({ path: lineage.browser.path }));
+    } }] : [] });
+  return { path: artifact, sha256: sha256File(artifact), ownerEntry: entry, ownerEntrySha256: sha256File(entry),
+    inputs: Object.keys(buildResult.metafile.inputs).filter(name => name !== path.basename(entry)).map(name => path.resolve(name)),
+    ...(lineage ? { participantImports: lineage } : {}) };
 }
 
 function threadCpuNs(reads) {
@@ -604,8 +612,8 @@ async function measureBrowserRawControls(browser, origin, adapter, out, id) {
   return result;
 }
 
-function makeRetention(packageDirectory) {
-  const result = spawnSync(process.execPath, ['--expose-gc', path.join(ROOT, 'bench/profile/server-profile-retention.mjs'), packageDirectory],
+function makeRetention(packageDirectory, participant) {
+  const result = spawnSync(process.execPath, ['--expose-gc', path.join(ROOT, 'bench/profile/server-profile-retention.mjs'), packageDirectory, participant],
     { encoding: 'utf8', timeout: 60_000 });
   let report;
   try { report = JSON.parse(result.stdout); } catch { /* Даже malformed stdout сохраняется при отказе child. */ }
@@ -677,7 +685,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     const closure = new Map();
     for (const [id, name] of Object.entries(PACKAGES)) packages[id] = packageClosure(name, path.join(out, 'packages', 'vendors'), path.join(consumers.comparators, 'node_modules'), closure);
     const adapters = {};
-    for (const id of ['baseline', 'candidate', ...SERVER_PROFILE.comparators]) adapters[id] = buildAdapter(id, consumers[id] ?? consumers.comparators, esbuild, out);
+    for (const id of ['baseline', 'candidate', ...SERVER_PROFILE.comparators]) adapters[id] = await buildAdapter(id, consumers[id] ?? consumers.comparators, esbuild, out);
     Object.entries(adapters).forEach(([id, value]) => { harness[`adapter:${id}`] = value; });
     origin = await startBenchmarkOrigin(); checkpoint();
     browser = await browserType.launch({ headless: SERVER_PROFILE.headless, executablePath: executable }); checkpoint();
@@ -700,11 +708,9 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     checkpoint();
     const implementations = {};
     const loadImplementation = async (id) => {
-      const metadata = JSON.parse(readFileSync(path.join(packages[id].directory, 'package.json'), 'utf8'));
-      const entry = metadata.exports['./animate'].import.default;
-      implementations[id] = (await import(pathToFileURL(path.join(packages[id].directory, entry)).href)).animate;
-      const main = metadata.exports['.'].import.default;
-      implementations[`${id}:stock-c`] = (await import(pathToFileURL(path.join(packages[id].directory, main)).href)).MotionValue;
+      const participant = await loadServerParticipant(packages[id].directory, id);
+      implementations[id] = participant.animate;
+      implementations[`${id}:stock-c`] = participant.MotionValue;
     };
     await loadImplementation('baseline');
     observer = new PerformanceObserver((list) => { for (const entry of list.getEntries()) artifact.gc.push({ startTime: entry.startTime, duration: entry.duration, detail: entry.detail }); });
@@ -788,7 +794,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     artifact.retention = {};
     for (const id of ['baseline', 'candidate']) {
       checkpoint();
-      artifact.retention[id] = makeRetention(packages[id].directory);
+      artifact.retention[id] = makeRetention(packages[id].directory, id);
       journal('retention-sample', { id, value: artifact.retention[id] });
       checkpoint();
     }

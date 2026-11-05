@@ -152,6 +152,7 @@ const testCommands = [
   activatePnpm,
   'pnpm install --frozen-lockfile',
   'pnpm build',
+  'pnpm exec playwright install --with-deps chromium',
   vitestCommand,
   'node test/fixtures/server-thread-cpu-clock-check.mjs',
 ];

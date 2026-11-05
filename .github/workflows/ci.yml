@@ -195,6 +195,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Chromium для actual packed consumer controls
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Vitest
         id: vitest
         shell: bash
