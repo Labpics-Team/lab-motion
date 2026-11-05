@@ -1,5 +1,5 @@
-// Расширение существующего bench owner: общие сборка, origin, адаптеры и законы
-// round-robin. Ни одного вывода о физическом мобильном устройстве здесь нет.
+// Расширение существующего измерителя: общие сборка, сервер, адаптеры и циклический
+// порядок участников. Ни одного вывода о физическом мобильном устройстве здесь нет.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readlinkSync, realpathSync, statSync, statfsSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -94,7 +94,7 @@ function captureResourceConfiguration() {
       subtreeControl: resourceRead(directory + '/cgroup.subtree_control') });
     if (current === '/') break;
   }
-  // Linux v6.18.44/v7.0: policy 0 допускает full-switch sched-ext; читаем его состояние, не счётчики /proc/self/sched.
+  // Linux v6.18.44/v7.0: policy 0 допускает полное переключение на sched-ext; читаем его состояние, не счётчики /proc/self/sched.
   const schedExtState = { model: 'linux-v6.18.44-v7.0-sched-ext-state', ...resourceRead('/sys/kernel/sched_ext/state') };
   const resource = { membership, mountinfo, mount, scheduler, schedExtState, scopes };
   try { validateServerResourceIdentity(resource); }
@@ -249,8 +249,8 @@ export function serverParticipantPreparation(root, participant) {
     requiredRootPackages: ['tsup', 'typescript', 'esbuild'] };
 }
 
-// Игнорирование publish scripts запрещает vendor prepack rebuild другим toolchain.
-// Фактический npm-consumer получает именно unpacked архив; workspace dist не импортируется.
+// Отключение сценариев публикации не позволяет поставщику пересобрать prepack другим набором инструментов.
+// Фактический потребитель npm получает распакованный архив; dist рабочей области не импортируется.
 export function packConsumer(packageRoot, directory, nodeModules) {
   mkdirSync(directory, { recursive: true });
   const metadata = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
@@ -326,7 +326,7 @@ function sampleCpuClock(raw) {
 }
 
 function compactSampleCpuEvidence(sample) {
-  // Никакой частичной замены при отказе encoder: исходные массивы остаются в error.raw.
+  // При отказе кодировщика частичной замены нет: исходные массивы остаются в error.raw.
   let encoded;
   try { encoded = sample.raw.map((measured) => compactServerCpuEvidence(measured.raw.cpuReads)); }
   catch (error) { throw Object.assign(new AggregateError([error], 'server profile: native CPU carrier не завершён'), { raw: sample }); }
@@ -390,9 +390,9 @@ export async function measureServerStockC(MotionValue, scene, workMultiplier = 1
       };
       const start = timed ? read('before') : null;
       for (let operation = 0; operation < calls; operation++) {
-        // Чтение frame count необходимо для каждого вызова: среднее47
-        // не отличает две неправильные операции0/94. Два массива выделены
-        // до CPU, а преобразование в RLE и oracle выполняются после него.
+        // Число кадров читается для каждого вызова: среднее 47
+        // не отличает две неправильные операции 0/94. Два массива выделены
+        // до измерения CPU, а преобразование в RLE и проверка выполняются после него.
         const value = macro.run();
         values[operation] = value;
         frames[operation] = macro.getFrameCount();
@@ -407,8 +407,8 @@ export async function measureServerStockC(MotionValue, scene, workMultiplier = 1
       validateStockMotionValueBatch(result, scene, multiplier, timed);
       return result;
     };
-    // Штатные две warmup batches до первой измеренной работы; candidate
-    // попадает сюда только после общей calibration и frozen N.
+    // Два штатных пакета прогрева выполняются до первой измеренной работы; кандидат
+    // попадает сюда только после общей калибровки и фиксации N.
     for (let index = 0; index < scene.warmupBatches; index++) warmup.push(batch(false, 1));
     for (let repetition = 0; repetition < SERVER_PROFILE.repetitions; repetition++) raw.push(batch(true, workMultiplier));
     sampleResult = { operationNs: raw.reduce((sum, result) => sum + result.operationNs, 0) / SERVER_PROFILE.repetitions,
@@ -514,7 +514,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
         ? A.startStagger(els, config.toPx, config.durationMs, config.scene.staggerGapMs)
         : A.start(els, config.toPx, config.durationMs);
       if (typeof start !== 'function' || !A?.start || (config.scene.staggerGapMs > 0 && !A.startStagger)) throw new Error('нет общего API сцены');
-      // Независимый CSS matrix oracle подтверждает реальный линейный endpoint.
+      // Независимая проверка матриц CSS подтверждает фактическую линейную конечную позицию.
       const witness = create();
       const controlStartBegin = performance.now(); const control = start(witness); const controlStartMs = performance.now() - controlStartBegin;
       await new Promise((resolve) => setTimeout(resolve, config.durationMs + (witness.length - 1) * config.scene.staggerGapMs + 100));

@@ -1,4 +1,4 @@
-// Ограниченное наблюдение с вмешательством только для baseline не доказывает квалификацию.
+// Ограниченное наблюдение с вмешательством только для базовой версии не доказывает квалификацию.
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -70,7 +70,7 @@ export function tracedBrowserMeasure(out, index, measure = measureServerBrowser,
       const categories = (await boundedDiagnostic(session.send('Tracing.getCategories'))).categories;
       const requested = ['devtools.timeline', 'v8', 'v8.execute', 'blink.user_timing', 'disabled-by-default-v8.gc', 'disabled-by-default-v8.compile'];
       if (requested.some(category => !categories.includes(category))) throw new Error('diagnostic trace categories unavailable');
-      // Подписка предшествует старту; весь диагностический образец ограничен отдельным сроком в hosted-среде.
+      // Подписка предшествует старту; весь диагностический образец ограничен отдельным сроком в среде CI.
       completion = tracingCompletion(session, 120_000);
       const settled = completion.promise.then(value => ({ value }), error => ({ error }));
       completion.settled = settled;

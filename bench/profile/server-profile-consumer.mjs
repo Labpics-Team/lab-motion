@@ -1,10 +1,10 @@
-// Один packed import owner для engine и отдельного retention child.
+// Общий импорт установленного пакета для движка и отдельного дочернего процесса проверки удержаний.
 import { readFileSync, realpathSync } from 'node:fs';
 import { resolve, relative, isAbsolute } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { SERVER_PROFILE } from './server-profile-registration.mjs';
 
-// До сборки читаем только public targets; после unpack проверяем реальные пути.
+// До сборки читаем только публичные точки входа; после распаковки проверяем реальные пути.
 export function serverParticipantExportTargets(directory, participant) {
   const policy = SERVER_PROFILE.participantImports[participant];
   if (!policy) throw new Error('server profile: unknown participant import lineage');

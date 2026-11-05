@@ -6,7 +6,7 @@ import { sha256Bytes } from '../compare/provenance.mjs';
 import { parseServerJsonBytes, parseServerJournalBytes, serverArtifactChunks,
   validateServerArtifact, validateServerJournal } from './server-profile-contract.mjs';
 
-// Файловый адаптер использует тот же carrier и проверки, что и контракт профиля.
+// Файловый адаптер использует то же представление данных и проверки, что и контракт профиля.
 // Эксклюзивное создание сохраняет уже записанный результат при повторном запуске.
 export function writeServerArtifact(file, artifact) {
   const descriptor = openSync(file, 'wx'), hash = createHash('sha256');

@@ -29,28 +29,28 @@ function errorBounds(value, error) {
   return { low: Math.max(0, nextDown(value - error)), high: nextUp(value + error) };
 }
 
-// Observed quantum не удостоверяет error model. Error берётся из закреплённого
-// upstream TimeClamper/TimeTicks и учитывает float conversion обеих reads.
+// Наблюдаемый квант не удостоверяет модель погрешности. Погрешность берётся из закреплённых
+// исходников TimeClamper/TimeTicks и учитывает преобразование обоих чтений в числа с плавающей точкой.
 export function serverBrowserClockBounds(clock, monotonicHostUpperNs) {
   invariant(/^\d+$/.test(monotonicHostUpperNs ?? ''), 'нет общего CLOCK_MONOTONIC bound');
   const ns = BigInt(monotonicHostUpperNs);
   invariant(ns > 0n && ns < BigInt(SERVER_PROFILE.clockError.monotonicCounterLimitMs) * 1_000_000n, 'CLOCK_MONOTONIC вне safe модели');
-  // Запас1ms превышает conversion error Number(ns)/1e6 при limit2^42ms.
+  // Запас 1ms превышает погрешность преобразования Number(ns)/1e6 при пределе 2^42ms.
   const upperMs = nextUp(Number(ns) / 1e6 + 1);
   invariant(Number.isFinite(clock?.beginMs) && Number.isFinite(clock?.endMs) && clock.beginMs >= 0 &&
     clock.endMs >= clock.beginMs && clock.endMs <= upperMs, 'невалидные clock reads');
   const measuredMs = clock.endMs - clock.beginMs;
   const endpointError = SERVER_PROFILE.clockError.browserClampErrorPerTimestampMs + SERVER_PROFILE.clockError.browserTickTruncationPerTimestampMs;
-  // Две conversions(now/origin) и subtraction на каждую read; ещё одна
-  // subtraction интервала. Origin одинаков, но его ошибка включена консервативно.
+  // Два преобразования (now/origin) и вычитание на каждое чтение; ещё одно
+  // вычитание для интервала. Начало отсчёта одинаково, но его погрешность включена консервативно.
   const errorMs = nextUp(nextUp(2 * endpointError) + nextUp(6 * binary64Ulp(upperMs) + binary64Ulp(measuredMs)));
   return { ...errorBounds(measuredMs, errorMs), measuredMs, errorMs };
 }
 
-// В perf интервале общий origin сокращается. Сопоставление document frame
-// с perf API включает три coarsened timestamps: frame, now и origin.
-// Та же закреплённая модель даёт три endpoint envelopes и девять ULP;
-// это semantic relation, не изменение uncertainty измеряемых API costs.
+// В интервале performance.now общее начало отсчёта сокращается. Сопоставление кадровых часов
+// документа с performance.now включает три метки сниженной точности: frame, now и origin.
+// Та же закреплённая модель даёт три границы конечных меток и девять ULP;
+// это связь семантических наблюдений, а не изменение погрешности измеряемой стоимости API.
 export function serverBrowserSemanticClockErrorMs(monotonicHostUpperNs) {
   return nextUp(1.5 * serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, monotonicHostUpperNs).errorMs);
 }
@@ -87,7 +87,7 @@ function compactSemanticGroups(groups) {
 
 export function compactServerSemanticEvidence(evidence) {
   if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return evidence;
-  // Отказ сохраняет приобретённый prefix и дополнительные поля, без создания отсутствующих наблюдений.
+  // Отказ сохраняет уже полученные наблюдения и дополнительные поля, не создавая отсутствующих наблюдений.
   const compact = { ...evidence };
   if (Array.isArray(evidence.checkpoints)) compact.checkpoints = evidence.checkpoints.map((checkpoint) =>
     checkpoint && typeof checkpoint === 'object' && !Array.isArray(checkpoint) && Object.hasOwn(checkpoint, 'groups')
@@ -125,7 +125,7 @@ function validateNormalMotion(evidence, scene, monotonicHostUpperNs) {
     onset.firstFrame.groups.length === calls, 'нет normal-motion first publication');
   onset.firstFrame = { ...onset.firstFrame, groups: onset.firstFrame.groups.map((group) => ({ ...group,
     positions: expandCoordinates(group?.positions, scene.targetsPerCall) })) };
-  // Clock/zero/phase law принадлежит общему oracle; decoder восстанавливает каждый target.
+  // Правила часов, нуля и фазы проверяются общей проверкой; декодировщик восстанавливает каждую цель.
   const expanded = { ...evidence, onset, checkpoints: evidence.checkpoints.map((checkpoint) => {
     invariant(Number.isFinite(checkpoint.frameTimestampMs), 'нет observed normal-motion frame timestamp');
     invariant(Array.isArray(checkpoint.groups) && checkpoint.groups.length === calls, 'потеряна normal-motion группа');
@@ -474,8 +474,8 @@ function validateStartWitness(raw, scene, monotonicHostUpperNs) {
   const window = serverBrowserClockBounds({ beginMs: raw.startClock.beginMs, endMs: witness.readClock.endMs }, monotonicHostUpperNs);
   invariant(window.high < SERVER_PROFILE.durationMs * (1 - SERVER_PROFILE.browserSemantics.finalTolerancePx / SERVER_PROFILE.toPx),
     'start batch не разрешил окно до линейного endpoint');
-  // Каждый свежий owner вызван после batch begin, а CSS прочитан до read end.
-  // Общая верхняя граница elapsed учитывает обе clock reads и float roundoff.
+  // Каждый свежий запуск вызван после начала пакета, а CSS прочитан до конца чтений.
+  // Общая верхняя граница прошедшего времени учитывает оба чтения часов и округление чисел с плавающей точкой.
   const maximumPosition = nextUp(nextUp(nextUp(SERVER_PROFILE.toPx / SERVER_PROFILE.durationMs) * window.high) +
     SERVER_PROFILE.browserSemantics.movementThresholdPx);
   for (let call = 0; call < raw.calls; call++) {

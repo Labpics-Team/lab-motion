@@ -8,11 +8,11 @@ on:
   workflow_dispatch:
     inputs:
       profile_baseline:
-        description: 'Снять зарегистрированный размерный baseline PROFILE-01, только если profile_prepare выключен'
+        description: 'Снять зарегистрированные базовые размеры PROFILE-01, только если profile_prepare выключен'
         type: boolean
         default: false
       profile_prepare:
-        description: 'Снять только идентичность hosted-среды до регистрации серверной эпохи, без образцов; имеет приоритет над profile_baseline'
+        description: 'Снять только идентичность среды CI до регистрации серверной эпохи, без образцов; имеет приоритет над profile_baseline'
         type: boolean
         default: false
       profile_server:
@@ -20,15 +20,15 @@ on:
         type: boolean
         default: false
       profile_diagnostic:
-        description: 'Трассировка только baseline; требует profile_server, не даёт квалификации'
+        description: 'Трассировка только базовой версии; требует profile_server, не даёт квалификации'
         type: boolean
         default: false
       profile_observer_ablation:
-        description: 'Фиксированная диагностика baseline H0/H1 без трассировки; требует profile_server, не даёт квалификации'
+        description: 'Фиксированная диагностика базовой версии H0/H1 без трассировки; требует profile_server, не даёт квалификации'
         type: boolean
         default: false
       performance_baseline:
-        description: 'Commit для парного сравнения полной стоимости движения'
+        description: 'Коммит для парного сравнения полной стоимости движения'
         type: string
         default: ''
 
@@ -52,8 +52,8 @@ jobs:
     with:
       baseline: ${{ inputs.performance_baseline }}
 
-  # Два явных маршрута: подготовка идентичности hosted-среды или размерный baseline.
-  # При обоих входах profile_prepare имеет приоритет: baseline не измеряется.
+  # Два явных маршрута: подготовка идентичности среды CI или базовые размеры.
+  # При обоих входах profile_prepare имеет приоритет: базовые размеры не измеряются.
   # Обычный кандидат не обязан совпадать с зарегистрированным старым источником PROFILE-01.
   profile-baseline:
     if: ${{ github.event_name == 'workflow_dispatch' && (inputs.profile_baseline || inputs.profile_prepare) && !inputs.profile_server }}

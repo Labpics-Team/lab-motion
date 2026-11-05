@@ -1,29 +1,29 @@
 name: PROFILE-01 — проверка размерного протокола
 
 # Размерный вектор вызывается вручную через ci.yml в той же среде, что обычный CI
-# публичного репозитория. Время/GPU/энергия этой машины не являются device proof.
+# публичного репозитория. Время, GPU и энергия этой машины не доказывают свойства физического устройства.
 on:
   workflow_call:
     inputs:
       prepare_only:
-        description: 'Только идентичность среды до регистрации серверной эпохи; без образцов SUT'
+        description: 'Только идентичность среды до регистрации серверной эпохи; без образцов проверяемой реализации'
         type: boolean
         default: false
 
       server_timing:
-        description: 'Явный полный запуск серверного измерителя; не метаданные и не размерный baseline'
+        description: 'Явный полный запуск серверного измерителя; не метаданные и не базовые размеры'
         type: boolean
         default: false
       baseline_diagnostic:
-        description: 'Трассировка только baseline, без квалификации'
+        description: 'Трассировка только базовой версии, без квалификации'
         type: boolean
         default: false
       observer_ablation:
-        description: 'Фиксированная диагностика baseline H0/H1 без трассировки и квалификации'
+        description: 'Фиксированная диагностика базовой версии H0/H1 без трассировки и квалификации'
         type: boolean
         default: false
       conflicting_inputs:
-        description: 'Отказ при смешении серверного тайминга с прежними режимами'
+        description: 'Отказ при смешении серверных измерений времени с прежними режимами'
         type: boolean
         default: false
 
@@ -99,12 +99,12 @@ jobs:
           import { hashFileTree, sha256File } from './bench/compare/provenance.mjs';
           const out = join(process.env.RUNNER_TEMP, 'server-profile-preparation');
           const journal = createServerJournal(out);
-          const receipt = { schema: 1, scope: 'только метаданные, без образцов SUT; не квалификация часов и не performance PASS',
+          const receipt = { schema: 1, scope: 'только метаданные, без образцов проверяемой реализации; не квалификация часов и не результат PASS проверки производительности',
             source: process.env.PROFILE_SOURCE_SHA, protocolDigest: serverProfileDigest(SERVER_PROFILE),
             hosted: { runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
               imageOS: process.env.ImageOS, imageVersion: process.env.ImageVersion },
             observed: { platform: platform(), arch: arch(), kernelRelease: release() }, failures: [] };
-          // Все чтения выполняются до native/browser preparation, вне timing.
+          // Все чтения выполняются до подготовки нативного модуля и браузера, вне измерений времени.
           let browser;
           try {
             try {

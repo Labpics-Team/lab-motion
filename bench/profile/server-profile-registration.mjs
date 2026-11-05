@@ -1,5 +1,5 @@
 // Серверная диагностическая клетка PROFILE-01. Устройства, энергия, GPU и
-// частота физического экрана требуют отдельного evidence и здесь не выводятся.
+// частота физического экрана требуют отдельных доказательств и здесь не выводятся.
 import { isDeepStrictEqual } from 'node:util';
 import { sha256Bytes } from '../compare/provenance.mjs';
 
@@ -62,7 +62,7 @@ export const SERVER_PROFILE = freeze({
   mdeRelative: 0.05,
   power: 0.8,
   zPower: 0.8416212335729143,
-  // Bonferroni: 11 клеток × p50/p95, двухсторонняя family-wise 95% полоса.
+  // Bonferroni: 11 клеток × p50/p95, двухсторонняя 95% полоса для всего семейства.
   zFamily: 3.052065201864885,
   metrics: {
     engine: ['operationNs', 'meanFrameNs', 'cancelDrainNs'],
@@ -76,14 +76,14 @@ export const SERVER_PROFILE = freeze({
     baseline: { browserExport: './animate', browserOwner: 'lab-legacy', stockExport: '.' },
     candidate: { browserExport: '.', browserOwner: 'lab', stockExport: './driver' },
   },
-  stockCpuScope: 'штатный whole legacy stockC macro MotionValue (baseline packed root, candidate packed driver re-export; не новый root value): factory+2×2000warmups внеCPU; clock/drain/construct/onChange/setTarget/destroy вCPU, preallocated per-operation last+getFrameCount recording вCPU одинаков обеимролям; RLE/oracle внеCPU. Не per-framep99/100channels.',
+  stockCpuScope: 'Полный штатный макросценарий прежнего stockC MotionValue: базовая версия берётся из корневого экспорта установленного пакета, кандидат — из повторного экспорта driver установленного пакета; новый объект из корневого экспорта не используется. Фабрика и два прогрева по 2000 вызовов находятся вне измерения CPU. Чтение часов, завершение очереди, создание объекта, onChange/setTarget/destroy и запись last/getFrameCount для каждой операции в заранее выделенную память входят в измерение CPU одинаково для обеих ролей. Преобразование в RLE и независимая проверка находятся вне измерения CPU. Это не покадровый p99 и не сценарий со 100 каналами.',
   stoppingRule: 'один baseline-only pilot → замороженный N; невозможная мощность немедленно сохраняет UNPROVEN без A/A, 2×work и A/B; иначе один A/A и 2×work → A/B только при годной калибровке; добор и повтор к green запрещены',
   preservedGuards: 'size-gate, численные/семантические допуски и protected p95 upper ≤1.05 не меняются',
   scope: 'headless server: CPU потока engine и API browser при duration=128 ms; counts/stagger закреплены; endpoint/start/frame/retarget/cancel отдельно; canonical 1200 ms guards независимы',
   unproven: ['mobile Android/iOS', 'physical 60/120 Hz', 'whole-page energy', 'GPU', 'M-04 physical-device envelope', 'M-05 product scene families'],
   forcedGc: 'только отдельный retention child process после host turn, затем два GC у каждого heap snapshot; в timing отсутствует',
   rawControls: 'baseline no-motion: два одинаковых PNG; reduced-motion: endpoint без rAF/WAAPI; candidate controls только после PASS calibration',
-  resourcePolicy: 'process domain cgroup v2 SCHED_OTHER с явным /sys/kernel/sched_ext/state=disabled (Linux v6.18.44/v7.0 sched-ext state ABI; ошибка/отсутствие означает unknown, не disabled) и каждый non-root ancestor отдельно: один немаскированный mount с доказанным hierarchy root, неизвестное покрытие/aliases/threaded отвергаются; topology/limits/affinity связаны с регистрацией и до/после каждого парного блока; nr_throttled/throttled_usec delta=0 каждого scope, usage не суммируется; endpoint readback не исключает ABA, внешняя переконфигурация epoch запрещена; все samples сохраняются, нарушение даёт UNPROVEN без post-hoc исключений',
+  resourcePolicy: 'Домен процессов cgroup v2 с SCHED_OTHER и явным /sys/kernel/sched_ext/state=disabled. Используется ABI состояния sched-ext Linux v6.18.44/v7.0; ошибка или отсутствие состояния означает unknown, а не disabled. Каждый предок, кроме корня, проверяется отдельно. Требуется единственное немаскированное монтирование с доказанным корнем иерархии; неизвестное покрытие, псевдонимы и режим threaded отвергаются. Топология, ограничения и привязка CPU связаны с регистрацией и проверяются до и после каждого парного блока. Для каждой области приращения nr_throttled/throttled_usec равны 0; usage не суммируется. Проверка конечного состояния не исключает ABA; внешняя переконфигурация эпохи запрещена. Все образцы сохраняются; нарушение даёт UNPROVEN без исключений после наблюдения результатов.',
   browserOperationTimeoutMs: 30_000,
   clockError: {
     id: 'azure7.0.0-1017-thread-scheduled-runtime-node24.19-chromium149-isolated',
@@ -92,7 +92,7 @@ export const SERVER_PROFILE = freeze({
       sourcePackage: 'linux-azure-7.0', sourceVersion: '7.0.0-1017.17~24.04.1', upstreamVersion: '7.0.14', architecture: 'amd64',
       configSha256: '59b49d17af9e7049b5d1c0de5451d8afbeac39420b5086bfaa39f16cd1dec10b',
       preparationReceiptDigest: 'a4ec913f2a90e4f50b72037642a00a0d3591e922e076051b0e8d21d297e09a50',
-      sourceReconstruction: 'Ubuntu Format1.0: orig archive linux-7.0/ + exact diff, strip1, fuzz0; hashes ниже относятся к итоговым файлам, не archive bytes',
+      sourceReconstruction: 'Ubuntu Format1.0: исходный архив linux-7.0/ и точная разница, strip1, fuzz0. Приведённые хеши относятся к итоговым файлам, а не байтам архива.',
       sourceFiles: {
         'kernel/time/posix-cpu-timers.c': '205aca87c575d5338ac8ae0975dce7c71bc5bb2a4bd232af5dd5d1c003cd694a',
         'kernel/time/posix-timers.c': '38783f38c3a7cc23d2f7ab7dc504ed666d4a99818d2799ab6be8b9a3bd309fac',
@@ -112,7 +112,7 @@ export const SERVER_PROFILE = freeze({
         'lib/vdso/gettimeofday.c': '20581b599c8c4107b974b7a41028c335eded6bca586417b8a87a084abf770d33',
         'arch/x86/include/asm/vdso/gettimeofday.h': '2b8ed9bd114062b33cb78b1da45697c0c894c2d6b4ceb2be2daaa5aba92874de',
       },
-      applicability: 'trusted hosted runner: actual version_signature/package/config связаны preparation receipt; SCHED_OTHER + sched_ext disabled; CONFIG_SCHED_CLASS_EXT=y исключает CONFIG_SCHED_PROXY_EXEC; self/time_for_children namespace одинаков, self/init monotonic offsets=0; identity init namespace не требуется; отсутствие clock override остаётся прежней предпосылкой, не новым attestation claim',
+      applicability: 'Доверенный исполнитель CI: фактические version_signature, пакет и конфигурация связаны с квитанцией подготовки. Требуются SCHED_OTHER и sched_ext в состоянии disabled; CONFIG_SCHED_CLASS_EXT=y исключает CONFIG_SCHED_PROXY_EXEC. Пространства имён self/time_for_children одинаковы; смещения монотонных часов self/init равны 0. Совпадение идентичности с пространством имён init не требуется. Отсутствие переопределения часов остаётся прежней предпосылкой, а не новым утверждением об аттестации.',
     },
     nodeVersion: 'v24.19.0',
     nodeExecutableSha256: 'bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12',
@@ -124,7 +124,7 @@ export const SERVER_PROFILE = freeze({
     monotonicCounterLimitMs: 2 ** 42,
     engineClock: 'CLOCK_THREAD_CPUTIME_ID',
     engineCounterOutwardPaddingNs: 2_000,
-    engineCounterScope: 'сообщённый Linux scheduled-runtime текущего main-thread; 2us — прежнее консервативное outward padding reported counter, без гарантии физической точности или выводов из nominal clock_getres; getter overhead не вычитается',
+    engineCounterScope: 'Сообщённое Linux время исполнения текущего главного потока по планировщику. Прежний консервативный запас 2us расширяет границы сообщённого счётчика наружу; он не гарантирует физическую точность и не выводится из номинального clock_getres. Накладные расходы функции чтения не вычитаются.',
     nativeSourceFiles: {
       'bench/profile/server-thread-cpu-clock.c': '4f32f23c2409c3e83943121a587c8d9f5e19af7f308ac987323ff4189ddd14c0',
       'bench/profile/native-clock/include/js_native_api.h': '8808ef8899a1691411928ef5dd7dae0537aedc93d3a34e223b2d89692e79c788',
@@ -154,9 +154,9 @@ export const SERVER_PROFILE = freeze({
       linuxAzureBuildinfo: { url: 'https://archive.ubuntu.com/ubuntu/pool/main/l/linux-azure-7.0/linux-buildinfo-7.0.0-1017-azure_7.0.0-1017.17~24.04.1_amd64.deb', sha256: '6a6610af63bdd1fc9af7ba7a3fcfad57d069b0655d89f901ffe8d5d583da7ad4' },
       linuxAzureSignedDescriptor: { url: 'https://archive.ubuntu.com/ubuntu/pool/main/l/linux-signed-azure-7.0/linux-signed-azure-7.0_7.0.0-1017.17~24.04.1.dsc', sha256: '63ced201ca362205724d4e2b0a6a12683f217402db6e188e7be436e244acebbd' },
     },
-    documentFrame: 'Chromium149 PageAnimator coarsens frame TimeTicks тем же isolated TimeClamper; DocumentTimeline origin совпадает с навигацией; AnimationClock стабилен в rendering/task; CSS recalc обновляет animation timing этим clock. До/после onset API observed publication clock одинаков и связывает origin свежего движения; checkpoint clock одинаков до/после CSS и связан с observed rAF. Frame timestamp может предшествовать execution wall, wall chronology отдельна. Сопоставление frame/perf включает три coarsened timestamps(frame/now/origin): upward(1.5×прежний2-endpoint envelope), без изменения API-cost bounds. Нет qualification или clocks противоречат — отказ. Это clock публикации CSS, а не атрибуция внутреннего таймера JS/native API.',
-    scope: 'Linux CLOCK_THREAD_CPUTIME_ID: разность exact seconds/nanoseconds reported scheduled-runtime с прежним2us outward padding; Chromium isolated TimeClamper может округлять в обе стороны на5us, TimeTicks truncates1us; обе browser clockreads и binary64 roundoff входят в pointwise bounds до CI, без shrink по repeats/N',
-    assumption: 'закреплённые official browser/Node binaries, private native getter и точный Ubuntu Azure kernelBuild исполняют указанную source-backed clock model; Node hrtime и browser TimeTicks используют общий Linux CLOCK_MONOTONIC без namespace/clock override; reported scheduled-runtime не является физическим elapsed временем, nominal resolution/observed quantum не являются сертификатами error; другие binary/model/небезопасные counters дают отказ',
+    documentFrame: 'В Chromium149 PageAnimator снижает точность кадровых TimeTicks тем же изолированным TimeClamper. Начало отсчёта DocumentTimeline совпадает с навигацией; AnimationClock стабилен при отрисовке и выполнении задачи. Пересчёт CSS обновляет время анимации по этим часам. Наблюдаемые часы публикации одинаковы до и после API начала движения и связывают начало отсчёта свежего движения. Часы контрольной точки одинаковы до и после чтения CSS и связаны с наблюдаемым rAF. Метка времени кадра может предшествовать фактическому времени исполнения; хронология фактического времени учитывается отдельно. Сопоставление кадровых часов с performance.now включает три метки сниженной точности: frame/now/origin. Граница округляется вверх и равна 1.5×прежней границе для двух конечных меток; границы стоимости API не меняются. Отсутствие квалификации или противоречие часов даёт отказ. Это часы публикации CSS, а не определение внутреннего таймера JS/native API.',
+    scope: 'Linux CLOCK_THREAD_CPUTIME_ID: разность точных секунд и наносекунд сообщённого времени исполнения по планировщику с прежним запасом 2us, расширяющим границы наружу. Изолированный Chromium TimeClamper может округлять в обе стороны на 5us; TimeTicks отбрасывает остаток до 1us. Оба чтения браузерных часов и погрешность binary64 входят в границы каждого наблюдения до построения доверительных интервалов; повторы и N не сужают погрешность часов',
+    assumption: 'Закреплённые официальные исполняемые файлы браузера и Node, закрытая нативная функция чтения часов и точный Ubuntu Azure kernelBuild исполняют указанную модель часов, подтверждённую исходниками. Node hrtime и браузерные TimeTicks используют общий Linux CLOCK_MONOTONIC без переопределения пространства имён или часов. Сообщённое время исполнения по планировщику не является физическим прошедшим временем; номинальное разрешение и наблюдаемый квант не удостоверяют погрешность. Другие исполняемые файлы, модели или небезопасные значения счётчиков дают отказ.',
   },
   browserCancellationWitness: { frames: 2, transformTolerancePx: 0.000001,
     scope: 'attached targets после cancel: нет WAAPI, transform неизменен два rAF; sync cancelMs и elapsed cancel→drain раздельно; swallowed vendor exceptions нормализованного adapter не наблюдаются' },
@@ -170,8 +170,8 @@ export function serverProfileStringify(value) {
 
 export function serverProfileDigest(value) {
   const text = serverProfileStringify(value);
-  // Native SHA читает UTF-8 string без отдельной Buffer копии. Undefined
-  // сохраняет прежний TypeError после того же однократного чтения JSON.
+  // Нативная SHA-функция читает строку UTF-8 без отдельной копии Buffer.
+  // Значение undefined сохраняет прежний TypeError после одного чтения JSON.
   return sha256Bytes(text === undefined ? Buffer.from(text) : text);
 }
 
@@ -180,16 +180,16 @@ export function verifyServerProfile(value) {
 }
 
 export function serverTailPolicy() {
-  // Family alpha = 1/20; rational denominator предотвращает лишнюю float
-  // операцию, дающую соседний binary64 к точному1/1760.
+  // Для семейства alpha = 1/20; рациональный знаменатель исключает лишнюю
+  // операцию с плавающей точкой, дающую соседнее binary64 вместо точного 1/1760.
   const alphaPerTail = 1 / (SERVER_PROFILE.familySize * 2 * 2 * 2 * 20);
   return { alphaPerTail, quantiles: [0.5, 0.95], minimumBlocks: Math.ceil(Math.log(alphaPerTail) / Math.log(0.95)),
     correction: 'Bonferroni: 11 cells × 2 quantiles × 2 participants × 2 tails; family-wise 95%' };
 }
 
-// Требуемый N выводится только из baseline A/A pilot, до любых candidate samples.
-// Формула планирует средний парный log-contrast; tail admission остаётся отдельным
-// строгим гейтом и не получает гарантии мощности от этой приближённой оценки.
+// Требуемый N выводится только из пилота A/A базовой версии, до любых образцов кандидата.
+// Формула планирует средний парный логарифмический контраст; допуск хвостовых
+// квантилей проверяется отдельно и не получает гарантии мощности от этой приближённой оценки.
 export function planServerSampleSize(pilotPairs) {
   if (!Array.isArray(pilotPairs) || pilotPairs.length !== SERVER_PROFILE.familySize) {
     throw new Error('server profile: неполное семейство null-pilot');

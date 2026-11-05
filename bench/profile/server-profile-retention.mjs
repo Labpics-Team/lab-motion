@@ -1,4 +1,4 @@
-// Forced GC изолирован от timing. Отрицательная delta не превращается в ноль.
+// Принудительная GC изолирована от измерений времени. Отрицательное приращение не превращается в ноль.
 import { runTransformLifecycleSample } from '../../scripts/bench-transform-support.mjs';
 import { createMotionValueDefaultBenchmark } from '../../scripts/bench-support.mjs';
 import { SERVER_PROFILE } from './server-profile-registration.mjs';
