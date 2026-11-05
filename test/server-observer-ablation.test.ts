@@ -36,6 +36,32 @@ function observe(source: string, values: number[], fault?: string) {
   catch (thrown) { return { thrown, error, reads }; }
 }
 
+function expectPositiveObservation(observation: ReturnType<typeof observe>, values: number[]) {
+  expect(observation.thrown).toBeUndefined();
+  expect(observation.value).toBeDefined();
+  const { connectedTargets, activeWaapi, transforms } = observation.value;
+  expect(connectedTargets).toBe(Math.ceil(values.length / 2));
+  expect(activeWaapi).toBe(values.length * (values.length - 1) / 2);
+  expect(transforms.count).toBe(values.length);
+  const coordinates = transforms.encoding === 'repeat'
+    ? Array(transforms.count).fill(transforms.value)
+    : transforms.runs.flatMap(([count, value]: [number, number]) => Array(count).fill(value));
+  expect(coordinates).toHaveLength(values.length);
+  expect(coordinates.map((value: number, index: number) => Object.is(value, values[index])))
+    .toEqual(values.map(() => true));
+  expect(observation.reads).toEqual([
+    ...values.map((_, index) => `connected:${index}`),
+    ...values.map((_, index) => `animations:${index}`),
+    ...values.flatMap((_, index) => [`style:${index}`, `matrix:${index}`]),
+  ]);
+}
+
+function expectPositiveEquivalence(original: ReturnType<typeof observe>, reduced: ReturnType<typeof observe>, values: number[]) {
+  expectPositiveObservation(original, values);
+  expectPositiveObservation(reduced, values);
+  expect(reduced.value).toEqual(original.value);
+}
+
 describe('diagnostic-only three-pass observer', () => {
   it('assigns exactly eight balanced baseline pairs per scene, retains all arms and stops before qualification', async () => {
     const artifact: any = { diagnostic: OBSERVER_ABLATION, stages: [] };
@@ -103,16 +129,33 @@ describe('diagnostic-only three-pass observer', () => {
     expect(compactBegin).toBeGreaterThan(0); expect(compactEnd).toBeGreaterThan(compactBegin);
     expect(h0Begin).toBeGreaterThan(0); expect(h0End).toBeGreaterThan(h0Begin);
     const original = observe(h0, values), reduced = observe(observerSnapshotH1.toString(), values);
-    expect(reduced.value).toEqual(original.value);
-    expect(reduced.reads).toEqual(original.reads);
+    expectPositiveEquivalence(original, reduced, values);
+  });
+
+  it('rejects unexpected observer failures through the positive equivalence oracle', () => {
+    const values = [0, 1, 2];
+    const sources = [h0, observerSnapshotH1.toString()];
+    const healthy = sources.map(source => observe(source, values));
+    expectPositiveEquivalence(healthy[0], healthy[1], values);
+    for (const failingArms of [[0], [1], [0, 1]]) {
+      const observations = [...healthy];
+      for (const arm of failingArms) {
+        observations[arm] = observe(sources[arm], values, 'matrix:1');
+        expect(observations[arm].thrown).toBe(observations[arm].error);
+      }
+      expect(() => expectPositiveEquivalence(observations[0], observations[1], values))
+        .toThrowError(expect.objectContaining({ name: 'AssertionError' }));
+    }
   });
 
   it('roundtrips signed-zero coordinates through actual artifact and journal carriers', () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), 'observer-carrier-'));
     try {
-      const original = observe(h0, [0, -0, -0, 0]).value;
-      const reduced = observe(observerSnapshotH1.toString(), [0, -0, -0, 0]).value;
-      expect(reduced).toEqual(original);
+      const values = [0, -0, -0, 0];
+      const originalObservation = observe(h0, values);
+      const reducedObservation = observe(observerSnapshotH1.toString(), values);
+      expectPositiveEquivalence(originalObservation, reducedObservation, values);
+      const original = originalObservation.value, reduced = reducedObservation.value;
       const rawFile = path.join(directory, 'raw.json');
       writeServerArtifact(rawFile, { original, reduced });
       const raw = parseServerJsonBytes(readFileSync(rawFile));
