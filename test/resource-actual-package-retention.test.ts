@@ -9,14 +9,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 // Архив пакета, сведения о сборке, точный скрипт и журналы сохраняют воспроизводимость,
 // включая неудачные прогоны. r11 G-PERF §4/§6 защищает ошибки и единственную копию доказательств.
-const EVIDENCE = join(ROOT, 'scratchpad', 'resource-evidence');
+const EVIDENCE = process.env.LAB_MOTION_RESOURCE_EVIDENCE_DIR ?? join(ROOT, 'scratchpad', 'resource-evidence');
 const WINDOWS_SHELL = process.platform === 'win32';
 const NPM = WINDOWS_SHELL ? 'npm.cmd' : 'npm';
 const shellPath = (value: string): string => WINDOWS_SHELL ? `"${value}"` : value;
 const RUNTIME_FILES = [
   'index', 'frame/index', 'compositor/index', 'bindings/index',
   'behaviors/index', 'behaviors/reorder/index', 'compositor/follow/index',
-  'presence/index', 'animate/index',
+  'presence/index', 'animate/index', 'motion/index',
 ].flatMap(entry => [`dist/${entry}.js`, `dist/${entry}.cjs`]);
 const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
 const EXISTING_KINDS = [
@@ -25,6 +25,7 @@ const EXISTING_KINDS = [
   'follow-native', 'follow-pickup', 'follow-live',
 ];
 const ADDED_KINDS = ['presence-transition', 'animate-scope-main', 'animate-scope-native'];
+const ROOT_KINDS = ['root-value', 'root-scope-main', 'root-scope-native', 'root-playhead', 'root-sequence', 'root-layout'];
 const ownerNames = (kinds: string[]) => ['esm', 'cjs'].flatMap(format => kinds.map(owner => `${format}/${owner}`));
 const EXPECTED_OWNERS = ownerNames([...EXISTING_KINDS, ...ADDED_KINDS]);
 
@@ -148,25 +149,25 @@ describe('RESOURCE-01: реальные байты установленного 
     expect(result.tailExcess).toEqual([0, 0, 0, 0]);
   }, 120_000);
 
-  it.each(['prefix', 'growing'] as const)('измеритель обнаруживает %s удержание в установленном пакете', (kind) => {
+  it.each(['existing', 'root'].flatMap(corpus => ['prefix', 'growing'].map(kind => ({ corpus, kind }))))('измеритель обнаруживает $kind удержание в установленном $corpus пакете', ({ corpus, kind }) => {
     const source = readFileSync(entry, 'utf8');
     const boundary = '    const measured = await memory();';
     expect(source.split(boundary)).toHaveLength(2);
     const injection = kind === 'prefix'
       ? 'globalThis.__resourceChurnControl = prefix === BATCH_CYCLES ? component(prefix, CONTROL_WORDS) : undefined;'
       : '(globalThis.__resourceChurnControl ??= []).push(component(prefix, CONTROL_WORDS));';
-    const mutant = join(app, `retained-${kind}.mjs`);
+    const mutant = join(app, `retained-${kind}-${corpus}.mjs`);
     writeFileSync(mutant, source.replace(boundary, `    ${injection}\n${boundary}`));
-    const run = spawnSync(process.execPath, [...vmFlags('bytes', true), mutant, 'bytes', 'existing'], {
+    const run = spawnSync(process.execPath, [...vmFlags('bytes', true), mutant, 'bytes', corpus], {
       cwd: app, encoding: 'utf8', timeout: 90_000, maxBuffer: 4 * 1024 * 1024,
     });
-    writeFileSync(join(evidenceRun, `retained-${kind}.stdout.log`), run.stdout ?? '');
-    writeFileSync(join(evidenceRun, `retained-${kind}.stderr.log`), run.stderr ?? '');
+    writeFileSync(join(evidenceRun, `retained-${kind}-${corpus}.stdout.log`), run.stdout ?? '');
+    writeFileSync(join(evidenceRun, `retained-${kind}-${corpus}.stderr.log`), run.stderr ?? '');
     expect(run.error).toBeUndefined();
     expect(run.status, run.stderr).toBe(1);
     const result = JSON.parse(run.stdout.trim().split('\n').at(-1)!) as Record<string, unknown>;
     expect(result.status).toBe('fail');
-    completeCycles(result, ownerNames(EXISTING_KINDS));
+    completeCycles(result, ownerNames(corpus === 'root' ? ROOT_KINDS : EXISTING_KINDS));
     const excess = result.excess as number[];
     expect(excess).toHaveLength(5);
     expect(excess[0]).toBeGreaterThan(0);
@@ -177,6 +178,44 @@ describe('RESOURCE-01: реальные байты установленного 
       expect(excess.every(bytes => bytes > 0)).toBe(true);
       expect(excess.at(-1)).toBeGreaterThan(excess[0]!);
       expect((result.tailExcess as number[]).every(bytes => bytes > 0)).toBe(true);
+    }
+  }, 120_000);
+
+  it.each(['registration', 'removal'])('ROOT event control rejects no-op %s', kind => {
+    const source = readFileSync(entry, 'utf8');
+    const boundary = kind === 'registration'
+      ? 'addEventListener(_event, callback) { value.listeners.add(callback); }'
+      : 'removeEventListener(_event, callback) { value.listeners.delete(callback); }';
+    expect(source.split(boundary)).toHaveLength(2);
+    const mutant = join(app, `root-event-${kind}.mjs`);
+    writeFileSync(mutant, source.replace(boundary, boundary.replace(/\{.*\}/, '{}')));
+    const run = spawnSync(process.execPath, [...vmFlags('witness', true), mutant, 'witness', 'root'], {
+      cwd: app, encoding: 'utf8', timeout: 90_000, maxBuffer: 4 * 1024 * 1024,
+    });
+    writeFileSync(join(evidenceRun, `root-event-${kind}.stdout.log`), run.stdout ?? '');
+    writeFileSync(join(evidenceRun, `root-event-${kind}.stderr.log`), run.stderr ?? '');
+    expect(run.error).toBeUndefined();
+    expect(run.status, run.stderr).toBe(1);
+    const rejection = JSON.parse(run.stdout.trim().split('\n').at(-1)!) as Record<string, unknown>;
+    expect(rejection).toEqual({ status: 'fail', mode: 'witness', corpus: 'root',
+      code: kind === 'registration' ? 'ROOT_EVENT_REGISTRATION' : 'ROOT_EVENT_REMOVAL' });
+  }, 120_000);
+
+  it.each(['witness', 'lifecycle', 'retention', 'bytes'])('root public ESM/CJS %s uses the existing resource engine', mode => {
+    const result = probe(mode, mode !== 'lifecycle', 'root');
+    expect(result.status).toBe('pass');
+    if (mode !== 'witness') completeCycles(result, ownerNames(ROOT_KINDS));
+    if (mode === 'witness' || mode === 'retention') {
+      expect(result.retainedComponentReferences).toBe(0);
+      expect(result.retainedComponentPayloadBytes).toBe(0);
+      expect(result.controls).toMatchObject({ live: 12, expectedLive: 12, dropped: 0, deliberate: 1,
+        addedLiveReleased: 0, addedLiveReleaseControls: 12 });
+    }
+    if (mode === 'bytes') {
+      expect(result.baseline).toMatchObject({ warmupCyclesPerOwner: 2000, calibrationCyclesPerSample: 2000,
+        workloadCyclesPerSample: 2000, collector: 'major/async/last-resort', optimizer: 'foreground', maximumResolvableBand: 262144 });
+      expect(result.excess).toEqual([0, 0, 0, 0, 0]);
+      expect(result.tailExcess).toEqual([0, 0, 0, 0]);
     }
   }, 120_000);
 
