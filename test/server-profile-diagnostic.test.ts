@@ -22,6 +22,128 @@ const cliCases = [
   { mode: 'false', fault: 'bad-args', matches: 0 },
 ] as const;
 
+describe('actual runner raw-number preservation', () => {
+  const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  const recordBegin = source.indexOf('function preserveRawNumbers(');
+  const recordEnd = source.indexOf('function readOptional(', recordBegin);
+  const owner: { preserveRawNumbers: (value: unknown) => unknown; errorRecord: (error: unknown) => unknown } =
+    runInContext(`(() => { ${source.slice(recordBegin, recordEnd)} return { preserveRawNumbers, errorRecord }; })()`, createContext({}));
+
+  it.each(['repeat', 'rle'] as const)('preserves %s checkpoints, nested carriers and source containers', (encoding) => {
+    const positions = encoding === 'repeat' ? { encoding, count: 3, value: -0 }
+      : { encoding, count: 3, runs: Object.freeze([Object.freeze([1, -0]), Object.freeze([2, Infinity])]) };
+    const leaves = Object.freeze([NaN, Infinity, -Infinity, -0, undefined, , Object.freeze({ finite: 7 })]);
+    const input = Object.freeze({ phase: 'batch-started-before-cancel', repetition: 0, calls: 3,
+      startClock: Object.freeze({ beginMs: 1, endMs: 2 }),
+      startWitness: Object.freeze({ connectedTargets: 3, leadingAnimations: Object.freeze([0, 1, 2]),
+        leadingPositions: Object.freeze(positions), readClock: Object.freeze({ beginMs: 2, endMs: 3 }) }),
+      acquiredBatchStartMs: 1, ownersStarted: 3, leaves });
+    const descriptors = Object.getOwnPropertyDescriptors(leaves);
+    const expected = { ...input, startWitness: { ...input.startWitness, leadingPositions: encoding === 'repeat'
+      ? { encoding, count: 3, value: -0 } : { encoding, count: 3, runs: [[1, -0], [2, { nonfinite: 'Infinity' }]] } },
+      leaves: [{ nonfinite: 'NaN' }, { nonfinite: 'Infinity' }, { nonfinite: '-Infinity' }, -0, undefined, , { finite: 7 }] };
+
+    const output = owner.preserveRawNumbers(input);
+
+    expect(output).toEqual(expected);
+    expect(JSON.stringify(output)).toBe(JSON.stringify(expected));
+    expect(output).not.toBe(input);
+    const convertedLeaves: unknown = Object.getOwnPropertyDescriptor(output, 'leaves')?.value;
+    expect(Array.isArray(convertedLeaves)).toBe(true);
+    if (!Array.isArray(convertedLeaves)) throw new Error('missing converted leaves');
+    expect(convertedLeaves).not.toBe(leaves);
+    expect(Object.is(convertedLeaves[3], -0)).toBe(true);
+    expect(Object.hasOwn(convertedLeaves, 4)).toBe(true); expect(Object.hasOwn(convertedLeaves, 5)).toBe(false);
+    expect(Object.getOwnPropertyDescriptors(leaves)).toEqual(descriptors);
+    expect(input.leaves[0]).toBeNaN(); expect(input.leaves[1]).toBe(Infinity);
+    expect(Object.is(input.leaves[3], -0)).toBe(true); expect(Object.hasOwn(input.leaves, 5)).toBe(false);
+    expect(input.startWitness.leadingPositions).toBe(positions);
+  });
+
+  it('retains own __proto__, entry key order and ignored properties', () => {
+    const input = Object.create({ inherited: Infinity });
+    Object.defineProperties(input, {
+      tail: { enumerable: true, value: NaN },
+      ['__proto__']: { enumerable: true, value: Object.freeze({ value: -Infinity }) },
+      '10': { enumerable: true, value: Infinity }, '2': { enumerable: true, value: -0 },
+      hidden: { get() { throw new Error('non-enumerable read'); } },
+      [Symbol('ignored')]: { enumerable: true, get() { throw new Error('symbol read'); } },
+    });
+    Object.freeze(input);
+    const descriptors = Object.getOwnPropertyDescriptors(input);
+
+    const output = owner.preserveRawNumbers(input);
+
+    expect(Object.getPrototypeOf(output)).toBe(Object.getPrototypeOf(owner.preserveRawNumbers({})));
+    expect(Object.keys(output ?? {})).toEqual(['2', '10', 'tail', '__proto__']);
+    expect(Object.getOwnPropertyDescriptor(output, '__proto__')).toEqual({
+      value: { value: { nonfinite: '-Infinity' } }, enumerable: true, writable: true, configurable: true,
+    });
+    expect(output).toEqual(Object.fromEntries([
+      ['2', -0], ['10', { nonfinite: 'Infinity' }], ['tail', { nonfinite: 'NaN' }], ['__proto__', { value: { nonfinite: '-Infinity' } }],
+    ]));
+    expect(Object.getOwnPropertyDescriptors(input)).toEqual(descriptors);
+  });
+
+  it('snapshots sibling getter values before descending into children', () => {
+    const reads: string[] = [];
+    let sibling = Infinity;
+    const child = Object.freeze({ get nested() { reads.push('nested'); sibling = -Infinity; return NaN; } });
+    const input = Object.freeze({ get first() { reads.push('first'); return child; },
+      get second() { reads.push('second'); return sibling; }, get last() { reads.push('last'); return undefined; } });
+    const descriptors = Object.getOwnPropertyDescriptors(input);
+
+    const output = owner.preserveRawNumbers(input);
+
+    expect(reads).toEqual(['first', 'second', 'last', 'nested']);
+    expect(output).toEqual({ first: { nested: { nonfinite: 'NaN' } }, second: { nonfinite: 'Infinity' }, last: undefined });
+    expect(Object.getOwnPropertyDescriptors(input)).toEqual(descriptors);
+  });
+
+  it('retains nonfinite error raw and timer evidence through the actual error recorder', () => {
+    const raw = Object.freeze({ partial: Object.freeze([Object.freeze({ acquired: Infinity, cause: undefined })]) });
+    const timerEvidence = Object.freeze({ probes: Object.freeze([NaN, -Infinity]) });
+    const error = Object.assign(new Error('acquisition failed'), { code: 'EIO', raw, timerEvidence });
+    const expected = { name: 'Error', message: 'acquisition failed', code: 'EIO',
+      raw: { partial: [{ acquired: { nonfinite: 'Infinity' }, cause: undefined }] },
+      timerEvidence: { probes: [{ nonfinite: 'NaN' }, { nonfinite: '-Infinity' }] } };
+
+    const output = owner.errorRecord(error);
+
+    expect(output).toEqual(expected);
+    expect(JSON.stringify(output)).toBe(JSON.stringify(expected));
+    expect(error.raw).toBe(raw); expect(error.timerEvidence).toBe(timerEvidence);
+  });
+
+  it.each(['success', 'snapshot-throw', 'recursive-throw'] as const)('converts before actual checkpoint push and receipt: %s', async (phase) => {
+    const reads: string[] = [], partial: unknown[] = [];
+    const failure = new Error('getter failure');
+    const child = Object.freeze({ get nested() { reads.push('nested'); if (phase === 'recursive-throw') throw failure; return Infinity; } });
+    const input = Object.freeze({ get first() { reads.push('first'); return child; },
+      get second() { reads.push('second'); if (phase === 'snapshot-throw') throw failure; return NaN; },
+      get last() { reads.push('last'); return undefined; } });
+    let save: (value: unknown) => unknown = () => { throw new Error('callback not registered'); };
+    const callbackBegin = source.indexOf("    await page.exposeFunction('__serverSavePartial',");
+    const callbackEnd = source.indexOf('\n', callbackBegin);
+    const realm = createContext({ partial, page: { exposeFunction: async (_name: string, callback: typeof save) => { save = callback; } } });
+    await runInContext(`(async () => { ${source.slice(recordBegin, recordEnd)} ${source.slice(callbackBegin, callbackEnd)} })()`, realm);
+    const descriptors = Object.getOwnPropertyDescriptors(input);
+
+    const receipt = Promise.resolve().then(() => save(input));
+
+    if (phase === 'success') {
+      await expect(receipt).resolves.toBeUndefined();
+      expect(partial).toEqual([{ first: { nested: { nonfinite: 'Infinity' } }, second: { nonfinite: 'NaN' }, last: undefined }]);
+      expect(reads).toEqual(['first', 'second', 'last', 'nested']);
+    } else {
+      await expect(receipt).rejects.toBe(failure);
+      expect(partial).toEqual([]);
+      expect(reads).toEqual(phase === 'snapshot-throw' ? ['first', 'second'] : ['first', 'second', 'last', 'nested']);
+    }
+    expect(Object.getOwnPropertyDescriptors(input)).toEqual(descriptors);
+  });
+});
+
 describe('настоящий диагностический CLI', () => {
   it.each(cliCases)('mode=$mode acquisition=$fault', ({ mode, fault, matches }) => {
     const directory = mkdtempSync(path.join(os.tmpdir(), 'diagnostic-cli-'));

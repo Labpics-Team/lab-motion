@@ -37,7 +37,11 @@ const PACKAGES = { motion: 'motion', gsap: 'gsap', anime: 'animejs', 'motion-min
 function preserveRawNumbers(value) {
   if (typeof value === 'number' && !Number.isFinite(value)) return { nonfinite: String(value) };
   if (Array.isArray(value)) return value.map(preserveRawNumbers);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, preserveRawNumbers(child)]));
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value);
+    for (const entry of entries) entry[1] = preserveRawNumbers(entry[1]);
+    return Object.fromEntries(entries);
+  }
   return value;
 }
 
