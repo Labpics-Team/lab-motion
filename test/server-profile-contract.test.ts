@@ -1742,8 +1742,8 @@ describe('PROFILE: current-run clock build binding', () => {
 describe('PROFILE: ресурсный контракт проверяется до регистрации и samples', () => {
   const keys = ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'];
   const healthy = { usage_usec: 100, user_usec: 70, system_usec: 30, nr_periods: 20, nr_throttled: 2, throttled_usec: 50 };
-  function machine(quota: string | null = '400000 100000', counters: Record<string, number> = healthy) {
-    const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
+  function machine(quota: string | null = '400000 100000', counters: Record<string, number> = healthy, sourceOverride?: string) {
+    const source = sourceOverride ?? readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
     const common = source.slice(source.indexOf('function readOptional('), source.indexOf('async function withBrowserTimeout('));
     const capture = source.slice(source.indexOf('export function captureServerClockBuildEvidence('), source.indexOf('export function createServerJournal(')).replace(/^export /gm, '');
     const leaf = '/sys/fs/cgroup/system.slice/hosted-compute-agent.service';
@@ -1768,6 +1768,7 @@ describe('PROFILE: ресурсный контракт проверяется д
     if (quota === null) delete files[leaf + '/cpu.max']; else files[leaf + '/cpu.max'] = quota;
     const hashBinary = vi.fn(() => hash), reads: string[] = [];
     const errors: Record<string, string> = {}, inodes: Record<string, bigint> = {}, onRead: Record<string, () => void> = {};
+    const objects: Record<string, { directory?: boolean; fsType?: bigint; statError?: string; fsError?: string }> = {};
     // Точные функции owner, независимые файлы; без пакетов, CPU и браузера.
     const realm = createContext({
       readFileSync(file: string) {
@@ -1783,8 +1784,14 @@ describe('PROFILE: ресурсный контракт проверяется д
       },
       spawnSync(_command: string, args: string[]) { return clockEvidence.packages.find(record => record.args[2] === args[2]); },
       verifyServerClockBuildEvidence: (value: unknown, machine: unknown) => verifyServerClockBuildEvidence(JSON.parse(JSON.stringify(value)), machine),
-      statSync: (file: string) => ({ dev: 31n, ino: inodes[file] ?? BigInt(file.length), isDirectory: () => true }),
-      statfsSync: () => ({ type: 0x63677270n }), path,
+      statSync: (file: string) => {
+        if (objects[file]?.statError) throw Object.assign(new Error('fixture stat'), { code: objects[file]!.statError });
+        return { dev: 31n, ino: inodes[file] ?? BigInt(file.length), isDirectory: () => objects[file]?.directory ?? true };
+      },
+      statfsSync: (file: string) => {
+        if (objects[file]?.fsError) throw Object.assign(new Error('fixture statfs'), { code: objects[file]!.fsError });
+        return { type: objects[file]?.fsType ?? 0x63677270n };
+      }, path,
       errorRecord: (error: Error & { code?: string }) => ({ message: error.message, code: error.code }),
       validateServerResourceIdentity: (value: unknown) => validateServerResourceIdentity(JSON.parse(JSON.stringify(value))),
       serverResourceBinding: (value: unknown) => serverResourceBinding(JSON.parse(JSON.stringify(value))),
@@ -1794,8 +1801,46 @@ describe('PROFILE: ресурсный контракт проверяется д
       process: { version: 'v24.19.0', execPath: '/fixture/node', execArgv: [], memoryUsage: () => ({ heapUsed: 1 }) },
     });
     const owner = runInContext(common + '\n' + capture + '\n({ captureServerMachine, captureServerClockBuildEvidence });', realm);
-    return { capture: owner.captureServerMachine, collect: owner.captureServerClockBuildEvidence, hashBinary, files, errors, inodes, reads, leaf, onRead, clockEvidence };
+    return { capture: owner.captureServerMachine, collect: owner.captureServerClockBuildEvidence, hashBinary, files, errors, inodes, reads, leaf, onRead, clockEvidence, objects };
   }
+
+  it('prior cgroup owner counterexample loses captured object on owned rejection', () => {
+    const prior = childProcess.spawnSync('git', ['show', '5e0f5e87eae944401ba18d02917ac3a222cbc6e7:bench/profile/server-profile-runner.mjs'], { encoding: 'utf8' });
+    expect(prior.status).toBe(0);
+    const fixture = machine('400000 100000', healthy, prior.stdout);
+    fixture.objects[fixture.leaf] = { directory: false };
+    let caught: any;
+    try { fixture.capture(); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.raw.object).toBeUndefined();
+    expect(caught.raw.error).toBeDefined();
+  });
+
+  it('valid cgroup object retains identity', () => {
+    const fixture = machine();
+    const captured = fixture.capture();
+    expect(captured.identity.resource.scopes[0]).toMatchObject({ dev: '31', ino: String(fixture.leaf.length), fsType: String(0x63677270) });
+  });
+
+  it.each(['non-directory', 'wrong-filesystem', 'stat-error', 'statfs-error'] as const)
+  ('cgroup object diagnostic distinguishes %s', (fault) => {
+    const fixture = machine();
+    fixture.objects[fixture.leaf] = fault === 'non-directory' ? { directory: false }
+      : fault === 'wrong-filesystem' ? { fsType: 0x1234n }
+        : fault === 'stat-error' ? { statError: 'EACCES' } : { fsError: 'EIO' };
+    let caught: any;
+    try { fixture.capture(); } catch (error) { caught = error; }
+    expect(caught).toBeDefined();
+    expect(caught.raw.directory).toBe(fixture.leaf);
+    if (fault === 'stat-error' || fault === 'statfs-error') {
+      expect(caught.raw.error.code).toBe(fault === 'stat-error' ? 'EACCES' : 'EIO');
+      expect(caught.raw.object).toBeUndefined();
+    } else {
+      expect(caught.raw.error).toBeUndefined();
+      expect(caught.raw.object).toEqual({ dev: '31', ino: String(fixture.leaf.length),
+        fsType: String(fault === 'wrong-filesystem' ? 0x1234 : 0x63677270) });
+    }
+  });
 
   it.each(['config', 'signature', 'modules-package', 'read-error', 'children-namespace', 'self-offset'] as const)
   ('реальный machine capture отвергает current-run %s до identity/resource sampling', (fault) => {

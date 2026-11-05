@@ -78,12 +78,15 @@ function captureResourceConfiguration() {
   const scopes = [];
   for (let current = member; ; current = path.posix.dirname(current)) {
     const directory = mount.point + (current === '/' ? '' : current);
-    let object;
+    let info, fs;
     try {
-      const info = statSync(directory, { bigint: true }), fs = statfsSync(directory, { bigint: true });
-      object = { dev: String(info.dev), ino: String(info.ino), fsType: String(fs.type) };
-      if (!info.isDirectory() || fs.type !== 0x63677270n) refuse('объект не cgroup2 directory');
+      info = statSync(directory, { bigint: true });
+      fs = statfsSync(directory, { bigint: true });
     } catch (error) { throw Object.assign(new Error('server profile: cgroup object недоступен; до samples'), { raw: { ...raw, directory, error: errorRecord(error) } }); }
+    const object = { dev: String(info.dev), ino: String(info.ino), fsType: String(fs.type) };
+    if (!info.isDirectory() || fs.type !== 0x63677270n) {
+      throw Object.assign(new Error('server profile: объект не cgroup2 directory; до samples'), { raw: { ...raw, directory, object } });
+    }
     scopes.push({ path: current, directory, ...object, type: resourceRead(directory + '/cgroup.type'),
       cpuMax: resourceRead(directory + '/cpu.max'), burst: resourceRead(directory + '/cpu.max.burst'),
       memoryMax: resourceRead(directory + '/memory.max'), controllers: resourceRead(directory + '/cgroup.controllers'),
