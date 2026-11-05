@@ -263,7 +263,7 @@ jobs:
           node --input-type=module <<'NODE'
           import { appendFileSync } from 'node:fs';
           import { SERVER_PROFILE } from './bench/profile/server-profile-registration.mjs';
-          if (!/^[a-f0-9]{40}$/.test(SERVER_PROFILE.baselineRevision)) throw new Error('invalid registered baseline');
+          if (!/^[a-f0-9]{40}$/.test(SERVER_PROFILE.baselineRevision)) throw new Error('Некорректная зарегистрированная базовая ревизия');
           appendFileSync(process.env.GITHUB_OUTPUT, `baseline=${SERVER_PROFILE.baselineRevision}\n`);
           NODE
 
@@ -314,7 +314,7 @@ jobs:
           const source = (root) => ({ sha: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
             tree: execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root, encoding: 'utf8' }).trim() });
           const baseline = source(resolve('../server-baseline')), candidate = source(process.cwd());
-          if (baseline.sha !== SERVER_PROFILE.baselineRevision || candidate.sha !== process.env.PROFILE_SOURCE_SHA) throw new Error('source binding mismatch');
+          if (baseline.sha !== SERVER_PROFILE.baselineRevision || candidate.sha !== process.env.PROFILE_SOURCE_SHA) throw new Error('Привязка исходных ревизий не совпадает');
           const receipt = { runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
             baseline, candidate, protocolDigest: serverProfileDigest(SERVER_PROFILE), out: process.env.SERVER_OUT };
           writeFileSync(join(process.env.SERVER_RECEIPTS, 'source.json'), JSON.stringify(receipt), { flag: 'wx' });

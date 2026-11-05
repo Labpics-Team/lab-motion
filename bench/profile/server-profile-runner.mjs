@@ -86,7 +86,7 @@ function captureResourceConfiguration() {
     } catch (error) { throw Object.assign(new Error('server profile: объект cgroup недоступен; до сбора образцов'), { raw: { ...raw, directory, error: errorRecord(error) } }); }
     const object = { dev: String(info.dev), ino: String(info.ino), fsType: String(fs.type) };
     if (!info.isDirectory() || fs.type !== 0x63677270n) {
-      throw Object.assign(new Error('server profile: объект не cgroup2 directory; до samples'), { raw: { ...raw, directory, object } });
+      throw Object.assign(new Error('server profile: объект не является каталогом cgroup2; до сбора образцов'), { raw: { ...raw, directory, object } });
     }
     scopes.push({ path: current, directory, ...object, type: resourceRead(directory + '/cgroup.type'),
       cpuMax: resourceRead(directory + '/cpu.max'), burst: resourceRead(directory + '/cpu.max.burst'),
@@ -98,7 +98,7 @@ function captureResourceConfiguration() {
   const schedExtState = { model: 'linux-v6.18.44-v7.0-sched-ext-state', ...resourceRead('/sys/kernel/sched_ext/state') };
   const resource = { membership, mountinfo, mount, scheduler, schedExtState, scopes };
   try { validateServerResourceIdentity(resource); }
-  catch (error) { throw Object.assign(new Error(error.message + '; до samples'), { raw: { resource, cgroupCpuMax: scopes[0].cpuMax.text ?? null } }); }
+  catch (error) { throw Object.assign(new Error(error.message + '; до сбора образцов'), { raw: { resource, cgroupCpuMax: scopes[0].cpuMax.text ?? null } }); }
   return resource;
 }
 function contextSwitches() {
@@ -115,7 +115,7 @@ function captureServerLoad() {
     const cpuStat = Object.fromEntries(entries.map(([key, value]) => [key, Number(value)]));
     if (raw.error || entries.some((entry) => entry.length !== 2) || new Set(entries.map(([key]) => key)).size !== entries.length ||
       !['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'].every((key) => Number.isSafeInteger(cpuStat[key]) && cpuStat[key] >= 0)) {
-      throw Object.assign(new Error('server profile: cpu.stat требует шесть безопасных счётчиков; до samples'),
+      throw Object.assign(new Error('server profile: cpu.stat требует шесть безопасных счётчиков; до сбора образцов'),
         { raw: { resource: { path: scope.path, cpuMax: scope.cpuMax.text, cpuStat, read: raw } } });
     }
     return { path: scope.path, cpuStat };
@@ -123,10 +123,10 @@ function captureServerLoad() {
   const after = captureResourceConfiguration();
   const affinityAfter = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
   if (serverProfileDigest(serverResourceBinding(resource)) !== serverProfileDigest(serverResourceBinding(after)) || affinity !== affinityAfter) {
-    throw Object.assign(new Error('server profile: cgroup/affinity изменились при snapshot'), { raw: { resource, after, affinity, affinityAfter } });
+    throw Object.assign(new Error('server profile: cgroup или привязка CPU изменились при получении снимка'), { raw: { resource, after, affinity, affinityAfter } });
   }
   return { at: new Date().toISOString(), affinity, resource, scopes, cpuMax: resource.scopes[0].cpuMax.text,
-    cpuStat: scopes[0].cpuStat, loadavg: loadavg(), contextSwitches: contextSwitches(), scope: 'process cgroup; каждый non-root ancestor отдельно' };
+    cpuStat: scopes[0].cpuStat, loadavg: loadavg(), contextSwitches: contextSwitches(), scope: 'cgroup процесса; каждый предок, кроме корня, учитывается отдельно' };
 }
 async function withBrowserTimeout(promise, label) {
   let timeout;
@@ -221,7 +221,7 @@ export async function runServerProfileCalibration(artifact, runStage, journal, {
   artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock));
   artifact.frozenPlanDigest = serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan });
   journal('N-frozen-before-calibration-and-AB', { samplePlan: artifact.samplePlan, digest: artifact.frozenPlanDigest });
-  if (!artifact.samplePlan.feasible) throw Object.assign(new Error(`server profile: pilot требует ${artifact.samplePlan.requiredRuns} runs, предел ${SERVER_PROFILE.maxRuns}`), {
+  if (!artifact.samplePlan.feasible) throw Object.assign(new Error(`server profile: пилот требует ${artifact.samplePlan.requiredRuns} запусков, предел ${SERVER_PROFILE.maxRuns}`), {
     code: 'UNPROVEN_POWER', raw: { samplePlan: artifact.samplePlan, frozenPlanDigest: artifact.frozenPlanDigest },
   });
   artifact.aa = await runStage('aa', artifact.samplePlan.runs);

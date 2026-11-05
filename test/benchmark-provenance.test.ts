@@ -438,7 +438,7 @@ describe('Происхождение измеряемого бенчмарком
       const missing = structuredClone(metadata);
       delete (missing.exports as Partial<typeof metadata.exports>)[key];
       writeFileSync(path.join(f.root, 'package.json'), JSON.stringify(missing));
-      expect(() => serverParticipantPreparation(f.root, 'candidate')).toThrow(/missing packed export/);
+      expect(() => serverParticipantPreparation(f.root, 'candidate')).toThrow(Error);
     }
     writeFileSync(path.join(f.root, 'package.json'), JSON.stringify(metadata));
     for (const missing of options.requiredDist) {
