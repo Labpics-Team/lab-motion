@@ -501,7 +501,7 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
     const end = source.indexOf('          await window.__serverSavePartial(', begin);
     const actual = source.slice(begin, end);
     const legacy = actual.replace(/          let connectedTargets = 0;\n          for \(const element of targets\) if \(element.isConnected\) connectedTargets\+\+;\n          const startWitness = \{ connectedTargets,/, '          const startWitness = { connectedTargets: targets.filter((element) => element.isConnected).length,');
-    const compactBegin = source.indexOf('      const compact = (values) => {', source.indexOf('const result = await withBrowserTimeout(page.evaluate')));
+    const compactBegin = source.indexOf('      const compact = (values) => {', source.indexOf('const result = await withBrowserTimeout(page.evaluate'));
     const compactEnd = source.indexOf('      const expand = ', compactBegin);
     const compactSource = source.slice(compactBegin, compactEnd);
     const run = (block: string) => {
