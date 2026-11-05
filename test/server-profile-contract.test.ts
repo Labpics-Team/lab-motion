@@ -1816,7 +1816,7 @@ describe('PROFILE: current-run clock build binding', () => {
     if (fault === 'unrelated') {
       return admit().then(() => { expect(journal).toHaveBeenCalledTimes(1); expect(measure).toHaveBeenCalledTimes(1); });
     }
-    return expect(admit()).rejects.toThrow(/clock build/).then(() => {
+    return expect(admit()).rejects.toMatchObject({ name: 'Error', raw: { clockBuildEvidence: current } }).then(() => {
       expect(journal).not.toHaveBeenCalled(); expect(measure).not.toHaveBeenCalled();
     });
   });
