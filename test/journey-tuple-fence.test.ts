@@ -38,6 +38,7 @@ it('default fence отклоняет coherent foreign HTTP tuple той же в�
     const foreignBytes = readFileSync(foreign.tarball);
     expect(digest(foreignBytes)).not.toBe(digest(globalSetup.archive));
     let bytes = globalSetup.archive;
+    let rootModule = 'dist/motion/index.js';
     const bundle = Buffer.from('export const checkerFixture = true;');
     const hash = digest(bundle);
     const server = createServer((req, res) => {
@@ -48,8 +49,10 @@ it('default fence отклоняет coherent foreign HTTP tuple той же в�
         bundleSha256: hash, recipesSha256: hash, motionInputs: ['dist/smart/index.js'], motionInputSha256: { 'dist/smart/index.js': hash } };
       const follow = { package: `${scope.package.name}@${scope.package.version}`, tarball: archive,
         documentSha256: hash, outputs: [{ file: 'compositor-follow-recipes.js', sha256: hash }] };
+      const rootReceipt = { tarball: archive, bundleSha256: hash, modules: [rootModule] };
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify(req.url?.endsWith('scope-recipes.package.json') ? scope : follow));
+      res.end(JSON.stringify(req.url?.endsWith('scope-recipes.package.json') ? scope
+        : req.url?.endsWith('motion-root.package.json') ? rootReceipt : follow));
     });
     onTestFinished(async () => {
       if (server.listening) { server.close(); await once(server, 'close'); }
@@ -62,10 +65,18 @@ it('default fence отклоняет coherent foreign HTTP tuple той же в�
       // Проверяется Node checker seam; этот тест не объявляет browser journey выполненным.
       const page = { request: client, context: () => ({ browser: () => undefined }) } as unknown as Page;
       const info = { annotations: [], project: { name: 'checker-seam' }, attach: async () => {} } as unknown as TestInfo;
-      await verifyJourneyTuple(page, info);
+      for (const module of ['dist/motion/index.js', 'dist\\motion\\index.js']) {
+        rootModule = module;
+        await verifyJourneyTuple(page, info);
+      }
+      for (const module of ['src/motion/index.js', 'src\\motion\\index.js']) {
+        rootModule = module;
+        await expect(verifyJourneyTuple(page, info)).rejects.toThrow();
+      }
+      rootModule = 'dist/motion/index.js';
       bytes = foreignBytes;
       await expect(verifyJourneyTuple(page, info)).rejects.toThrow();
-      expect(globalSetup.reads).toBe(2);
+      expect(globalSetup.reads).toBe(5);
     } finally { await client.dispose(); server.close(); await once(server, 'close'); }
   } finally { rmSync(work, { recursive: true, force: true }); }
 }, 120_000);
