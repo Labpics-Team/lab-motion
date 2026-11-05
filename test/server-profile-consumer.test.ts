@@ -11,20 +11,28 @@ import { SERVER_PROFILE } from '../bench/profile/server-profile-registration.mjs
 import { createMotionValueDefaultBenchmark } from '../scripts/bench-support.mjs';
 
 let work = '', baseline = '', candidate = '';
+const registeredWorktrees = new Set<string>();
 const root = resolve('.');
 beforeAll(() => {
   work = mkdtempSync(join(tmpdir(), 'server-packed-consumers-'));
   baseline = join(work, 'baseline'); candidate = join(work, 'candidate');
   for (const [directory, sha] of [[baseline, SERVER_PROFILE.baselineRevision], [candidate, execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()]]) {
     execFileSync('git', ['worktree', 'add', '--detach', directory, sha!], { cwd: root, stdio: 'pipe' });
+    registeredWorktrees.add(directory!);
     execFileSync('pnpm', ['install', '--frozen-lockfile'], { cwd: directory, stdio: 'pipe', timeout: 180_000 });
     rmSync(join(directory!, 'dist'), { recursive: true, force: true });
     execFileSync('pnpm', ['build'], { cwd: directory, stdio: 'pipe', timeout: 180_000 });
   }
 }, 800_000);
 afterAll(() => {
-  for (const directory of [baseline, candidate]) if (directory) execFileSync('git', ['worktree', 'remove', '--force', directory], { cwd: root, stdio: 'pipe' });
-  if (work) rmSync(work, { recursive: true, force: true });
+  const failures: unknown[] = [];
+  for (const directory of registeredWorktrees) {
+    try { execFileSync('git', ['worktree', 'remove', '--force', directory], { cwd: root, stdio: 'pipe' }); }
+    catch (error) { failures.push(error); }
+  }
+  try { if (work) rmSync(work, { recursive: true, force: true }); }
+  catch (error) { failures.push(error); }
+  if (failures.length) throw new AggregateError(failures, 'owned packed-consumer cleanup failed');
 });
 
 it.each(['baseline', 'candidate'] as const)('real clean packed %s binds source, lifecycle and legacy stock C', async (id) => {

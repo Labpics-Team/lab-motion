@@ -1809,9 +1809,13 @@ describe('PROFILE: ресурсный контракт проверяется д
   }
 
   it('prior cgroup owner counterexample loses captured object on owned rejection', () => {
-    const prior = childProcess.spawnSync('git', ['show', '5e0f5e87eae944401ba18d02917ac3a222cbc6e7:bench/profile/server-profile-runner.mjs'], { encoding: 'utf8' });
-    expect(prior.status).toBe(0);
-    const fixture = machine('400000 100000', healthy, prior.stdout);
+    const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+    const begin = source.indexOf('    let info, fs;'), end = source.indexOf('    scopes.push(', begin);
+    expect(begin).toBeGreaterThan(0); expect(end).toBeGreaterThan(begin);
+    // Exact minimal pre-fix block from 5e0f5e87; deliberate mutation of the current owner.
+    const priorBlock = "    let object;\n    try {\n      const info = statSync(directory, { bigint: true }), fs = statfsSync(directory, { bigint: true });\n      object = { dev: String(info.dev), ino: String(info.ino), fsType: String(fs.type) };\n      if (!info.isDirectory() || fs.type !== 0x63677270n) refuse('объект не cgroup2 directory');\n    } catch (error) { throw Object.assign(new Error('server profile: cgroup object недоступен; до samples'), { raw: { ...raw, directory, error: errorRecord(error) } }); }\n";
+    const prior = source.slice(0, begin) + priorBlock + source.slice(end);
+    const fixture = machine('400000 100000', healthy, prior);
     fixture.objects[fixture.leaf] = { directory: false };
     let caught: any;
     try { fixture.capture(); } catch (error) { caught = error; }

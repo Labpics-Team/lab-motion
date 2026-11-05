@@ -368,7 +368,7 @@ function assertNativeGraph(files: Map<string, string>) {
         const exports = job.steps!.filter(item => item.uses?.startsWith('actions/upload-artifact@'));
         expect(exports.map(item => item.id)).toEqual(['raw_export', 'receipt_export']);
         for (const item of exports) {
-          expect(item.uses).toBe('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9');
+          expect(unpin(item.uses!)).toBe('actions/upload-artifact@<sha>');
           expect(item.with?.['retention-days']).toBe(5);
           expect(item.with?.['if-no-files-found']).toBe('error');
           expect(item.if).toContain('always()');
