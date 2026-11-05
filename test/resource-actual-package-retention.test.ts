@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -80,25 +80,32 @@ describe('RESOURCE-01: реальные байты установленного 
     copyFileSync(entry, join(evidenceRun, 'resource-package-probe.mjs'));
   }, 60_000);
 
-  // Удаляется только временный установленный пакет; evidenceRun сохраняет доказательства.
-  afterAll(() => { if (work !== undefined) rmSync(work, { recursive: true, force: true }); });
-
-  function probe(mode: string, forcedGc = false, corpus = 'combined'): Record<string, unknown> {
-    const args = [...vmFlags(mode, forcedGc), entry, mode, corpus];
-    const receiptName = corpus === 'combined' ? mode : `${mode}-${corpus}`;
-    let output: string;
+  // Hosted logs — существующий durable export, без нового CI artifact исключения.
+  // Полный tarball остаётся локальным archive; tuple связывает его с точным SHA.
+  afterAll(() => {
     try {
-      output = execFileSync(process.execPath, args, {
-        cwd: app, encoding: 'utf8', timeout: 90_000, maxBuffer: 4 * 1024 * 1024,
-      });
-    } catch (error) {
-      const result = error as Error & { stdout?: string; stderr?: string };
-      writeFileSync(join(evidenceRun, `${receiptName}.stdout.log`), result.stdout ?? '');
-      writeFileSync(join(evidenceRun, `${receiptName}.stderr.log`), result.stderr ?? result.message);
-      throw error;
+      if (evidenceRun) for (const name of readdirSync(evidenceRun).sort()) {
+        if (name === 'package-tuple.json' || name.endsWith('.stdout.log') || name.endsWith('.stderr.log'))
+          console.log(JSON.stringify({ resourceEvidence: 1, file: name, content: readFileSync(join(evidenceRun, name), 'utf8') }));
+      }
+    } finally {
+      if (work !== undefined) rmSync(work, { recursive: true, force: true });
     }
-    writeFileSync(join(evidenceRun, `${receiptName}.stdout.log`), output);
-    const result = JSON.parse(output.trim().split('\n').at(-1)!) as Record<string, unknown>;
+  });
+
+  function probe(mode: string, forcedGc = false, corpus = 'combined', script = entry): Record<string, unknown> {
+    const args = [...vmFlags(mode, forcedGc), script, mode, corpus];
+    const receiptName = corpus === 'combined' ? mode : `${mode}-${corpus}`;
+    const child = spawnSync(process.execPath, args, {
+      cwd: app, encoding: 'utf8', timeout: 90_000, maxBuffer: 4 * 1024 * 1024,
+    });
+    writeFileSync(join(evidenceRun, `${receiptName}.stdout.log`), child.stdout ?? '');
+    writeFileSync(join(evidenceRun, `${receiptName}.stderr.log`), child.stderr ?? '');
+    if (child.error) throw child.error;
+    if (child.status !== 0 || child.signal !== null) throw Object.assign(
+      new Error(`RESOURCE probe exit=${child.status} signal=${child.signal}`),
+      { status: child.status, signal: child.signal, stdout: child.stdout, stderr: child.stderr });
+    const result = JSON.parse(child.stdout.trim().split('\n').at(-1)!) as Record<string, unknown>;
     expect(result.corpus).toBe(corpus);
     return result;
   }
@@ -109,6 +116,19 @@ describe('RESOURCE-01: реальные байты установленного 
     expect(measured.map(owner => owner.name)).toEqual(owners);
     expect(measured.every(owner => owner.cycles === 10_000)).toBe(true);
   }
+
+  it.each(['success', 'exit', 'signal'])('probe сохраняет обе streams и различает %s', outcome => {
+    const script = join(app, `receipt-${outcome}.mjs`);
+    const stderr = `RESOURCE_RECEIPT_${outcome}\n`;
+    writeFileSync(script, `import { writeSync } from 'node:fs';\nwriteSync(1, JSON.stringify({ status: 'pass', corpus: 'root' }) + '\\n');\nwriteSync(2, ${JSON.stringify(stderr)});\n`
+      + (outcome === 'exit' ? 'process.exitCode = 1;\n' : outcome === 'signal' ? "process.kill(process.pid, 'SIGTERM');\n" : ''));
+    const invoke = () => probe(`receipt-${outcome}`, false, 'root', script);
+    if (outcome === 'success') expect(invoke()).toEqual({ status: 'pass', corpus: 'root' });
+    else if (outcome === 'exit') expect(invoke).toThrow(expect.objectContaining({ status: 1, signal: null }));
+    else expect(invoke).toThrow(expect.objectContaining({ status: null, signal: 'SIGTERM' }));
+    expect(readFileSync(join(evidenceRun, `receipt-${outcome}-root.stderr.log`), 'utf8')).toBe(stderr);
+    expect(JSON.parse(readFileSync(join(evidenceRun, `receipt-${outcome}-root.stdout.log`), 'utf8'))).toEqual({ status: 'pass', corpus: 'root' });
+  });
 
   it('packed ESM/CJS сохраняют один frame clock после getter reentry и частичного host failure', () => {
     const result = probe('reentry');
