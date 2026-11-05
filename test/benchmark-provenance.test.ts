@@ -25,6 +25,7 @@ import {
   revisionFingerprint,
   sha256File,
 } from '../bench/compare/provenance.mjs';
+import { serverParticipantPreparation } from '../bench/profile/server-profile-runner.mjs';
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>();
@@ -419,6 +420,41 @@ describe('Происхождение измеряемого бенчмарком
       captureEnvironment: () => ({ node: 'v24.0.0', pnpm: '11.11.0', packages: {} }),
     })).toThrow(/bench\/entry\.mjs.*animate\/native/i);
     expect(builds).toBe(0);
+  });
+
+  it('PROFILE preparation сохраняет public export и built-file отказы', () => {
+    const f = fixture();
+    const metadata = { exports: {
+      '.': { import: { default: './dist/motion/index.js' } },
+      './animate': { import: { default: './dist/animate/index.js' } },
+      './driver': { import: { default: './dist/driver/index.js' } },
+    } };
+    writeFileSync(path.join(f.root, 'package.json'), JSON.stringify(metadata));
+    const options = serverParticipantPreparation(f.root, 'candidate');
+    expect(options.requiredDist).toEqual(['dist/animate/index.js', 'dist/motion/index.js', 'dist/driver/index.js']);
+    expect(() => assertBenchmarkExportSurface({ ...options, requiredDist: [...options.requiredDist, 'dist/index.js'] }))
+      .toThrow(/requiredDist.*dist\/index.*export/i);
+    for (const key of ['.', './animate', './driver'] as const) {
+      const missing = structuredClone(metadata);
+      delete (missing.exports as Partial<typeof metadata.exports>)[key];
+      writeFileSync(path.join(f.root, 'package.json'), JSON.stringify(missing));
+      expect(() => serverParticipantPreparation(f.root, 'candidate')).toThrow(/missing packed export/);
+    }
+    writeFileSync(path.join(f.root, 'package.json'), JSON.stringify(metadata));
+    for (const missing of options.requiredDist) {
+      const build = vi.fn(() => {
+        for (const file of options.requiredDist) {
+          const absolute = path.join(f.root, file);
+          mkdirSync(path.dirname(absolute), { recursive: true });
+          if (file === missing) rmSync(absolute, { force: true });
+          else writeFileSync(absolute, 'fresh-runtime');
+        }
+      });
+      expect(() => prepareBenchmarkCheckout({ ...options, benchDirectory: f.benchDirectory, build,
+        readState: () => f.state, captureEnvironment: () => ({ node: 'v24.0.0', pnpm: '11.11.0', packages: {} }) }))
+        .toThrow(/сборка не создала обязательный файл/);
+      expect(build).toHaveBeenCalledTimes(1);
+    }
   });
 
   it('включает symlink target в tree fingerprint, не следуя за ним наружу', () => {

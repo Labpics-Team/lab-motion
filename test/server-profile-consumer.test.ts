@@ -5,7 +5,8 @@ import { join, resolve, relative, isAbsolute } from 'node:path';
 import { beforeAll, afterAll, expect, it } from 'vitest';
 import * as esbuild from 'esbuild';
 import { chromium } from '@playwright/test';
-import { buildAdapter, packConsumer } from '../bench/profile/server-profile-runner.mjs';
+import { buildAdapter, packConsumer, serverParticipantPreparation } from '../bench/profile/server-profile-runner.mjs';
+import { prepareBenchmarkCheckout } from '../bench/compare/provenance.mjs';
 import { loadServerParticipant } from '../bench/profile/server-profile-consumer.mjs';
 import { SERVER_PROFILE } from '../bench/profile/server-profile-registration.mjs';
 import { createMotionValueDefaultBenchmark } from '../scripts/bench-support.mjs';
@@ -16,12 +17,19 @@ const root = resolve('.');
 beforeAll(() => {
   work = mkdtempSync(join(tmpdir(), 'server-packed-consumers-'));
   baseline = join(work, 'baseline'); candidate = join(work, 'candidate');
-  for (const [directory, sha] of [[baseline, SERVER_PROFILE.baselineRevision], [candidate, execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()]]) {
+  execFileSync('pnpm', ['--dir', join(root, 'bench/compare'), 'install', '--frozen-lockfile'], { cwd: root, stdio: 'pipe', timeout: 180_000 });
+  for (const [id, directory, sha] of [['baseline', baseline, SERVER_PROFILE.baselineRevision], ['candidate', candidate, execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()]] as const) {
     execFileSync('git', ['worktree', 'add', '--detach', directory, sha!], { cwd: root, stdio: 'pipe' });
     registeredWorktrees.add(directory!);
     execFileSync('pnpm', ['install', '--frozen-lockfile'], { cwd: directory, stdio: 'pipe', timeout: 180_000 });
     rmSync(join(directory!, 'dist'), { recursive: true, force: true });
-    execFileSync('pnpm', ['build'], { cwd: directory, stdio: 'pipe', timeout: 180_000 });
+    const options = serverParticipantPreparation(directory, id);
+    expect(options.requiredDist).toEqual(id === 'baseline'
+      ? ['dist/animate/index.js', 'dist/index.js']
+      : ['dist/animate/index.js', 'dist/motion/index.js', 'dist/driver/index.js']);
+    const prepared = prepareBenchmarkCheckout(options);
+    expect(prepared.revision).toBe(sha);
+    expect(prepared.distRuntime.files).toBeGreaterThan(0);
   }
 }, 800_000);
 afterAll(() => {

@@ -18,7 +18,7 @@ import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './serv
 import { compactServerCpuEvidence, compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
   serverFamilyIntervals, serverOrders, serverResourceBinding, serverResourceReasons, validateServerResourceIdentity, validateServerBrowserSample, validateServerEngineSample, verifyServerClockBuildEvidence, verifyServerClockRegistration } from './server-profile-contract.mjs';
 import { writeServerArtifact } from './server-profile-artifact.mjs';
-import { loadServerParticipant, serverParticipantImports } from './server-profile-consumer.mjs';
+import { loadServerParticipant, serverParticipantImports, serverParticipantExportTargets } from './server-profile-consumer.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const BENCH = path.join(ROOT, 'bench/compare');
@@ -231,6 +231,14 @@ export async function runServerProfileCalibration(artifact, runStage, journal) {
 function buildToStderr(root) {
   execFileSync('pnpm', ['run', 'build'], { cwd: root, stdio: ['ignore', 'ignore', 'inherit'],
     shell: process.platform === 'win32', timeout: 180_000 });
+}
+
+export function serverParticipantPreparation(root, participant) {
+  const targets = serverParticipantExportTargets(root, participant);
+  return { root, benchDirectory: BENCH, build: buildToStderr,
+    requiredDist: [...new Set([targets.engine, targets.browser, targets.stock].map(entry => entry.path.slice(2)))],
+    requiredPackages: ['esbuild', 'playwright', 'motion', 'gsap', 'animejs'],
+    requiredRootPackages: ['tsup', 'typescript', 'esbuild'] };
 }
 
 // Игнорирование publish scripts запрещает vendor prepack rebuild другим toolchain.
@@ -678,9 +686,8 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     harness = Object.fromEntries([...HARNESS_FILES, ...ENTRIES.map((id) => `bench/compare/entries/${id === 'waapi-ctl' ? 'waapi-control' : id}.entry.mjs`)]
       .map((file) => [file, { path: path.join(ROOT, file), sha256: sha256File(path.join(ROOT, file)) }]));
     for (const id of ['baseline', 'candidate']) {
-      prepared[id] = prepareBenchmarkCheckout({ root: roots[id], benchDirectory: BENCH, build: buildToStderr,
-        requiredDist: ['dist/animate/index.js', 'dist/index.js'], requiredPackages: ['esbuild', 'playwright', 'motion', 'gsap', 'animejs'],
-        requiredRootPackages: ['tsup', 'typescript', 'esbuild'], requiredInputs: Object.entries(harness).map(([key, info]) => [key, info.path]) });
+      prepared[id] = prepareBenchmarkCheckout({ ...serverParticipantPreparation(roots[id], id),
+        requiredInputs: Object.entries(harness).map(([key, info]) => [key, info.path]) });
     }
     if (prepared.baseline.revision !== SERVER_PROFILE.baselineRevision) throw new Error('server profile: baseline отличается от регистрации');
     const consumers = {};
