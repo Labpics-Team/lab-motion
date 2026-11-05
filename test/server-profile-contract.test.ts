@@ -1298,7 +1298,7 @@ describe('серверный PROFILE: независимые sabotage controls',
     expect(() => validateServerJournal(artifact, chain(wrongFinish, history))).toThrow(/финальная/);
   }, 30_000);
 
-  it('сохраняет partial A/B и поздний отказ, а пропавшие comparator/retention не допускает', () => {
+  it('сохраняет partial A/B и failed-sample raw при полном зарегистрированном N', () => {
     const history = admissionHistory(), complete = history.artifact;
     // Меняются только принадлежащие отказу ветви. Полная unchanged история
     // Полный зарегистрированный N остаётся входом, без трёх лишних копий raw.
@@ -1316,7 +1316,11 @@ describe('серверный PROFILE: независимые sabotage controls',
     expect(validateServerJournal(partial, chain(partialEvents, history))).toHaveProperty('journalFinalDigest');
     const missingFailure = partialEvents.filter((event) => event.type !== 'failure');
     expect(() => validateServerJournal(partial, chain(missingFailure, history))).toThrow(/failures/);
+  }, 30_000);
 
+  it('сохраняет поздний comparator отказ при полном зарегистрированном N', () => {
+    const history = admissionHistory(), complete = history.artifact, completeEvents = history.events;
+    const error = { name: 'Error', message: 'timeout второго участника; первый raw сохранён', raw: { completed: [] } };
     const late: any = { ...complete, verdict: 'UNPROVEN' };
     const firstComparator = completeEvents.findIndex((event) => event.type === 'comparator-sample');
     const comparatorFailure = completeEvents[firstComparator + 1].value;
@@ -1326,7 +1330,10 @@ describe('серверный PROFILE: независимые sabotage controls',
       { type: 'failure', value: late.failures[0] }, { type: 'finished', value: { verdict: 'UNPROVEN', digest: serverArtifactDigest(late) } }];
     expect(validateServerArtifact(late).verification).toBe('completed-samples-refused');
     expect(validateServerJournal(late, chain(lateEvents, history))).toHaveProperty('journalFinalDigest');
+  }, 30_000);
 
+  it('не допускает пропавшие comparator/retention при полном зарегистрированном N', () => {
+    const history = admissionHistory(), complete = history.artifact, completeEvents = history.events;
     const dropped: any = { ...complete, retention: { ...complete.retention } }; delete dropped.retention.candidate;
     expect(() => validateServerArtifact(dropped)).toThrow(/retention/);
     const omitted = completeEvents.filter((event) => event.type !== 'comparator-sample');
