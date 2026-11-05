@@ -161,7 +161,7 @@ function resourceIdentity() {
 }
 const resourceMachine = () => ({ affinity: '0', cgroupCpuMax: '400000 100000', resource: resourceIdentity() });
 
-function stage(name = 'aa', runs = 2) {
+function stage(name = 'aa', runs = 2, packedCpu = false) {
   const rows: any[] = [];
   // Одна зарегистрированная перестановка на stage, а не полный N-план
   // заново для каждой scene/run. Raw и независимые validator checks прежние.
@@ -181,6 +181,14 @@ function stage(name = 'aa', runs = 2) {
           } else {
             raw = Array.from({ length: SERVER_PROFILE.repetitions * multiplier }, (_, repetition) => engineRaw(scene, repetition));
             extra = { operationNs: 1_000_000 * multiplier, meanFrameNs: 1_000_000 * multiplier, cancelDrainNs: 500_000 * multiplier };
+          }
+          if (packedCpu) for (const measured of raw) {
+            // Synthetic endpoints уже имеют одну identity. Полный timespec vector
+            // задаётся напрямую в production carrier, без повторного encoder pass.
+            const reads = measured.raw.cpuReads;
+            measured.raw.cpuReads = { encoding: 'native-cpu-rle-v1', count: reads.length,
+              runs: [{ from: 0, count: reads.length, ...syntheticCpuIdentity,
+                values: reads.map((read: any) => [read.seconds, read.nanoseconds]) }] };
           }
         } else {
           const timerEvidence = { crossOriginIsolated: true, probes: ['before', 'after'].map((phase) => ({ phase,
@@ -257,11 +265,11 @@ function registeredRefusal() {
 
 function healthyAdmission() {
   const artifact: any = registeredRefusal(); artifact.failures = []; artifact.verdict = 'PASS';
-  artifact.warmup = stage('warmup', SERVER_PROFILE.warmupRuns);
-  artifact.pilot = stage('pilot', SERVER_PROFILE.pilotRuns);
+  artifact.warmup = stage('warmup', SERVER_PROFILE.warmupRuns, true);
+  artifact.pilot = stage('pilot', SERVER_PROFILE.pilotRuns, true);
   artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot'));
   const runs = artifact.samplePlan.runs;
-  artifact.aa = stage('aa', runs); artifact.positive = stage('positive', runs); artifact.ab = stage('ab', runs);
+  artifact.aa = stage('aa', runs, true); artifact.positive = stage('positive', runs, true); artifact.ab = stage('ab', runs, true);
   artifact.frozenPlanDigest = serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan });
   const aa = serverFamilyIntervals(serverCellPairs(artifact.aa, runs, 'aa'));
   const positive = serverFamilyIntervals(serverCellPairs(artifact.positive, runs, 'positive'));
@@ -323,13 +331,6 @@ let sharedAdmission: { artifact: any; events: any[]; records: any[] } | undefine
 function admissionHistory() {
   if (!sharedAdmission) {
     const artifact = healthyAdmission();
-    // Полные независимые vectors переходят в зарегистрированный carrier до events/hash.
-    // N, поля наблюдений и четыре контрпримера остаются прежними; legacy fault fixtures не меняются.
-    for (const name of ['warmup', 'pilot', 'aa', 'positive', 'ab']) for (const row of artifact[name].rows) {
-      if (row.kind === 'engine') for (const sample of Object.values(row.samples) as any[]) {
-        for (const measured of sample.raw) measured.raw.cpuReads = compactServerCpuEvidence(measured.raw.cpuReads);
-      }
-    }
     const events = admissionEvents(artifact);
     sharedAdmission = { artifact, events, records: chain(events) };
   }
