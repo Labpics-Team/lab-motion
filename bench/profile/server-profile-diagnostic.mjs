@@ -36,7 +36,7 @@ export function traceCoverage(events, anchors, id) {
     anchors[1].startTime > anchors[0].startTime && [id, `${id}-end`].every(name => events.some(event => event.name === name && Number.isFinite(event.ts)));
 }
 
-export function tracedBrowserMeasure(out, index, measure = measureServerBrowser) {
+export function tracedBrowserMeasure(out, index, measure = measureServerBrowser, publish = writeFileSync) {
   let sequence = 0;
   return async (browser, origin, adapter, scene, workMultiplier = 1, observation = {}) => {
     const id = `diagnostic-${sequence++}-${scene.id}`;
@@ -112,9 +112,15 @@ export function tracedBrowserMeasure(out, index, measure = measureServerBrowser)
       const trace = { diagnostic: true, qualification: false, id, scene: scene.id, observation, adapterSha256: adapter.sha256,
         workMultiplier, anchors, startAttempted, startAcknowledged, terminal, overflow, complete, errors, traceEvents: events };
       const bytes = JSON.stringify(trace), traceDigest = digest(bytes), file = `${id}.trace.json`;
-      writeFileSync(path.join(out, file), bytes, { flag: 'wx' });
-      writeFileSync(path.join(out, `${id}.trace.sha256`), traceDigest + '\n', { flag: 'wx' });
-      index.push({ id, file, sha256: traceDigest, scene: scene.id, observation, workMultiplier, complete, measurementTimeOriginMs: sample?.measurementTimeOriginMs ?? null });
+      try {
+        publish(path.join(out, file), bytes, { flag: 'wx' });
+        publish(path.join(out, `${id}.trace.sha256`), traceDigest + '\n', { flag: 'wx' });
+        index.push({ id, file, sha256: traceDigest, scene: scene.id, observation, workMultiplier, complete, measurementTimeOriginMs: sample?.measurementTimeOriginMs ?? null });
+      } catch (error) {
+        errors.push({ phase: 'publication', error: errorRecord(error) });
+        if (failure) failure.errors = [...(failure.errors ?? []), error];
+        else failure = error;
+      }
       if (!complete) failure ??= new Error('diagnostic trace incomplete; partial evidence preserved');
     }
     if (failure) {

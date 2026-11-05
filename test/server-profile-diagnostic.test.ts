@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { createContext, runInContext } from 'node:vm';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -70,7 +70,7 @@ describe('bounded intrusive baseline diagnostic', () => {
     } finally { rmSync(out, { recursive: true, force: true }); }
   });
 
-  it.each(['shutdown', 'detach', 'measurement', 'success'])('journals acquired raw through the actual timing stage for %s', async (phase) => {
+  it.each(['shutdown', 'detach', 'measurement', 'success', 'trace-write', 'hash-write', 'measurement-trace-write', 'measurement-hash-write'])('journals acquired raw through the actual timing stage for %s', async (phase) => {
     const out = mkdtempSync(path.join(os.tmpdir(), 'profile-diagnostic-'));
     const journalDirectory = path.join(out, 'journal');
     const journal = createServerJournal(journalDirectory);
@@ -99,10 +99,16 @@ describe('bounded intrusive baseline diagnostic', () => {
       const observed = await actual.newPage();
       await observed.goto('http://test.invalid');
       await actual.close();
-      if (phase === 'measurement') throw acquisitionFailure;
+      if (phase.startsWith('measurement')) throw acquisitionFailure;
       return sample;
     };
     const index: any[] = [];
+    const publicationFailure = Object.assign(new Error('trace publication rejected'), { code: 'EIO' });
+    const publicationPhase = phase.endsWith('write');
+    const publish = (file: string, bytes: string, options: { flag: string }) => {
+      if (publicationPhase && file.endsWith(phase.endsWith('hash-write') ? '.trace.sha256' : '.trace.json')) throw publicationFailure;
+      writeFileSync(file, bytes, options);
+    };
     try {
       const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
       const begin = source.indexOf('    const runStage = async (name, runs) => {');
@@ -116,7 +122,7 @@ describe('bounded intrusive baseline diagnostic', () => {
         verify: () => {}, checkpoint: () => {}, captureServerLoad: () => ({}), serverOrders: () => [['left']],
         engineMeasure: vi.fn(), compactSampleCpuEvidence: vi.fn(), implementations: {}, registrationDigest: 'a'.repeat(64),
         browser, origin: {}, adapters: { baseline: { sha256: 'a'.repeat(64) } },
-        browserMeasure: tracedBrowserMeasure(out, index, measure), journal, process: { stderr: { write: () => {} } } });
+        browserMeasure: tracedBrowserMeasure(out, index, measure, publish), journal, process: { stderr: { write: () => {} } } });
       const stage = runInContext(`(() => { ${source.slice(recordBegin, recordEnd)} ${source.slice(begin, end)} return runStage; })()`, stageContext);
       const result = stage('warmup', 1);
       if (phase === 'success') {
@@ -124,7 +130,10 @@ describe('bounded intrusive baseline diagnostic', () => {
         expect(completed.rows[0].samples.left).toBe(sample);
       } else {
         await expect(result).rejects.toMatchObject({ raw: sample, timerEvidence });
-        if (phase === 'measurement') await expect(result).rejects.toBe(acquisitionFailure);
+        if (phase.startsWith('measurement')) {
+          await expect(result).rejects.toBe(acquisitionFailure);
+          if (publicationPhase) expect((acquisitionFailure as Error & { errors?: Error[] }).errors).toEqual([publicationFailure]);
+        }
         expect(artifact.warmup.rows[0].samples.left).toBeUndefined();
       }
       const events = readFileSync(path.join(journalDirectory, 'journal.ndjson'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
@@ -135,15 +144,23 @@ describe('bounded intrusive baseline diagnostic', () => {
         expect(events[0].value.partial).toEqual(sample);
         expect(events[0].value.timerEvidence).toEqual(timerEvidence);
         expect(events[0].value.error.raw).toEqual(sample);
+        if (publicationPhase) expect(events[0].value.error.errors).toEqual([
+          expect.objectContaining({ code: 'EIO' }),
+        ]);
       }
       expect(context.close).toHaveBeenCalledOnce();
       expect(session.detach).toHaveBeenCalledOnce();
       expect(session.listenerCount('Tracing.tracingComplete')).toBe(0);
-      expect(index[0].complete).toBe(phase === 'success');
-      const trace = JSON.parse(readFileSync(path.join(out, index[0].file), 'utf8'));
-      expect(trace.qualification).toBe(false);
-      if (phase === 'success') expect(trace.errors).toEqual([]);
-      else expect(trace.errors.some((error: any) => error.phase === phase)).toBe(true);
+      if (publicationPhase) {
+        expect(index).toEqual([]);
+        if (!phase.startsWith('measurement')) await expect(result).rejects.toMatchObject({ errors: [publicationFailure] });
+      } else {
+        expect(index[0].complete).toBe(phase === 'success');
+        const trace = JSON.parse(readFileSync(path.join(out, index[0].file), 'utf8'));
+        expect(trace.qualification).toBe(false);
+        if (phase === 'success') expect(trace.errors).toEqual([]);
+        else expect(trace.errors.some((error: any) => error.phase === phase)).toBe(true);
+      }
     } finally { rmSync(out, { recursive: true, force: true }); }
   });
 
