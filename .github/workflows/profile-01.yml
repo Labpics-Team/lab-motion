@@ -282,24 +282,24 @@ jobs:
           corepack enable
           corepack install --global pnpm@11.11.0
 
-      - name: Установить locked зависимости кандидата
+      - name: Установить зависимости кандидата по закреплённым версиям
         timeout-minutes: 10
         working-directory: server-candidate
         run: pnpm install --frozen-lockfile
 
-      - name: Установить locked зависимости baseline
+      - name: Установить зависимости базовой версии по закреплённым версиям
         timeout-minutes: 10
         working-directory: server-baseline
         run: pnpm install --frozen-lockfile
 
-      - name: Установить locked зависимости измерителя и Chromium
+      - name: Установить Chromium и закреплённые зависимости измерителя
         timeout-minutes: 15
         working-directory: server-candidate
         run: |
           pnpm --dir bench/compare install --frozen-lockfile
           pnpm --dir bench/compare exec playwright install --with-deps chromium
 
-      - name: Связать run attempt источники и протокол вне raw
+      - name: Связать попытку запуска, исходники и протокол вне raw
         id: binding
         timeout-minutes: 1
         working-directory: server-candidate
