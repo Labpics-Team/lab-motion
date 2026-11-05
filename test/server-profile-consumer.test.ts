@@ -55,7 +55,7 @@ type EndpointReceipt = {
 type Coordinates = number[] | { encoding: 'repeat'; count: number; value: number } |
   { encoding: 'rle'; count: number; runs: [number, number][] };
 type BrowserSample = Awaited<ReturnType<typeof measureServerBrowser>>;
-type RecordedError = { name: string; message: string; errors?: RecordedError[]; raw?: unknown; timerEvidence?: unknown };
+type RecordedError = { name: string; message: string; code?: string; errors?: RecordedError[]; raw?: unknown; timerEvidence?: unknown };
 type ControlOutcome = {
   status: 'pending' | 'resolved' | 'rejected'; payloads: unknown[]; armCount: number; heldCount: number;
   sample?: BrowserSample; error?: RecordedError; endpoint?: EndpointReceipt;
@@ -141,7 +141,8 @@ async function checkpointEndpointControl(browser: Browser, adapter: Awaited<Retu
     treeSha256: packed.treeSha256, adapterSha256: adapter.sha256, lineage: adapter.participantImports,
     ownerSha256: createHash('sha256').update(ownerSource).digest('hex'), scene, workMultiplier: 1,
     outcomes: {} as Partial<Record<'normal' | 'held', ControlOutcome>>, cleanupErrors: [] as RecordedError[],
-    setupError: undefined as RecordedError | undefined, reasons: [] as string[], falseAdmission: false, verdict: 'INCOMPLETE' };
+    setupError: undefined as RecordedError | undefined, classificationError: undefined as RecordedError | undefined,
+    reasons: [] as string[], falseAdmission: false, verdict: 'INCOMPLETE' };
   const contexts: BrowserContext[] = [], pages: Page[] = [];
   let origin: Awaited<ReturnType<typeof startBenchmarkOrigin>> | undefined;
   try {
@@ -191,44 +192,67 @@ async function checkpointEndpointControl(browser: Browser, adapter: Awaited<Retu
     }
     if (origin) try { await origin.close(); } catch (error) { evidence.cleanupErrors.push(records.errorRecord(error)); }
   }
-  const expand = (values: Coordinates): number[] => Array.isArray(values) ? values : values.encoding === 'repeat'
-    ? Array(values.count).fill(values.value) : values.runs.flatMap(([n, x]) => Array(n).fill(x));
-  const allEndpoints = (values: Coordinates) => expand(values).length === count && expand(values).every(x => Number.isFinite(x) && x === SERVER_PROFILE.toPx);
   const reasons: string[] = [];
-  const normal = evidence.outcomes.normal, held = evidence.outcomes.held;
-  const complete = (outcome: ControlOutcome | undefined): outcome is ControlOutcome & { sample: BrowserSample } => outcome?.status === 'resolved' && outcome.sample !== undefined && outcome.sample.raw.length === SERVER_PROFILE.repetitions &&
-    outcome.sample.warmup.length === 1 && [...outcome.sample.warmup, ...outcome.sample.raw].every(row =>
-      row.calls === SERVER_PROFILE.browserBatchCalls && row.ownersStarted === row.calls && row.ownersCancelled === row.calls);
-  if (!complete(normal)) reasons.push('normal sample не завершён');
-  else if (allEndpoints(normal.sample.raw[0].cancelWitness.transformsBefore)) reasons.push('normal cancellation уже на endpoint');
-  if (!held || held.armCount !== 1 || held.heldCount !== 1 || held.endpoint?.status !== 'endpoint' ||
-    held.endpoint.count !== count || !allEndpoints(held.endpoint.positions) || !held.release?.endpointResolvedBeforeCallbackReturn)
-    reasons.push('endpoint antecedent не завершён');
-  if (!complete(held)) reasons.push('held rejected/incomplete: отказ не идентифицирован как endpoint guard');
-  else {
-    const row = held.sample.raw[0];
-    if (!held.arm || held.arm.count !== count || held.arm.timeOriginMs !== held.sample.measurementTimeOriginMs ||
-      held.arm.armedMs > row.startClock.beginMs) reasons.push('подписка не доказана до trigger');
-    if (expand(row.startWitness.leadingPositions).some(x => !Number.isFinite(x) || x >= SERVER_PROFILE.toPx - SERVER_PROFILE.browserSemantics.finalTolerancePx))
-      reasons.push('ранний startWitness не до endpoint');
-    if (!allEndpoints(row.cancelWitness.transformsBefore) || row.cancelWitness.frames.some(frame => !allEndpoints(frame.transforms)))
-      reasons.push('cancel witness не сохранил endpoint');
-    if (held.endpoint?.status === 'endpoint' && held.release) {
-      if (held.endpoint.timeOriginMs !== held.sample.measurementTimeOriginMs ||
-        held.release.realm.timeOriginMs !== held.endpoint.timeOriginMs || held.endpoint.readClock.endMs > row.cancelClock.beginMs)
-        reasons.push('realm/order не совпали');
-      else {
-        try {
-          const ordering = serverBrowserClockBounds({ beginMs: held.endpoint.readClock.endMs, endMs: row.cancelClock.beginMs }, held.sample.monotonicHostUpperNs);
-          held.ordering = { ...ordering, resolved: ordering.low > 0, causalReceipt: held.release };
-        } catch (error) { held.orderingError = records.errorRecord(error); reasons.push('clock order не разрешён'); }
+  try {
+    const expand = (values: Coordinates): number[] => Array.isArray(values) ? values : values.encoding === 'repeat'
+      ? Array(values.count).fill(values.value) : values.runs.flatMap(([n, x]) => Array(n).fill(x));
+    const allEndpoints = (values: Coordinates) => expand(values).length === count && expand(values).every(x => Number.isFinite(x) && x === SERVER_PROFILE.toPx);
+    const normal = evidence.outcomes.normal, held = evidence.outcomes.held;
+    const completeSample = (sample: BrowserSample | undefined): sample is BrowserSample => sample !== undefined && sample.raw.length === SERVER_PROFILE.repetitions &&
+      sample.warmup.length === 1 && [...sample.warmup, ...sample.raw].every(row =>
+        row.calls === SERVER_PROFILE.browserBatchCalls && row.ownersStarted === row.calls && row.ownersCancelled === row.calls);
+    const complete = (outcome: ControlOutcome | undefined): outcome is ControlOutcome & { sample: BrowserSample } => outcome?.status === 'resolved' && completeSample(outcome.sample);
+    const guardCode = 'SERVER_PROFILE_CANCEL_WINDOW_UNPROVEN';
+    const guardLeaf = (error: RecordedError | undefined): RecordedError | undefined => error?.name === 'AggregateError' && error.errors?.length === 1 &&
+      error.errors[0].name === 'Error' && error.errors[0].code === guardCode && !error.errors[0].errors?.length ? error.errors[0] : undefined;
+    const heldGuard = held?.status === 'rejected' ? guardLeaf(held.error) : undefined;
+    const heldSample = held?.sample ?? (heldGuard ? held?.error?.raw as BrowserSample | undefined : undefined);
+    if (!complete(normal)) reasons.push(guardLeaf(normal?.error) ? 'normal conservative cancellation refusal' : 'normal sample не завершён');
+    else if (allEndpoints(normal.sample.raw[0].cancelWitness.transformsBefore)) reasons.push('normal cancellation уже на endpoint');
+    if (!held || held.armCount !== 1 || held.heldCount !== 1 || held.endpoint?.status !== 'endpoint' ||
+      held.endpoint.count !== count || !allEndpoints(held.endpoint.positions) || !held.release?.endpointResolvedBeforeCallbackReturn)
+      reasons.push('endpoint antecedent не завершён');
+    if (!held || !completeSample(heldSample) || (held.status !== 'resolved' && !heldGuard)) reasons.push('held rejected/incomplete: отказ не идентифицирован как endpoint guard');
+    else {
+      const row = heldSample.raw[0];
+      if (heldGuard) {
+        const raw = heldGuard.raw as { startClock?: typeof row.startClock; cancelClock?: typeof row.cancelClock; cancellationWindow?: ReturnType<typeof serverBrowserClockBounds>; cutoffMs?: number } | undefined;
+        const cutoffMs = SERVER_PROFILE.durationMs * (1 - SERVER_PROFILE.browserSemantics.finalTolerancePx / SERVER_PROFILE.toPx);
+        const window = serverBrowserClockBounds({ beginMs: row.startClock.beginMs, endMs: row.cancelClock.endMs }, heldSample.monotonicHostUpperNs);
+        if (!raw || raw.startClock?.beginMs !== row.startClock.beginMs || raw.startClock.endMs !== row.startClock.endMs ||
+          raw.cancelClock?.beginMs !== row.cancelClock.beginMs || raw.cancelClock.endMs !== row.cancelClock.endMs ||
+          raw.cutoffMs !== cutoffMs || raw.cancellationWindow?.high !== window.high || window.high < cutoffMs)
+          reasons.push('guard leaf не соответствует held repetition0');
+      }
+      if (!held.arm || held.arm.count !== count || held.arm.timeOriginMs !== heldSample.measurementTimeOriginMs ||
+        held.arm.armedMs > row.startClock.beginMs) reasons.push('подписка не доказана до trigger');
+      if (expand(row.startWitness.leadingPositions).some(x => !Number.isFinite(x) || x >= SERVER_PROFILE.toPx - SERVER_PROFILE.browserSemantics.finalTolerancePx))
+        reasons.push('ранний startWitness не до endpoint');
+      if (!allEndpoints(row.cancelWitness.transformsBefore) || row.cancelWitness.frames.some(frame => !allEndpoints(frame.transforms)))
+        reasons.push('cancel witness не сохранил endpoint');
+      if (held.endpoint?.status === 'endpoint' && held.release) {
+        if (held.endpoint.timeOriginMs !== heldSample.measurementTimeOriginMs ||
+          held.release.realm.timeOriginMs !== held.endpoint.timeOriginMs || held.endpoint.readClock.endMs > row.cancelClock.beginMs)
+          reasons.push('realm/order не совпали');
+        else {
+          try {
+            const ordering = serverBrowserClockBounds({ beginMs: held.endpoint.readClock.endMs, endMs: row.cancelClock.beginMs }, heldSample.monotonicHostUpperNs);
+            held.ordering = { ...ordering, resolved: ordering.low > 0, causalReceipt: held.release };
+          } catch (error) { held.orderingError = records.errorRecord(error); reasons.push('clock order не разрешён'); }
+        }
       }
     }
+    if (evidence.setupError || evidence.cleanupErrors.length) reasons.push('setup/cleanup не завершён');
+    evidence.reasons = reasons;
+    evidence.falseAdmission = reasons.length === 0 && held?.status === 'resolved';
+    evidence.verdict = reasons.length ? 'INCOMPLETE' : evidence.falseAdmission ? 'RED_FALSE_ADMISSION' : 'PASS';
+  } catch (error) {
+    evidence.classificationError = records.errorRecord(error);
+    reasons.push('classification не завершена');
+    evidence.reasons = reasons;
+    evidence.falseAdmission = false;
+    evidence.verdict = 'INCOMPLETE';
   }
-  if (evidence.setupError || evidence.cleanupErrors.length) reasons.push('setup/cleanup не завершён');
-  evidence.reasons = reasons;
-  evidence.falseAdmission = reasons.length === 0;
-  evidence.verdict = evidence.falseAdmission ? 'RED_FALSE_ADMISSION' : 'INCOMPLETE';
   const directory = resolve('scratchpad', 'resource-evidence'); mkdirSync(directory, { recursive: true });
   const file = join(directory, 'checkpoint-endpoint-control.json');
   writeFileSync(file, serverProfileStringify(records.preserveRawNumbers(evidence)) + '\n', { flag: 'wx' });
@@ -236,6 +260,46 @@ async function checkpointEndpointControl(browser: Browser, adapter: Awaited<Retu
   // Обе руки и ошибки экспортированы до последующих проверок baseline.
   return evidence;
 }
+
+it('classification fault exports both acquired outcomes before deferred failure', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'checkpoint-classification-'));
+  try {
+    const source = readFileSync(resolve('test/server-profile-consumer.test.ts'), 'utf8').replace(/\r\n/g, '\n');
+    const begin = source.indexOf('  const reasons: string[] = [];', source.indexOf('async function checkpointEndpointControl'));
+    const end = source.indexOf('\n}', source.indexOf('  return evidence;', begin));
+    const owner = readFileSync(resolve('bench/profile/server-profile-runner.mjs'), 'utf8').replace(/\r\n/g, '\n');
+    const recordBegin = owner.indexOf('function preserveRawNumbers('), recordEnd = owner.indexOf('function readOptional(', recordBegin);
+    const records = runInNewContext('(() => { ' + owner.slice(recordBegin, recordEnd) + ' return { errorRecord, preserveRawNumbers }; })()');
+    const evidence = { outcomes: {
+      normal: { status: 'resolved', payloads: [{ phase: 'normal-acquired' }], sample: { raw: null } },
+      held: { status: 'rejected', payloads: [{ phase: 'held-acquired' }], error: { name: 'Error', message: 'retained' } },
+    }, cleanupErrors: [], reasons: [], falseAdmission: false, verdict: 'INCOMPLETE' };
+    const envelopes: string[] = [];
+    const compiled = esbuild.transformSync('(() => { ' + source.slice(begin, end) + ' })()', { loader: 'ts', target: 'esnext' }).code;
+    const result = runInNewContext(compiled, { evidence, records, SERVER_PROFILE, count: 3200,
+      serverBrowserClockBounds, serverProfileStringify, resolve: () => directory, join, mkdirSync, writeFileSync, readFileSync,
+      console: { log: (line: string) => envelopes.push(line) } });
+    expect(result.verdict).toBe('INCOMPLETE');
+    expect(result.classificationError.name).toBe('TypeError');
+    expect(result.falseAdmission).toBe(false);
+    expect(envelopes).toHaveLength(1);
+    const envelope = JSON.parse(envelopes[0]);
+    expect(envelope.resourceEvidence).toBe(1);
+    expect(envelope.file).toBe('checkpoint-endpoint-control.json');
+    expect(envelope.content).toBe(readFileSync(join(directory, envelope.file), 'utf8'));
+    const exported = JSON.parse(envelope.content);
+    expect(exported.outcomes).toEqual(evidence.outcomes);
+    expect(exported.classificationError.name).toBe('TypeError');
+    expect(exported.verdict).toBe('INCOMPLETE');
+    const assertionsBegin = source.lastIndexOf('\n  if (checkpointDiagnostic) {') + 1;
+    const assertionsEnd = source.indexOf('\n  }', assertionsBegin) + 4;
+    expect(result.reasons.length).toBeGreaterThan(0);
+    let deferredError: unknown;
+    try { runInNewContext(source.slice(assertionsBegin, assertionsEnd), { checkpointDiagnostic: result, expect }); }
+    catch (error) { deferredError = error; }
+    expect(deferredError).toHaveProperty('name', 'AssertionError');
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 
 it.each(['baseline', 'candidate'] as const)('real clean packed %s binds source, lifecycle and legacy stock C', async (id) => {
   const consumer = join(work, id + '-consumer'); mkdirSync(consumer);

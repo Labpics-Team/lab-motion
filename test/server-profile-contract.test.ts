@@ -954,6 +954,47 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
     } finally { fake.dispose(); }
   });
 
+  it.each(SERVER_PROFILE.browserScenes.flatMap(scene => ['left', 'right'].map(participant => ({ scene, participant }))))(
+    'short complete cancellation windows accept $scene.id $participant raw and warmup', ({ scene, participant }) => {
+      const sample = clone(stage().rows.find((row: any) => row.scene === scene.id).samples[participant]);
+      sample.warmup = [clone(sample.raw[0])];
+      expect(sample.warmup[0]).not.toBe(sample.raw[0]);
+      expect(() => validateServerBrowserSample(sample, scene)).not.toThrow();
+    });
+
+  it.each(['stale-gap', 'cancel-end', 'outward-straddle', 'equality', 'below', 'late-warmup'] as const)(
+    'cancellation eligibility uses whole outward window: %s', (mode) => {
+      const scene = SERVER_PROFILE.browserScenes[0];
+      const sample = clone(stage().rows.find((row: any) => row.scene === scene.id).samples.left);
+      sample.warmup = [clone(sample.raw[0])];
+      const row = mode === 'late-warmup' ? sample.warmup[0] : sample.raw[0];
+      const cutoffMs = SERVER_PROFILE.durationMs * (1 - SERVER_PROFILE.browserSemantics.finalTolerancePx / SERVER_PROFILE.toPx);
+      const duration = mode === 'below' ? cutoffMs - 1 : mode === 'outward-straddle' ? cutoffMs - 0.001 :
+        mode === 'equality' ? cutoffMs : cutoffMs + 1;
+      const beginMs = row.startClock.beginMs;
+      row.cancelClock = { beginMs: mode === 'cancel-end' ? beginMs + cutoffMs - 1 : beginMs + duration - 0.5,
+        endMs: beginMs + duration };
+      row.batchCancelMs = row.cancelClock.endMs - row.cancelClock.beginMs;
+      row.cancelMs = row.batchCancelMs / SERVER_PROFILE.browserBatchCalls;
+      sample.cancelMs = sample.raw.reduce((sum: number, value: any) => sum + value.cancelMs, 0) / sample.repetitions;
+      const cancellationWindow = serverBrowserClockBounds({ beginMs, endMs: row.cancelClock.endMs }, sample.monotonicHostUpperNs);
+      if (mode === 'below') {
+        expect(cancellationWindow.high).toBeLessThan(cutoffMs);
+        expect(() => validateServerBrowserSample(sample, scene)).not.toThrow();
+      } else {
+        if (mode === 'outward-straddle') expect(cancellationWindow.measuredMs).toBeLessThan(cutoffMs);
+        expect(cancellationWindow.high).toBeGreaterThanOrEqual(cutoffMs);
+        let failure: any;
+        try { validateServerBrowserSample(sample, scene); } catch (error) { failure = error; }
+        expect(failure).toMatchObject({ code: 'SERVER_PROFILE_CANCEL_WINDOW_UNPROVEN',
+          raw: { startClock: row.startClock, cancelClock: row.cancelClock, cancellationWindow, cutoffMs } });
+        expect(failure.raw.startClock).toBe(row.startClock);
+        expect(failure.raw.cancelClock).toBe(row.cancelClock);
+        expect(sample.raw).toHaveLength(SERVER_PROFILE.repetitions);
+        expect(sample.warmup).toHaveLength(1);
+      }
+    });
+
   it('consumer повторно выводит timed onset из actual start/read clocks при valid:true', () => {
     const scene = SERVER_PROFILE.browserScenes[0], sample = stage().rows.find((row: any) => row.scene === scene.id).samples.left;
     const raw = sample.raw[0]; raw.startClock.endMs = raw.startClock.beginMs + 0.8;
