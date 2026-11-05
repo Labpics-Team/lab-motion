@@ -1525,7 +1525,6 @@ describe('PROFILE: current-run clock build binding', () => {
     try {
       spy(vi.spyOn(fsBoundary, 'readFileSync')).mockImplementation(((file: any, ...args: any[]) => {
         const name = String(file);
-        if (name.startsWith(out)) return (realRead as any)(file, ...args);
         if (name === `/boot/config-${SERVER_PROFILE.clockError.kernelRelease}` && admissionReadArmed && mode === 'read-EIO') {
           injectedReads++; throw Object.assign(new Error('fresh admission config read'), { code: 'EIO' });
         }
