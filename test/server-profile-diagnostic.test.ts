@@ -58,7 +58,7 @@ describe('bounded intrusive baseline diagnostic', () => {
     const index: any[] = [];
     try {
       await expect(tracedBrowserMeasure(out, index, measure)(browser, {}, { sha256: 'a'.repeat(64) }, { id: 's2' }))
-        .rejects.toThrow('diagnostic trace incomplete');
+        .rejects.toMatchObject({ raw: { measurementTimeOriginMs: 1 } });
       expect(context.close).toHaveBeenCalledOnce();
       expect(session.detach).toHaveBeenCalledOnce();
       expect(index[0]).toMatchObject({ complete: false, scene: 's2' });
@@ -66,6 +66,50 @@ describe('bounded intrusive baseline diagnostic', () => {
       expect(trace.errors).toHaveLength(2);
       expect(trace.qualification).toBe(false);
       expect(session.listenerCount('Tracing.tracingComplete')).toBe(0);
+    } finally { rmSync(out, { recursive: true, force: true }); }
+  });
+
+  it.each(['shutdown', 'detach', 'measurement'])('retains acquired raw when %s fails without accepting an incomplete trace', async (phase) => {
+    const out = mkdtempSync(path.join(os.tmpdir(), 'profile-diagnostic-'));
+    const session: any = new EventEmitter();
+    session.detach = vi.fn(async () => { if (phase === 'detach') throw new Error('detach rejected'); });
+    session.send = vi.fn(async (method: string) => {
+      if (method === 'Tracing.getCategories') return { categories: ['devtools.timeline', 'v8', 'v8.execute', 'blink.user_timing', 'disabled-by-default-v8.gc', 'disabled-by-default-v8.compile'] };
+      if (method === 'Tracing.end') {
+        session.emit('Tracing.tracingComplete', { dataLossOccurred: false });
+        if (phase === 'shutdown') throw new Error('stop rejected');
+      }
+      return {};
+    });
+    let marks = 0;
+    const page: any = { goto: async () => ({}), evaluate: async (_fn: any, name: string) => {
+      session.emit('Tracing.dataCollected', { value: [{ name, ts: ++marks }] });
+      return { name, timeOrigin: 1, startTime: marks };
+    } };
+    const context = { newPage: async () => page, pages: () => [page], close: vi.fn(async () => {}) };
+    const browser = { newBrowserCDPSession: async () => session, newContext: async () => context };
+    const sample = { measurementTimeOriginMs: 1, raw: [{ calls: 32, batchCancelMs: 2 }], warmup: [{ calls: 32 }] };
+    const acquisitionFailure = Object.assign(new Error('measurement rejected'), { raw: sample });
+    const measure = async (facade: any) => {
+      const actual = await facade.newContext({});
+      const observed = await actual.newPage();
+      await observed.goto('http://test.invalid');
+      await actual.close();
+      if (phase === 'measurement') throw acquisitionFailure;
+      return sample;
+    };
+    const index: any[] = [];
+    try {
+      const result = tracedBrowserMeasure(out, index, measure)(browser, {}, { sha256: 'a'.repeat(64) }, { id: 's2' });
+      await expect(result).rejects.toMatchObject({ raw: sample });
+      if (phase === 'measurement') await expect(result).rejects.toBe(acquisitionFailure);
+      expect(context.close).toHaveBeenCalledOnce();
+      expect(session.detach).toHaveBeenCalledOnce();
+      expect(session.listenerCount('Tracing.tracingComplete')).toBe(0);
+      expect(index[0].complete).toBe(false);
+      const trace = JSON.parse(readFileSync(path.join(out, index[0].file), 'utf8'));
+      expect(trace.qualification).toBe(false);
+      expect(trace.errors.some((error: any) => error.phase === phase)).toBe(true);
     } finally { rmSync(out, { recursive: true, force: true }); }
   });
 

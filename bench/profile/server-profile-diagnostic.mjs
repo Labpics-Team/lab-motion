@@ -110,7 +110,10 @@ export function tracedBrowserMeasure(out, index, measure = measureServerBrowser)
       index.push({ id, file, sha256: traceDigest, scene: scene.id, observation, workMultiplier, complete, measurementTimeOriginMs: sample?.measurementTimeOriginMs ?? null });
       if (!complete) failure ??= new Error('diagnostic trace incomplete; partial evidence preserved');
     }
-    if (failure) throw failure;
+    if (failure) {
+      if (sample !== undefined) throw Object.assign(new AggregateError([failure], 'diagnostic failed after completed browser measurement'), { raw: sample });
+      throw failure;
+    }
     return sample;
   };
 }
