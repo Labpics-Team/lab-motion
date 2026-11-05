@@ -144,7 +144,7 @@ function validateNormalMotion(evidence, scene, monotonicHostUpperNs) {
     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, calls), 'normal-motion oracle отверг intermediate/stagger/topology');
 }
 
-/** Current-run build premise; raw diagnostics outside this projection do not pin an epoch. */
+/** Предпосылка сборки текущего запуска; диагностика raw вне этой проекции не закрепляет эпоху. */
 export function verifyServerClockBuildEvidence(evidence, identity) {
   const model = SERVER_PROFILE.clockError, build = model.kernelBuild;
   const fail = (message) => {

@@ -209,9 +209,9 @@ jobs:
   server:
     if: ${{ inputs.server_timing }}
     runs-on: ubuntu-latest
-    # 6 h — предел бесплатного hosted job, не гарантия полного maxRuns.
-    # TERM после 250 min сохраняет UNPROVEN через существующий runner; остаток
-    # бюджета оставлен на preparation, replay и export. Hard kill может прервать export.
+    # 6 h — предел бесплатного задания GitHub Actions, не гарантия полного maxRuns.
+    # TERM после 250 min сохраняет UNPROVEN через существующий измеритель; остаток
+    # бюджета оставлен на подготовку, повторную проверку и экспорт. Принудительное завершение может прервать экспорт.
     timeout-minutes: 360
     steps:
       - name: Создать attempt receipts до setup и отказа
