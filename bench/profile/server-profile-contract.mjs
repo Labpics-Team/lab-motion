@@ -485,6 +485,12 @@ function validateStartWitness(raw, scene, monotonicHostUpperNs) {
     invariant(position >= SERVER_PROFILE.browserSemantics.fromPx - SERVER_PROFILE.browserSemantics.movementThresholdPx &&
       position <= maximumPosition, 'timed onset не соответствует свежему началу и actual clock окну');
   }
+  const cancellationWindow = serverBrowserClockBounds({ beginMs: raw.startClock.beginMs, endMs: raw.cancelClock.endMs }, monotonicHostUpperNs);
+  const cutoffMs = SERVER_PROFILE.durationMs * (1 - SERVER_PROFILE.browserSemantics.finalTolerancePx / SERVER_PROFILE.toPx);
+  if (!(cancellationWindow.high < cutoffMs)) throw Object.assign(new Error('окно до конца cancellation не исключило endpoint'), {
+    code: 'SERVER_PROFILE_CANCEL_WINDOW_UNPROVEN',
+    raw: { startClock: raw.startClock, cancelClock: raw.cancelClock, cancellationWindow, cutoffMs },
+  });
 }
 
 function validateCancellationWitness(raw, targets) {
