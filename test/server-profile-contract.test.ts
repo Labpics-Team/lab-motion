@@ -490,6 +490,54 @@ async function syntheticSemanticControl(fake: ReturnType<typeof syntheticBrowser
 
 describe('серверный PROFILE: clock/progress falsifiers', () => {
 
+  it.each([
+    { name: 'heterogeneous', groups: [[true, false], [false, true]], animations: [0, 2, 1, 3], transforms: [7, 19] },
+    { name: 'empty', groups: [], animations: [], transforms: [] },
+    { name: 'all-connected', groups: [[true, true]], animations: [1, 0], transforms: [11] },
+    { name: 'all-detached', groups: [[false], [false]], animations: [2, 1], transforms: [13, 23] },
+  ])('фактический start witness сохраняет чтения плотного массива: $name', ({ groups: connectivity, animations, transforms }) => {
+    const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
+    const begin = source.indexOf('          const readBeginMs = performance.now();', source.indexOf('const raw = [], warmup'));
+    const end = source.indexOf('          await window.__serverSavePartial(', begin);
+    const actual = source.slice(begin, end);
+    const legacy = actual.replace(/          let connectedTargets = 0;\n          for \(const element of targets\) if \(element.isConnected\) connectedTargets\+\+;\n          const startWitness = \{ connectedTargets,/, '          const startWitness = { connectedTargets: targets.filter((element) => element.isConnected).length,');
+    const compactBegin = source.indexOf('      const compact = (values) => {', source.indexOf('const result = await withBrowserTimeout(page.evaluate')));
+    const compactEnd = source.indexOf('      const expand = ', compactBegin);
+    const compactSource = source.slice(compactBegin, compactEnd);
+    const run = (block: string) => {
+      const events: string[] = [], identities: object[] = [];
+      let index = 0;
+      const groups = connectivity.map((group, groupIndex) => group.map((connected) => {
+        const id = index++;
+        const element = { get isConnected() { events.push('connected:' + id); return connected; },
+          getAnimations() { events.push('animations:' + id); return Array(animations[id]).fill({}); }, groupIndex, id };
+        identities.push(element); return element;
+      }));
+      const before = groups.flat();
+      let clock = 0;
+      const realm = createContext({ groups, performance: { now() { events.push('clock:' + clock); return ++clock; } },
+        getComputedStyle(element: { id: number; groupIndex: number }) { events.push('transform:' + element.id); return { transform: transforms[element.groupIndex] }; },
+        DOMMatrixReadOnly: class { e: number; constructor(transform: number) { this.e = transform; } } });
+      const result = runInContext('(() => {\n' + compactSource + block + '\nreturn { startWitness, targets }; })()', realm);
+      expect(result.targets).toHaveLength(identities.length);
+      result.targets.forEach((element: object, i: number) => expect(element).toBe(identities[i]));
+      groups.flat().forEach((element, i) => expect(element).toBe(before[i]));
+      const witness = JSON.parse(JSON.stringify(result.startWitness));
+      const expected = ['clock:0', ...identities.map((_, i) => 'connected:' + i), ...identities.map((_, i) => 'animations:' + i),
+        ...groups.map((group) => 'transform:' + group[0].id), 'clock:1'];
+      expect(events).toEqual(expected);
+      expect(witness).toEqual({ connectedTargets: connectivity.flat().filter(Boolean).length,
+        activeWaapi: animations.reduce((sum, count) => sum + count, 0),
+        leadingPositions: transforms.every((value) => Object.is(value, transforms[0]))
+          ? { encoding: 'repeat', count: transforms.length, ...(transforms.length ? { value: transforms[0] } : {}) }
+          : { encoding: 'rle', count: transforms.length, runs: transforms.map((value) => [1, value]) },
+        readClock: { beginMs: 1, endMs: 2 } });
+      return { witness, events };
+    };
+    expect(run(actual)).toEqual(run(legacy));
+  });
+
+
   it('locked server owner сохраняет cancel-only adapter без completion API', async () => {
     const fake = syntheticBrowser({ completion: 'absent' });
     try {

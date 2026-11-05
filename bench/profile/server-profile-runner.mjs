@@ -542,7 +542,9 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
           const batchStartMs = startClock.endMs - startClock.beginMs;
           const readBeginMs = performance.now();
           const targets = groups.flat();
-          const startWitness = { connectedTargets: targets.filter((element) => element.isConnected).length,
+          let connectedTargets = 0;
+          for (const element of targets) if (element.isConnected) connectedTargets++;
+          const startWitness = { connectedTargets,
             activeWaapi: targets.reduce((sum, element) => sum + element.getAnimations().length, 0),
             leadingPositions: compact(groups.map((elements) => new DOMMatrixReadOnly(getComputedStyle(elements[0]).transform).e)),
             readClock: { beginMs: readBeginMs, endMs: performance.now() } };
