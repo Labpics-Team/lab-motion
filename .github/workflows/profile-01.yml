@@ -14,6 +14,10 @@ on:
         description: 'Явный полный server runner; не metadata и не размерный baseline'
         type: boolean
         default: false
+      baseline_diagnostic:
+        description: 'Intrusive baseline-only trace, not qualification'
+        type: boolean
+        default: false
       conflicting_inputs:
         description: 'Отказ при смешении server timing с прежними режимами'
         type: boolean
@@ -317,14 +321,23 @@ jobs:
         id: timing
         timeout-minutes: 254
         working-directory: server-candidate
+        env:
+          BASELINE_DIAGNOSTIC: ${{ inputs.baseline_diagnostic }}
         run: |
           set -euo pipefail
           CPU=$(awk '/^Cpus_allowed_list:/ { split($2, parts, /[,-]/); print parts[1] }' /proc/self/status)
           test -n "$CPU"
           printf '%s\n' "$CPU" > "$SERVER_RECEIPTS/cpu.txt"
+          ENTRY=bench/profile/server-profile-runner.mjs
+          BUDGET=250m
+          if test "$BASELINE_DIAGNOSTIC" = true; then
+            ENTRY=bench/profile/server-profile-diagnostic.mjs
+            BUDGET=20m
+          fi
+          printf 'diagnostic=%s\nentry=%s\n' "$BASELINE_DIAGNOSTIC" "$ENTRY" > "$SERVER_RECEIPTS/mode.txt"
           set +e
-          timeout --signal=TERM --kill-after=90s 250m taskset -c "$CPU" \
-            node bench/profile/server-profile-runner.mjs \
+          timeout --signal=TERM --kill-after=90s "$BUDGET" taskset -c "$CPU" \
+            node "$ENTRY" \
             --baseline "$GITHUB_WORKSPACE/server-baseline" \
             --candidate "$GITHUB_WORKSPACE/server-candidate" \
             --browser chromium --out "$SERVER_OUT" \

@@ -207,9 +207,14 @@ export async function withServerProfileSignals(run) {
   finally { process.off('SIGINT', interrupt); process.off('SIGTERM', terminate); }
 }
 
-export async function runServerProfileCalibration(artifact, runStage, journal) {
+export async function runServerProfileCalibration(artifact, runStage, journal, { baselineOnlyDiagnostic = false } = {}) {
   artifact.warmup = await runStage('warmup', SERVER_PROFILE.warmupRuns);
   artifact.pilot = await runStage('pilot', SERVER_PROFILE.pilotRuns);
+  if (baselineOnlyDiagnostic) {
+    artifact.diagnostic = { kind: 'intrusive-baseline-trace', qualification: false, stoppedBefore: 'sample-plan/AA/positive/AB' };
+    journal('diagnostic-baseline-only-stop', artifact.diagnostic);
+    throw Object.assign(new Error('server profile: intrusive baseline diagnostic is not qualification'), { code: 'DIAGNOSTIC_ONLY', raw: artifact.diagnostic });
+  }
   artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock));
   artifact.frozenPlanDigest = serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan });
   journal('N-frozen-before-calibration-and-AB', { samplePlan: artifact.samplePlan, digest: artifact.frozenPlanDigest });
@@ -641,6 +646,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
   const artifact = { schema: 1, protocol: SERVER_PROFILE, registration: null, registrationDigest: null,
     verdict: 'UNPROVEN', failures: [], warmup: [], gc: [], stages: [],
     jitObservation: { status: 'UNPROVEN', reason: 'GC events наблюдаются; точная JIT attribution требует отдельного intrusive trace и не подменяется гипотезой' } };
+  if (dependencies.baselineOnlyDiagnostic === true) artifact.diagnostic = { kind: 'intrusive-baseline-trace', qualification: false };
   let browser, origin, observer, engineClock, interruptionRecorded = false;
   const checkpoint = () => dependencies.signal?.throwIfAborted();
   let prepared = {}, roots = {}, harness = {}, packages = {}, registrationAttempt;
@@ -683,7 +689,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     const executable = browserType.executablePath();
     const browserExecutableSha256 = sha256File(executable);
     const browserTree = { directory: path.dirname(executable), ...hashFileTree(path.dirname(executable)) };
-    harness = Object.fromEntries([...HARNESS_FILES, ...ENTRIES.map((id) => `bench/compare/entries/${id === 'waapi-ctl' ? 'waapi-control' : id}.entry.mjs`)]
+    harness = Object.fromEntries([...HARNESS_FILES, ...(dependencies.baselineOnlyDiagnostic === true ? ['bench/profile/server-profile-diagnostic.mjs'] : []), ...ENTRIES.map((id) => `bench/compare/entries/${id === 'waapi-ctl' ? 'waapi-control' : id}.entry.mjs`)]
       .map((file) => [file, { path: path.join(ROOT, file), sha256: sha256File(path.join(ROOT, file)) }]));
     for (const id of ['baseline', 'candidate']) {
       prepared[id] = prepareBenchmarkCheckout({ ...serverParticipantPreparation(roots[id], id),
@@ -748,7 +754,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
               const multiplier = name === 'positive' && id === 'right' ? SERVER_PROFILE.positiveWorkMultiplier : 1;
               try {
                 const sample = kind === 'engine' ? await engineMeasure(implementations[scene.workload === 'stock-c' ? `${build}:stock-c` : build], scene, multiplier)
-                  : await browserMeasure(browser, origin, adapters[build], scene, multiplier);
+                  : await browserMeasure(browser, origin, adapters[build], scene, multiplier, { stage: name, run, participant: id, build, registrationDigest });
                 if (kind === 'engine') compactSampleCpuEvidence(sample);
                 current.samples[id] = sample;
                 journal('sample', { stage: name, kind, scene: scene.id, run, participant: id, build, value: current.samples[id] });
@@ -773,7 +779,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       }
       verify(); return stage;
     };
-    if (!await runServerProfileCalibration(artifact, runStage, journal)) return artifact;
+    if (!await runServerProfileCalibration(artifact, runStage, journal, { baselineOnlyDiagnostic: dependencies.baselineOnlyDiagnostic === true })) return artifact;
     checkpoint();
     await loadImplementation('candidate');
     checkpoint();

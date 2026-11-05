@@ -19,6 +19,10 @@ on:
         description: 'Полный server PROFILE-01; отдельно от metadata, size и performance inputs'
         type: boolean
         default: false
+      profile_diagnostic:
+        description: 'Intrusive baseline-only trace; requires profile_server; never qualification'
+        type: boolean
+        default: false
       performance_baseline:
         description: 'Commit для парного сравнения полной стоимости движения'
         type: string
@@ -58,6 +62,7 @@ jobs:
     uses: ./.github/workflows/profile-01.yml
     with:
       server_timing: true
+      baseline_diagnostic: ${{ inputs.profile_diagnostic }}
       conflicting_inputs: ${{ inputs.profile_baseline || inputs.profile_prepare || inputs.performance_baseline != '' }}
 
   verify:
