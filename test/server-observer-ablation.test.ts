@@ -41,7 +41,7 @@ function expectPositiveObservation(observation: ReturnType<typeof observe>, valu
   expect(observation.value).toBeDefined();
   const { connectedTargets, activeWaapi, transforms } = observation.value;
   expect(connectedTargets).toBe(Math.ceil(values.length / 2));
-  expect(activeWaapi).toBe(values.length * (values.length - 1) / 2);
+  expect(activeWaapi).toBe(values.reduce((sum, _, index) => sum + index, 0));
   expect(transforms.count).toBe(values.length);
   const coordinates = transforms.encoding === 'repeat'
     ? Array(transforms.count).fill(transforms.value)
