@@ -497,12 +497,21 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
     { name: 'all-detached', groups: [[false], [false]], animations: [2, 1], transforms: [13, 23] },
   ])('фактический start witness сохраняет чтения плотного массива: $name', ({ groups: connectivity, animations, transforms }) => {
     const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
-    const begin = source.indexOf('          const readBeginMs = performance.now();', source.indexOf('const raw = [], warmup'));
+    const timingBegin = source.indexOf('const raw = [], warmup');
+    expect(timingBegin).toBeGreaterThanOrEqual(0);
+    const begin = source.indexOf('          const readBeginMs = performance.now();', timingBegin);
     const end = source.indexOf('          await window.__serverSavePartial(', begin);
+    expect(begin).toBeGreaterThan(timingBegin);
+    expect(end).toBeGreaterThan(begin);
     const actual = source.slice(begin, end);
     const legacy = actual.replace(/          let connectedTargets = 0;\n          for \(const element of targets\) if \(element.isConnected\) connectedTargets\+\+;\n          const startWitness = \{ connectedTargets,/, '          const startWitness = { connectedTargets: targets.filter((element) => element.isConnected).length,');
-    const compactBegin = source.indexOf('      const compact = (values) => {', source.indexOf('const result = await withBrowserTimeout(page.evaluate'));
+    expect(legacy).not.toBe(actual);
+    const evaluationBegin = source.indexOf('const result = await withBrowserTimeout(page.evaluate');
+    expect(evaluationBegin).toBeGreaterThanOrEqual(0);
+    const compactBegin = source.indexOf('      const compact = (values) => {', evaluationBegin);
     const compactEnd = source.indexOf('      const expand = ', compactBegin);
+    expect(compactBegin).toBeGreaterThan(evaluationBegin);
+    expect(compactEnd).toBeGreaterThan(compactBegin);
     const compactSource = source.slice(compactBegin, compactEnd);
     const run = (block: string) => {
       const events: string[] = [], identities: object[] = [];
@@ -1825,7 +1834,13 @@ describe('PROFILE: current-run clock build binding', () => {
 describe('PROFILE: ресурсный контракт проверяется до регистрации и samples', () => {
   const keys = ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'];
   const healthy = { usage_usec: 100, user_usec: 70, system_usec: 30, nr_periods: 20, nr_throttled: 2, throttled_usec: 50 };
-  function machine(quota: string | null = '400000 100000', counters: Record<string, number> = healthy, sourceOverride?: string) {
+  function expectResourceValidatorRefusal(errors: unknown[]) {
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ name: 'Error' });
+  }
+
+  function machine(quota: string | null = '400000 100000', counters: Record<string, number> = healthy, sourceOverride?: string,
+    resourceValidator: typeof validateServerResourceIdentity = validateServerResourceIdentity) {
     const source = sourceOverride ?? readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
     const common = source.slice(source.indexOf('function readOptional('), source.indexOf('async function withBrowserTimeout('));
     const capture = source.slice(source.indexOf('export function captureServerClockBuildEvidence('), source.indexOf('export function createServerJournal(')).replace(/^export /gm, '');
@@ -1849,7 +1864,7 @@ describe('PROFILE: ресурсный контракт проверяется д
     }
     files[leaf + '/cpu.stat'] = Object.entries(counters).map(([key, value]) => key + ' ' + value).join('\n');
     if (quota === null) delete files[leaf + '/cpu.max']; else files[leaf + '/cpu.max'] = quota;
-    const hashBinary = vi.fn(() => hash), reads: string[] = [];
+    const hashBinary = vi.fn(() => hash), reads: string[] = [], validatorErrors: unknown[] = [];
     const errors: Record<string, string> = {}, inodes: Record<string, bigint> = {}, onRead: Record<string, () => void> = {};
     const objects: Record<string, { directory?: boolean; fsType?: bigint; statError?: string; fsError?: string }> = {};
     const host = { release: SERVER_PROFILE.clockError.kernelRelease };
@@ -1880,7 +1895,10 @@ describe('PROFILE: ресурсный контракт проверяется д
         return { type: objects[file]?.fsType ?? 0x63677270n };
       }, path,
       errorRecord: (error: Error & { code?: string }) => ({ message: error.message, code: error.code }),
-      validateServerResourceIdentity: (value: unknown) => validateServerResourceIdentity(JSON.parse(JSON.stringify(value))),
+      validateServerResourceIdentity(value: unknown) {
+        try { return resourceValidator(JSON.parse(JSON.stringify(value))); }
+        catch (error) { validatorErrors.push(error); throw error; }
+      },
       serverResourceBinding: (value: unknown) => serverResourceBinding(JSON.parse(JSON.stringify(value))),
       existsSync: (file: string) => Object.hasOwn(files, file), loadavg: () => [0, 0, 0],
       platform: () => 'linux', release: () => host.release, arch: () => 'x64', hostname: () => 'fixture',
@@ -1888,7 +1906,7 @@ describe('PROFILE: ресурсный контракт проверяется д
       process: { version: 'v24.19.0', execPath: '/fixture/node', execArgv: [], memoryUsage: () => ({ heapUsed: 1 }) },
     });
     const owner = runInContext(common + '\n' + capture + '\n({ captureServerMachine, captureServerClockBuildEvidence });', realm);
-    return { capture: owner.captureServerMachine, collect: owner.captureServerClockBuildEvidence, hashBinary, files, errors, inodes, reads, leaf, onRead, clockEvidence, objects, host };
+    return { capture: owner.captureServerMachine, collect: owner.captureServerClockBuildEvidence, hashBinary, files, errors, inodes, reads, leaf, onRead, clockEvidence, objects, host, validatorErrors };
   }
 
   it('prior cgroup owner counterexample loses captured object on owned rejection', () => {
@@ -2096,6 +2114,8 @@ describe('PROFILE: ресурсный контракт проверяется д
     'отказывает unsupported topology %s до hashing/setup', (fault) => {
       // Given
       const fixture = machine();
+      expect(fixture.capture().identity.resource.scopes).toHaveLength(3);
+      fixture.hashBinary.mockClear();
       switch (fault) {
         case 'bind': fixture.files['/proc/self/mountinfo'] = resourceIdentity().mountinfo.text.replace('0:31 / ', '0:31 /system.slice '); break;
         case 'alias': fixture.files['/proc/self/mountinfo'] += '\n38 31 0:31 / /alias rw - cgroup2 cgroup2 rw'; break;
@@ -2112,10 +2132,67 @@ describe('PROFILE: ресурсный контракт проверяется д
         case 'scheduler': fixture.files['/proc/self/stat'] = '123 (fixture) ' + Array(51).fill('1').join(' '); break;
         default: throw new Error('unknown fixture mutation: ' + fault);
       }
-      // When / Then
-      expect(() => fixture.capture()).toThrow();
+      const membership = { text: fixture.files['/proc/self/cgroup'] };
+      const mountinfo = { text: fixture.files['/proc/self/mountinfo'] };
+      const leaf = '/system.slice/hosted-compute-agent.service';
+      const expectedRaw: Record<string, object> = {
+        bind: { membership, mountinfo, mount: { root: '/system.slice' } },
+        alias: { membership, mountinfo },
+        overmount: { membership, mountinfo, mount: { point: '/sys/fs/cgroup' } },
+        'missing-membership': { membership, mountinfo },
+        'duplicate-membership': { membership, mountinfo },
+        'parent-traversal': { membership, mountinfo },
+        'namespace-root': { resource: { scopes: [{ path: leaf }, { path: '/system.slice' }, { path: '/', type: { text: 'domain' } }] } },
+        threaded: { resource: { scopes: [{ path: leaf, type: { text: 'domain threaded' } }, { path: '/system.slice' }, { path: '/' }] } },
+        'cpu-disabled': { resource: { scopes: [{ path: leaf }, { path: '/system.slice', subtreeControl: { text: 'memory' } }, { path: '/' }] } },
+        denied: { resource: { scopes: [{ path: leaf, cpuMax: { error: { code: 'EACCES' } } }, { path: '/system.slice' }, { path: '/' }] } },
+        'period-zero': { resource: { scopes: [{ path: leaf, cpuMax: { text: '100000 0' } }, { path: '/system.slice' }, { path: '/' }] } },
+        'duplicate-counter': { resource: { path: leaf, read: { text: fixture.files[fixture.leaf + '/cpu.stat'] } } },
+        scheduler: { membership, mountinfo, scheduler: { text: fixture.files['/proc/self/stat'] } },
+      };
+      // When / Then: проверяется свидетельство отказа, не текст сообщения из другого realm.
+      let caught: unknown;
+      try { fixture.capture(); } catch (error) { caught = error; }
+      expect(caught).toMatchObject({ name: 'Error', raw: expectedRaw[fault] });
+      if (['namespace-root', 'threaded', 'cpu-disabled', 'denied', 'period-zero'].includes(fault)) {
+        expectResourceValidatorRefusal(fixture.validatorErrors);
+      } else expect(fixture.validatorErrors).toHaveLength(0);
       expect(fixture.hashBinary).not.toHaveBeenCalled();
     });
+
+  it('oracle отвергает скрытый TypeError при удалении quota invariant настоящего validator', () => {
+    const source = readFileSync(new URL('../bench/profile/server-profile-contract.mjs', import.meta.url), 'utf8');
+    const validatorBegin = source.indexOf('export function validateServerResourceIdentity(');
+    const validatorEnd = source.indexOf('\nexport function serverResourceBinding(', validatorBegin);
+    const invariantBegin = source.indexOf('function invariant(');
+    const invariantEnd = source.indexOf('\nfunction positive(', invariantBegin);
+    expect(validatorBegin).toBeGreaterThanOrEqual(0);
+    expect(validatorEnd).toBeGreaterThan(validatorBegin);
+    expect(invariantBegin).toBeGreaterThanOrEqual(0);
+    expect(invariantEnd).toBeGreaterThan(invariantBegin);
+    const validator = source.slice(validatorBegin, validatorEnd).replace(/^export /, '');
+    const mutant = validator.replace(/^    invariant\(quota &&[^\n]*\n/m, '');
+    expect(mutant).not.toBe(validator);
+    const realm = createContext({ isDeepStrictEqual });
+    const validateMutant = runInContext(source.slice(invariantBegin, invariantEnd) + '\n' + mutant +
+      '\n(value) => validateServerResourceIdentity(JSON.parse(JSON.stringify(value)));', realm);
+    const fixture = machine('400000 100000', healthy, undefined, validateMutant);
+    expect(fixture.capture().identity.resource.scopes).toHaveLength(3);
+    expect(fixture.validatorErrors).toHaveLength(0);
+    fixture.hashBinary.mockClear();
+    fixture.files[fixture.leaf + '/cpu.max'] = '100000 0';
+    let caught: unknown;
+    try { fixture.capture(); } catch (error) { caught = error; }
+    expect(caught).toMatchObject({ name: 'Error', raw: { resource: { scopes: [
+      { cpuMax: { text: '100000 0' } }, { path: '/system.slice' }, { path: '/' },
+    ] } } });
+    expect(fixture.validatorErrors).toHaveLength(1);
+    expect(fixture.validatorErrors[0]).toMatchObject({ name: 'TypeError' });
+    let oracleFailure: unknown;
+    try { expectResourceValidatorRefusal(fixture.validatorErrors); } catch (error) { oracleFailure = error; }
+    expect(oracleFailure).toMatchObject({ name: 'AssertionError' });
+    expect(fixture.hashBinary).not.toHaveBeenCalled();
+  });
 
   it('посторонний mount во время snapshot не прерывает захват машины', () => {
     // Given: изменение происходит точно между двумя configuration reads.
