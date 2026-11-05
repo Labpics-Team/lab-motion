@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createServerJournal, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
 import { boundedDiagnostic, tracedBrowserMeasure, traceCoverage, tracingCompletion } from '../bench/profile/server-profile-diagnostic.mjs';
 import { SERVER_PROFILE } from '../bench/profile/server-profile-registration.mjs';
-import { OBSERVER_ABLATION, observerSnapshotH1 } from '../bench/profile/server-observer-ablation.mjs';
+import { OBSERVER_ABLATION } from '../bench/profile/server-observer-ablation.mjs';
 
 const cliCases = [
   { mode: undefined, fault: 'one', matches: 1 },
@@ -92,7 +92,7 @@ describe('настоящий диагностический CLI', () => {
         ]);
         expect(acquisition.calls[0].observer).toEqual({ arm: 'H0' });
         expect(acquisition.calls[1].observer.arm).toBe('H1');
-        expect(acquisition.calls[1].observer.snapshotSource).toBe(observerSnapshotH1.toString());
+        expect(acquisition.calls[1].observer.snapshotSource).toBe(acquisition.expectedSnapshotSource);
       } else {
         expect(index.plan).toBeUndefined();
         expect(index.tracesDisabled).toBeUndefined();
