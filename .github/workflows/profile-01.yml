@@ -67,7 +67,7 @@ jobs:
           import { PROFILE_01, preregistrationDigest, verifyPreregistration } from './bench/profile/profile-01-preregistration.mjs';
           verifyPreregistration(PROFILE_01);
           if (PROFILE_01.candidateSamplesObservedAtRegistration !== false) {
-            throw new Error('preregistration обязана предшествовать samples');
+            throw new Error('Предварительная регистрация обязана предшествовать сбору образцов');
           }
           console.log(`preregistration digest: ${preregistrationDigest(PROFILE_01)}`);
           NODE
@@ -214,7 +214,7 @@ jobs:
     # бюджета оставлен на подготовку, повторную проверку и экспорт. Принудительное завершение может прервать экспорт.
     timeout-minutes: 360
     steps:
-      - name: Создать attempt receipts до setup и отказа
+      - name: Создать квитанции попытки до подготовки и отказа
         id: receipt_init
         timeout-minutes: 1
         env:
@@ -321,7 +321,7 @@ jobs:
           console.log(JSON.stringify(receipt));
           NODE
 
-      - name: Исполнить существующий server runner на actual allowed CPU
+      - name: Выполнить существующий серверный измеритель на фактически разрешённом CPU
         id: timing
         timeout-minutes: 254
         working-directory: server-candidate
@@ -374,7 +374,7 @@ jobs:
             > "$SERVER_RECEIPTS/replay.stdout" 2> "$SERVER_RECEIPTS/replay.stderr"
           tail -n 30 "$SERVER_RECEIPTS/replay.stdout"
 
-      - name: Экспортировать весь raw включая partial failures
+      - name: Экспортировать все исходные данные, включая частичные отказы
         if: ${{ always() && steps.timing.outcome != 'skipped' }}
         id: raw_export
         timeout-minutes: 15
@@ -387,7 +387,7 @@ jobs:
           retention-days: 5
           compression-level: 6
 
-      - name: Сохранить отдельный raw archive receipt
+      - name: Сохранить отдельную квитанцию архива исходных данных
         if: ${{ always() && steps.receipt_init.outcome == 'success' }}
         timeout-minutes: 1
         env:
@@ -399,7 +399,7 @@ jobs:
           printf 'raw_id=%s\nraw_archive_digest=%s\nraw_outcome=%s\ntiming_outcome=%s\n' \
             "$RAW_ID" "$RAW_DIGEST" "$RAW_OUTCOME" "$TIMING_OUTCOME" > "$SERVER_RECEIPTS/raw-export.txt"
 
-      - name: Экспортировать независимые source digest journal receipts
+      - name: Экспортировать независимые квитанции исходников, дайджеста и журнала
         if: ${{ always() && steps.receipt_init.outcome == 'success' }}
         id: receipt_export
         timeout-minutes: 5
@@ -410,7 +410,7 @@ jobs:
           if-no-files-found: error
           retention-days: 5
 
-      - name: Проверить фактические export receipts
+      - name: Проверить фактические квитанции экспорта
         timeout-minutes: 1
         if: ${{ always() && steps.receipt_init.outcome == 'success' }}
         env:

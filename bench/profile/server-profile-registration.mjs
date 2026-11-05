@@ -198,7 +198,7 @@ export function planServerSampleSize(pilotPairs) {
     if (typeof id !== 'string' || !Array.isArray(left) || !Array.isArray(right) ||
         left.length !== SERVER_PROFILE.pilotRuns || right.length !== left.length ||
         [...left, ...right].some((x) => !Number.isFinite(x) || x <= 0)) {
-      throw new Error('server profile: некорректные baseline-only pilot samples');
+      throw new Error('server profile: некорректные образцы пилота только базовой версии');
     }
     const differences = Array.from({ length: left.length / 2 }, (_, block) =>
       (Math.log(left[block * 2]) - Math.log(right[block * 2]) + Math.log(left[block * 2 + 1]) - Math.log(right[block * 2 + 1])) / 2);
@@ -213,5 +213,5 @@ export function planServerSampleSize(pilotPairs) {
   const requiredRuns = Math.max(SERVER_PROFILE.minRuns, tail.minimumBlocks * 2, ...cells.map(({ requiredRuns: n }) => n));
   const runs = Math.min(SERVER_PROFILE.maxRuns, Math.ceil(requiredRuns / 2) * 2);
   return { runs, requiredRuns, feasible: requiredRuns <= SERVER_PROFILE.maxRuns, cells, tail,
-    method: 'baseline-only paired block log-contrast normal approximation; power 0.8, MDE 5%, Bonferroni family 11×2; N в runs, блок содержит два run' };
+    method: 'Нормальное приближение парного блочного логарифмического контраста только базовой версии; мощность 0.8, MDE 5%, семейство Bonferroni 11×2; N в запусках, блок содержит два запуска' };
 }

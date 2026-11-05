@@ -12,7 +12,7 @@ export const OBSERVER_ABLATION = Object.freeze({
   id: 'observer-allocation-ablation-1', qualification: false, seed,
   pairs: 8, scenes: ['s2', 's3'], orders: first.map(arm => [arm, arm === 'left' ? 'right' : 'left']),
   arms: { left: 'H0', right: 'H1' },
-  estimand: 'paired fresh-realm cancelMs mean of all8 repetitions after1warmup; observer after cancel may affect later heap/state only',
+  estimand: 'Парное среднее cancelMs в свежем контексте исполнения по всем 8 повторам после 1 прогрева; наблюдатель после отмены может влиять только на последующую кучу/состояние',
   retry: false, tracing: false,
 });
 export function observerSnapshotH1(els) {
