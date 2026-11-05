@@ -191,10 +191,10 @@ function runCase({ mod, kind, name }, value, terminal) {
       element.querySelectorAll = () => [element];
       const parent = mod.motion.scope(element);
       const off = parent.on(element, 'click', notify);
-      assert.equal(value.listeners.size, 1, Object.assign(new Error(name + ': event listener не зарегистрирован'), { code: 'ROOT_EVENT_REGISTRATION' }));
+      if (value.listeners.size !== 1) throw Object.assign(new Error(name + ': event listener не зарегистрирован'), { code: 'ROOT_EVENT_REGISTRATION' });
       const beforeEvent = value.publications;
       element.dispatchEvent({ type: 'click' });
-      assert.equal(value.publications, beforeEvent + 1, Object.assign(new Error(name + ': event listener не доставил событие'), { code: 'ROOT_EVENT_DELIVERY' }));
+      if (value.publications !== beforeEvent + 1) throw Object.assign(new Error(name + ': event listener не доставил событие'), { code: 'ROOT_EVENT_DELIVERY' });
       const child = parent.scope(scopeRoot(value, [element])), scalar = child.value(0), scalarOff = scalar.subscribe(notify);
       const scalarRun = mod.motion.playhead(scalar.animate([0, 1], { duration: 1000, ease: 'linear' }));
       scalarRun.pause(); scalarRun.seek(100);
@@ -218,10 +218,10 @@ function runCase({ mod, kind, name }, value, terminal) {
       const pending = Promise.all(runs.map(run => run.finished));
       destroy = () => {
         parent.dispose();
-        assert.equal(value.listeners.size, 0, Object.assign(new Error(name + ': listener не снят'), { code: 'ROOT_EVENT_REMOVAL' }));
+        if (value.listeners.size !== 0) throw Object.assign(new Error(name + ': listener не снят'), { code: 'ROOT_EVENT_REMOVAL' });
         const afterDispose = value.publications;
         element.dispatchEvent({ type: 'click' });
-        assert.equal(value.publications, afterDispose, Object.assign(new Error(name + ': disposed event listener продолжает доставку'), { code: 'ROOT_EVENT_DISPOSED_DELIVERY' }));
+        if (value.publications !== afterDispose) throw Object.assign(new Error(name + ': disposed event listener продолжает доставку'), { code: 'ROOT_EVENT_DISPOSED_DELIVERY' });
       };
       owners = [parent, child, scalar, off, scalarOff, ...runs, ...(mutation ? [mutation.promise] : [])];
       terminalCheck = { pending, host, name, kind, ref: new WeakRef(value) }; if (terminal) componentPromises.push(terminalCheck);
