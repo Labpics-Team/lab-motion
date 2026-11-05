@@ -163,6 +163,9 @@ const resourceMachine = () => ({ affinity: '0', cgroupCpuMax: '400000 100000', r
 
 function stage(name = 'aa', runs = 2) {
   const rows: any[] = [];
+  // Одна зарегистрированная перестановка на stage, а не полный N-план
+  // заново для каждой scene/run. Raw и независимые validator checks прежние.
+  const orders = serverOrders(runs);
   for (let run = 0; run < runs; run++) for (const [kind, scenes] of [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]] as const) {
     for (const scene of scenes) {
       const samples: any = {};
@@ -204,7 +207,7 @@ function stage(name = 'aa', runs = 2) {
         samples[id] = { raw, ...extra, semantic: true, workMultiplier: multiplier, repetitions: SERVER_PROFILE.repetitions, denominator: SERVER_PROFILE.denominator,
           ...(kind === 'engine' ? { cpuClock: { ...syntheticCpuIdentity } } : {}) };
       }
-      rows.push({ kind, scene: scene.id, run, order: serverOrders(runs)[run], samples });
+      rows.push({ kind, scene: scene.id, run, order: [...orders[run]], samples });
     }
   }
   const blocks = Array.from({ length: runs / 2 }, (_, block) => {
