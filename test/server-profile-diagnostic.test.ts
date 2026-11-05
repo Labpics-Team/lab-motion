@@ -1,9 +1,10 @@
 import { EventEmitter } from 'node:events';
+import { createContext, runInContext } from 'node:vm';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
+import { createServerJournal, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
 import { boundedDiagnostic, tracedBrowserMeasure, traceCoverage, tracingCompletion } from '../bench/profile/server-profile-diagnostic.mjs';
 import { SERVER_PROFILE } from '../bench/profile/server-profile-registration.mjs';
 
@@ -69,8 +70,10 @@ describe('bounded intrusive baseline diagnostic', () => {
     } finally { rmSync(out, { recursive: true, force: true }); }
   });
 
-  it.each(['shutdown', 'detach', 'measurement'])('retains acquired raw when %s fails without accepting an incomplete trace', async (phase) => {
+  it.each(['shutdown', 'detach', 'measurement', 'success'])('journals acquired raw through the actual timing stage for %s', async (phase) => {
     const out = mkdtempSync(path.join(os.tmpdir(), 'profile-diagnostic-'));
+    const journalDirectory = path.join(out, 'journal');
+    const journal = createServerJournal(journalDirectory);
     const session: any = new EventEmitter();
     session.detach = vi.fn(async () => { if (phase === 'detach') throw new Error('detach rejected'); });
     session.send = vi.fn(async (method: string) => {
@@ -88,8 +91,9 @@ describe('bounded intrusive baseline diagnostic', () => {
     } };
     const context = { newPage: async () => page, pages: () => [page], close: vi.fn(async () => {}) };
     const browser = { newBrowserCDPSession: async () => session, newContext: async () => context };
-    const sample = { measurementTimeOriginMs: 1, raw: [{ calls: 32, batchCancelMs: 2 }], warmup: [{ calls: 32 }] };
-    const acquisitionFailure = Object.assign(new Error('measurement rejected'), { raw: sample });
+    const timerEvidence = { probes: [{ phase: 'before', performanceNowDeltasMs: [0.005] }] };
+    const sample = { measurementTimeOriginMs: 1, raw: [{ calls: 32, batchCancelMs: 2 }], warmup: [{ calls: 32 }], timerEvidence };
+    const acquisitionFailure = Object.assign(new Error('measurement rejected'), { raw: sample, timerEvidence });
     const measure = async (facade: any) => {
       const actual = await facade.newContext({});
       const observed = await actual.newPage();
@@ -100,16 +104,46 @@ describe('bounded intrusive baseline diagnostic', () => {
     };
     const index: any[] = [];
     try {
-      const result = tracedBrowserMeasure(out, index, measure)(browser, {}, { sha256: 'a'.repeat(64) }, { id: 's2' });
-      await expect(result).rejects.toMatchObject({ raw: sample });
-      if (phase === 'measurement') await expect(result).rejects.toBe(acquisitionFailure);
+      const source = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+      const begin = source.indexOf('    const runStage = async (name, runs) => {');
+      const end = source.indexOf('    if (!await runServerProfileCalibration(', begin);
+      const recordBegin = source.indexOf('function preserveRawNumbers(');
+      const recordEnd = source.indexOf('function readOptional(', recordBegin);
+      expect(begin).toBeGreaterThan(0); expect(end).toBeGreaterThan(begin);
+      expect(recordBegin).toBeGreaterThan(0); expect(recordEnd).toBeGreaterThan(recordBegin);
+      const artifact: any = { stages: [] };
+      const stageContext = createContext({ artifact, SERVER_PROFILE: { ...SERVER_PROFILE, engineScenes: [], browserScenes: [{ id: 's2' }] },
+        verify: () => {}, checkpoint: () => {}, captureServerLoad: () => ({}), serverOrders: () => [['left']],
+        engineMeasure: vi.fn(), compactSampleCpuEvidence: vi.fn(), implementations: {}, registrationDigest: 'a'.repeat(64),
+        browser, origin: {}, adapters: { baseline: { sha256: 'a'.repeat(64) } },
+        browserMeasure: tracedBrowserMeasure(out, index, measure), journal, process: { stderr: { write: () => {} } } });
+      const stage = runInContext(`(() => { ${source.slice(recordBegin, recordEnd)} ${source.slice(begin, end)} return runStage; })()`, stageContext);
+      const result = stage('warmup', 1);
+      if (phase === 'success') {
+        const completed = await result;
+        expect(completed.rows[0].samples.left).toBe(sample);
+      } else {
+        await expect(result).rejects.toMatchObject({ raw: sample, timerEvidence });
+        if (phase === 'measurement') await expect(result).rejects.toBe(acquisitionFailure);
+        expect(artifact.warmup.rows[0].samples.left).toBeUndefined();
+      }
+      const events = readFileSync(path.join(journalDirectory, 'journal.ndjson'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+      expect(events).toHaveLength(1);
+      expect(events[0].type).toBe(phase === 'success' ? 'sample' : 'failed-sample');
+      if (phase === 'success') expect(events[0].value.value).toEqual(sample);
+      else {
+        expect(events[0].value.partial).toEqual(sample);
+        expect(events[0].value.timerEvidence).toEqual(timerEvidence);
+        expect(events[0].value.error.raw).toEqual(sample);
+      }
       expect(context.close).toHaveBeenCalledOnce();
       expect(session.detach).toHaveBeenCalledOnce();
       expect(session.listenerCount('Tracing.tracingComplete')).toBe(0);
-      expect(index[0].complete).toBe(false);
+      expect(index[0].complete).toBe(phase === 'success');
       const trace = JSON.parse(readFileSync(path.join(out, index[0].file), 'utf8'));
       expect(trace.qualification).toBe(false);
-      expect(trace.errors.some((error: any) => error.phase === phase)).toBe(true);
+      if (phase === 'success') expect(trace.errors).toEqual([]);
+      else expect(trace.errors.some((error: any) => error.phase === phase)).toBe(true);
     } finally { rmSync(out, { recursive: true, force: true }); }
   });
 

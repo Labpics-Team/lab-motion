@@ -111,7 +111,7 @@ export function tracedBrowserMeasure(out, index, measure = measureServerBrowser)
       if (!complete) failure ??= new Error('diagnostic trace incomplete; partial evidence preserved');
     }
     if (failure) {
-      if (sample !== undefined) throw Object.assign(new AggregateError([failure], 'diagnostic failed after completed browser measurement'), { raw: sample });
+      if (sample !== undefined) throw Object.assign(new AggregateError([failure], 'diagnostic failed after completed browser measurement'), { raw: sample, timerEvidence: sample.timerEvidence });
       throw failure;
     }
     return sample;
