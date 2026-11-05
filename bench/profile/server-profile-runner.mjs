@@ -56,7 +56,7 @@ function resourceRead(file, trim = true) {
 function captureResourceConfiguration() {
   const membership = resourceRead('/proc/self/cgroup', false), mountinfo = resourceRead('/proc/self/mountinfo', false);
   const raw = { membership, mountinfo };
-  const refuse = (message) => { throw Object.assign(new Error('server profile: ' + message + '; до samples'), { raw }); };
+  const refuse = (message) => { throw Object.assign(new Error('server profile: ' + message + '; до сбора образцов'), { raw }); };
   const entries = membership.text?.split('\n').filter((line) => line.startsWith('0::')) ?? [];
   const absolute = (value) => typeof value === 'string' && value.startsWith('/') &&
     (value === '/' || value.split('/').slice(1).every((part) => part !== '' && part !== '.' && part !== '..')) && !/[\x00-\x1f]/.test(value);
@@ -83,7 +83,7 @@ function captureResourceConfiguration() {
     try {
       info = statSync(directory, { bigint: true });
       fs = statfsSync(directory, { bigint: true });
-    } catch (error) { throw Object.assign(new Error('server profile: cgroup object недоступен; до samples'), { raw: { ...raw, directory, error: errorRecord(error) } }); }
+    } catch (error) { throw Object.assign(new Error('server profile: объект cgroup недоступен; до сбора образцов'), { raw: { ...raw, directory, error: errorRecord(error) } }); }
     const object = { dev: String(info.dev), ino: String(info.ino), fsType: String(fs.type) };
     if (!info.isDirectory() || fs.type !== 0x63677270n) {
       throw Object.assign(new Error('server profile: объект не cgroup2 directory; до samples'), { raw: { ...raw, directory, object } });
@@ -210,13 +210,13 @@ export async function withServerProfileSignals(run) {
 export async function runServerProfileCalibration(artifact, runStage, journal, { baselineOnlyDiagnostic = false, observerAblation = false } = {}) {
   if (observerAblation) {
     await runStage('observer-ablation', OBSERVER_ABLATION.pairs);
-    throw Object.assign(new Error('server profile: observer ablation is not qualification'), { code: 'DIAGNOSTIC_ONLY', raw: artifact.diagnostic });
+    throw Object.assign(new Error('server profile: исключение наблюдателя не является квалификацией'), { code: 'DIAGNOSTIC_ONLY', raw: artifact.diagnostic });
   }
   artifact.warmup = await runStage('warmup', SERVER_PROFILE.warmupRuns);
   artifact.pilot = await runStage('pilot', SERVER_PROFILE.pilotRuns);
   if (baselineOnlyDiagnostic) {
     artifact.diagnostic = { kind: 'intrusive-baseline-trace', qualification: false, stoppedBefore: 'sample-plan/AA/positive/AB' };
-    throw Object.assign(new Error('server profile: intrusive baseline diagnostic is not qualification'), { code: 'DIAGNOSTIC_ONLY', raw: artifact.diagnostic });
+    throw Object.assign(new Error('server profile: диагностика с вмешательством для базовой версии не является квалификацией'), { code: 'DIAGNOSTIC_ONLY', raw: artifact.diagnostic });
   }
   artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock));
   artifact.frozenPlanDigest = serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan });

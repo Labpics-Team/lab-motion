@@ -15,7 +15,7 @@ export function observerAblationMeasure(measure = measureServerBrowser) {
 export async function boundedDiagnostic(promise, timeoutMs = 30_000) {
   let timer;
   try { return await Promise.race([promise, new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error('diagnostic operation timeout')), timeoutMs);
+    timer = setTimeout(() => reject(new Error('Истёк срок диагностической операции')), timeoutMs);
   })]); } finally { clearTimeout(timer); }
 }
 
@@ -24,7 +24,7 @@ export function tracingCompletion(session, timeoutMs = 30_000) {
   const promise = new Promise((resolve, reject) => {
     listener = (event) => { clearTimeout(timer); resolve(event); };
     session.once('Tracing.tracingComplete', listener);
-    timer = setTimeout(() => { session.off('Tracing.tracingComplete', listener); reject(new Error('diagnostic trace completion timeout')); }, timeoutMs);
+    timer = setTimeout(() => { session.off('Tracing.tracingComplete', listener); reject(new Error('Истёк срок завершения диагностической трассы')); }, timeoutMs);
   });
   return { promise, cancel() { clearTimeout(timer); session.off('Tracing.tracingComplete', listener); } };
 }
@@ -69,7 +69,7 @@ export function tracedBrowserMeasure(out, index, measure = measureServerBrowser,
       session.on('Tracing.dataCollected', collected);
       const categories = (await boundedDiagnostic(session.send('Tracing.getCategories'))).categories;
       const requested = ['devtools.timeline', 'v8', 'v8.execute', 'blink.user_timing', 'disabled-by-default-v8.gc', 'disabled-by-default-v8.compile'];
-      if (requested.some(category => !categories.includes(category))) throw new Error('diagnostic trace categories unavailable');
+      if (requested.some(category => !categories.includes(category))) throw new Error('Категории диагностической трассы недоступны');
       // Подписка предшествует старту; весь диагностический образец ограничен отдельным сроком в среде CI.
       completion = tracingCompletion(session, 120_000);
       const settled = completion.promise.then(value => ({ value }), error => ({ error }));
@@ -121,7 +121,7 @@ export function tracedBrowserMeasure(out, index, measure = measureServerBrowser,
         if (failure) failure.errors = [...(failure.errors ?? []), error];
         else failure = error;
       }
-      if (!complete) failure ??= new Error('diagnostic trace incomplete; partial evidence preserved');
+      if (!complete) failure ??= new Error('Диагностическая трасса неполна; частичные свидетельства сохранены');
     }
     if (failure) {
       if (sample !== undefined) throw Object.assign(new AggregateError([failure], 'diagnostic failed after completed browser measurement'), { raw: sample, timerEvidence: sample.timerEvidence });
