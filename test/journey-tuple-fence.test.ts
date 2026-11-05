@@ -48,8 +48,10 @@ it('default fence отклоняет coherent foreign HTTP tuple той же в�
         bundleSha256: hash, recipesSha256: hash, motionInputs: ['dist/smart/index.js'], motionInputSha256: { 'dist/smart/index.js': hash } };
       const follow = { package: `${scope.package.name}@${scope.package.version}`, tarball: archive,
         documentSha256: hash, outputs: [{ file: 'compositor-follow-recipes.js', sha256: hash }] };
+      const rootReceipt = { tarball: archive, bundleSha256: hash, modules: ['dist/motion/index.js'] };
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify(req.url?.endsWith('scope-recipes.package.json') ? scope : follow));
+      res.end(JSON.stringify(req.url?.endsWith('scope-recipes.package.json') ? scope
+        : req.url?.endsWith('motion-root.package.json') ? rootReceipt : follow));
     });
     onTestFinished(async () => {
       if (server.listening) { server.close(); await once(server, 'close'); }

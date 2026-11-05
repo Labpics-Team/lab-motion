@@ -4,6 +4,29 @@
  * здесь установленный production tarball проходит настоящий DOM, фокус, ввод и визуальную C0-границу.
  */
 import { expect, packedJourneyTest as test } from './fixtures/harness';
+import type { MotionScope, Playback } from '../src/motion/index.js';
+
+type CardBox = { x: number; y: number; width: number; height: number };
+interface RootCardState {
+  area: MotionScope;
+  root: HTMLElement;
+  card: HTMLElement;
+  media: HTMLElement;
+  input: HTMLInputElement;
+  opening: Playback;
+  openingMedia: Playback;
+  retarget: Playback;
+  retargetMedia: Playback;
+  closing?: Playback;
+  reopened?: Playback;
+  active?: Playback;
+  before: CardBox[];
+  boundary: CardBox[];
+  moving: CardBox[];
+  boxes(): CardBox[];
+  activations(): number;
+}
+type RootCardWindow = Window & { __rootCard: RootCardState };
 
 test('card↔details: вложенная геометрия, перенацеливание в полёте, фокус и режимы без движения', async ({ page }) => {
   const result = await page.evaluate(async () => {
@@ -411,4 +434,151 @@ test('card↔details: выделение и ввод в том же input пер
       transform: document.querySelector<HTMLElement>('#card')!.style.transform };
   });
   expect(result).toEqual({ same: true, focused: true, value: 'alpha 世界', start: 8, end: 8, transform: '' });
+});
+
+test('root card↔details: живая геометрия, перехват, ввод и освобождение одной области', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-01-01T00:01:00Z'));
+  await page.evaluate(async () => {
+    const { scope } = await import('/browser/.artifacts/motion-root.js');
+    document.body.innerHTML = `
+      <div id="root" style="position:relative;width:720px;height:640px">
+        <article id="card" style="position:absolute;left:0;top:50px;width:120px;height:80px">
+          <div id="media" style="position:absolute;left:12px;top:12px;width:48px;height:48px"></div>
+          <button id="action">Действие</button><input id="title" value="alpha beta">
+        </article>
+      </div>`;
+    const root = document.querySelector<HTMLElement>('#root')!;
+    const card = document.querySelector<HTMLElement>('#card')!;
+    const media = document.querySelector<HTMLElement>('#media')!;
+    const action = document.querySelector<HTMLButtonElement>('#action')!;
+    const input = document.querySelector<HTMLInputElement>('#title')!;
+    const area = scope(root, { spring: { mass: 1, stiffness: 170, damping: 26 } });
+    let activations = 0;
+    area.on(action, 'click', () => { activations++; });
+    // Размеры принадлежат приложению; root исполняет CSS-каналы живых узлов,
+    // без snapshot, скопированного solver и ручной передачи скорости.
+    const opening = area.animate(card, { left: 40, top: 30, width: 360, height: 300 });
+    const openingMedia = area.animate(media, { left: 40, top: 60, width: 200, height: 120 });
+    const boxes = () => [card, media].map(node => {
+      const box = node.getBoundingClientRect();
+      return { x: box.x, y: box.y, width: box.width, height: box.height };
+    });
+    (window as unknown as RootCardWindow).__rootCard = { area, root, card, media, input, opening, openingMedia,
+      retarget: opening, retargetMedia: openingMedia, before: [], boundary: [], moving: [], boxes,
+      activations: () => activations };
+  });
+  await page.clock.runFor(64);
+  const intermediate = await page.evaluate(() => {
+    const state = (window as unknown as RootCardWindow).__rootCard;
+    return { boxes: state.boxes(), card: state.opening.state, media: state.openingMedia.state };
+  });
+  expect(intermediate.card).toBe('running'); expect(intermediate.media).toBe('running');
+  expect(intermediate.boxes[0]!.width).toBeGreaterThan(120);
+  expect(intermediate.boxes[0]!.width).toBeLessThan(360);
+  expect(intermediate.boxes[1]!.width).toBeGreaterThan(48);
+  expect(intermediate.boxes[1]!.width).toBeLessThan(200);
+  await page.evaluate(() => {
+    const state = (window as unknown as RootCardWindow).__rootCard;
+    state.before = state.boxes();
+    state.retarget = state.area.animate(state.card, { left: 20, top: 50, width: 420, height: 360 });
+    state.retargetMedia = state.area.animate(state.media, { left: 44, top: 80, width: 260, height: 160 });
+    state.boundary = state.boxes();
+  });
+  await page.clock.runFor(32);
+  const geometry = await page.evaluate(() => {
+    const state = (window as unknown as RootCardWindow).__rootCard;
+    return { before: state.before, boundary: state.boundary, moving: state.boxes() };
+  });
+  for (let i = 0; i < 2; i++) {
+    for (const key of ['x', 'y', 'width', 'height'] as const)
+      expect(Math.abs(geometry.boundary[i]![key] - geometry.before[i]![key])).toBeLessThanOrEqual(0.25);
+    expect(geometry.moving[i]).not.toEqual(geometry.boundary[i]);
+  }
+  const action = page.locator('#action');
+  const box = await action.boundingBox();
+  expect(box).not.toBeNull();
+  const point = { x: box!.x + box!.width / 2, y: box!.y + box!.height / 2 };
+  expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.id, point)).toBe('action');
+  await page.mouse.click(point.x, point.y);
+  await action.focus(); await page.keyboard.press('Enter');
+  expect(await page.evaluate(() => (window as unknown as RootCardWindow).__rootCard.activations())).toBe(2);
+  await page.locator('#title').focus();
+  await page.locator('#title').evaluate(node => (node as HTMLInputElement).setSelectionRange(6, 10));
+  const preserved = await page.evaluate(() => {
+    const state = (window as unknown as RootCardWindow).__rootCard;
+    state.closing = state.area.animate(state.card, { left: 0, top: 50, width: 120, height: 80 });
+    const input = document.querySelector<HTMLInputElement>('#title')!;
+    return { same: input === state.input, focused: document.activeElement === input,
+      start: input.selectionStart, end: input.selectionEnd };
+  });
+  expect(preserved).toEqual({ same: true, focused: true, start: 6, end: 10 });
+  // Исходный finished доставляет clock, а не ручная terminal-команда playback.
+  const completionBudget = await page.evaluate(() => {
+    const state = (window as unknown as RootCardWindow).__rootCard;
+    return Math.ceil(Math.max(state.closing!.duration, state.retargetMedia.duration)) + 64;
+  });
+  await page.clock.runFor(completionBudget);
+  expect(await page.evaluate(() => (window as unknown as RootCardWindow).__rootCard.closing!.state)).toBe('finished');
+  expect(await page.evaluate(() => (window as unknown as RootCardWindow).__rootCard.retargetMedia.state)).toBe('finished');
+  const reopenBudget = await page.evaluate(() => {
+    const state = (window as unknown as RootCardWindow).__rootCard;
+    state.reopened = state.area.animate(state.card, { left: 20, top: 50, width: 420, height: 360 });
+    return Math.ceil(state.reopened.duration) + 64;
+  });
+  await page.clock.runFor(reopenBudget);
+  expect(await page.evaluate(() => (window as unknown as RootCardWindow).__rootCard.reopened!.state)).toBe('finished');
+  const settled = await page.evaluate(async () => {
+    const state = (window as unknown as RootCardWindow).__rootCard;
+    const rootBox = state.root.getBoundingClientRect();
+    const final = state.boxes().map((rect: { x: number; y: number; width: number; height: number }) =>
+      ({ ...rect, x: rect.x - rootBox.x, y: rect.y - rootBox.y }));
+    return { stopped: await state.retarget.finished, final, opening: await state.opening.finished,
+      openingMedia: await state.openingMedia.finished, closing: await state.closing!.finished,
+      reopened: await state.reopened!.finished, media: await state.retargetMedia.finished };
+  });
+  expect(settled.opening).toEqual({ status: 'stopped' });
+  expect(settled.openingMedia).toEqual({ status: 'stopped' });
+  expect(settled.stopped).toEqual({ status: 'stopped' });
+  expect(settled.closing).toEqual({ status: 'finished' });
+  expect(settled.reopened).toEqual({ status: 'finished' });
+  expect(settled.media).toEqual({ status: 'finished' });
+  expect(settled.final).toEqual([
+    { x: 20, y: 50, width: 420, height: 360 },
+    { x: 64, y: 130, width: 260, height: 160 },
+  ]);
+  await page.keyboard.insertText('世界');
+  expect(await page.locator('#title').inputValue()).toBe('alpha 世界');
+  const cleanup = await page.evaluate(() => {
+    const state = (window as unknown as RootCardWindow).__rootCard;
+    const quiet = state.area.animate(state.card, { left: 80, top: 90, width: 300, height: 220 },
+      { reducedMotion: 'always' });
+    const quietState = quiet.state;
+    const quietBox = state.card.getBoundingClientRect();
+    const still = state.area.animate(state.card, { left: 80, top: 90, width: 300, height: 220 }, { duration: 0 });
+    const stillState = still.state;
+    state.active = state.area.animate(state.card, { left: 0, width: 120 });
+    return { quietState, stillState, quietWidth: quietBox.width, quietHeight: quietBox.height };
+  });
+  await page.clock.runFor(32);
+  const disposed = await page.evaluate(() => {
+    const state = (window as unknown as RootCardWindow).__rootCard;
+    const running = state.active!.state;
+    const width = state.card.getBoundingClientRect().width;
+    state.area.dispose(); state.area.dispose();
+    document.querySelector<HTMLButtonElement>('#action')!.click();
+    return { running, width, state: state.active!.state,
+      style: state.card.getAttribute('style'), activations: state.activations(),
+      effects: state.root.getAnimations({ subtree: true }).length };
+  });
+  expect(cleanup).toEqual({ quietState: 'finished', stillState: 'finished', quietWidth: 300, quietHeight: 220 });
+  expect(disposed).toMatchObject({ running: 'running', state: 'stopped', activations: 2, effects: 0 });
+  expect(disposed.width).toBeGreaterThan(120); expect(disposed.width).toBeLessThan(300);
+  // Управляемый tick проверяет именно позднюю доставку после terminal boundary.
+  await page.clock.runFor(64);
+  expect(await page.evaluate(() => {
+    const state = (window as unknown as RootCardWindow).__rootCard;
+    return { style: state.card.getAttribute('style'), activations: state.activations(),
+      transform: state.card.style.transform, sameInput: document.querySelector('#title') === state.input };
+  })).toEqual({ style: disposed.style, activations: 2, transform: '', sameInput: true });
 });

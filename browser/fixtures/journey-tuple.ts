@@ -8,9 +8,11 @@ export async function verifyJourneyTuple(page: Page, info: TestInfo): Promise<vo
   const digest = (bytes: Buffer): string => createHash('sha256').update(bytes).digest('hex');
   const scopeResponse = await page.request.get('/browser/.artifacts/scope-recipes.package.json');
   const followResponse = await page.request.get('/browser/.artifacts/compositor-follow-package.json');
-  expect(scopeResponse.ok()).toBe(true); expect(followResponse.ok()).toBe(true);
+  const rootResponse = await page.request.get('/browser/.artifacts/motion-root.package.json');
+  expect(scopeResponse.ok()).toBe(true); expect(followResponse.ok()).toBe(true); expect(rootResponse.ok()).toBe(true);
   const scope = await scopeResponse.json();
   const follow = await followResponse.json();
+  const root = await rootResponse.json();
   expect(scope.schema).toBe('scope-recipes-package-v1');
   expect(scope.package.name).toBe('@labpics/motion');
   expect(follow.package).toBe(`${scope.package.name}@${scope.package.version}`);
@@ -35,6 +37,12 @@ export async function verifyJourneyTuple(page: Page, info: TestInfo): Promise<vo
   expect(followBytes.equals(bytes)).toBe(true);
   expect(digest(followBytes)).toBe(follow.tarball.sha256);
   expect(digest(await bundle.body())).toBe(scope.bundleSha256);
+  const rootBundle = await page.request.get('/browser/.artifacts/motion-root.js');
+  expect(rootBundle.ok()).toBe(true);
+  expect(root.tarball.sha256).toBe(sha256);
+  expect(digest(await rootBundle.body())).toBe(root.bundleSha256);
+  expect(root.modules.length).toBeGreaterThan(0);
+  expect(root.modules.every((path: string) => path.startsWith('dist/'))).toBe(true);
   expect(digest(await followBundle.body())).toBe(follow.outputs.find((output: { file: string }) =>
     output.file === 'compositor-follow-recipes.js')?.sha256);
   expect(follow.documentSha256).toBe(scope.recipesSha256);
@@ -47,6 +55,6 @@ export async function verifyJourneyTuple(page: Page, info: TestInfo): Promise<vo
   }
   info.annotations.push({ type: 'package-sha256', description: sha256 });
   await info.attach('journey-package-tuple', { contentType: 'application/json', body: JSON.stringify({
-    scope, follow, expectedArchiveSha256, browser: page.context().browser()?.version(), project: info.project.name,
+    scope, follow, root, expectedArchiveSha256, browser: page.context().browser()?.version(), project: info.project.name,
   }) });
 }
