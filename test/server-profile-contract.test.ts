@@ -1463,6 +1463,30 @@ describe('серверный PROFILE: независимые sabotage controls',
       else expect(() => serverResourceReasons([value], resourceMachine())).toThrow(/resource|ancestor|delta/);
     });
 
+  it.each([false, true])('смена глубины ancestor с сохранёнными counter paths=%s даёт явный отказ', (retainedPaths) => {
+    const value = stage(), block = value.blocks[0], identity = resourceMachine();
+    if (!block) throw new Error('missing fixture block');
+    expect(serverResourceReasons([value], identity)).toEqual([]);
+    const rawBefore = clone(block.before);
+    const after = block.after;
+    after.resource.membership.text = '0::/system.slice';
+    after.resource.scopes.shift();
+    after.scopes.pop();
+    if (!retainedPaths) after.scopes[0].path = '/system.slice';
+    // Обе resource identity и cardinality каждого snapshot валидны отдельно.
+    expect(() => validateServerResourceIdentity(block.before.resource)).not.toThrow();
+    expect(() => validateServerResourceIdentity(after.resource)).not.toThrow();
+    expect(after.scopes).toHaveLength(after.resource.scopes.length - 1);
+    // Согласованные paths уже дают явный отказ; старые paths достигают undefined.
+    let refusal: unknown;
+    try { serverResourceReasons([value], identity); } catch (error) { refusal = error; }
+    expect(refusal).toBeInstanceOf(Error);
+    expect(refusal).not.toBeInstanceOf(TypeError);
+    expect(block.before).toEqual(rawBefore);
+    expect(after.resource.membership.text).toBe('0::/system.slice');
+    expect(block.scopeDeltas).toHaveLength(2);
+  });
+
   it('пересчитанный artifact digest не скрывает удаление ancestor', () => {
     // Given
     const value = registeredRefusal();

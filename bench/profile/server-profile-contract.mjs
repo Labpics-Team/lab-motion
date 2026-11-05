@@ -698,6 +698,8 @@ export function serverResourceReasons(stages, identity) {
         invariant(Array.isArray(snapshot.scopes) && snapshot.scopes.length === snapshot.resource.scopes.length - 1 &&
           isDeepStrictEqual(snapshot.cpuStat, snapshot.scopes[0].cpuStat), 'неполные resource scope counters');
       }
+      invariant(block.before.scopes.length === block.after.scopes.length &&
+        block.before.scopes.length === registeredResource.scopes.length - 1, 'resource scope cardinality изменилась');
       invariant(Array.isArray(block.scopeDeltas) && block.scopeDeltas.length === block.before.scopes.length &&
         isDeepStrictEqual(block.delta, block.scopeDeltas[0].delta), 'неполные resource scope delta');
       for (let scopeIndex = 0; scopeIndex < block.scopeDeltas.length; scopeIndex++) {
