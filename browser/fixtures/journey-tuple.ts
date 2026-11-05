@@ -42,7 +42,7 @@ export async function verifyJourneyTuple(page: Page, info: TestInfo): Promise<vo
   expect(root.tarball.sha256).toBe(sha256);
   expect(digest(await rootBundle.body())).toBe(root.bundleSha256);
   expect(root.modules.length).toBeGreaterThan(0);
-  expect(root.modules.every((path: string) => path.startsWith('dist/'))).toBe(true);
+  expect(root.modules.every((path: string) => path.replaceAll('\\', '/').startsWith('dist/'))).toBe(true);
   expect(digest(await followBundle.body())).toBe(follow.outputs.find((output: { file: string }) =>
     output.file === 'compositor-follow-recipes.js')?.sha256);
   expect(follow.documentSha256).toBe(scope.recipesSha256);
