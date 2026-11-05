@@ -208,7 +208,7 @@ class Surface {
   private _written: string | undefined;
   private _token: Promise<Animation> | undefined;
   constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string) {
-    this._transforms = _key === 'transform' ? initialTransforms(_engine._host.styles(_element)) : {};
+    this._transforms = {};
     this._stamp = number(_engine._host.now(), 'clock');
   }
   _lock(busy: boolean): void {
