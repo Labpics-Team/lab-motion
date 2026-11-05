@@ -519,7 +519,7 @@ function assertNativeGraph(files: Map<string, string>) {
 describe('нативный граф CI', () => {
   it('проверяет любой PR через явные обязательные jobs', () => assertNativeGraph(sources()));
 
-  it.each(['success', 'owned-failure', 'foreign-failure'] as const)('реальное тело PROFILE preparation сохраняет identity или отказ capture=%s', async (mode) => {
+  it.each(['success', 'owned-failure', 'foreign-failure', 'clock-refusal'] as const)('реальное тело PROFILE preparation сохраняет identity или отказ capture=%s', async (mode) => {
     const captureFails = mode !== 'success';
     // Given: извлекается выполняемое тело YAML; заменены только внешние эффекты.
     const workflow: Workflow = parse(readFileSync(join(directory, 'profile-01.yml'), 'utf8'));
@@ -530,7 +530,7 @@ describe('нативный граф CI', () => {
     const collect = vi.fn(() => clockBuildEvidence);
     const machine = { identity: { platform: 'linux', affinity: '0', clockBuildEvidence }, sha256: 'a'.repeat(64), observation: { at: 'fixture' } };
     const metadata = { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 17, tid: 17 };
-    const failure = Object.assign(new Error('fixture capture failed'), { raw: { file: '/fixture/cpu.max', code: 'EIO', ...(mode === 'owned-failure' ? { clockBuildEvidence } : {}) } });
+    const failure = Object.assign(new Error('fixture capture failed'), { raw: { file: '/fixture/cpu.max', code: 'EIO', ...(mode === 'owned-failure' || mode === 'clock-refusal' ? { clockBuildEvidence } : {}), ...(mode === 'clock-refusal' ? { machine } : {}) } });
     const journal = vi.fn<(type: string, value: unknown) => void>(), output = vi.fn<(line: string) => void>();
     const close = vi.fn(async () => {}), assertUnchanged = vi.fn();
     const executable = '/fixture/chromium', executableSha256 = 'b'.repeat(64), tree = { sha256: 'c'.repeat(64), files: 3 };
@@ -555,7 +555,7 @@ describe('нативный граф CI', () => {
       browser: { name: 'chromium', executableSha256, tree: { directory: dirname(executable), ...tree }, version: 'fixture-browser' },
       failures: captureFails ? [expect.objectContaining({ message: failure.message, raw: failure.raw,
         topology: expect.objectContaining({ '/proc/self/cgroup': { text: 'observed:/proc/self/cgroup' } }) })] : [],
-      ...(captureFails ? {} : { machine }) } });
+      ...(captureFails && mode !== 'clock-refusal' ? {} : { machine }) } });
     expect(collect).toHaveBeenCalledTimes(mode === 'foreign-failure' ? 1 : 0);
     expect(close).toHaveBeenCalledTimes(1);
     expect(assertUnchanged).toHaveBeenCalledTimes(1);

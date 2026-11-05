@@ -1769,6 +1769,7 @@ describe('PROFILE: ресурсный контракт проверяется д
     const hashBinary = vi.fn(() => hash), reads: string[] = [];
     const errors: Record<string, string> = {}, inodes: Record<string, bigint> = {}, onRead: Record<string, () => void> = {};
     const objects: Record<string, { directory?: boolean; fsType?: bigint; statError?: string; fsError?: string }> = {};
+    const host = { release: SERVER_PROFILE.clockError.kernelRelease };
     // Точные функции owner, независимые файлы; без пакетов, CPU и браузера.
     const realm = createContext({
       readFileSync(file: string) {
@@ -1796,12 +1797,12 @@ describe('PROFILE: ресурсный контракт проверяется д
       validateServerResourceIdentity: (value: unknown) => validateServerResourceIdentity(JSON.parse(JSON.stringify(value))),
       serverResourceBinding: (value: unknown) => serverResourceBinding(JSON.parse(JSON.stringify(value))),
       existsSync: (file: string) => Object.hasOwn(files, file), loadavg: () => [0, 0, 0],
-      platform: () => 'linux', release: () => SERVER_PROFILE.clockError.kernelRelease, arch: () => 'x64', hostname: () => 'fixture',
+      platform: () => 'linux', release: () => host.release, arch: () => 'x64', hostname: () => 'fixture',
       cpus: () => [{ model: 'fixture' }], totalmem: () => 1024, sha256File: hashBinary, serverProfileDigest,
       process: { version: 'v24.19.0', execPath: '/fixture/node', execArgv: [], memoryUsage: () => ({ heapUsed: 1 }) },
     });
     const owner = runInContext(common + '\n' + capture + '\n({ captureServerMachine, captureServerClockBuildEvidence });', realm);
-    return { capture: owner.captureServerMachine, collect: owner.captureServerClockBuildEvidence, hashBinary, files, errors, inodes, reads, leaf, onRead, clockEvidence, objects };
+    return { capture: owner.captureServerMachine, collect: owner.captureServerClockBuildEvidence, hashBinary, files, errors, inodes, reads, leaf, onRead, clockEvidence, objects, host };
   }
 
   it('prior cgroup owner counterexample loses captured object on owned rejection', () => {
@@ -1843,7 +1844,7 @@ describe('PROFILE: ресурсный контракт проверяется д
   });
 
   it.each(['config', 'signature', 'modules-package', 'read-error', 'children-namespace', 'self-offset'] as const)
-  ('реальный machine capture отвергает current-run %s до identity/resource sampling', (fault) => {
+  ('реальный machine capture отвергает current-run %s до admission с сохранёнными observations', (fault) => {
     const fixture = machine();
     if (fault === 'modules-package' || fault === 'children-namespace') mutateClockBuild(fixture.clockEvidence, fault);
     else if (fault === 'read-error') fixture.errors[`/boot/config-${SERVER_PROFILE.clockError.kernelRelease}`] = 'EIO';
@@ -1855,8 +1856,39 @@ describe('PROFILE: ресурсный контракт проверяется д
     try { fixture.capture(); } catch (error) { caught = error; }
     expect(caught?.message).toContain('clock build');
     expect(caught.raw.clockBuildEvidence).toBeDefined();
+    expect(caught.raw.machine.identity.affinity).toBe('0');
+    expect(caught.raw.machine.identity.resource.scopes).toHaveLength(3);
+    expect(fixture.hashBinary).toHaveBeenCalled();
+    expect(fixture.reads).toContain('/proc/self/status');
+  });
+
+  it('kernel mismatch and inaccessible resource preserve both raw witnesses without admitted machine', () => {
+    const fixture = machine();
+    fixture.host.release += '-changed';
+    fixture.objects[fixture.leaf] = { statError: 'EACCES' };
+    let caught: any;
+    try { fixture.capture(); } catch (error) { caught = error; }
+    expect(caught.raw.error.code).toBe('EACCES');
+    expect(caught.raw.directory).toBe(fixture.leaf);
+    expect(caught.raw.clockBuildEvidence).toBeDefined();
+    expect(caught.raw.machine).toBeUndefined();
+    expect(() => verifyServerClockBuildEvidence(caught.raw.clockBuildEvidence, { release: fixture.host.release, arch: 'x64' }))
+      .toThrow(/clock build/);
     expect(fixture.hashBinary).not.toHaveBeenCalled();
-    expect(fixture.reads).not.toContain('/proc/self/status');
+  });
+
+  it('kernel mismatch retains available identity and resources but refuses admission', () => {
+    const fixture = machine();
+    fixture.host.release += '-changed';
+    let caught: any;
+    try { fixture.capture(); } catch (error) { caught = error; }
+    expect(caught?.message).toContain('clock build');
+    expect(caught.raw.machine.identity).toMatchObject({ release: fixture.host.release, affinity: '0', cpu: 'fixture',
+      logicalCpus: 1, totalMemoryBytes: 1024, node: 'v24.19.0', cgroupCpuMax: '400000 100000' });
+    expect(caught.raw.machine.identity.resource.scopes).toHaveLength(3);
+    expect(caught.raw.machine.sha256).toBe(serverProfileDigest(caught.raw.machine.identity));
+    expect(caught.raw.clockBuildEvidence).toBeDefined();
+    expect(() => verifyServerClockBuildEvidence(caught.raw.clockBuildEvidence, caught.raw.machine.identity)).toThrow(/clock build/);
   });
 
   it('capture самостоятельно собирает witness без supplied historical evidence', () => {

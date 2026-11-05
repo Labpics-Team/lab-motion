@@ -94,6 +94,7 @@ jobs:
               receipt.clockBuildEvidence = receipt.machine.identity.clockBuildEvidence;
             }
             catch (error) {
+              if (error.raw?.machine) receipt.machine = error.raw.machine;
               receipt.clockBuildEvidence = error.raw?.clockBuildEvidence ?? captureServerClockBuildEvidence();
               const topology = {};
               for (const file of ['/proc/self/cgroup', '/proc/self/mountinfo', '/sys/fs/cgroup/cgroup.controllers',

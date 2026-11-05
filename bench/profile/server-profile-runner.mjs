@@ -158,8 +158,8 @@ export function captureServerClockBuildEvidence() {
 }
 export function captureServerMachine() {
   const clockBuildEvidence = captureServerClockBuildEvidence();
+  let machine;
   try {
-    verifyServerClockBuildEvidence(clockBuildEvidence, { release: release(), arch: arch() });
     const affinity = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
     if (!/^\d+$/.test(affinity ?? '')) throw new Error('server profile: нужен один CPU через taskset, общий scheduler не закреплён');
     const resource = captureServerLoad();
@@ -171,9 +171,11 @@ export function captureServerMachine() {
       governor: readOptional(`/sys/devices/system/cpu/cpu${affinity}/cpufreq/scaling_governor`),
       display: 'headless; физический экран отсутствует', power: 'среда сервера; не устройство', thermal: 'не измеряется',
       node: process.version, nodeExecutableSha256: sha256File(process.execPath), execArgv: process.execArgv };
-    return { identity, sha256: serverProfileDigest(identity), observation: { at: new Date().toISOString(), resource, loadavg: loadavg(), memory: process.memoryUsage() } };
+    machine = { identity, sha256: serverProfileDigest(identity), observation: { at: new Date().toISOString(), resource, loadavg: loadavg(), memory: process.memoryUsage() } };
+    verifyServerClockBuildEvidence(clockBuildEvidence, identity);
+    return machine;
   } catch (error) {
-    error.raw = { ...error.raw, clockBuildEvidence };
+    error.raw = { ...error.raw, clockBuildEvidence, ...(machine ? { machine } : {}) };
     throw error;
   }
 }
