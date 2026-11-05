@@ -57,24 +57,27 @@ it.each(['baseline', 'candidate'] as const)('real clean packed %s binds source, 
       const x = (el: HTMLElement) => new DOMMatrixReadOnly(getComputedStyle(el).transform).e;
       const rows = [];
       for (const stagger of [false, true]) {
-        const els = Array.from({ length: 3 }, () => document.body.appendChild(document.createElement('div')));
+        let els = Array.from({ length: 3 }, () => document.body.appendChild(document.createElement('div')));
         const start = () => stagger ? A.startStagger(els, 300, 128, 8) : A.start(els, 300, 128);
-        const owner = start();
         // Подписка до действия; rAF наблюдает реальный endpoint, deadline лишь ограничивает отказ.
         const endpoint = new Promise<void>((resolve, reject) => {
           const timer = setTimeout(() => reject(new Error('packed endpoint deadline')), 5000);
           const observe = () => { if (els.every(el => Math.abs(x(el) - 300) < .1)) { clearTimeout(timer); resolve(); } else requestAnimationFrame(observe); };
           requestAnimationFrame(observe);
         });
+        const owner = start();
         await endpoint; owner.cancel();
-        els.forEach(el => { el.style.transform = 'translateX(0px)'; });
-        const active = start();
-        if (typeof active.finished === 'function') active.finished().catch(() => {});
-        const onset = await new Promise<number[]>((resolve, reject) => {
+        els.forEach(el => el.remove());
+        // Новый lifecycle не подменяет settled registry внешней записью CSS.
+        els = Array.from({ length: 3 }, () => document.body.appendChild(document.createElement('div')));
+        const onsetSignal = new Promise<number[]>((resolve, reject) => {
           const timer = setTimeout(() => reject(new Error('packed onset deadline')), 5000);
           const observe = () => { const values = els.map(x); if (values.some(value => value > 0 && value < 300)) { clearTimeout(timer); resolve(values); } else requestAnimationFrame(observe); };
           requestAnimationFrame(observe);
         });
+        const active = start();
+        if (typeof active.finished === 'function') active.finished().catch(() => {});
+        const onset = await onsetSignal;
         active.cancel();
         const before = els.map(x); await frame(); await frame();
         rows.push({ onset, before, after: els.map(x), animations: els.map(el => el.getAnimations().length) });

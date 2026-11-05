@@ -1559,7 +1559,7 @@ describe('PROFILE: current-run clock build binding', () => {
       spy(vi.spyOn(fsBoundary, 'realpathSync')).mockImplementation(((file: any, ...args: any[]) => {
         const name = String(file);
         return name === path.join(directory, 'baseline') || name === path.join(directory, 'candidate') || name.replaceAll('\\', '/').includes('/bench/compare/node_modules/')
-          || name.startsWith(path.join(out, 'consumer-')) || name.startsWith(path.join(out, 'package-'))
+          || name.startsWith(path.join(out, 'consumers') + path.sep) || name.startsWith(path.join(out, 'packages') + path.sep)
           ? name : (realPath as any)(file, ...args);
       }) as any);
       spy(vi.spyOn(fsBoundary, 'statSync')).mockImplementation(((file: any, ...args: any[]) => {
@@ -1602,7 +1602,7 @@ describe('PROFILE: current-run clock build binding', () => {
       const bytes = realRead(path.join(out, 'server-profile.json'));
       const stored = parseServerJsonBytes(bytes), records = parseServerJournalBytes(realRead(path.join(out, 'journal.ndjson')));
       expect(stored).toEqual(JSON.parse(JSON.stringify(artifact)));
-      expect(validateServerArtifact(stored)).toMatchObject({ verification: mode === 'healthy-admitted' ? 'recorded-refusal-only' : 'preparation-refused', verdict: 'UNPROVEN' });
+      expect(validateServerArtifact(stored), JSON.stringify(artifact.failures)).toMatchObject({ verification: mode === 'healthy-admitted' ? 'recorded-refusal-only' : 'preparation-refused', verdict: 'UNPROVEN' });
       expect(() => validateServerJournal(stored, records)).not.toThrow();
       expect(controls).not.toHaveBeenCalled(); expect(artifact.stages).toEqual([]);
       expect(closeBrowser).toHaveBeenCalledTimes(1); expect(closeOrigin).toHaveBeenCalledTimes(1);
