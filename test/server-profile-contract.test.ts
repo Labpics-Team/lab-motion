@@ -1708,7 +1708,7 @@ describe('PROFILE: current-run clock build binding', () => {
     const begin = source.indexOf('  const verify = (registration = artifact.registration) => {'), end = source.indexOf('\n  try {\n    checkpoint();', begin);
     const registration: any = registeredRefusal().registration, current: any = clone(registration.machine.identity.clockBuildEvidence);
     const journal = vi.fn(), measure = vi.fn(async () => ({}));
-    const context = createContext({ engineClock: undefined, artifact: { registration },
+    const context = createContext({ engineClock: undefined, artifact: { registration }, dependencies: {},
       captureServerClockBuildEvidence: () => current, verifyServerClockBuildEvidence,
       release: () => SERVER_PROFILE.clockError.kernelRelease, arch: () => 'x64', serverProfileDigest,
       captureServerLoad: () => ({ affinity: registration.machine.identity.affinity, resource: registration.machine.identity.resource }),

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { OBSERVER_ABLATION, observerSnapshotH1 } from '../bench/profile/server-observer-ablation.mjs';
 import { observerAblationMeasure } from '../bench/profile/server-profile-diagnostic.mjs';
 import { createServerJournal, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
-import { SERVER_PROFILE, serverProfileDigest } from '../bench/profile/server-profile-registration.mjs';
+import { SERVER_PROFILE, serverProfileDigest, serverProfileStringify } from '../bench/profile/server-profile-registration.mjs';
 import { parseServerJsonBytes, parseServerJournalBytes, serverArtifactDigest, validateServerJournal, serverStagePlan } from '../bench/profile/server-profile-contract.mjs';
 
 import { writeServerArtifact } from '../bench/profile/server-profile-artifact.mjs';
@@ -84,16 +84,19 @@ describe('diagnostic-only three-pass observer', () => {
       return items.map(event => { const payload = { sequenceDigest: previous, ...event };
         previous = serverProfileDigest(payload); return { ...payload, digest: previous }; });
     };
-    expect(validateServerJournal(artifact, chain(events))).toHaveProperty('journalFinalDigest');
+    // Replay consumes serialized artifact/journal, not VM prototype identities.
+    const storedArtifact = JSON.parse(serverProfileStringify(artifact));
+    const storedChain = (items: any[]) => JSON.parse(serverProfileStringify(chain(items)));
+    expect(validateServerJournal(storedArtifact, storedChain(events))).toHaveProperty('journalFinalDigest');
     const wrongArm = structuredClone(events);
     wrongArm[2].value.participant = wrongArm[2].value.participant === 'left' ? 'right' : 'left';
-    expect(() => validateServerJournal(artifact, chain(wrongArm))).toThrow();
-    expect(() => validateServerJournal(artifact, chain(events.filter((event, index) => index !== 2)))).toThrow();
+    expect(() => validateServerJournal(storedArtifact, storedChain(wrongArm))).toThrow();
+    expect(() => validateServerJournal(storedArtifact, storedChain(events.filter((event, index) => index !== 2)))).toThrow();
     const lateResource = [...events];
     const blockIndex = lateResource.findLastIndex(event => event.type === 'resources-block');
     const [block] = lateResource.splice(blockIndex, 1);
     lateResource.splice(lateResource.length - 1, 0, block);
-    expect(() => validateServerJournal(artifact, chain(lateResource))).toThrow();
+    expect(() => validateServerJournal(storedArtifact, storedChain(lateResource))).toThrow();
   });
   it.each([[], [0], [2, 2, 2], [1, 2, 2, 1], [0, -0, -0, 0], [NaN, NaN, Infinity, -Infinity]].map(values => [values] as const))
   ('preserves every coordinate and DOM read order for %j', values => {
