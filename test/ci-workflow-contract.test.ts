@@ -23,9 +23,11 @@ type BrowserShard = { browser: string; shard: number; shards: number };
 type Job = {
   name?: string;
   'runs-on'?: string;
+  'timeout-minutes'?: number;
   if?: string | boolean;
   needs?: string[];
   uses?: string;
+  with?: Record<string, unknown>;
   permissions?: Record<string, string>;
   defaults?: unknown;
   container?: { image: string; options: string };
@@ -353,13 +355,27 @@ function assertNativeGraph(files: Map<string, string>) {
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
-  // Only the protected release pipeline transports bytes between jobs.
-  // Diagnostic archives are never a requirement or a side effect of verification.
+  // Ordinary candidate verification never uploads diagnostic archives. Only the
+  // protected release and the explicitly requested performance measurement export bytes.
   for (const [name, workflow] of workflows) {
     if (name === 'release.yml') continue;
-    for (const job of Object.values(workflow.jobs)) {
-      for (const item of job.steps ?? []) {
-        expect(item.uses ?? '').not.toMatch(/^actions\/(upload-artifact|upload-pages-artifact)@/);
+    for (const [id, job] of Object.entries(workflow.jobs)) {
+      for (const [index, item] of (job.steps ?? []).entries()) {
+        if (name === 'performance.yml' && id === 'compare' && index === job.steps!.length - 1) {
+          const { name: _name, ...contract } = item;
+          expect({ ...contract, uses: unpin(item.uses ?? '') }).toEqual({
+            if: '${{ always() }}',
+            uses: 'actions/upload-artifact@<sha>',
+            with: {
+              name: 'motion-performance-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+              path: 'candidate/bench/compare/results/\n${{ runner.temp }}/motion-performance/\n',
+              'retention-days': 5,
+              'if-no-files-found': 'error',
+            },
+          });
+        } else {
+          expect(item.uses ?? '').not.toMatch(/^actions\/(upload-artifact|upload-pages-artifact)@/);
+        }
       }
     }
   }
@@ -399,8 +415,52 @@ function assertNativeGraph(files: Map<string, string>) {
   const performance = workflows.get('performance.yml')!;
   expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true } } } });
   expect(performance.permissions).toEqual({ contents: 'read' });
-  expect(performance.jobs.compare!['runs-on']).toBe('ubuntu-latest');
-  expect(performance.jobs.compare!['continue-on-error']).toBeUndefined();
+  expect(performance.defaults).toBeUndefined();
+  expect(Object.keys(performance.jobs)).toEqual(['compare']);
+  const compare = performance.jobs.compare!;
+  expect(compare['runs-on']).toBe('ubuntu-latest');
+  expect(compare['timeout-minutes']).toBe(90);
+  expect(compare.strategy).toBeUndefined();
+  expect(compare['continue-on-error']).toBeUndefined();
+  expect(compare.if).toBeUndefined();
+  expect(compare.defaults).toBeUndefined();
+  expect(compare.permissions).toBeUndefined();
+  const { name: _baselineName, ...baselineValidation } = compare.steps![0]!;
+  expect(baselineValidation).toEqual({
+    shell: 'bash', env: { BASELINE: '${{ inputs.baseline }}' },
+    run: 'set -euo pipefail\n[[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]\n',
+  });
+  const checkouts = compare.steps!.filter(item => item.uses?.startsWith('actions/checkout@'));
+  expect(checkouts.map(({ name: _name, uses, ...contract }) => ({ ...contract, uses: unpin(uses!) })))
+    .toEqual([
+      { uses: 'actions/checkout@<sha>', with: { path: 'candidate', 'persist-credentials': false, 'fetch-depth': 0 } },
+      { uses: 'actions/checkout@<sha>', with: { path: 'baseline', ref: '${{ inputs.baseline }}', 'persist-credentials': false, 'fetch-depth': 0 } },
+    ]);
+  for (const item of compare.steps!) expect(item['continue-on-error']).toBeUndefined();
+  const performanceRuns = compare.steps!.filter(item => item.run).slice(1);
+  expect(performanceRuns.map(({ name: _name, ...contract }) => ({ ...contract, run: contract.run!.trim() })))
+    .toEqual([
+      { run: activatePnpm },
+      { id: 'build', run: 'pnpm --dir baseline install --frozen-lockfile\npnpm --dir candidate install --frozen-lockfile\npnpm --dir baseline build\npnpm --dir candidate build' },
+      { run: 'mkdir -p "$RUNNER_TEMP/motion-performance"\nnode candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"' },
+      { run: 'node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"' },
+      { run: 'pnpm --dir candidate/bench/compare install --frozen-lockfile' },
+      { run: 'pnpm --dir candidate/bench/compare exec playwright install --with-deps chromium' },
+      { run: 'xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs' },
+      { shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/spring" spring-pair baseline\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline' },
+      { shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline' },
+      { 'working-directory': 'candidate/bench/compare', run: 'xvfb-run -a node bench.mjs' },
+      { if: "${{ !cancelled() && steps.build.outcome == 'success' }}", shell: 'bash', run: [
+        'set -euo pipefail', 'mkdir -p "$RUNNER_TEMP/motion-performance"', 'motion_size_status=0',
+        'node baseline/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/baseline-size.txt" || motion_size_status=1',
+        'node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt" || motion_size_status=1',
+        'exit "$motion_size_status"',
+      ].join('\n') },
+    ]);
+  const performanceCallers = [...workflows].flatMap(([file, workflow]) =>
+    Object.entries(workflow.jobs).filter(([, job]) => job.uses === './.github/workflows/performance.yml')
+      .map(([id]) => [file, id]));
+  expect(performanceCallers).toEqual([['ci.yml', 'performance']]);
   expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);
   for (const document of [ci, browser]) {
@@ -502,6 +562,49 @@ describe('нативный граф CI', () => {
     ['архив обычного CI', 'ci.yml', (w: Workflow) => {
       w.jobs.verify!.steps!.push({ name: 'Keep package', uses: 'actions/upload-artifact@0123456789012345678901234567890123456789', with: { path: 'node-floor-artifact' } });
     }],
+    ...['verify', 'tests', 'mutation', 'security'].map((id) => [`performance export в обычном CI/${id}`, 'ci.yml', (w: Workflow) => {
+      const performance = parse(sources().get('performance.yml')!) as Workflow;
+      w.jobs[id]!.steps!.push(performance.jobs.compare!.steps!.at(-1)!);
+    }] as const),
+    ['performance без ручного события', 'ci.yml', (w: Workflow) => { w.jobs.performance!.if = "${{ inputs.performance_baseline != '' }}"; }],
+    ['performance без явного baseline', 'ci.yml', (w: Workflow) => { w.jobs.performance!.if = "${{ github.event_name == 'workflow_dispatch' }}"; }],
+    ['performance с подменой baseline', 'ci.yml', (w: Workflow) => { w.jobs.performance = { ...w.jobs.performance, with: { baseline: 'main' } };  }],
+    ['performance обход caller через docs', 'docs.yml', (w: Workflow) => { w.jobs.export = { uses: './.github/workflows/performance.yml' }; }],
+    ['performance push trigger', 'performance.yml', (w: Workflow) => { w.on.push = null; }],
+    ['performance прямой dispatch', 'performance.yml', (w: Workflow) => { w.on.workflow_dispatch = null; }],
+    ['performance без обязательного input', 'performance.yml', (w: Workflow) => { w.on.workflow_call = { inputs: { baseline: { type: 'string', required: false } } }; }],
+    ['performance дополнительная job', 'performance.yml', (w: Workflow) => { w.jobs.extra = { 'runs-on': 'ubuntu-latest' }; }],
+    ['performance расширяет timeout', 'performance.yml', (w: Workflow) => { w.jobs.compare!['timeout-minutes'] = 360; }],
+    ['performance дублирует измерение matrix', 'performance.yml', (w: Workflow) => { w.jobs.compare!.strategy = { 'fail-fast': false, matrix: { node: ['24', '24'] } }; }],
+    ['performance пропускает сравнительные assertions', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run === 'xvfb-run -a node bench.mjs')!.if = false; }],
+    ['performance скрывает отказ сравнительных assertions', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run === 'xvfb-run -a node bench.mjs')!.run += ' || true'; }],
+    ['performance скрывает отказ размера', 'performance.yml', (w: Workflow) => { const item = w.jobs.compare!.steps!.find(item => item.run?.includes('exit "$motion_size_status"'))!; item.run = item.run!.replace('exit "$motion_size_status"', 'exit 0'); }],
+    ['performance игнорирует failure', 'performance.yml', (w: Workflow) => { w.jobs.compare!['continue-on-error'] = true; }],
+    ['performance пропускает baseline validation', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.if = false; }],
+    ['performance ослабляет identity baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.run = 'true\n'; }],
+    ['performance подменяет input baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.env!.BASELINE = 'main'; }],
+    ['performance подменяет checkout baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![2]!.with!.ref = 'main'; }],
+    ['performance скрывает исходный failure', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!['continue-on-error'] = true; }],
+    ['performance export не последний', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.push({ run: 'true' }); }],
+    ['performance второй export', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.unshift(w.jobs.compare!.steps!.at(-1)!); }],
+    ...['if', 'uses', 'with', 'continue-on-error'].map((field) => [`performance export mutation ${field}`, 'performance.yml', (w: Workflow) => {
+      const item = w.jobs.compare!.steps!.at(-1)!;
+      if (field === 'if') item.if = '${{ success() }}';
+      else if (field === 'uses') item.uses = item.uses!.replace('upload-artifact', 'upload-pages-artifact');
+      else if (field === 'with') delete item.with;
+      else item['continue-on-error'] = true;
+    }] as const),
+    ...([
+      ['name', 'motion-performance-${{ github.sha }}'],
+      ['name', 'motion-performance-${{ github.run_id }}-${{ github.run_attempt }}'],
+      ['path', 'candidate/bench/compare/results/\n'],
+      ['path', '${{ runner.temp }}/motion-performance/\n'],
+      ['path', '**/*\n'],
+      ['retention-days', 30],
+      ['if-no-files-found', 'ignore'],
+    ] as const).map(([field, value]) => [`performance export option ${field}=${value}`, 'performance.yml', (w: Workflow) => {
+      w.jobs.compare!.steps!.at(-1)!.with![field] = value;
+    }] as const),
     ['раннее истечение release-пакета при ожидании approval', 'release.yml', (w: Workflow) => {
       step(w.jobs.verify!, 'Upload sealed package').with!['retention-days'] = 1;
     }],
