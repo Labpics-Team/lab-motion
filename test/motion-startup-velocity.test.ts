@@ -6,6 +6,50 @@ import type { MotionOptions, Playback } from '../src/motion/types.js';
 const linear = { duration: 1000, ease: 'linear' } as const;
 const own = Run.prototype._own;
 
+it('sequence publishes a completed first segment before its following gap', async () => {
+  const h = harness();
+  const samples: Array<{ key: string; value: number[]; velocity: number[] }> = [];
+  const ownership = vi.spyOn(Run.prototype, '_own').mockImplementation(function (this: Run, track, reduced) {
+    expect(track._owner).toBeUndefined();
+    expect(track._group._tracks.has(track._program._key)).toBe(false);
+    expect(track._program._duration).toBe(1200);
+    expect(track._program._segments[0]!._end).toBe(0);
+    expect(track._program._segments[1]!._at).toBe(200);
+    expect(track._value.length).toBe(track._program._final.length);
+    expect(track._velocity.length).toBe(track._value.length);
+    for (let i = 0; i < track._value.length; i++) {
+      expect(Number.isFinite(track._value[i])).toBe(true);
+      expect(Number.isFinite(track._velocity[i])).toBe(true);
+    }
+    samples.push({ key: track._program._key, value: [...track._value], velocity: [...track._velocity] });
+    own.call(this, track, reduced);
+  });
+  let run: Playback | undefined;
+  try {
+    run = h.runtime.sequence([
+      [h.element, { x: [20, 40], color: ['#000', '#fff'] }, { at: 0, duration: 0, ease: 'linear' }],
+      [h.element, { x: [40, 100], color: ['#fff', '#000'] }, { at: 200, ...linear }],
+    ]);
+    expect(ownership.mock.calls).toHaveLength(2);
+    expect(samples).toEqual([
+      { key: 'x', value: [40], velocity: [0] },
+      { key: 'color', value: [65025, 65025, 65025, 1], velocity: [0, 0, 0, 0] },
+    ]);
+    expect(h.x()).toBe(40); expect(h.values.get('color')).toBe('rgba(255,255,255,1)');
+    run.seek(100);
+    expect(h.x()).toBe(40); expect(h.values.get('color')).toBe('rgba(255,255,255,1)');
+    const finished = run.finished;
+    run.seek(1200);
+    expect(await finished).toEqual({ status: 'finished' });
+    expect(h.x()).toBe(100); expect(h.values.get('color')).toBe('rgba(0,0,0,1)');
+    expect(h.effects).toHaveLength(0);
+    expect(h.updates.size + h.renders.size).toBe(0);
+    for (const [track] of ownership.mock.calls) {
+      expect(track._owner).toBeUndefined(); expect(track._group._tracks.size).toBe(0);
+    }
+  } finally { run?.stop(); ownership.mockRestore(); }
+});
+
 for (const native of [false, true]) {
   for (const mode of ['normal', 'delayed', 'reduced', 'instant'] as const) {
     it(`startup samples every coordinate before ownership: native=${native}, mode=${mode}`, async () => {
