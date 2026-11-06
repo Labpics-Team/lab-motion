@@ -105,3 +105,14 @@ jobs:
           node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt" || motion_size_status=1
           exit "$motion_size_status"
 
+      - name: Upload performance evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: motion-performance-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            candidate/bench/compare/results/
+            ${{ runner.temp }}/motion-performance/
+          retention-days: 5
+          if-no-files-found: error
+
