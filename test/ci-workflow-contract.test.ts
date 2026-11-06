@@ -355,8 +355,8 @@ function assertNativeGraph(files: Map<string, string>) {
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
-  // Ordinary candidate verification never uploads diagnostic archives. Only the
-  // protected release and the explicitly requested performance measurement export bytes.
+  // Обычная проверка кандидата не выгружает архивы. Экспорт разрешён только
+  // защищённому release и явно запрошенному измерению производительности.
   for (const [name, workflow] of workflows) {
     if (name === 'release.yml') continue;
     for (const [id, job] of Object.entries(workflow.jobs)) {
@@ -436,6 +436,9 @@ function assertNativeGraph(files: Map<string, string>) {
       { uses: 'actions/checkout@<sha>', with: { path: 'candidate', 'persist-credentials': false, 'fetch-depth': 0 } },
       { uses: 'actions/checkout@<sha>', with: { path: 'baseline', ref: '${{ inputs.baseline }}', 'persist-credentials': false, 'fetch-depth': 0 } },
     ]);
+  const setup = compare.steps!.filter(item => item.uses?.startsWith('actions/setup-node@'));
+  expect(setup.map(({ name: _name, uses, ...contract }) => ({ ...contract, uses: unpin(uses!) })))
+    .toEqual([{ uses: 'actions/setup-node@<sha>', with: { 'node-version': '24.19.0' } }]);
   for (const item of compare.steps!) expect(item['continue-on-error']).toBeUndefined();
   const performanceRuns = compare.steps!.filter(item => item.run).slice(1);
   expect(performanceRuns.map(({ name: _name, ...contract }) => ({ ...contract, run: contract.run!.trim() })))
@@ -585,6 +588,9 @@ describe('нативный граф CI', () => {
     ['performance подменяет input baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.env!.BASELINE = 'main'; }],
     ['performance подменяет checkout baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![2]!.with!.ref = 'main'; }],
     ['performance скрывает исходный failure', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!['continue-on-error'] = true; }],
+    ['performance подменяет Node', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.uses?.startsWith('actions/setup-node@'))!.with!['node-version'] = '24'; }],
+    ['performance пропускает setup Node', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.uses?.startsWith('actions/setup-node@'))!.if = false; }],
+    ['performance пропускает checkout', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![1]!.if = false; }],
     ['performance export не последний', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.push({ run: 'true' }); }],
     ['performance второй export', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.unshift(w.jobs.compare!.steps!.at(-1)!); }],
     ...['if', 'uses', 'with', 'continue-on-error'].map((field) => [`performance export mutation ${field}`, 'performance.yml', (w: Workflow) => {
