@@ -6,8 +6,15 @@ import type { Playback } from '../src/motion/types.js';
 const options = { duration: 1000, ease: 'linear' } as const;
 
 it('группа естественно завершает native эффекты и освобождает исполнителей', async () => {
-  // Given: две поверхности с явно заданной начальной позой.
+  // Given: каждый native host наблюдает только собственную начальную позу.
   const a = harness(true), b = harness(true);
+  for (const target of [a, b]) {
+    const animate = target.element.animate.bind(target.element);
+    target.element.animate = (keys, timing) => {
+      expect(target.x()).toBe(20);
+      return animate(keys, timing);
+    };
+  }
   // When: группа запускается через настоящий Runtime.
   const run = a.runtime.animate([a.element, b.element], { x: [20, 100] }, options);
   try {
