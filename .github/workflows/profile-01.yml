@@ -1,9 +1,31 @@
 name: PROFILE-01 — проверка размерного протокола
 
 # Размерный вектор вызывается вручную через ci.yml в той же среде, что обычный CI
-# публичного репозитория. Время/GPU/энергия этой машины не являются device proof.
+# публичного репозитория. Время, GPU и энергия этой машины не доказывают свойства физического устройства.
 on:
   workflow_call:
+    inputs:
+      prepare_only:
+        description: 'Только идентичность среды до регистрации серверной эпохи; без образцов проверяемой реализации'
+        type: boolean
+        default: false
+
+      server_timing:
+        description: 'Явный полный запуск серверного измерителя; не метаданные и не базовые размеры'
+        type: boolean
+        default: false
+      baseline_diagnostic:
+        description: 'Трассировка только базовой версии, без квалификации'
+        type: boolean
+        default: false
+      observer_ablation:
+        description: 'Фиксированная диагностика базовой версии H0/H1 без трассировки и квалификации'
+        type: boolean
+        default: false
+      conflicting_inputs:
+        description: 'Отказ при смешении серверных измерений времени с прежними режимами'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -15,6 +37,7 @@ env:
 
 jobs:
   probe:
+    if: ${{ !inputs.server_timing }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -28,7 +51,7 @@ jobs:
       - name: Настроить Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24'
+          node-version: ${{ inputs.prepare_only && '24.19.0' || '24' }}
 
       - name: Активировать закреплённый pnpm
         run: |
@@ -44,7 +67,7 @@ jobs:
           import { PROFILE_01, preregistrationDigest, verifyPreregistration } from './bench/profile/profile-01-preregistration.mjs';
           verifyPreregistration(PROFILE_01);
           if (PROFILE_01.candidateSamplesObservedAtRegistration !== false) {
-            throw new Error('preregistration обязана предшествовать samples');
+            throw new Error('Предварительная регистрация обязана предшествовать сбору образцов');
           }
           console.log(`preregistration digest: ${preregistrationDigest(PROFILE_01)}`);
           NODE
@@ -52,7 +75,78 @@ jobs:
       - name: Установить зависимости
         run: pnpm install --frozen-lockfile
 
+      - name: Подготовить закреплённый браузер без образцов
+        if: ${{ inputs.prepare_only }}
+        run: |
+          pnpm --dir bench/compare install --frozen-lockfile
+          pnpm --dir bench/compare exec playwright install --with-deps chromium
+
+      - name: Сохранить фактическую идентичность среды CI до выбора новой эпохи
+        if: ${{ inputs.prepare_only }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CPU=$(awk '/^Cpus_allowed_list:/ { split($2, parts, /[,-]/); print parts[1] }' /proc/self/status)
+          test -n "$CPU"
+          taskset -c "$CPU" node --input-type=module <<'NODE'
+          import { createRequire } from 'node:module';
+          import { readFileSync } from 'node:fs';
+          import { join, dirname } from 'node:path';
+          import { arch, platform, release } from 'node:os';
+          import { captureServerMachine, captureServerClockBuildEvidence, createServerJournal } from './bench/profile/server-profile-runner.mjs';
+          import { prepareServerThreadCpuClock } from './bench/profile/server-thread-cpu-clock.mjs';
+          import { SERVER_PROFILE, serverProfileDigest } from './bench/profile/server-profile-registration.mjs';
+          import { hashFileTree, sha256File } from './bench/compare/provenance.mjs';
+          const out = join(process.env.RUNNER_TEMP, 'server-profile-preparation');
+          const journal = createServerJournal(out);
+          const receipt = { schema: 1, scope: 'только метаданные, без образцов проверяемой реализации; не квалификация часов и не результат PASS проверки производительности',
+            source: process.env.PROFILE_SOURCE_SHA, protocolDigest: serverProfileDigest(SERVER_PROFILE),
+            hosted: { runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
+              imageOS: process.env.ImageOS, imageVersion: process.env.ImageVersion },
+            observed: { platform: platform(), arch: arch(), kernelRelease: release() }, failures: [] };
+          // Все чтения выполняются до подготовки нативного модуля и браузера, вне измерений времени.
+          let browser;
+          try {
+            try {
+              receipt.machine = captureServerMachine();
+              receipt.clockBuildEvidence = receipt.machine.identity.clockBuildEvidence;
+            }
+            catch (error) {
+              if (error.raw?.machine) receipt.machine = error.raw.machine;
+              receipt.clockBuildEvidence = error.raw?.clockBuildEvidence ?? captureServerClockBuildEvidence();
+              const topology = {};
+              for (const file of ['/proc/self/cgroup', '/proc/self/mountinfo', '/sys/fs/cgroup/cgroup.controllers',
+                '/sys/fs/cgroup/cgroup.subtree_control', '/sys/fs/cgroup/cpu.stat']) {
+                try { topology[file] = { text: readFileSync(file, 'utf8') }; }
+                catch (readError) { topology[file] = { error: { code: readError.code, message: readError.message } }; }
+              }
+              receipt.failures.push({ boundary: 'machine-resource-prerequisite', message: error.message,
+                raw: error.raw ?? null, topology });
+            }
+            const clock = prepareServerThreadCpuClock({ directory: out });
+            receipt.engineClock = clock.metadata;
+            const requireBench = createRequire(join(process.cwd(), 'bench/compare/package.json'));
+            const browserType = requireBench('playwright').chromium;
+            const executable = browserType.executablePath();
+            receipt.browser = { name: 'chromium', executableSha256: sha256File(executable),
+              tree: { directory: dirname(executable), ...hashFileTree(dirname(executable)) } };
+            browser = await browserType.launch({ headless: SERVER_PROFILE.headless, executablePath: executable });
+            receipt.browser.version = browser.version();
+            clock.assertUnchanged();
+          } catch (error) {
+            receipt.failures.push({ boundary: 'identity-preparation', message: error.message, raw: error.raw ?? null });
+          } finally {
+            try { await browser?.close(); }
+            catch (error) { receipt.failures.push({ boundary: 'browser-cleanup', message: error.message }); }
+          }
+          const digest = serverProfileDigest(receipt);
+          journal('hosted-identity-before-epoch-and-samples', { receipt, digest });
+          console.log(`HOSTED_PROFILE_PREPARATION ${JSON.stringify({ receipt, digest })}`);
+          process.exitCode = receipt.failures.length ? 1 : 0;
+          NODE
+
       - name: Измерить прежний размерный вектор
+        if: ${{ !inputs.prepare_only }}
         id: probe
         shell: bash
         run: |
@@ -111,3 +205,230 @@ jobs:
           }
           NODE
 
+
+  server:
+    if: ${{ inputs.server_timing }}
+    runs-on: ubuntu-latest
+    # 6 h — предел бесплатного задания GitHub Actions, не гарантия полного maxRuns.
+    # TERM после 250 min сохраняет UNPROVEN через существующий измеритель; остаток
+    # бюджета оставлен на подготовку, повторную проверку и экспорт. Принудительное завершение может прервать экспорт.
+    timeout-minutes: 360
+    steps:
+      - name: Создать квитанции попытки до подготовки и отказа
+        id: receipt_init
+        timeout-minutes: 1
+        env:
+          EXPECTED_CANDIDATE: ${{ github.event.pull_request.head.sha || github.sha }}
+          CONFLICTING_INPUTS: ${{ inputs.conflicting_inputs || inputs.prepare_only }}
+        run: |
+          set -euo pipefail
+          SERVER_OUT="$RUNNER_TEMP/server-profile-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          SERVER_RECEIPTS="$RUNNER_TEMP/server-profile-receipts-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          printf 'SERVER_OUT=%s\nSERVER_RECEIPTS=%s\n' "$SERVER_OUT" "$SERVER_RECEIPTS" >> "$GITHUB_ENV"
+          mkdir "$SERVER_RECEIPTS"
+          printf 'run_id=%s\nattempt=%s\ncandidate_requested=%s\nconflicting_inputs=%s\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$EXPECTED_CANDIDATE" "$CONFLICTING_INPUTS" \
+            > "$SERVER_RECEIPTS/attempt.txt"
+
+      - name: Отклонить смешанные режимы до подготовки и сбора образцов
+        timeout-minutes: 1
+        env:
+          CONFLICTING_INPUTS: ${{ inputs.conflicting_inputs || inputs.prepare_only }}
+        run: |
+          set -euo pipefail
+          test "$CONFLICTING_INPUTS" = false
+
+      - name: Получить точный совмещённый кандидат
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 10
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          path: server-candidate
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Настроить зарегистрированный Node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        timeout-minutes: 5
+        with:
+          node-version: '24.19.0'
+
+      - name: Прочитать baseline только из владельца протокола
+        id: registration
+        timeout-minutes: 1
+        working-directory: server-candidate
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$PROFILE_SOURCE_SHA"
+          node --input-type=module <<'NODE'
+          import { appendFileSync } from 'node:fs';
+          import { SERVER_PROFILE } from './bench/profile/server-profile-registration.mjs';
+          if (!/^[a-f0-9]{40}$/.test(SERVER_PROFILE.baselineRevision)) throw new Error('Некорректная зарегистрированная базовая ревизия');
+          appendFileSync(process.env.GITHUB_OUTPUT, `baseline=${SERVER_PROFILE.baselineRevision}\n`);
+          NODE
+
+      - name: Получить точный зарегистрированный baseline
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        timeout-minutes: 10
+        with:
+          ref: ${{ steps.registration.outputs.baseline }}
+          path: server-baseline
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Активировать закреплённый pnpm для обоих участников
+        timeout-minutes: 5
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+
+      - name: Установить зависимости кандидата по закреплённым версиям
+        timeout-minutes: 10
+        working-directory: server-candidate
+        run: pnpm install --frozen-lockfile
+
+      - name: Установить зависимости базовой версии по закреплённым версиям
+        timeout-minutes: 10
+        working-directory: server-baseline
+        run: pnpm install --frozen-lockfile
+
+      - name: Установить Chromium и закреплённые зависимости измерителя
+        timeout-minutes: 15
+        working-directory: server-candidate
+        run: |
+          pnpm --dir bench/compare install --frozen-lockfile
+          pnpm --dir bench/compare exec playwright install --with-deps chromium
+
+      - name: Связать попытку запуска, исходники и протокол вне raw
+        id: binding
+        timeout-minutes: 1
+        working-directory: server-candidate
+        run: |
+          set -euo pipefail
+          test ! -e "$SERVER_OUT"
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { writeFileSync } from 'node:fs';
+          import { resolve, join } from 'node:path';
+          import { SERVER_PROFILE, serverProfileDigest } from './bench/profile/server-profile-registration.mjs';
+          const source = (root) => ({ sha: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+            tree: execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { cwd: root, encoding: 'utf8' }).trim() });
+          const baseline = source(resolve('../server-baseline')), candidate = source(process.cwd());
+          if (baseline.sha !== SERVER_PROFILE.baselineRevision || candidate.sha !== process.env.PROFILE_SOURCE_SHA) throw new Error('Привязка исходных ревизий не совпадает');
+          const receipt = { runId: process.env.GITHUB_RUN_ID, attempt: process.env.GITHUB_RUN_ATTEMPT,
+            baseline, candidate, protocolDigest: serverProfileDigest(SERVER_PROFILE), out: process.env.SERVER_OUT };
+          writeFileSync(join(process.env.SERVER_RECEIPTS, 'source.json'), JSON.stringify(receipt), { flag: 'wx' });
+          console.log(JSON.stringify(receipt));
+          NODE
+
+      - name: Выполнить существующий серверный измеритель на фактически разрешённом CPU
+        id: timing
+        timeout-minutes: 254
+        working-directory: server-candidate
+        env:
+          BASELINE_DIAGNOSTIC: ${{ inputs.baseline_diagnostic }}
+          PROFILE_OBSERVER_ABLATION: ${{ inputs.observer_ablation }}
+        run: |
+          set -euo pipefail
+          CPU=$(awk '/^Cpus_allowed_list:/ { split($2, parts, /[,-]/); print parts[1] }' /proc/self/status)
+          test -n "$CPU"
+          printf '%s\n' "$CPU" > "$SERVER_RECEIPTS/cpu.txt"
+          ENTRY=bench/profile/server-profile-runner.mjs
+          BUDGET=250m
+          if test "$BASELINE_DIAGNOSTIC" = true || test "$PROFILE_OBSERVER_ABLATION" = true; then
+            ENTRY=bench/profile/server-profile-diagnostic.mjs
+            BUDGET=20m
+          fi
+          printf 'diagnostic=%s\nobserver_ablation=%s\nentry=%s\n' "$BASELINE_DIAGNOSTIC" "$PROFILE_OBSERVER_ABLATION" "$ENTRY" > "$SERVER_RECEIPTS/mode.txt"
+          set +e
+          timeout --signal=TERM --kill-after=90s "$BUDGET" taskset -c "$CPU" \
+            node "$ENTRY" \
+            --baseline "$GITHUB_WORKSPACE/server-baseline" \
+            --candidate "$GITHUB_WORKSPACE/server-candidate" \
+            --browser chromium --out "$SERVER_OUT" \
+            > "$SERVER_RECEIPTS/runner.stdout" 2> "$SERVER_RECEIPTS/runner.stderr"
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$SERVER_RECEIPTS/runner-exit.txt"
+          tail -n 30 "$SERVER_RECEIPTS/runner.stdout"
+          tail -n 30 "$SERVER_RECEIPTS/runner.stderr"
+          exit "$status"
+
+      - name: Независимо связать digest journal и перепроверить полный raw
+        if: ${{ always() && steps.timing.outcome != 'skipped' }}
+        timeout-minutes: 10
+        working-directory: server-candidate
+        run: |
+          set -euo pipefail
+          for name in server-profile.sha256 journal.ndjson; do
+            if test -f "$SERVER_OUT/$name"; then cp "$SERVER_OUT/$name" "$SERVER_RECEIPTS/$name"; fi
+          done
+          test -s "$SERVER_OUT/server-profile.json"
+          test -s "$SERVER_OUT/server-profile.sha256"
+          test -s "$SERVER_OUT/journal.ndjson"
+          DIGEST=$(awk '{print $1}' "$SERVER_RECEIPTS/server-profile.sha256")
+          printf 'SERVER_RAW_DIGEST %s\n' "$DIGEST"
+          node bench/profile/server-profile-artifact.mjs \
+            --raw "$SERVER_OUT/server-profile.json" --digest "$DIGEST" \
+            --journal "$SERVER_RECEIPTS/journal.ndjson" \
+            > "$SERVER_RECEIPTS/replay.stdout" 2> "$SERVER_RECEIPTS/replay.stderr"
+          tail -n 30 "$SERVER_RECEIPTS/replay.stdout"
+
+      - name: Экспортировать все исходные данные, включая частичные отказы
+        if: ${{ always() && steps.timing.outcome != 'skipped' }}
+        id: raw_export
+        timeout-minutes: 15
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: server-profile-raw-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.SERVER_OUT }}
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 5
+          compression-level: 6
+
+      - name: Сохранить отдельную квитанцию архива исходных данных
+        if: ${{ always() && steps.receipt_init.outcome == 'success' }}
+        timeout-minutes: 1
+        env:
+          RAW_ID: ${{ steps.raw_export.outputs.artifact-id }}
+          RAW_DIGEST: ${{ steps.raw_export.outputs.artifact-digest }}
+          RAW_OUTCOME: ${{ steps.raw_export.outcome }}
+          TIMING_OUTCOME: ${{ steps.timing.outcome }}
+        run: |
+          printf 'raw_id=%s\nraw_archive_digest=%s\nraw_outcome=%s\ntiming_outcome=%s\n' \
+            "$RAW_ID" "$RAW_DIGEST" "$RAW_OUTCOME" "$TIMING_OUTCOME" > "$SERVER_RECEIPTS/raw-export.txt"
+
+      - name: Экспортировать независимые квитанции исходников, дайджеста и журнала
+        if: ${{ always() && steps.receipt_init.outcome == 'success' }}
+        id: receipt_export
+        timeout-minutes: 5
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: server-profile-receipts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.SERVER_RECEIPTS }}
+          if-no-files-found: error
+          retention-days: 5
+
+      - name: Проверить фактические квитанции экспорта
+        timeout-minutes: 1
+        if: ${{ always() && steps.receipt_init.outcome == 'success' }}
+        env:
+          RAW_ID: ${{ steps.raw_export.outputs.artifact-id }}
+          RAW_DIGEST: ${{ steps.raw_export.outputs.artifact-digest }}
+          RECEIPT_ID: ${{ steps.receipt_export.outputs.artifact-id }}
+          RECEIPT_DIGEST: ${{ steps.receipt_export.outputs.artifact-digest }}
+          TIMING_OUTCOME: ${{ steps.timing.outcome }}
+          RAW_OUTCOME: ${{ steps.raw_export.outcome }}
+          RECEIPT_OUTCOME: ${{ steps.receipt_export.outcome }}
+        run: |
+          set -euo pipefail
+          test "$RECEIPT_OUTCOME" = success
+          test -n "$RECEIPT_ID"
+          test -n "$RECEIPT_DIGEST"
+          if test "$TIMING_OUTCOME" != skipped; then
+            test "$RAW_OUTCOME" = success
+            test -n "$RAW_ID"
+            test -n "$RAW_DIGEST"
+          fi
+          printf 'SERVER_EXPORT raw=%s digest=%s receipts=%s\n' "$RAW_ID" "$RAW_DIGEST" "$RECEIPT_ID"

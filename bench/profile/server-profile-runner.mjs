@@ -1,7 +1,7 @@
-// Расширение существующего bench owner: общие сборка, origin, адаптеры и законы
-// round-robin. Ни одного вывода о физическом мобильном устройстве здесь нет.
+// Расширение существующего измерителя: общие сборка, сервер, адаптеры и циклический
+// порядок участников. Ни одного вывода о физическом мобильном устройстве здесь нет.
 import { execFileSync, spawnSync } from 'node:child_process';
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readlinkSync, realpathSync, statSync, statfsSync, symlinkSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { arch, cpus, hostname, loadavg, platform, release, totalmem } from 'node:os';
 import path from 'node:path';
@@ -13,18 +13,21 @@ import { runSemanticStartCheck, startBenchmarkOrigin } from '../compare/bench.mj
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, PRODUCTION_ADAPTER_PROFILE, validateStockMotionValueBatch } from '../compare/methodology.mjs';
 import { assertCheckoutUnchanged, assertFileHashesUnchanged, assertInstalledPackageTreesUnchanged,
   hashFileTree, prepareBenchmarkCheckout, sha256File } from '../compare/provenance.mjs';
-import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest } from './server-profile-registration.mjs';
+import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverProfileStringify } from './server-profile-registration.mjs';
 import { prepareServerThreadCpuClock, readServerThreadCpuEndpoint } from './server-thread-cpu-clock.mjs';
 import { compactServerCpuEvidence, compactServerSemanticEvidence, serverBrowserSemanticClockErrorMs, serverCalibrationVerdict, serverCellPairs,
-  serverFamilyIntervals, serverOrders, serverResourceReasons, validateServerBrowserSample, validateServerEngineSample, verifyServerClockRegistration } from './server-profile-contract.mjs';
+  serverFamilyIntervals, serverOrders, serverResourceBinding, serverResourceReasons, validateServerResourceIdentity, validateServerBrowserSample, validateServerEngineSample, verifyServerClockBuildEvidence, verifyServerClockRegistration } from './server-profile-contract.mjs';
 import { writeServerArtifact } from './server-profile-artifact.mjs';
+import { loadServerParticipant, serverParticipantImports, serverParticipantExportTargets } from './server-profile-consumer.mjs';
+import { OBSERVER_ABLATION } from './server-observer-ablation.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const BENCH = path.join(ROOT, 'bench/compare');
 const requireBench = createRequire(path.join(BENCH, 'package.json'));
 const HARNESS_FILES = ['bench/profile/server-profile-registration.mjs', 'bench/profile/server-profile-contract.mjs',
-  'bench/profile/server-profile-artifact.mjs',
-  'bench/profile/server-profile-runner.mjs', 'bench/profile/server-profile-retention.mjs',
+  'bench/profile/server-profile-artifact.mjs', 'bench/profile/server-observer-ablation.mjs',
+  'bench/profile/server-profile-runner.mjs', 'bench/profile/server-profile-retention.mjs', 'bench/profile/server-profile-consumer.mjs',
+  'bench/compare/entries/lab-legacy.entry.mjs',
   'bench/profile/server-thread-cpu-clock.mjs', ...Object.keys(SERVER_PROFILE.clockError.nativeSourceFiles),
   'scripts/bench-transform-support.mjs', 'scripts/bench-support.mjs', 'scripts/bench.mjs', 'bench/compare/bench.mjs',
   'bench/compare/methodology.mjs', 'bench/compare/provenance.mjs'];
@@ -46,16 +49,84 @@ function errorRecord(error) {
     ...(error?.raw ? { raw: preserveRawNumbers(error.raw) } : {}), ...(error?.timerEvidence ? { timerEvidence: preserveRawNumbers(error.timerEvidence) } : {}) };
 }
 function readOptional(file) { return existsSync(file) ? readFileSync(file, 'utf8').trim() : null; }
+function resourceRead(file, trim = true) {
+  try { const text = readFileSync(file, 'utf8'); return { text: trim ? text.trim() : text }; }
+  catch (error) { return { error: errorRecord(error) }; }
+}
+function captureResourceConfiguration() {
+  const membership = resourceRead('/proc/self/cgroup', false), mountinfo = resourceRead('/proc/self/mountinfo', false);
+  const raw = { membership, mountinfo };
+  const refuse = (message) => { throw Object.assign(new Error('server profile: ' + message + '; до сбора образцов'), { raw }); };
+  const entries = membership.text?.split('\n').filter((line) => line.startsWith('0::')) ?? [];
+  const absolute = (value) => typeof value === 'string' && value.startsWith('/') &&
+    (value === '/' || value.split('/').slice(1).every((part) => part !== '' && part !== '.' && part !== '..')) && !/[\x00-\x1f]/.test(value);
+  if (entries.length !== 1 || !absolute(entries[0].slice(3)) || entries[0].includes(' (deleted)')) refuse('некорректная принадлежность процесса к cgroup');
+  const member = entries[0].slice(3);
+  const decode = (value) => value.replace(/\\(040|011|012|134)/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)));
+  const mounts = (mountinfo.text ?? '').split('\n').filter(Boolean).map((line) => {
+    const halves = line.split(' - '), fields = halves[0].split(' '), tail = halves[1]?.split(' ');
+    if (halves.length !== 2 || fields.length < 6 || !tail || tail.length < 3) refuse('невалидный mountinfo');
+    return { id: fields[0], root: decode(fields[3]), point: decode(fields[4]), filesystem: tail[0] };
+  });
+  const candidates = mounts.filter((mount) => mount.filesystem === 'cgroup2');
+  if (candidates.length !== 1) refuse('неподдерживаемая неоднозначность монтирований cgroup2');
+  const mount = candidates[0]; raw.mount = mount;
+  if (mount.root !== '/' || !absolute(mount.point) || mount.point === '/') refuse('неполное покрытие предков: привязочное монтирование или монтирование пространства имён');
+  if (mounts.some((other) => other !== mount && (other.point === mount.point || other.point.startsWith(mount.point + '/')))) refuse('маскирующее монтирование cgroup');
+  const stat = resourceRead('/proc/self/stat'); raw.scheduler = stat;
+  const scheduler = stat.text?.slice(stat.text.lastIndexOf(')') + 2).split(/\s+/)[38];
+  if (scheduler !== '0') refuse('поддерживается только SCHED_OTHER');
+  const scopes = [];
+  for (let current = member; ; current = path.posix.dirname(current)) {
+    const directory = mount.point + (current === '/' ? '' : current);
+    let info, fs;
+    try {
+      info = statSync(directory, { bigint: true });
+      fs = statfsSync(directory, { bigint: true });
+    } catch (error) { throw Object.assign(new Error('server profile: объект cgroup недоступен; до сбора образцов'), { raw: { ...raw, directory, error: errorRecord(error) } }); }
+    const object = { dev: String(info.dev), ino: String(info.ino), fsType: String(fs.type) };
+    if (!info.isDirectory() || fs.type !== 0x63677270n) {
+      throw Object.assign(new Error('server profile: объект не является каталогом cgroup2; до сбора образцов'), { raw: { ...raw, directory, object } });
+    }
+    scopes.push({ path: current, directory, ...object, type: resourceRead(directory + '/cgroup.type'),
+      cpuMax: resourceRead(directory + '/cpu.max'), burst: resourceRead(directory + '/cpu.max.burst'),
+      memoryMax: resourceRead(directory + '/memory.max'), controllers: resourceRead(directory + '/cgroup.controllers'),
+      subtreeControl: resourceRead(directory + '/cgroup.subtree_control') });
+    if (current === '/') break;
+  }
+  // Linux v6.18.44/v7.0: policy 0 допускает полное переключение на sched-ext; читаем его состояние, не счётчики /proc/self/sched.
+  const schedExtState = { model: 'linux-v6.18.44-v7.0-sched-ext-state', ...resourceRead('/sys/kernel/sched_ext/state') };
+  const resource = { membership, mountinfo, mount, scheduler, schedExtState, scopes };
+  try { validateServerResourceIdentity(resource); }
+  catch (error) { throw Object.assign(new Error(error.message + '; до сбора образцов'), { raw: { resource, cgroupCpuMax: scopes[0].cpuMax.text ?? null } }); }
+  return resource;
+}
 function contextSwitches() {
   const status = readFileSync('/proc/self/status', 'utf8');
   return Object.fromEntries(['voluntary_ctxt_switches', 'nonvoluntary_ctxt_switches'].map((name) =>
     [name, Number(new RegExp(`^${name}:\\s*(\\d+)$`, 'm').exec(status)?.[1])]));
 }
 function captureServerLoad() {
-  const raw = readFileSync('/sys/fs/cgroup/cpu.stat', 'utf8');
-  const cpuStat = Object.fromEntries(raw.trim().split('\n').map((line) => { const [key, value] = line.split(/\s+/); return [key, Number(value)]; }));
-  return { at: new Date().toISOString(), affinity: /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1],
-    cpuMax: readOptional('/sys/fs/cgroup/cpu.max'), cpuStat, loadavg: loadavg(), contextSwitches: contextSwitches(), scope: 'весь cgroup, включая возможные фоновые процессы' };
+  const resource = captureResourceConfiguration();
+  const affinity = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
+  const scopes = resource.scopes.slice(0, -1).map((scope) => {
+    const raw = resourceRead(scope.directory + '/cpu.stat');
+    const entries = (raw.text ?? '').split('\n').map((line) => line.trim().split(/\s+/));
+    const cpuStat = Object.fromEntries(entries.map(([key, value]) => [key, Number(value)]));
+    if (raw.error || entries.some((entry) => entry.length !== 2) || new Set(entries.map(([key]) => key)).size !== entries.length ||
+      !['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'].every((key) => Number.isSafeInteger(cpuStat[key]) && cpuStat[key] >= 0)) {
+      throw Object.assign(new Error('server profile: cpu.stat требует шесть безопасных счётчиков; до сбора образцов'),
+        { raw: { resource: { path: scope.path, cpuMax: scope.cpuMax.text, cpuStat, read: raw } } });
+    }
+    return { path: scope.path, cpuStat };
+  });
+  const after = captureResourceConfiguration();
+  const affinityAfter = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
+  if (serverProfileDigest(serverResourceBinding(resource)) !== serverProfileDigest(serverResourceBinding(after)) || affinity !== affinityAfter) {
+    throw Object.assign(new Error('server profile: cgroup или привязка CPU изменились при получении снимка'), { raw: { resource, after, affinity, affinityAfter } });
+  }
+  return { at: new Date().toISOString(), affinity, resource, scopes, cpuMax: resource.scopes[0].cpuMax.text,
+    cpuStat: scopes[0].cpuStat, loadavg: loadavg(), contextSwitches: contextSwitches(), scope: 'cgroup процесса; каждый предок, кроме корня, учитывается отдельно' };
 }
 async function withBrowserTimeout(promise, label) {
   let timeout;
@@ -65,27 +136,48 @@ async function withBrowserTimeout(promise, label) {
     })]);
   } finally { clearTimeout(timeout); }
 }
+export function captureServerClockBuildEvidence() {
+  const evidence = { files: {}, namespaces: {}, packages: [] };
+  for (const file of ['/proc/version', '/proc/version_signature', '/proc/cmdline', '/proc/self/timens_offsets',
+    '/proc/1/timens_offsets', `/boot/config-${release()}`]) {
+    try { evidence.files[file] = { text: readFileSync(file, 'utf8') }; }
+    catch (error) { evidence.files[file] = { error: { code: error.code, message: error.message } }; }
+  }
+  for (const file of ['/proc/self/ns/time', '/proc/self/ns/time_for_children', '/proc/1/ns/time']) {
+    try { evidence.namespaces[file] = { target: readlinkSync(file) }; }
+    catch (error) { evidence.namespaces[file] = { error: { code: error.code, message: error.message } }; }
+  }
+  for (const name of [`linux-image-${release()}`, `linux-modules-${release()}`]) {
+    const args = ['-W', '-f=${binary:Package} ${Version} ${source:Package} ${source:Version}\n', name];
+    const result = spawnSync('dpkg-query', args, { encoding: 'utf8', timeout: 10_000, maxBuffer: 1024 * 1024 });
+    evidence.packages.push({ command: 'dpkg-query', args, status: result.status, signal: result.signal,
+      stdout: result.stdout, stderr: result.stderr,
+      ...(result.error ? { error: { code: result.error.code, message: result.error.message } } : {}) });
+  }
+  return evidence;
+}
 export function captureServerMachine() {
-  const affinity = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
-  if (!/^\d+$/.test(affinity ?? '')) throw new Error('server profile: нужен один CPU через taskset, общий scheduler не закреплён');
-  const cgroupCpuMax = readOptional('/sys/fs/cgroup/cpu.max');
-  if (typeof cgroupCpuMax !== 'string' || cgroupCpuMax.length === 0) {
-    throw Object.assign(new Error('server profile: нет cgroup v2 cpu.max; ресурсный контракт невыполним до samples'),
-      { raw: { affinity, cgroupCpuMax } });
+  const clockBuildEvidence = captureServerClockBuildEvidence();
+  let machine;
+  try {
+    const affinity = /^Cpus_allowed_list:\s*(.+)$/m.exec(readFileSync('/proc/self/status', 'utf8'))?.[1];
+    if (!/^\d+$/.test(affinity ?? '')) throw new Error('server profile: нужен один CPU через taskset, общий планировщик не закреплён');
+    const resource = captureServerLoad();
+    if (resource.affinity !== affinity) throw Object.assign(new Error('server profile: привязка CPU изменилась до регистрации'), { raw: { affinity, resource } });
+    const cgroupCpuMax = resource.cpuMax;
+    const identity = { platform: platform(), release: release(), arch: arch(), host: hostname(),
+      cpu: cpus()[Number(affinity)]?.model, logicalCpus: cpus().length, totalMemoryBytes: totalmem(), affinity,
+      cgroupCpuMax, resource: resource.resource, cgroupMemoryMax: resource.resource.scopes[0].memoryMax, clockBuildEvidence,
+      governor: readOptional(`/sys/devices/system/cpu/cpu${affinity}/cpufreq/scaling_governor`),
+      display: 'headless; физический экран отсутствует', power: 'среда сервера; не устройство', thermal: 'не измеряется',
+      node: process.version, nodeExecutableSha256: sha256File(process.execPath), execArgv: process.execArgv };
+    machine = { identity, sha256: serverProfileDigest(identity), observation: { at: new Date().toISOString(), resource, loadavg: loadavg(), memory: process.memoryUsage() } };
+    verifyServerClockBuildEvidence(clockBuildEvidence, identity);
+    return machine;
+  } catch (error) {
+    error.raw = { ...error.raw, clockBuildEvidence, ...(machine ? { machine } : {}) };
+    throw error;
   }
-  const resource = captureServerLoad();
-  const resourceKeys = ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'];
-  if (!resourceKeys.every((key) => Number.isSafeInteger(resource.cpuStat[key]) && resource.cpuStat[key] >= 0)) {
-    throw Object.assign(new Error('server profile: cpu.stat не содержит шесть безопасных неотрицательных счётчиков; ресурсный контракт невыполним до samples'),
-      { raw: { resource } });
-  }
-  const identity = { platform: platform(), release: release(), arch: arch(), host: hostname(),
-    cpu: cpus()[Number(affinity)]?.model, logicalCpus: cpus().length, totalMemoryBytes: totalmem(), affinity,
-    cgroupCpuMax, cgroupMemoryMax: readOptional('/sys/fs/cgroup/memory.max'),
-    governor: readOptional(`/sys/devices/system/cpu/cpu${affinity}/cpufreq/scaling_governor`),
-    display: 'headless; физический экран отсутствует', power: 'среда сервера; не устройство', thermal: 'не измеряется',
-    node: process.version, nodeExecutableSha256: sha256File(process.execPath), execArgv: process.execArgv };
-  return { identity, sha256: serverProfileDigest(identity), observation: { at: new Date().toISOString(), loadavg: loadavg(), memory: process.memoryUsage() } };
 }
 
 export function createServerJournal(out) {
@@ -95,7 +187,7 @@ export function createServerJournal(out) {
   return (type, value) => {
     const payload = { sequenceDigest: previous, type, value };
     const digest = serverProfileDigest(payload);
-    appendFileSync(file, `${JSON.stringify({ ...payload, digest })}\n`, { flag: 'a' });
+    appendFileSync(file, `${serverProfileStringify({ ...payload, digest })}\n`, { flag: 'a' });
     previous = digest;
     return digest;
   };
@@ -115,13 +207,21 @@ export async function withServerProfileSignals(run) {
   finally { process.off('SIGINT', interrupt); process.off('SIGTERM', terminate); }
 }
 
-export async function runServerProfileCalibration(artifact, runStage, journal) {
+export async function runServerProfileCalibration(artifact, runStage, journal, { baselineOnlyDiagnostic = false, observerAblation = false } = {}) {
+  if (observerAblation) {
+    await runStage('observer-ablation', OBSERVER_ABLATION.pairs);
+    throw Object.assign(new Error('server profile: исключение наблюдателя не является квалификацией'), { code: 'DIAGNOSTIC_ONLY', raw: artifact.diagnostic });
+  }
   artifact.warmup = await runStage('warmup', SERVER_PROFILE.warmupRuns);
   artifact.pilot = await runStage('pilot', SERVER_PROFILE.pilotRuns);
+  if (baselineOnlyDiagnostic) {
+    artifact.diagnostic = { kind: 'intrusive-baseline-trace', qualification: false, stoppedBefore: 'sample-plan/AA/positive/AB' };
+    throw Object.assign(new Error('server profile: диагностика с вмешательством для базовой версии не является квалификацией'), { code: 'DIAGNOSTIC_ONLY', raw: artifact.diagnostic });
+  }
   artifact.samplePlan = planServerSampleSize(serverCellPairs(artifact.pilot, SERVER_PROFILE.pilotRuns, 'pilot', artifact.registration.engineClock));
   artifact.frozenPlanDigest = serverProfileDigest({ registrationDigest: artifact.registrationDigest, samplePlan: artifact.samplePlan });
   journal('N-frozen-before-calibration-and-AB', { samplePlan: artifact.samplePlan, digest: artifact.frozenPlanDigest });
-  if (!artifact.samplePlan.feasible) throw Object.assign(new Error(`server profile: pilot требует ${artifact.samplePlan.requiredRuns} runs, предел ${SERVER_PROFILE.maxRuns}`), {
+  if (!artifact.samplePlan.feasible) throw Object.assign(new Error(`server profile: пилот требует ${artifact.samplePlan.requiredRuns} запусков, предел ${SERVER_PROFILE.maxRuns}`), {
     code: 'UNPROVEN_POWER', raw: { samplePlan: artifact.samplePlan, frozenPlanDigest: artifact.frozenPlanDigest },
   });
   artifact.aa = await runStage('aa', artifact.samplePlan.runs);
@@ -141,9 +241,17 @@ function buildToStderr(root) {
     shell: process.platform === 'win32', timeout: 180_000 });
 }
 
-// Игнорирование publish scripts запрещает vendor prepack rebuild другим toolchain.
-// Фактический npm-consumer получает именно unpacked архив; workspace dist не импортируется.
-function packConsumer(packageRoot, directory, nodeModules) {
+export function serverParticipantPreparation(root, participant) {
+  const targets = serverParticipantExportTargets(root, participant);
+  return { root, benchDirectory: BENCH, build: buildToStderr,
+    requiredDist: [...new Set([targets.engine, targets.browser, targets.stock].map(entry => entry.path.slice(2)))],
+    requiredPackages: ['esbuild', 'playwright', 'motion', 'gsap', 'animejs'],
+    requiredRootPackages: ['tsup', 'typescript', 'esbuild'] };
+}
+
+// Отключение сценариев публикации не позволяет поставщику пересобрать prepack другим набором инструментов.
+// Фактический потребитель npm получает распакованный архив; dist рабочей области не импортируется.
+export function packConsumer(packageRoot, directory, nodeModules) {
   mkdirSync(directory, { recursive: true });
   const metadata = JSON.parse(readFileSync(path.join(packageRoot, 'package.json'), 'utf8'));
   const tarball = path.join(directory, 'consumer.tgz');
@@ -172,7 +280,7 @@ function packageClosure(name, out, nodeModules, packed = new Map()) {
       const entry = resolver.resolve(dependency);
       let cursor = path.dirname(realpathSync(entry));
       while (!existsSync(path.join(cursor, 'package.json')) || JSON.parse(readFileSync(path.join(cursor, 'package.json'), 'utf8')).name !== dependency) {
-        const parent = path.dirname(cursor); if (parent === cursor) throw new Error('server profile: не разрешён transitive package'); cursor = parent;
+        const parent = path.dirname(cursor); if (parent === cursor) throw new Error('server profile: не найдена транзитивная зависимость пакета'); cursor = parent;
       }
       packDependency(cursor);
     }
@@ -180,15 +288,22 @@ function packageClosure(name, out, nodeModules, packed = new Map()) {
   }
 }
 
-function buildAdapter(id, consumerRoot, esbuild, out) {
-  const owner = id === 'baseline' || id === 'candidate' ? 'lab' : id;
+export async function buildAdapter(id, consumerRoot, esbuild, out) {
+  const participant = id === 'baseline' || id === 'candidate';
+  const lineage = participant ? serverParticipantImports(path.join(consumerRoot, 'node_modules/@labpics/motion'), id) : null;
+  const owner = lineage?.browserOwner ?? id;
   const entry = path.join(BENCH, `entries/${owner === 'waapi-ctl' ? 'waapi-control' : owner}.entry.mjs`);
-  const original = readFileSync(entry, 'utf8');
-  const contents = owner === 'lab' ? original.replace("'../../../dist/animate/index.js'", "'@labpics/motion/animate'") : original;
+  const contents = readFileSync(entry, 'utf8');
   const artifact = path.join(out, `${id}.iife.js`);
-  esbuild.buildSync({ ...PRODUCTION_ADAPTER_PROFILE, stdin: { contents, resolveDir: consumerRoot, sourcefile: path.basename(entry) },
-    nodePaths: [path.join(consumerRoot, 'node_modules')], format: 'iife', globalName: '__adapterModule', outfile: artifact, logLevel: 'silent' });
-  return { path: artifact, sha256: sha256File(artifact), ownerEntry: entry, ownerEntrySha256: sha256File(entry) };
+  const buildResult = await esbuild.build({ ...PRODUCTION_ADAPTER_PROFILE, absWorkingDir: consumerRoot, metafile: true, stdin: { contents, resolveDir: consumerRoot, sourcefile: path.basename(entry) },
+    nodePaths: [path.join(consumerRoot, 'node_modules')], format: 'iife', globalName: '__adapterModule', outfile: artifact, logLevel: 'silent',
+    plugins: lineage ? [{ name: 'packed-participant-entry', setup(build) {
+      build.onResolve({ filter: /^\.\.\/\.\.\/\.\.\/dist\/(motion\/|animate\/)?index\.js$/ }, () => ({ path: lineage.browser.path }));
+    } }] : [] });
+  return { path: artifact, sha256: sha256File(artifact), ownerEntry: entry, ownerEntrySha256: sha256File(entry),
+    inputs: Object.keys(buildResult.metafile.inputs).map(name => path.resolve(consumerRoot, name))
+      .filter(name => name !== path.resolve(consumerRoot, path.basename(entry))),
+    ...(lineage ? { participantImports: lineage } : {}) };
 }
 
 function threadCpuNs(reads) {
@@ -198,10 +313,10 @@ function threadCpuNs(reads) {
   if (acquired.clock !== 'CLOCK_THREAD_CPUTIME_ID' || acquired.pid !== process.pid || acquired.tid !== process.pid ||
       typeof acquired.seconds !== 'string' || !/^(0|[1-9]\d*)$/.test(acquired.seconds) ||
       !Number.isSafeInteger(acquired.nanoseconds) || acquired.nanoseconds < 0 || acquired.nanoseconds >= 1_000_000_000) {
-    throw Object.assign(new Error('server profile: unsafe native scheduled CPU endpoint вне clock model'), { raw: acquired });
+    throw Object.assign(new Error('server profile: небезопасная конечная отметка CPU нативного потока вне модели часов'), { raw: acquired });
   }
   const valueNs = BigInt(acquired.seconds) * 1_000_000_000n + BigInt(acquired.nanoseconds);
-  if (acquired.valueNs !== String(valueNs)) throw Object.assign(new Error('server profile: native CPU value не пересчитывается из sec/nsec'), { raw: acquired });
+  if (acquired.valueNs !== String(valueNs)) throw Object.assign(new Error('server profile: значение CPU нативного потока не пересчитывается из sec/nsec'), { raw: acquired });
   return valueNs;
 }
 
@@ -211,10 +326,10 @@ function sampleCpuClock(raw) {
 }
 
 function compactSampleCpuEvidence(sample) {
-  // Никакой частичной замены при отказе encoder: исходные массивы остаются в error.raw.
+  // При отказе кодировщика частичной замены нет: исходные массивы остаются в error.raw.
   let encoded;
   try { encoded = sample.raw.map((measured) => compactServerCpuEvidence(measured.raw.cpuReads)); }
-  catch (error) { throw Object.assign(new AggregateError([error], 'server profile: native CPU carrier не завершён'), { raw: sample }); }
+  catch (error) { throw Object.assign(new AggregateError([error], 'server profile: носитель отметки CPU нативного потока не завершён'), { raw: sample }); }
   for (let index = 0; index < sample.raw.length; index++) sample.raw[index].raw.cpuReads = encoded[index];
 }
 
@@ -243,24 +358,24 @@ export async function measureServerEngine(animate, scene, workMultiplier = 1) {
       cancelDrainNs: aggregate((sample) => sample.cancelDrainNs), semantic: raw.every((sample) => sample.semantic.valid),
       repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
       cpuClock: sampleCpuClock(raw),
-      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; timing использует только CPU текущего потока' },
-      allocationObservation: { before, after: process.memoryUsage(), scope: 'пакет + независимый oracle + harness; allocator/GC не разложены' }, raw };
+      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'процесс Node; время измеряется только по CPU текущего потока' },
+      allocationObservation: { before, after: process.memoryUsage(), scope: 'пакет, независимая эталонная проверка и испытательная обвязка; аллокатор и GC не разделены' }, raw };
     validateServerEngineSample(sampleResult, scene, workMultiplier);
     return sampleResult;
   } catch (error) {
-    throw Object.assign(new AggregateError([error], 'server profile: engine sample не завершён'), { raw: sampleResult ?? {
+    throw Object.assign(new AggregateError([error], 'server profile: образец движка не завершён'), { raw: sampleResult ?? {
       completed: raw, failedRepetition: preserveRawNumbers(error?.raw ? { ...error.raw, cpuReads } : { cpuReads }), before, after: process.memoryUsage() } });
   }
 }
 
-/** Штатный stock C: per-call evidence stores внутри CPU, oracle/RLE снаружи. */
+/** Штатный stock C: запись свидетельств каждого вызова внутри CPU-измерения, эталонная проверка и RLE снаружи. */
 export async function measureServerStockC(MotionValue, scene, workMultiplier = 1) {
   const raw = [], warmup = [];
   const before = process.memoryUsage(), contextBefore = contextSwitches();
   let current = null;
   let sampleResult;
   try {
-    if (typeof MotionValue !== 'function' || ![1, 2].includes(workMultiplier)) throw new Error('stock C: неизвестный constructor/work multiplier');
+    if (typeof MotionValue !== 'function' || ![1, 2].includes(workMultiplier)) throw new Error('stock C: неизвестный конструктор или множитель работы');
     const macro = createMotionValueDefaultBenchmark(MotionValue, scene.spring);
     const batch = (timed, multiplier) => {
       const calls = scene.callsPerRepetition * multiplier;
@@ -275,9 +390,9 @@ export async function measureServerStockC(MotionValue, scene, workMultiplier = 1
       };
       const start = timed ? read('before') : null;
       for (let operation = 0; operation < calls; operation++) {
-        // Чтение frame count необходимо для каждого вызова: среднее47
-        // не отличает две неправильные операции0/94. Два массива выделены
-        // до CPU, а преобразование в RLE и oracle выполняются после него.
+        // Число кадров читается для каждого вызова: среднее 47
+        // не отличает две неправильные операции 0/94. Два массива выделены
+        // до измерения CPU, а преобразование в RLE и проверка выполняются после него.
         const value = macro.run();
         values[operation] = value;
         frames[operation] = macro.getFrameCount();
@@ -292,16 +407,16 @@ export async function measureServerStockC(MotionValue, scene, workMultiplier = 1
       validateStockMotionValueBatch(result, scene, multiplier, timed);
       return result;
     };
-    // Штатные две warmup batches до первой измеренной работы; candidate
-    // попадает сюда только после общей calibration и frozen N.
+    // Два штатных пакета прогрева выполняются до первой измеренной работы; кандидат
+    // попадает сюда только после общей калибровки и фиксации N.
     for (let index = 0; index < scene.warmupBatches; index++) warmup.push(batch(false, 1));
     for (let repetition = 0; repetition < SERVER_PROFILE.repetitions; repetition++) raw.push(batch(true, workMultiplier));
     sampleResult = { operationNs: raw.reduce((sum, result) => sum + result.operationNs, 0) / SERVER_PROFILE.repetitions,
       semantic: true, repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator,
       cpuScope: SERVER_PROFILE.stockCpuScope, warmup, raw,
       cpuClock: sampleCpuClock(raw),
-      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'Node process; CPU только текущего потока' },
-      allocationObservation: { before, after: process.memoryUsage(), scope: 'whole macro + recorder + oracle + harness; retained отдельно' } };
+      contextSwitchObservation: { before: contextBefore, after: contextSwitches(), scope: 'процесс Node; CPU только текущего потока' },
+      allocationObservation: { before, after: process.memoryUsage(), scope: 'полный макросценарий, запись, эталонная проверка и испытательная обвязка; удержания проверяются отдельно' } };
     validateServerEngineSample(sampleResult, scene, workMultiplier);
     return sampleResult;
   } catch (error) {
@@ -315,7 +430,7 @@ export async function measureServerStockC(MotionValue, scene, workMultiplier = 1
       current.raw.values = acquired(current.raw.values, completed + Number(valueAcquired));
       current.raw.frames = acquired(current.raw.frames, completed + Number(frameAcquired));
     }
-    throw Object.assign(new AggregateError([error], 'server profile: stock C sample не завершён'), { raw: sampleResult ?? preserveRawNumbers({
+    throw Object.assign(new AggregateError([error], 'server profile: образец stock C не завершён'), { raw: sampleResult ?? preserveRawNumbers({
       warmup, completed: raw, failedRepetition: current, before, after: process.memoryUsage() }) });
   }
 }
@@ -329,30 +444,31 @@ async function browserTimerProbe(page, phase) {
       if (end > begin) deltas.push(end - begin);
     }
     return { timeOriginMs: performance.timeOrigin, performanceNowDeltasMs: deltas };
-  }), 'browser timer probe');
+  }), 'проверка таймера браузера');
   return { phase, ...raw };
 }
 
-export async function measureServerBrowser(browser, origin, adapter, scene, workMultiplier = 1) {
-  const context = await withBrowserTimeout(browser.newContext({ viewport: SERVER_PROFILE.viewport, deviceScaleFactor: SERVER_PROFILE.deviceScaleFactor }), 'browser context');
+export async function measureServerBrowser(browser, origin, adapter, scene, workMultiplier = 1, _observation, diagnosticObserver) {
+  const sampleBeginNs = diagnosticObserver ? process.hrtime.bigint() : null;
+  const context = await withBrowserTimeout(browser.newContext({ viewport: SERVER_PROFILE.viewport, deviceScaleFactor: SERVER_PROFILE.deviceScaleFactor }), 'контекст браузера');
   const partial = [];
   let before, sampleResult, failure;
   try {
     const page = await context.newPage(); await page.goto(origin.url, { waitUntil: 'load' });
     await page.exposeFunction('__serverSavePartial', (value) => { partial.push(preserveRawNumbers(value)); });
-    if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('server profile: отсутствует изоляция realm часов');
+    if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('server profile: отсутствует изоляция среды исполнения часов');
     const source = readFileSync(adapter.path, 'utf8');
     const coldImportMs = await withBrowserTimeout(page.evaluate((source) => {
       const begin = performance.now(); (0, eval)(source); return performance.now() - begin;
-    }, source), 'browser cold import');
+    }, source), 'холодный импорт браузера');
     partial.push({ phase: 'cold-import', coldImportMs });
     const semanticClockErrorMs = serverBrowserSemanticClockErrorMs(process.hrtime.bigint().toString());
     const semanticConfig = { ...scene, ...SERVER_PROFILE.browserSemantics, semanticClockErrorMs,
       durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx };
     const semanticEvidence = compactServerSemanticEvidence(await withBrowserTimeout(
-      runSemanticStartCheck(page, semanticConfig, SERVER_PROFILE.browserSemanticCalls), 'browser normal-motion semantic control'));
+      runSemanticStartCheck(page, semanticConfig, SERVER_PROFILE.browserSemanticCalls), 'семантический контроль обычного движения в браузере'));
     partial.push({ phase: 'normal-motion', evidence: semanticEvidence });
-    if (!semanticEvidence.valid) throw Object.assign(new Error('server profile: normal motion/topology не доказаны существующим oracle'), { raw: { partial, semanticEvidence } });
+    if (!semanticEvidence.valid) throw Object.assign(new Error('server profile: обычное движение и топология не доказаны существующей эталонной проверкой'), { raw: { partial, semanticEvidence } });
     before = await browserTimerProbe(page, 'before');
     const result = await withBrowserTimeout(page.evaluate(async (config) => {
       const A = window.__adapterModule;
@@ -368,21 +484,27 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       };
       const expand = (values) => Array.isArray(values) ? values : values.encoding === 'repeat' ? Array(values.count).fill(values.value)
         : values.runs.flatMap(([length, value]) => Array(length).fill(value));
-      const snapshot = (els) => ({ connectedTargets: els.filter((element) => element.isConnected).length,
+      const snapshot = config.diagnosticObserver?.snapshotSource ? (0, eval)(`(${config.diagnosticObserver.snapshotSource})`) : (els) => ({ connectedTargets: els.filter((element) => element.isConnected).length,
         activeWaapi: els.reduce((sum, element) => sum + element.getAnimations().length, 0),
         transforms: compact(els.map((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).e)) });
       const cancellationWitness = async (els, cancelBegin) => {
-        const before = snapshot(els), frames = [];
-        for (let frame = 0; frame < config.cancellation.frames; frame++) { await drain(); frames.push(snapshot(els)); }
+        const collectorClocks = [];
+        const collect = config.diagnosticObserver ? () => {
+          const beginMs = performance.now(), value = snapshot(els), endMs = performance.now();
+          collectorClocks.push({ beginMs, endMs }); return value;
+        } : () => snapshot(els);
+        const before = collect(), frames = [];
+        for (let frame = 0; frame < config.cancellation.frames; frame++) { await drain(); frames.push(collect()); }
         return { connectedTargets: before.connectedTargets, activeWaapiBefore: before.activeWaapi,
-          transformsBefore: before.transforms, frames, cancelDrainMs: performance.now() - cancelBegin };
+          transformsBefore: before.transforms, frames, cancelDrainMs: performance.now() - cancelBegin,
+          ...(config.diagnosticObserver ? { collectorClocks } : {}) };
       };
       const assertCancellation = (witness, targets) => {
         const before = expand(witness.transformsBefore);
         if (witness.connectedTargets !== targets || witness.activeWaapiBefore !== 0 ||
             witness.frames.some((frame) => frame.connectedTargets !== targets || frame.activeWaapi !== 0 ||
               expand(frame.transforms).some((value, index) => !Number.isFinite(value) || Math.abs(value - before[index]) > config.cancellation.transformTolerancePx))) {
-          throw new Error('cancel не достиг наблюдаемой неподвижности attached targets после двух rAF');
+          throw new Error('отмена не достигла наблюдаемой неподвижности присоединённых целей после двух rAF');
         }
       };
       const create = () => Array.from({ length: config.scene.targetsPerCall }, () => {
@@ -392,7 +514,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
         ? A.startStagger(els, config.toPx, config.durationMs, config.scene.staggerGapMs)
         : A.start(els, config.toPx, config.durationMs);
       if (typeof start !== 'function' || !A?.start || (config.scene.staggerGapMs > 0 && !A.startStagger)) throw new Error('нет общего API сцены');
-      // Независимый CSS matrix oracle подтверждает реальный линейный endpoint.
+      // Независимая проверка матриц CSS подтверждает фактическую линейную конечную позицию.
       const witness = create();
       const controlStartBegin = performance.now(); const control = start(witness); const controlStartMs = performance.now() - controlStartBegin;
       await new Promise((resolve) => setTimeout(resolve, config.durationMs + (witness.length - 1) * config.scene.staggerGapMs + 100));
@@ -404,10 +526,11 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       await window.__serverSavePartial({ phase: 'endpoint', controlStartMs, controlCancelMs, endpoints, controlCancelWitness });
       assertCancellation(controlCancelWitness, config.scene.targetsPerCall);
       witness.forEach((element) => element.remove());
-      if (endpoints.some((value) => !Number.isFinite(value) || Math.abs(value - config.toPx) > 2)) throw new Error('не совпал endpoint oracle');
+      if (endpoints.some((value) => !Number.isFinite(value) || Math.abs(value - config.toPx) > 2)) throw new Error('не совпала эталонная конечная позиция');
       const raw = [], warmup = [];
       for (let repetition = -1; repetition < config.repetitions; repetition++) {
           const calls = config.batchCalls * config.workMultiplier;
+          const batchBeginMs = config.diagnosticObserver ? performance.now() : null;
           const groups = Array.from({ length: calls }, create), owners = [];
           const beginMs = performance.now();
           try { for (const targets of groups) owners.push(start(targets)); } catch (error) {
@@ -419,7 +542,9 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
           const batchStartMs = startClock.endMs - startClock.beginMs;
           const readBeginMs = performance.now();
           const targets = groups.flat();
-          const startWitness = { connectedTargets: targets.filter((element) => element.isConnected).length,
+          let connectedTargets = 0;
+          for (const element of targets) if (element.isConnected) connectedTargets++;
+          const startWitness = { connectedTargets,
             activeWaapi: targets.reduce((sum, element) => sum + element.getAnimations().length, 0),
             leadingPositions: compact(groups.map((elements) => new DOMMatrixReadOnly(getComputedStyle(elements[0]).transform).e)),
             readClock: { beginMs: readBeginMs, endMs: performance.now() } };
@@ -443,14 +568,16 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
           await window.__serverSavePartial({ phase: repetition < 0 ? 'warmup' : 'timing', repetition, ...row });
           assertCancellation(row.cancelWitness, calls * config.scene.targetsPerCall);
           if (expand(startWitness.leadingPositions).some((value) => !Number.isFinite(value) || value < -2 || value >= config.toPx - 2)) {
-            throw new Error('timed owner не сохранил окно до endpoint');
+            throw new Error('измеряемый владелец не сохранил окно до конечной позиции');
           }
           targets.forEach((element) => element.remove()); await Promise.resolve();
+          if (config.diagnosticObserver) row.fullBatchClock = { beginMs: batchBeginMs, endMs: performance.now() };
       }
       return { raw, warmup, endpoints, controlStartMs, controlCancelMs, controlCancelWitness, measurementTimeOriginMs: performance.timeOrigin,
         heapObservation: performance.memory ? { usedJSHeapSize: performance.memory.usedJSHeapSize, totalJSHeapSize: performance.memory.totalJSHeapSize } : null };
     }, { scene, workMultiplier, repetitions: SERVER_PROFILE.repetitions, durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx,
-      batchCalls: SERVER_PROFILE.browserBatchCalls, cancellation: SERVER_PROFILE.browserCancellationWitness }), 'browser API sample');
+      batchCalls: SERVER_PROFILE.browserBatchCalls, cancellation: SERVER_PROFILE.browserCancellationWitness,
+      ...(diagnosticObserver ? { diagnosticObserver } : {}) }), 'образец API браузера');
     const after = await browserTimerProbe(page, 'after');
     const timerEvidence = { crossOriginIsolated: true, probes: [before, after] };
     const timerStepMs = deriveRealmTimerStep('server browser', timerEvidence);
@@ -462,20 +589,21 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       repetitions: SERVER_PROFILE.repetitions, workMultiplier, denominator: SERVER_PROFILE.denominator, semantic: true };
     validateServerBrowserSample(sampleResult, scene, workMultiplier);
   } catch (error) {
-    failure = Object.assign(new AggregateError([error], 'server profile: browser sample не завершён'), {
+    failure = Object.assign(new AggregateError([error], 'server profile: образец браузера не завершён'), {
       raw: sampleResult ?? error?.raw ?? { partial, timerBefore: before, scene, workMultiplier }, timerEvidence: error?.timerEvidence });
   } finally {
-    try { await withBrowserTimeout(context.close(), 'browser context cleanup'); } catch (error) {
-      failure = Object.assign(new AggregateError([...(failure ? [failure] : []), error], 'server profile: browser cleanup не завершён'),
+    try { await withBrowserTimeout(context.close(), 'очистка контекста браузера'); } catch (error) {
+      failure = Object.assign(new AggregateError([...(failure ? [failure] : []), error], 'server profile: очистка браузера не завершена'),
         { raw: sampleResult ?? failure?.raw ?? { partial, timerBefore: before, scene, workMultiplier } });
     }
   }
+  if (sampleBeginNs !== null && sampleResult) sampleResult.fullSampleDurationNs = (process.hrtime.bigint() - sampleBeginNs).toString();
   if (failure) throw failure;
   return sampleResult;
 }
 
 async function measureBrowserRawControls(browser, origin, adapter, out, id) {
-  const context = await withBrowserTimeout(browser.newContext({ viewport: SERVER_PROFILE.viewport, deviceScaleFactor: SERVER_PROFILE.deviceScaleFactor, reducedMotion: 'reduce' }), 'raw-control browser context');
+  const context = await withBrowserTimeout(browser.newContext({ viewport: SERVER_PROFILE.viewport, deviceScaleFactor: SERVER_PROFILE.deviceScaleFactor, reducedMotion: 'reduce' }), 'контекст браузера для контроля исходных данных');
   let result, failure;
   const partial = {};
   try {
@@ -493,7 +621,7 @@ async function measureBrowserRawControls(browser, origin, adapter, out, id) {
     const firstFile = path.join(out, `${id}-no-motion-before.png`), secondFile = path.join(out, `${id}-no-motion-after.png`);
     writeFileSync(firstFile, first, { flag: 'wx' }); writeFileSync(secondFile, second, { flag: 'wx' });
     partial.noMotion = { firstFile, secondFile, beforeSha256: sha256File(firstFile), afterSha256: sha256File(secondFile), equal: first.equals(second) };
-    if (!first.equals(second)) throw Object.assign(new Error('server profile: no-motion PNG различаются'), {
+    if (!first.equals(second)) throw Object.assign(new Error('server profile: PNG без движения различаются'), {
       raw: { firstFile, secondFile, beforeSha256: sha256File(firstFile), afterSha256: sha256File(secondFile) } });
     const reduced = await withBrowserTimeout(page.evaluate(async (config) => {
       const el = document.getElementById('static-control'); const before = window.__serverRafCount;
@@ -502,28 +630,28 @@ async function measureBrowserRawControls(browser, origin, adapter, out, id) {
       const x = new DOMMatrixReadOnly(getComputedStyle(el).transform).e;
       const rafRequests = window.__serverRafCount - before; const activeWaapi = el.getAnimations().length;
       owner.cancel(); return { x, rafRequests, activeWaapi, prefersReducedMotion: matchMedia('(prefers-reduced-motion: reduce)').matches };
-    }, SERVER_PROFILE), 'browser reduced-motion control');
+    }, SERVER_PROFILE), 'контроль reduced-motion в браузере');
     partial.reduced = reduced;
     if (!reduced.prefersReducedMotion || Math.abs(reduced.x - SERVER_PROFILE.toPx) > 2 || reduced.rafRequests !== 0 || reduced.activeWaapi !== 0) {
-      throw Object.assign(new Error('server profile: reduced-motion не выполнил snap без движущего владельца'), { raw: reduced });
+      throw Object.assign(new Error('server profile: reduced-motion не выполнил мгновенный переход без движущего владельца'), { raw: reduced });
     }
     result = partial;
   } catch (error) {
-    failure = Object.assign(new AggregateError([error], 'server profile: raw control не завершён'), { raw: { ...partial, failureRaw: error.raw ?? null } });
+    failure = Object.assign(new AggregateError([error], 'server profile: контроль исходных данных не завершён'), { raw: { ...partial, failureRaw: error.raw ?? null } });
   } finally {
-    try { await withBrowserTimeout(context.close(), 'raw-control context cleanup'); } catch (error) {
-      failure = Object.assign(new AggregateError([...(failure ? [failure] : []), error], 'server profile: raw-control cleanup не завершён'), { raw: result ?? failure?.raw ?? partial });
+    try { await withBrowserTimeout(context.close(), 'очистка контекста контроля исходных данных'); } catch (error) {
+      failure = Object.assign(new AggregateError([...(failure ? [failure] : []), error], 'server profile: очистка контроля исходных данных не завершена'), { raw: result ?? failure?.raw ?? partial });
     }
   }
   if (failure) throw failure;
   return result;
 }
 
-function makeRetention(packageDirectory) {
-  const result = spawnSync(process.execPath, ['--expose-gc', path.join(ROOT, 'bench/profile/server-profile-retention.mjs'), packageDirectory],
+function makeRetention(packageDirectory, participant) {
+  const result = spawnSync(process.execPath, ['--expose-gc', path.join(ROOT, 'bench/profile/server-profile-retention.mjs'), packageDirectory, participant],
     { encoding: 'utf8', timeout: 60_000 });
   let report;
-  try { report = JSON.parse(result.stdout); } catch { /* Даже malformed stdout сохраняется при отказе child. */ }
+  try { report = JSON.parse(result.stdout); } catch { /* Даже некорректный stdout сохраняется при отказе дочернего процесса. */ }
   if (result.status !== 0 || report?.verdict !== 'COMPLETE') throw Object.assign(new Error(`server profile retention: ${result.stderr || result.error?.message || result.status}`),
     { raw: { report, stdout: result.stdout, stderr: result.stderr, status: result.status, signal: result.signal } });
   return report;
@@ -533,16 +661,24 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
   const journal = createServerJournal(out);
   const artifact = { schema: 1, protocol: SERVER_PROFILE, registration: null, registrationDigest: null,
     verdict: 'UNPROVEN', failures: [], warmup: [], gc: [], stages: [],
-    jitObservation: { status: 'UNPROVEN', reason: 'GC events наблюдаются; точная JIT attribution требует отдельного intrusive trace и не подменяется гипотезой' } };
+    jitObservation: { status: 'UNPROVEN', reason: 'События GC наблюдаются; точное отнесение затрат к JIT требует отдельной трассировки с вмешательством и не заменяется гипотезой' } };
+  if (dependencies.baselineOnlyDiagnostic === true) artifact.diagnostic = { kind: 'intrusive-baseline-trace', qualification: false };
+  if (dependencies.observerAblation === true) artifact.diagnostic = { kind: OBSERVER_ABLATION.id, ...OBSERVER_ABLATION };
   let browser, origin, observer, engineClock, interruptionRecorded = false;
   const checkpoint = () => dependencies.signal?.throwIfAborted();
-  let prepared = {}, roots = {}, harness = {}, packages = {};
-  const verify = () => {
+  let prepared = {}, roots = {}, harness = {}, packages = {}, registrationAttempt;
+  const verify = (registration = artifact.registration) => {
     engineClock?.assertUnchanged();
-    if (artifact.registration) {
-      const current = captureServerLoad(), registered = artifact.registration.machine.identity;
-      if (current.affinity !== registered.affinity || current.cpuMax !== registered.cgroupCpuMax) {
-        throw Object.assign(new Error('server profile: machine affinity/quota изменились после регистрации'), { raw: { current, registered } });
+    if (registration) {
+      const registered = registration.machine.identity;
+      const clockBuildEvidence = captureServerClockBuildEvidence();
+      if (serverProfileDigest(verifyServerClockBuildEvidence(clockBuildEvidence, { release: release(), arch: arch() })) !==
+        serverProfileDigest(verifyServerClockBuildEvidence(registered.clockBuildEvidence, registered))) {
+        throw Object.assign(new Error('server profile: предпосылка модели часов для сборки изменилась после регистрации'), { raw: { clockBuildEvidence } });
+      }
+      const current = captureServerLoad();
+      if (current.affinity !== registered.affinity || serverProfileDigest(serverResourceBinding(current.resource)) !== serverProfileDigest(serverResourceBinding(registered.resource))) {
+        throw Object.assign(new Error('server profile: привязка CPU или квота машины изменились после регистрации'), { raw: { current, registered } });
       }
     }
     for (const [id, provenance] of Object.entries(prepared)) {
@@ -551,17 +687,17 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       assertInstalledPackageTreesUnchanged(BENCH, provenance.environment.packages);
     }
     assertFileHashesUnchanged(harness);
-    for (const consumer of [...Object.values(packages), ...Object.values(artifact.registration?.transitivePackages ?? {})]) {
-      if (sha256File(consumer.tarball) !== consumer.tarballSha256 || hashFileTree(consumer.directory).sha256 !== consumer.treeSha256) throw new Error('server profile: изменились consumer bytes');
+    for (const consumer of [...Object.values(packages), ...Object.values(registrationAttempt?.transitivePackages ?? {})]) {
+      if (sha256File(consumer.tarball) !== consumer.tarballSha256 || hashFileTree(consumer.directory).sha256 !== consumer.treeSha256) throw new Error('server profile: изменились байты пакета потребителя');
     }
-    if (artifact.registration?.browserTree && hashFileTree(artifact.registration.browserTree.directory).sha256 !== artifact.registration.browserTree.sha256) throw new Error('server profile: изменились browser bytes');
+    if (registrationAttempt?.browserTree && hashFileTree(registrationAttempt.browserTree.directory).sha256 !== registrationAttempt.browserTree.sha256) throw new Error('server profile: изменились байты браузера');
   };
   try {
     checkpoint();
-    if (!SERVER_PROFILE.browsers.includes(browserName)) throw new Error('server profile: неизвестный browser');
-    if (browserName !== SERVER_PROFILE.clockError.browser) throw new Error('server profile: clock model этого browser пока UNPROVEN');
+    if (!SERVER_PROFILE.browsers.includes(browserName)) throw new Error('server profile: неизвестный браузер');
+    if (browserName !== SERVER_PROFILE.clockError.browser) throw new Error('server profile: модель часов этого браузера пока UNPROVEN');
     roots = { baseline: realpathSync(baseline), candidate: realpathSync(candidate) };
-    if (roots.baseline === roots.candidate) throw new Error('server profile: baseline/candidate требуют разных checkout');
+    if (roots.baseline === roots.candidate) throw new Error('server profile: базовая версия и кандидат требуют разных рабочих копий');
     engineClock = prepareServerThreadCpuClock({ directory: out });
     artifact.engineClockPreparation = engineClock.metadata;
     const machine = captureServerMachine();
@@ -570,14 +706,13 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     const executable = browserType.executablePath();
     const browserExecutableSha256 = sha256File(executable);
     const browserTree = { directory: path.dirname(executable), ...hashFileTree(path.dirname(executable)) };
-    harness = Object.fromEntries([...HARNESS_FILES, ...ENTRIES.map((id) => `bench/compare/entries/${id === 'waapi-ctl' ? 'waapi-control' : id}.entry.mjs`)]
+    harness = Object.fromEntries([...HARNESS_FILES, ...(dependencies.baselineOnlyDiagnostic === true || dependencies.observerAblation === true ? ['bench/profile/server-profile-diagnostic.mjs'] : []), ...ENTRIES.map((id) => `bench/compare/entries/${id === 'waapi-ctl' ? 'waapi-control' : id}.entry.mjs`)]
       .map((file) => [file, { path: path.join(ROOT, file), sha256: sha256File(path.join(ROOT, file)) }]));
     for (const id of ['baseline', 'candidate']) {
-      prepared[id] = prepareBenchmarkCheckout({ root: roots[id], benchDirectory: BENCH, build: buildToStderr,
-        requiredDist: ['dist/animate/index.js', 'dist/index.js'], requiredPackages: ['esbuild', 'playwright', 'motion', 'gsap', 'animejs'],
-        requiredRootPackages: ['tsup', 'typescript', 'esbuild'], requiredInputs: Object.entries(harness).map(([key, info]) => [key, info.path]) });
+      prepared[id] = prepareBenchmarkCheckout({ ...serverParticipantPreparation(roots[id], id),
+        requiredInputs: Object.entries(harness).map(([key, info]) => [key, info.path]) });
     }
-    if (prepared.baseline.revision !== SERVER_PROFILE.baselineRevision) throw new Error('server profile: baseline отличается от регистрации');
+    if (prepared.baseline.revision !== SERVER_PROFILE.baselineRevision) throw new Error('server profile: базовая версия отличается от регистрации');
     const consumers = {};
     for (const id of ['baseline', 'candidate', 'comparators']) {
       consumers[id] = path.join(out, 'consumers', id); mkdirSync(path.join(consumers[id], 'node_modules'), { recursive: true });
@@ -586,19 +721,26 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     const closure = new Map();
     for (const [id, name] of Object.entries(PACKAGES)) packages[id] = packageClosure(name, path.join(out, 'packages', 'vendors'), path.join(consumers.comparators, 'node_modules'), closure);
     const adapters = {};
-    for (const id of ['baseline', 'candidate', ...SERVER_PROFILE.comparators]) adapters[id] = buildAdapter(id, consumers[id] ?? consumers.comparators, esbuild, out);
+    for (const id of ['baseline', 'candidate', ...SERVER_PROFILE.comparators]) adapters[id] = await buildAdapter(id, consumers[id] ?? consumers.comparators, esbuild, out);
     Object.entries(adapters).forEach(([id, value]) => { harness[`adapter:${id}`] = value; });
     origin = await startBenchmarkOrigin(); checkpoint();
     browser = await browserType.launch({ headless: SERVER_PROFILE.headless, executablePath: executable }); checkpoint();
-    artifact.registration = { protocolDigest: serverProfileDigest(SERVER_PROFILE), candidateSamplesObserved: false,
+    registrationAttempt = { protocolDigest: serverProfileDigest(SERVER_PROFILE), candidateSamplesObserved: false,
       candidateSamplesObservedScope: SERVER_PROFILE.candidateSamplesObservedScope,
       clockModelDigest: serverProfileDigest(SERVER_PROFILE.clockError),
       registeredAt: new Date().toISOString(), browser: browserName, browserVersion: browser.version(), browserExecutableSha256, browserTree,
       machine, engineClock: engineClock.metadata, provenance: prepared, packages, transitivePackages: Object.fromEntries(closure), harness,
-      allocationScope: 'observational heap + GC; retained отдельным процессом после timing' };
-    verifyServerClockRegistration(artifact.registration);
-    artifact.registrationDigest = serverProfileDigest(artifact.registration);
-    journal('registration-before-any-sample', { registration: artifact.registration, digest: artifact.registrationDigest });
+      allocationScope: 'Наблюдаемые куча и GC; удержания проверяются отдельным процессом после измерения времени',
+      ...(dependencies.observerAblation === true ? { diagnostic: { ...artifact.diagnostic,
+        sourceIds: { H0: harness['bench/profile/server-profile-runner.mjs'].sha256, H1: harness['bench/profile/server-observer-ablation.mjs'].sha256 },
+        adapterSha256: adapters.baseline.sha256, baselineTarballSha256: packages.baseline.tarballSha256 } } : {}) };
+    verifyServerClockRegistration(registrationAttempt);
+    verify(registrationAttempt);
+    const registrationDigest = serverProfileDigest(registrationAttempt);
+    journal('registration-before-any-sample', { registration: registrationAttempt, digest: registrationDigest });
+    artifact.registration = registrationAttempt;
+    artifact.registrationDigest = registrationDigest;
+    if (dependencies.observerAblation === true) artifact.diagnostic = registrationAttempt.diagnostic;
     checkpoint();
     verify();
     artifact.rawControls = { baseline: await measureBrowserRawControls(browser, origin, adapters.baseline, out, 'baseline') };
@@ -606,11 +748,9 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     checkpoint();
     const implementations = {};
     const loadImplementation = async (id) => {
-      const metadata = JSON.parse(readFileSync(path.join(packages[id].directory, 'package.json'), 'utf8'));
-      const entry = metadata.exports['./animate'].import.default;
-      implementations[id] = (await import(pathToFileURL(path.join(packages[id].directory, entry)).href)).animate;
-      const main = metadata.exports['.'].import.default;
-      implementations[`${id}:stock-c`] = (await import(pathToFileURL(path.join(packages[id].directory, main)).href)).MotionValue;
+      const participant = await loadServerParticipant(packages[id].directory, id);
+      implementations[id] = participant.animate;
+      implementations[`${id}:stock-c`] = participant.MotionValue;
     };
     await loadImplementation('baseline');
     observer = new PerformanceObserver((list) => { for (const entry of list.getEntries()) artifact.gc.push({ startTime: entry.startTime, duration: entry.duration, detail: entry.detail }); });
@@ -618,13 +758,16 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     const engineMeasure = dependencies.engineMeasure ?? measureServerEngine;
     const browserMeasure = dependencies.browserMeasure ?? measureServerBrowser;
     const runStage = async (name, runs) => {
+      verify();
       checkpoint();
       const stage = { name, rows: [], blocks: [] }; artifact[name] = stage; artifact.stages.push(name);
+      const ablation = name === 'observer-ablation';
       let resourceBefore;
       for (let run = 0; run < runs; run++) {
         if (run % 2 === 0) resourceBefore = captureServerLoad();
-        for (const [kind, scenes] of [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]]) {
-          const row = { kind, scene: scenes[0]?.id, run, order: serverOrders(runs)[run], samples: {} };
+        for (const [kind, scenes] of ablation ? [['browser', SERVER_PROFILE.browserScenes.filter(scene => OBSERVER_ABLATION.scenes.includes(scene.id))]]
+          : [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]]) {
+          const row = { kind, scene: scenes[0]?.id, run, order: ablation ? OBSERVER_ABLATION.orders[run] : serverOrders(runs)[run], samples: {} };
           for (const scene of scenes) {
             const current = { ...row, scene: scene.id, samples: {} };
             stage.rows.push(current);
@@ -634,7 +777,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
               const multiplier = name === 'positive' && id === 'right' ? SERVER_PROFILE.positiveWorkMultiplier : 1;
               try {
                 const sample = kind === 'engine' ? await engineMeasure(implementations[scene.workload === 'stock-c' ? `${build}:stock-c` : build], scene, multiplier)
-                  : await browserMeasure(browser, origin, adapters[build], scene, multiplier);
+                  : await browserMeasure(browser, origin, adapters[build], scene, multiplier, { stage: name, run, participant: id, build, registrationDigest });
                 if (kind === 'engine') compactSampleCpuEvidence(sample);
                 current.samples[id] = sample;
                 journal('sample', { stage: name, kind, scene: scene.id, run, participant: id, build, value: current.samples[id] });
@@ -650,17 +793,20 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
         if (run % 2 === 1) {
           const after = captureServerLoad();
           const block = { block: Math.floor(run / 2), before: resourceBefore, after,
-            delta: Object.fromEntries(['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'].map((key) => [key, after.cpuStat[key] - resourceBefore.cpuStat[key]])) };
+            delta: Object.fromEntries(['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'].map((key) => [key, after.cpuStat[key] - resourceBefore.cpuStat[key]])),
+            scopeDeltas: resourceBefore.scopes.map((scope, index) => ({ path: scope.path,
+              delta: Object.fromEntries(['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec'].map((key) => [key, after.scopes[index]?.cpuStat[key] - scope.cpuStat[key]])) })) };
           stage.blocks.push(block); journal('resources-block', { stage: name, ...block });
         }
         process.stderr.write(`server profile ${name}: ${run + 1}/${runs}\n`);
       }
       verify(); return stage;
     };
-    if (!await runServerProfileCalibration(artifact, runStage, journal)) return artifact;
+    if (!await runServerProfileCalibration(artifact, runStage, journal, { baselineOnlyDiagnostic: dependencies.baselineOnlyDiagnostic === true, observerAblation: dependencies.observerAblation === true })) return artifact;
     checkpoint();
     await loadImplementation('candidate');
     checkpoint();
+    verify();
     artifact.rawControls.candidate = await measureBrowserRawControls(browser, origin, adapters.candidate, out, 'candidate');
     journal('raw-controls-candidate-after-calibration', artifact.rawControls.candidate);
     checkpoint();
@@ -672,9 +818,9 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     for (const scene of SERVER_PROFILE.browserScenes) for (const id of SERVER_PROFILE.comparators) {
       checkpoint();
       if (scene.staggerGapMs > 0 && ['motion-mini', 'anime-waapi'].includes(id)) {
-        artifact.comparators.push({ scene: scene.id, id, status: 'UNPROVEN', reason: 'existing owner entry не реализует общий stagger API' }); continue;
+        artifact.comparators.push({ scene: scene.id, id, status: 'UNPROVEN', reason: 'существующая точка входа владельца не реализует общий API разнесения запусков' }); continue;
       }
-      const comparison = { scene: scene.id, id, rows: [], claim: 'raw API cost; descriptive only, без рейтинга и M-05 superiority' };
+      const comparison = { scene: scene.id, id, rows: [], claim: 'Исходная стоимость API; только описание, без рейтинга и утверждения о превосходстве M-05' };
       artifact.comparators.push(comparison);
       for (let run = 0; run < artifact.samplePlan.runs; run++) {
         checkpoint();
@@ -690,7 +836,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     artifact.retention = {};
     for (const id of ['baseline', 'candidate']) {
       checkpoint();
-      artifact.retention[id] = makeRetention(packages[id].directory);
+      artifact.retention[id] = makeRetention(packages[id].directory, id);
       journal('retention-sample', { id, value: artifact.retention[id] });
       checkpoint();
     }
@@ -698,6 +844,8 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
     artifact.verdict = artifact.comparison.every((cell) => cell.p95.bounded && cell.p95.high <= SERVER_PROFILE.nonInferiorityUpper) ? 'PASS' : 'NO-GO';
     return artifact;
   } catch (error) {
+    if (!artifact.registration && registrationAttempt) error.raw = { ...error.raw,
+      clockBuildEvidence: error.raw?.clockBuildEvidence ?? registrationAttempt.machine.identity.clockBuildEvidence };
     interruptionRecorded = dependencies.signal?.aborted && error === dependencies.signal.reason;
     artifact.failures.push({ stage: artifact.stages.at(-1) ?? 'preparation', at: new Date().toISOString(), error: errorRecord(error) });
     journal('failure', artifact.failures.at(-1)); return artifact;
@@ -711,7 +859,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       artifact.failures.push(failure); journal('failure', failure);
     }
     for (const [resource, close] of [['browser', () => browser?.close()], ['origin', () => origin?.close()]]) {
-      try { await withBrowserTimeout(close(), `${resource} cleanup`); } catch (error) {
+      try { await withBrowserTimeout(close(), `${resource}: очистка`); } catch (error) {
         artifact.verdict = 'UNPROVEN'; const failure = { stage: 'cleanup', resource, error: errorRecord(error) };
         artifact.failures.push(failure); journal('failure', failure);
       }

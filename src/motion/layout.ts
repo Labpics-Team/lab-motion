@@ -103,8 +103,9 @@ class LayoutRun implements Playback {
   stop(): void { this._stopWith(STOPPED); }
   finish(): void { this._stopWith(FINISHED); }
   private async _commit(): Promise<void> {
-    const action = this._mutate; this._mutate = undefined;
-    await action?.();
+    let action = this._mutate; this._mutate = undefined;
+    const pending = action?.(); action = undefined;
+    await pending;
   }
   private _ready(): void {
     const session = this._session;
