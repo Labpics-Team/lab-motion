@@ -21,7 +21,16 @@ it('группа естественно завершает native эффекты
     // Then: обе траектории доступны до return и завершаются с очисткой.
     expect(a.x()).toBe(20); expect(b.x()).toBe(20);
     expect(a.effects).toHaveLength(1); expect(b.effects).toHaveLength(1);
-    a.effects[0]?.complete(); b.effects[0]?.complete();
+    const settled = vi.fn();
+    void run.finished.then(settled, settled);
+    a.effects[0]?.complete();
+    await a.effects[0]?.finished;
+    // _watch зарегистрирован раньше await; этот барьер также обрабатывает Run.finished.
+    await Promise.resolve();
+    expect(run.state).toBe('running'); expect(settled).not.toHaveBeenCalled();
+    expect(a.x()).toBe(100); expect(b.x()).toBe(20);
+    expect(b.effects[0]?.cancelled).toBe(false);
+    b.effects[0]?.complete();
     expect(await run.finished).toEqual({ status: 'finished' });
     expect(a.x()).toBe(100); expect(b.x()).toBe(100);
     expect([...a.effects, ...b.effects].every(effect => effect.cancelled)).toBe(true);
