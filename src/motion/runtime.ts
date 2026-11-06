@@ -574,8 +574,8 @@ export class Runtime {
       for (const group of touched) {
         group._render();
         for (const track of [...group._tracks.values()]) if (track._elapsed >= track._program._duration) group._end(track, true);
+        group._reconcile();
       }
-      for (const group of touched) group._reconcile();
       run._complete();
     } catch (error) { run._error(error); throw error; }
     this._flush(); return run;

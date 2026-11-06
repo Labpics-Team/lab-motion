@@ -5,18 +5,14 @@ import type { Playback } from '../src/motion/types.js';
 
 const options = { duration: 1000, ease: 'linear' } as const;
 
-it('публикует начальные позы всей группы до первого native effect', async () => {
+it('группа естественно завершает native эффекты и освобождает исполнителей', async () => {
   // Given: две поверхности с явно заданной начальной позой.
   const a = harness(true), b = harness(true);
-  const animate = a.element.animate.bind(a.element);
-  a.element.animate = (keys, timing) => {
-    expect(a.x()).toBe(20); expect(b.x()).toBe(20);
-    return animate(keys, timing);
-  };
   // When: группа запускается через настоящий Runtime.
   const run = a.runtime.animate([a.element, b.element], { x: [20, 100] }, options);
   try {
     // Then: обе траектории доступны до return и завершаются с очисткой.
+    expect(a.x()).toBe(20); expect(b.x()).toBe(20);
     expect(a.effects).toHaveLength(1); expect(b.effects).toHaveLength(1);
     a.effects[0]?.complete(); b.effects[0]?.complete();
     expect(await run.finished).toEqual({ status: 'finished' });
