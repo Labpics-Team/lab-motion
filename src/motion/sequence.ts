@@ -1,11 +1,12 @@
 import { MAX_CHANNELS, failMotion, number, properties, snapshot, timing } from './model.js';
 import { runtime, type Runtime, type Draft } from './runtime.js';
 import type { MotionOptions, Playback, SequenceOptions, SequenceStep } from './types.js';
+import type { Segment } from './program.js';
 
-// До _execute план принадлежит только сборщику sequence. Мутируемые поля
-// ограничены оболочкой Draft и общими конечными параметрами Program.
+// До _execute сборщик владеет отдельным массивом сегментов каждого канала.
+// Входные программы остаются неизменными; готовый план читает только runtime.
 type SequenceDraft = Omit<Draft, '_program' | '_reduced'> & {
-  _program: Draft['_program'];
+  _program: Draft['_program'] & { readonly _segments: Segment[] };
   _reduced: boolean;
 };
 type SequenceEnd = {
@@ -34,12 +35,10 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
       let channels = merged.get(draft._element);
       if (!channels) { channels = new Map(); merged.set(draft._element, channels); }
       const before = channels.get(draft._key);
-      const next: SequenceDraft = draft;
-      if (before) {
-        const at = draft._program._segments[0]!._at;
-        if (at < before._program._duration) failMotion('Пересечение шагов');
-        next._program = { ...draft._program, _segments: [...before._program._segments, ...draft._program._segments] };
-      }
+      if (before && draft._program._segments[0]!._at < before._program._duration) failMotion('Пересечение шагов');
+      const segments = before?._program._segments ?? [];
+      for (const segment of draft._program._segments) segments.push(segment);
+      const next: SequenceDraft = { ...draft, _program: { ...draft._program, _segments: segments } };
       channels.set(draft._key, next);
       end = Math.max(end, next._program._duration);
     }
