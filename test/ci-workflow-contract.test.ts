@@ -1,11 +1,14 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { createContext, runInContext } from 'node:vm';
+import { describe, expect, it, vi } from 'vitest';
+import { SERVER_PROFILE, serverProfileDigest } from '../bench/profile/server-profile-registration.mjs';
 import { isMap, isScalar, isSeq, parse, parseDocument, stringify } from 'yaml';
 import vitestConfig from '../vitest.config.js';
+import profileVitestConfig from '../vitest.profile.config.js';
 
 type Step = {
   uses?: string;
@@ -18,6 +21,7 @@ type Step = {
   env?: Record<string, string>;
   'working-directory'?: string;
   'continue-on-error'?: boolean;
+  'timeout-minutes'?: number;
 };
 type BrowserShard = { browser: string; shard: number; shards: number };
 type Job = {
@@ -152,6 +156,7 @@ const testCommands = [
   activatePnpm,
   'pnpm install --frozen-lockfile',
   'pnpm build',
+  'pnpm exec playwright install --with-deps chromium',
   vitestCommand,
   'node test/fixtures/server-thread-cpu-clock-check.mjs',
 ];
@@ -294,7 +299,7 @@ const requiredActions = {
       }
     },
     {
-      "index": 6,
+      "index": 7,
       "name": "Setup registered native-clock Node",
       "uses": "actions/setup-node@<sha>",
       "with": {
@@ -356,10 +361,23 @@ function assertNativeGraph(files: Map<string, string>) {
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
   // Обычная проверка кандидата не выгружает архивы. Экспорт разрешён только
-  // защищённому release и явно запрошенному измерению производительности.
+  // защищённому release, явно запрошенному измерению производительности и серверному PROFILE.
   for (const [name, workflow] of workflows) {
     if (name === 'release.yml') continue;
     for (const [id, job] of Object.entries(workflow.jobs)) {
+      if (name === 'profile-01.yml' && id === 'server') {
+        expect(job.if).toBe('${{ inputs.server_timing }}');
+        const exports = job.steps!.filter(item => item.uses?.startsWith('actions/upload-artifact@'));
+        expect(exports.map(item => item.id)).toEqual(['raw_export', 'receipt_export']);
+        for (const item of exports) {
+          expect(unpin(item.uses!)).toBe('actions/upload-artifact@<sha>');
+          expect(item.with?.['retention-days']).toBe(5);
+          expect(item.with?.['if-no-files-found']).toBe('error');
+          expect(item.if).toContain('always()');
+          expect(item['continue-on-error']).toBeUndefined();
+        }
+        continue;
+      }
       for (const [index, item] of (job.steps ?? []).entries()) {
         if (name === 'performance.yml' && id === 'compare' && index === job.steps!.length - 1) {
           const { name: _name, ...contract } = item;
@@ -391,26 +409,38 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(download.with?.['artifact-ids']).toBe('$' + '{{ needs.verify.outputs.artifact_id }}');
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
-  expect(ci.on).toEqual({
+  const dispatch = ci.on.workflow_dispatch as { inputs: Record<string, Record<string, unknown>> };
+  const dispatchInputs = Object.fromEntries(Object.entries(dispatch.inputs)
+    .map(([name, { description: _description, ...contract }]) => [name, contract]));
+  expect({ ...ci.on, workflow_dispatch: { ...dispatch, inputs: dispatchInputs } }).toEqual({
     push: { branches: ['main'] }, pull_request: null, merge_group: null,
-    workflow_dispatch: { inputs: { profile_baseline: {
-      description: 'Снять зарегистрированный размерный baseline PROFILE-01',
-      type: 'boolean', default: false,
-    }, performance_baseline: {
-      description: 'Commit для парного сравнения полной стоимости движения',
-      type: 'string', default: '',
-    } } },
+    workflow_dispatch: { inputs: {
+      profile_baseline: { type: 'boolean', default: false },
+      profile_prepare: { type: 'boolean', default: false },
+      profile_server: { type: 'boolean', default: false },
+      profile_diagnostic: { type: 'boolean', default: false },
+      profile_observer_ablation: { type: 'boolean', default: false },
+      performance_baseline: { type: 'string', default: '' },
+    } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'performance', 'profile-baseline', 'security', 'tests', 'verify']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'performance', 'profile-baseline', 'profile-server', 'security', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}",
+    if: "${{ github.event_name == 'workflow_dispatch' && (inputs.profile_baseline || inputs.profile_prepare) && !inputs.profile_server }}",
     uses: './.github/workflows/profile-01.yml',
+    with: { prepare_only: '${{ inputs.profile_prepare }}' },
   });
   expect(ci.jobs.performance).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' }}",
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !inputs.profile_server }}",
     uses: './.github/workflows/performance.yml',
     with: { baseline: '${{ inputs.performance_baseline }}' },
+  });
+  expect(ci.jobs['profile-server']).toEqual({
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_server }}",
+    uses: './.github/workflows/profile-01.yml',
+    with: { server_timing: true, baseline_diagnostic: '${{ inputs.profile_diagnostic }}',
+      observer_ablation: '${{ inputs.profile_observer_ablation }}',
+      conflicting_inputs: "${{ inputs.profile_baseline || inputs.profile_prepare || inputs.performance_baseline != '' || (inputs.profile_diagnostic && inputs.profile_observer_ablation) }}" },
   });
   const performance = workflows.get('performance.yml')!;
   expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true } } } });
@@ -464,7 +494,36 @@ function assertNativeGraph(files: Map<string, string>) {
     Object.entries(workflow.jobs).filter(([, job]) => job.uses === './.github/workflows/performance.yml')
       .map(([id]) => [file, id]));
   expect(performanceCallers).toEqual([['ci.yml', 'performance']]);
-  expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
+  const profile = workflows.get('profile-01.yml')!;
+  const call = profile.on.workflow_call as { inputs: Record<string, Record<string, unknown>> };
+  const callInputs = Object.fromEntries(Object.entries(call.inputs)
+    .map(([name, { description: _description, ...contract }]) => [name, contract]));
+  expect({ ...profile.on, workflow_call: { ...call, inputs: callInputs } }).toEqual({
+    workflow_call: { inputs: { prepare_only: { type: 'boolean', default: false },
+      server_timing: { type: 'boolean', default: false }, baseline_diagnostic: { type: 'boolean', default: false },
+      observer_ablation: { type: 'boolean', default: false },
+      conflicting_inputs: { type: 'boolean', default: false } } },
+  });
+  expect(profile.permissions).toEqual({ contents: 'read' });
+  const probe = profile.jobs.probe!;
+  expect(probe.if).toBe('${{ !inputs.server_timing }}');
+  expect(probe['continue-on-error']).toBeUndefined();
+  const profileNode = probe.steps!.find(item => item.uses?.startsWith('actions/setup-node@'))!;
+  expect(profileNode.with).toEqual({ 'node-version': "${{ inputs.prepare_only && '24.19.0' || '24' }}" });
+  const prepareBrowser = probe.steps!.find(item => item.run?.includes('playwright install --with-deps chromium'))!;
+  const prepareIdentity = probe.steps!.find(item => item.run?.includes('HOSTED_PROFILE_PREPARATION'))!;
+  const measurement = probe.steps!.find(item => item.run?.includes('node bench/profile/probe-profile-01.mjs'))!;
+  expect(prepareBrowser.if).toBe('${{ inputs.prepare_only }}');
+  expect(prepareIdentity.if).toBe('${{ inputs.prepare_only }}');
+  expect(measurement.if).toBe('${{ !inputs.prepare_only }}');
+  expect(measurement.id).toBe('probe');
+  for (const item of [profileNode, prepareBrowser, prepareIdentity, measurement]) {
+    expect(item['continue-on-error']).toBeUndefined();
+  }
+  expect(probe.steps!.find(item => item.run?.includes('node bench/profile/validate-profile-01.mjs --raw'))!.if)
+    .toBe("${{ !cancelled() && steps.probe.outcome != 'skipped' }}");
+  expect(probe.steps!.find(item => item.run?.includes('profile-replay-mutations-'))!.if)
+    .toBe("${{ !cancelled() && steps.probe.outcome == 'success' }}");
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);
   for (const document of [ci, browser]) {
     expect(document.permissions).toEqual({ contents: 'read' });
@@ -551,6 +610,185 @@ function assertNativeGraph(files: Map<string, string>) {
 
 describe('нативный граф CI', () => {
   it('проверяет любой PR через явные обязательные jobs', () => assertNativeGraph(sources()));
+
+  it.each(['success', 'owned-failure', 'foreign-failure', 'clock-refusal'] as const)('реальное тело PROFILE preparation сохраняет identity или отказ capture=%s', async (mode) => {
+    const captureFails = mode !== 'success';
+    // Given: извлекается выполняемое тело YAML; заменены только внешние эффекты.
+    const workflow: Workflow = parse(readFileSync(join(directory, 'profile-01.yml'), 'utf8'));
+    const script = workflow.jobs.probe?.steps?.find(item => item.run?.includes('HOSTED_PROFILE_PREPARATION'))?.run;
+    const body = script?.match(/<<'NODE'\r?\n([\s\S]*?)\r?\nNODE(?:\r?\n|$)/)?.[1];
+    if (!body) throw new Error('missing preparation heredoc');
+    const clockBuildEvidence = { files: { '/proc/version_signature': { text: 'fixture signature' } }, namespaces: {}, packages: [] };
+    const collect = vi.fn(() => clockBuildEvidence);
+    const machine = { identity: { platform: 'linux', affinity: '0', clockBuildEvidence }, sha256: 'a'.repeat(64), observation: { at: 'fixture' } };
+    const metadata = { clock: 'CLOCK_THREAD_CPUTIME_ID', pid: 17, tid: 17 };
+    const failure = Object.assign(new Error('fixture capture failed'), { raw: { file: '/fixture/cpu.max', code: 'EIO', ...(mode === 'owned-failure' || mode === 'clock-refusal' ? { clockBuildEvidence } : {}), ...(mode === 'clock-refusal' ? { machine } : {}) } });
+    const journal = vi.fn<(type: string, value: unknown) => void>(), output = vi.fn<(line: string) => void>();
+    const close = vi.fn(async () => {}), assertUnchanged = vi.fn();
+    const executable = '/fixture/chromium', executableSha256 = 'b'.repeat(64), tree = { sha256: 'c'.repeat(64), files: 3 };
+    const processState = { exitCode: 0, cwd: () => '/fixture', env: { RUNNER_TEMP: '/fixture/tmp', PROFILE_SOURCE_SHA: 'd'.repeat(40) } };
+    const context = createContext({
+      join, dirname, SERVER_PROFILE, serverProfileDigest, process: processState, console: { log: output },
+      platform: () => 'linux', arch: () => 'x64', release: () => 'fixture-kernel',
+      readFileSync: (file: string) => 'observed:' + file,
+      captureServerClockBuildEvidence: collect,
+      createServerJournal: () => journal, prepareServerThreadCpuClock: () => ({ metadata, assertUnchanged }),
+      captureServerMachine: () => { if (captureFails) throw failure; return machine; },
+      sha256File: () => executableSha256, hashFileTree: () => tree,
+      createRequire: () => () => ({ chromium: { executablePath: () => executable,
+        launch: async () => ({ version: () => 'fixture-browser', close }) } }),
+    });
+    // When: catch/finally, receipt, журнал и exitCode остаются кодом workflow.
+    await runInContext(`(async () => {\n${body.replace(/^import .*;\r?$/gm, '')}\n})()`, context, { timeout: 1000 });
+    // Then
+    expect(journal).toHaveBeenCalledTimes(1);
+    const payload = journal.mock.calls[0]?.[1];
+    expect(payload).toMatchObject({ receipt: { engineClock: metadata, clockBuildEvidence,
+      browser: { name: 'chromium', executableSha256, tree: { directory: dirname(executable), ...tree }, version: 'fixture-browser' },
+      failures: captureFails ? [expect.objectContaining({ message: failure.message, raw: failure.raw,
+        topology: expect.objectContaining({ '/proc/self/cgroup': { text: 'observed:/proc/self/cgroup' } }) })] : [],
+      ...(captureFails && mode !== 'clock-refusal' ? {} : { machine }) } });
+    expect(collect).toHaveBeenCalledTimes(mode === 'foreign-failure' ? 1 : 0);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(assertUnchanged).toHaveBeenCalledTimes(1);
+    expect(output).toHaveBeenCalledTimes(1);
+    const printed = output.mock.calls[0]?.[0];
+    if (!printed) throw new Error('missing preparation output');
+    expect(JSON.parse(printed.slice(printed.indexOf(' ') + 1))).toEqual(payload);
+    if (captureFails) expect(processState.exitCode).not.toBe(0);
+    else expect(processState.exitCode).toBe(0);
+  });
+
+  it('server input matrix preserves legacy routes and rejects mixed opt-in modes', () => {
+    const files = sources();
+    assertNativeGraph(files);
+    const ci = parse(files.get('ci.yml')!) as Workflow;
+    const profile = parse(files.get('profile-01.yml')!) as Workflow;
+    const evaluate = (expression: unknown, event: string, inputs: Record<string, boolean | string>) =>
+      Function('github', 'inputs', 'return (' + String(expression).slice(3, -2).trim() + ');')({ event_name: event }, inputs) as boolean;
+    const guard = profile.jobs.server!.steps!.find(item => item.env?.CONFLICTING_INPUTS && item.run?.includes('test "$CONFLICTING_INPUTS"'))!;
+    for (const event of ['workflow_dispatch', 'pull_request', 'push', 'merge_group']) {
+      for (const server of [false, true]) for (const baseline of [false, true]) for (const prepare of [false, true]) for (const performance of ['', 'fixture']) for (const diagnostic of [false, true]) for (const ablation of [false, true]) {
+        const inputs = { profile_server: server, profile_baseline: baseline, profile_prepare: prepare, performance_baseline: performance, profile_diagnostic: diagnostic, profile_observer_ablation: ablation };
+        expect(evaluate(ci.jobs['profile-server']!.with!.observer_ablation, event, inputs)).toBe(ablation);
+        expect(evaluate(ci.jobs['profile-server']!.with!.baseline_diagnostic, event, inputs)).toBe(diagnostic);
+        expect(evaluate(ci.jobs['profile-server']!.if, event, inputs)).toBe(event === 'workflow_dispatch' && server);
+        expect(evaluate(ci.jobs['profile-baseline']!.if, event, inputs)).toBe(event === 'workflow_dispatch' && !server && (baseline || prepare));
+        expect(evaluate(ci.jobs.performance!.if, event, inputs)).toBe(event === 'workflow_dispatch' && !server && performance !== '');
+        const conflicts = evaluate(ci.jobs['profile-server']!.with!.conflicting_inputs, event, inputs);
+        expect(conflicts).toBe(baseline || prepare || performance !== '' || (diagnostic && ablation));
+        for (const directPrepare of [false, true]) {
+          const direct = { server_timing: server, prepare_only: directPrepare, conflicting_inputs: conflicts, baseline_diagnostic: diagnostic };
+          expect(evaluate(profile.jobs.probe!.if, event, direct)).toBe(!server);
+          expect(evaluate(profile.jobs.server!.if, event, direct)).toBe(server);
+          const refusal = evaluate(guard.env!.CONFLICTING_INPUTS, event, direct);
+          expect(refusal).toBe(conflicts || directPrepare);
+        }
+      }
+    }
+  });
+
+  it('server owned export guards preserve failed attempts and enforce both archives', () => {
+    const profile = parse(readFileSync(join(directory, 'profile-01.yml'), 'utf8')) as Workflow;
+    const server = profile.jobs.server!;
+    expect(server['timeout-minutes']).toBe(360);
+    expect(server.steps!.every(item => Number.isInteger(item['timeout-minutes']))).toBe(true);
+    expect(server.steps!.reduce((sum, item) => sum + item['timeout-minutes']!, 0)).toBeLessThan(360);
+    const init = server.steps!.find(item => item.id === 'receipt_init')!;
+    const conflict = server.steps!.find(item => item.run?.includes('test "$CONFLICTING_INPUTS"'))!;
+    const timing = server.steps!.find(item => item.id === 'timing')!;
+    const replay = server.steps!.find(item => item.run?.includes('--journal "$SERVER_RECEIPTS/journal.ndjson"'))!;
+    const final = server.steps!.find(item => item.env?.RECEIPT_OUTCOME)!;
+    expect(server.steps!.indexOf(init)).toBe(0);
+    expect(server.steps!.indexOf(conflict)).toBe(1);
+    expect(timing['timeout-minutes']).toBe(254);
+    expect(timing.env).toEqual({ BASELINE_DIAGNOSTIC: '${{ inputs.baseline_diagnostic }}', PROFILE_OBSERVER_ABLATION: '${{ inputs.observer_ablation }}' });
+    const raw = server.steps!.find(item => item.id === 'raw_export')!;
+    expect(raw.with?.path).toBe("${{ env.SERVER_OUT }}");
+    expect(raw.with?.['include-hidden-files']).toBe(true);
+    expect(raw.if).toBe("${{ always() && steps.timing.outcome != 'skipped' }}");
+    const work = mkdtempSync(join(tmpdir(), 'profile-server-export-'));
+    const receipts = join(work, 'server-profile-receipts-17-2'), out = join(work, 'server-profile-17-2');
+    const execute = (run: string, extra: Record<string, string> = {}) => spawnSync(bash, ['-c', run], {
+      encoding: 'utf8', timeout: 1000, env: { ...process.env, RUNNER_TEMP: work, GITHUB_ENV: join(work, 'github-env'), SERVER_RECEIPTS: receipts, SERVER_OUT: out, ...extra },
+    });
+    try {
+      const started = execute(init.run!, { GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: '2', EXPECTED_CANDIDATE: 'a'.repeat(40), CONFLICTING_INPUTS: 'true' });
+      expect(started.error).toBeUndefined(); expect(started.status).toBe(0);
+      expect(readFileSync(join(work, 'github-env'), 'utf8')).toBe(`SERVER_OUT=${out}\nSERVER_RECEIPTS=${receipts}\n`);
+      expect(readFileSync(join(receipts, 'attempt.txt'), 'utf8')).toContain('candidate_requested=' + 'a'.repeat(40));
+      expect(execute(conflict.run!, { CONFLICTING_INPUTS: 'true' }).status).not.toBe(0);
+      expect(execute(conflict.run!, { CONFLICTING_INPUTS: 'false' }).status).toBe(0);
+      const bin = join(work, 'bin'), invocation = join(work, 'invocation.txt');
+      mkdirSync(bin);
+      writeFileSync(join(bin, 'timeout'), '#!/bin/bash\nprintf "%s\\n" "$@" > "$INVOCATION"\nexit 23\n', { mode: 0o755 });
+      for (const diagnostic of ['false', 'true']) for (const ablation of ['false', 'true']) {
+        const diagnosticMode = diagnostic === 'true' || ablation === 'true';
+        const timed = execute(timing.run!, { BASELINE_DIAGNOSTIC: diagnostic, PROFILE_OBSERVER_ABLATION: ablation, PATH: `${bin}:${process.env.PATH}`, INVOCATION: invocation,
+          GITHUB_WORKSPACE: work });
+        expect(timed.error).toBeUndefined(); expect(timed.status).toBe(23);
+        const args = readFileSync(invocation, 'utf8').trim().split('\n');
+        expect(args.slice(0, 4)).toEqual(['--signal=TERM', '--kill-after=90s', diagnosticMode ? '20m' : '250m', 'taskset']);
+        expect(args.slice(4)).toEqual(['-c', readFileSync(join(receipts, 'cpu.txt'), 'utf8').trim(), 'node',
+          diagnosticMode ? 'bench/profile/server-profile-diagnostic.mjs' : 'bench/profile/server-profile-runner.mjs',
+          '--baseline', `${work}/server-baseline`, '--candidate', `${work}/server-candidate`, '--browser', 'chromium', '--out', out]);
+        expect(readFileSync(join(receipts, 'runner-exit.txt'), 'utf8')).toBe('23\n');
+        expect(readFileSync(join(receipts, 'mode.txt'), 'utf8')).toContain(`diagnostic=${diagnostic}\nobserver_ablation=${ablation}\n`);
+      }
+      const env = { RAW_ID: '18', RAW_DIGEST: 'a'.repeat(64), RECEIPT_ID: '19', RECEIPT_DIGEST: 'b'.repeat(64), TIMING_OUTCOME: 'failure', RAW_OUTCOME: 'success', RECEIPT_OUTCOME: 'success' };
+      expect(execute(final.run!, env).status).toBe(0);
+      for (const key of ['RAW_ID', 'RAW_DIGEST', 'RECEIPT_ID', 'RECEIPT_DIGEST']) expect(execute(final.run!, { ...env, [key]: '' }).status).not.toBe(0);
+      expect(execute(final.run!, { ...env, RAW_OUTCOME: 'failure' }).status).not.toBe(0);
+      expect(execute(final.run!, { ...env, RECEIPT_OUTCOME: 'failure' }).status).not.toBe(0);
+      expect(execute(final.run!, { ...env, TIMING_OUTCOME: 'skipped', RAW_OUTCOME: 'skipped', RAW_ID: '', RAW_DIGEST: '' }).status).toBe(0);
+      mkdirSync(out);
+      writeFileSync(join(out, 'journal.ndjson'), 'partial journal\n');
+      writeFileSync(join(out, 'server-profile.sha256'), 'a'.repeat(64));
+      expect(execute(replay.run!).status).not.toBe(0);
+      expect(readFileSync(join(receipts, 'journal.ndjson'), 'utf8')).toBe('partial journal\n');
+      expect(readFileSync(join(receipts, 'server-profile.sha256'), 'utf8')).toBe('a'.repeat(64));
+    } finally { rmSync(work, { recursive: true, force: true }); }
+  });
+
+  it.each([
+    ['workflow_dispatch', undefined, undefined, false, false],
+    ['workflow_dispatch', false, false, false, false],
+    ['workflow_dispatch', true, false, true, false],
+    ['workflow_dispatch', false, true, true, true],
+    ['workflow_dispatch', true, true, true, true],
+    ['pull_request', false, false, false, false],
+    ['pull_request', true, true, false, false],
+    ['push', true, true, false, false],
+    ['merge_group', true, true, false, false],
+  ] as const)('PROFILE mode: %s baseline=%s prepare=%s',
+    (event, baseline, prepare, invoked, metadataOnly) => {
+      const files = sources();
+      assertNativeGraph(files);
+      const ci = parse(files.get('ci.yml')!) as Workflow;
+      const profile = parse(files.get('profile-01.yml')!) as Workflow;
+      const call = ci.jobs['profile-baseline']!;
+      // Эти выражения уже проверены как ограниченный JS-совместимый поднабор Actions выше.
+      const evaluate = (expression: unknown, inputs: Record<string, boolean>) => {
+        expect(expression).toEqual(expect.any(String));
+        const body = (expression as string).slice(3, -2).trim();
+        return Function('github', 'inputs', `return (${body});`)({ event_name: event }, inputs) as boolean;
+      };
+      const defaults = (ci.on.workflow_dispatch as { inputs: Record<string, { default: boolean }> }).inputs;
+      const dispatchInputs = {
+        profile_baseline: baseline ?? defaults.profile_baseline!.default,
+        profile_prepare: prepare ?? defaults.profile_prepare!.default,
+        profile_server: false,
+      };
+      expect(evaluate(call.if, dispatchInputs)).toBe(invoked);
+      const prepareOnly = evaluate(call.with!.prepare_only, dispatchInputs);
+      const probe = profile.jobs.probe!;
+      for (const token of ['playwright install --with-deps chromium', 'HOSTED_PROFILE_PREPARATION']) {
+        const item = probe.steps!.find(value => value.run?.includes(token))!;
+        expect(invoked && evaluate(item.if, { prepare_only: prepareOnly })).toBe(metadataOnly);
+      }
+      const measurement = probe.steps!.find(item => item.run?.includes('node bench/profile/probe-profile-01.mjs'))!;
+      expect(invoked && evaluate(measurement.if, { prepare_only: prepareOnly })).toBe(invoked && !metadataOnly);
+    });
 
   it.each([
     ['PR base filter', 'ci.yml', (w: Workflow) => { w.on.pull_request = { branches: ['main'] }; }],
@@ -647,6 +885,35 @@ describe('нативный граф CI', () => {
     ['PROFILE запущен для обычного кандидата', 'ci.yml', (w: Workflow) => { delete w.jobs['profile-baseline']!.if; }],
     ['PROFILE без явного запроса', 'ci.yml', (w: Workflow) => {
       w.jobs['profile-baseline']!.if = "${{ github.event_name == 'workflow_dispatch' }}";
+    }],
+    ['PROFILE input включён по умолчанию', 'ci.yml', (w: Workflow) => {
+      (w.on.workflow_dispatch as { inputs: Record<string, { default: boolean }> }).inputs.profile_prepare!.default = true;
+    }],
+    ['PROFILE потерял prepare routing', 'ci.yml', (w: Workflow) => { delete w.jobs['profile-baseline']!.with; }],
+    ['PROFILE принудительный prepare routing', 'ci.yml', (w: Workflow) => {
+      w.jobs['profile-baseline']!.with = { prepare_only: true };
+    }],
+    ['PROFILE prepare default изменён', 'profile-01.yml', (w: Workflow) => {
+      (w.on.workflow_call as { inputs: Record<string, { default: boolean }> }).inputs.prepare_only!.default = true;
+    }],
+    ['PROFILE permission расширены', 'profile-01.yml', (w: Workflow) => { w.permissions = { contents: 'write' }; }],
+    ['PROFILE браузер без prepare guard', 'profile-01.yml', (w: Workflow) => {
+      delete w.jobs.probe!.steps!.find(item => item.run?.includes('playwright install --with-deps chromium'))!.if;
+    }],
+    ['PROFILE identity без prepare guard', 'profile-01.yml', (w: Workflow) => {
+      delete w.jobs.probe!.steps!.find(item => item.run?.includes('HOSTED_PROFILE_PREPARATION'))!.if;
+    }],
+    ['PROFILE samples включены при prepare', 'profile-01.yml', (w: Workflow) => {
+      w.jobs.probe!.steps!.find(item => item.run?.includes('node bench/profile/probe-profile-01.mjs'))!.if = '${{ inputs.prepare_only }}';
+    }],
+    ['PROFILE prepare скрывает failure', 'profile-01.yml', (w: Workflow) => {
+      w.jobs.probe!.steps!.find(item => item.run?.includes('HOSTED_PROFILE_PREPARATION'))!['continue-on-error'] = true;
+    }],
+    ['PROFILE validator запускается без samples', 'profile-01.yml', (w: Workflow) => {
+      delete w.jobs.probe!.steps!.find(item => item.run?.includes('node bench/profile/validate-profile-01.mjs --raw'))!.if;
+    }],
+    ['PROFILE mutation validator выключен', 'profile-01.yml', (w: Workflow) => {
+      w.jobs.probe!.steps!.find(item => item.run?.includes('profile-replay-mutations-'))!.if = false;
     }],
     ['нет workflow_call', 'browser.yml', (w: Workflow) => { w.on = { workflow_dispatch: null }; }],
     ...['chromium', 'firefox', 'webkit'].map((engine) => [`нет ${engine}`, 'browser.yml', (w: Workflow) => {
@@ -789,6 +1056,61 @@ describe('нативный граф CI', () => {
 
 
 describe('Единый полный набор Vitest', () => {
+  it('keeps physical qualification explicit on the existing manual PROFILE route', () => {
+    // Дано: разобранный исходный workflow и оба исполняемых набора Vitest.
+    const profile = parse(readFileSync(join(directory, 'profile-01.yml'), 'utf8')) as Workflow;
+    const checkpoint = profile.jobs.checkpoint;
+    if (!checkpoint) throw new Error('missing physical checkpoint job');
+    // Проверяем: набор проверок корректности не сужен, нет скрытых пропусков, разрешённых отказов или произвольного runner.
+    expect(vitestConfig.test?.include).toEqual(['test/**/*.test.ts']);
+    expect(profileVitestConfig.test).toEqual({ include: ['test/server-profile-checkpoint.qualification.ts'], environment: 'node' });
+    expect(checkpoint.if).toBe('${{ inputs.server_timing && !inputs.prepare_only && !inputs.conflicting_inputs && !inputs.baseline_diagnostic && !inputs.observer_ablation }}');
+    expect(checkpoint['runs-on']).toBe('ubuntu-latest');
+    expect(checkpoint['continue-on-error']).toBeUndefined();
+    expect(checkpoint.steps?.map(item => item.uses).filter(Boolean)).toEqual([
+      'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+      'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1',
+    ]);
+    expect(checkpoint.steps?.[0].with).toEqual({ ref: '${{ github.event.pull_request.head.sha || github.sha }}', 'persist-credentials': false, 'fetch-depth': 0 });
+    expect(checkpoint.steps?.find(item => item.uses?.startsWith('actions/setup-node@'))?.with).toEqual({ 'node-version': '24.19.0' });
+    const runs = checkpoint.steps?.filter(item => item.run) ?? [];
+    expect(runs.slice(0, -1).map(item => item.run?.trim())).toEqual([activatePnpm, 'pnpm install --frozen-lockfile', 'pnpm exec playwright install --with-deps chromium']);
+    for (const item of runs) {
+      expect(item.if).toBeUndefined();
+      expect(item['continue-on-error']).toBeUndefined();
+    }
+  });
+
+  it.each([
+    { exitCode: 0, logFails: false, expectedStatus: 0 },
+    { exitCode: 23, logFails: false, expectedStatus: 23 },
+    { exitCode: 0, logFails: true, expectedStatus: 1 },
+    { exitCode: 23, logFails: true, expectedStatus: 23 },
+  ])('physical qualification shell preserves Vitest exit $exitCode and rejects log failure=$logFails', ({ exitCode, logFails, expectedStatus }) => {
+    // Дано: исходный shell из workflow; подменяем только внешние команды Git/pnpm.
+    const profile = parse(readFileSync(join(directory, 'profile-01.yml'), 'utf8')) as Workflow;
+    const command = profile.jobs.checkpoint?.steps?.find(item => item.id === 'checkpoint')?.run;
+    if (!command) throw new Error('missing physical checkpoint command');
+    const work = mkdtempSync(join(tmpdir(), 'profile-checkpoint-selection-'));
+    try {
+      const bin = join(work, 'bin'); mkdirSync(bin);
+      writeFileSync(join(bin, 'git'), '#!/bin/bash\nprintf "%s\\n" "$PROFILE_SOURCE_SHA"\n', { mode: 0o755 });
+      writeFileSync(join(bin, 'pnpm'), '#!/bin/bash\nprintf "%s\\n" "$@" > "$INVOCATION"\nprintf "acquired checkpoint evidence\\n"\nexit "$TEST_EXIT"\n', { mode: 0o755 });
+      // Каталог вместо файла вызывает отказ настоящего tee без подмены конвейера.
+      if (logFails) mkdirSync(join(work, 'checkpoint.log'));
+      // Действие: один запуск исходного shell с конвейером и передачей кода завершения.
+      const run = spawnSync(bash, ['-c', command], { cwd: work, encoding: 'utf8', timeout: 1000,
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, PROFILE_SOURCE_SHA: 'a'.repeat(40), TEST_EXIT: String(exitCode), INVOCATION: join(work, 'args') } });
+      // Проверяем: отказ Vitest приоритетен; отказ записи также не становится успехом.
+      expect(run.error).toBeUndefined();
+      expect(run.status).toBe(expectedStatus);
+      expect(readFileSync(join(work, 'args'), 'utf8')).toBe('vitest\nrun\n--config\nvitest.profile.config.ts\n');
+      expect(run.stdout).toBe('acquired checkpoint evidence\n');
+      if (logFails) expect(run.stderr).toContain('checkpoint.log');
+      else expect(readFileSync(join(work, 'checkpoint.log'), 'utf8')).toBe('acquired checkpoint evidence\n');
+    } finally { rmSync(work, { recursive: true, force: true }); }
+  });
+
   it('сохраняет автоматический выбор fuzz-файлов без второго запуска', () => {
     const root = fileURLToPath(new URL('../test/', import.meta.url));
     const fuzz = readdirSync(root).filter(name => name.endsWith('finiteness-fuzz.test.ts'));

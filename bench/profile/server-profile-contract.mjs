@@ -4,7 +4,9 @@ import { assertBalancedRunBlocks, assertRealmTimerStep, binary64Ulp, deriveRealm
   exactBinomialOrderStatisticBounds, makeRoundRobinOrders, nextDown, nextUp, summarizeSamples } from '../compare/methodology.mjs';
 import { validateStockMotionValueBatch } from '../compare/methodology.mjs';
 import { TRANSFORM_PAIR_PROFILE, createTransformLifecycleValidator, validateTransformLifecycleSample } from '../../scripts/bench-transform-support.mjs';
-import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverTailPolicy, verifyServerProfile } from './server-profile-registration.mjs';
+import { SERVER_PROFILE, planServerSampleSize, serverProfileDigest, serverProfileStringify, serverTailPolicy, verifyServerProfile } from './server-profile-registration.mjs';
+
+import { OBSERVER_ABLATION } from './server-observer-ablation.mjs';
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const SHA1 = /^[a-f0-9]{40}$/;
@@ -27,28 +29,28 @@ function errorBounds(value, error) {
   return { low: Math.max(0, nextDown(value - error)), high: nextUp(value + error) };
 }
 
-// Observed quantum не удостоверяет error model. Error берётся из закреплённого
-// upstream TimeClamper/TimeTicks и учитывает float conversion обеих reads.
+// Наблюдаемый квант не удостоверяет модель погрешности. Погрешность берётся из закреплённых
+// исходников TimeClamper/TimeTicks и учитывает преобразование обоих чтений в числа с плавающей точкой.
 export function serverBrowserClockBounds(clock, monotonicHostUpperNs) {
   invariant(/^\d+$/.test(monotonicHostUpperNs ?? ''), 'нет общего CLOCK_MONOTONIC bound');
   const ns = BigInt(monotonicHostUpperNs);
   invariant(ns > 0n && ns < BigInt(SERVER_PROFILE.clockError.monotonicCounterLimitMs) * 1_000_000n, 'CLOCK_MONOTONIC вне safe модели');
-  // Запас1ms превышает conversion error Number(ns)/1e6 при limit2^42ms.
+  // Запас 1ms превышает погрешность преобразования Number(ns)/1e6 при пределе 2^42ms.
   const upperMs = nextUp(Number(ns) / 1e6 + 1);
   invariant(Number.isFinite(clock?.beginMs) && Number.isFinite(clock?.endMs) && clock.beginMs >= 0 &&
     clock.endMs >= clock.beginMs && clock.endMs <= upperMs, 'невалидные clock reads');
   const measuredMs = clock.endMs - clock.beginMs;
   const endpointError = SERVER_PROFILE.clockError.browserClampErrorPerTimestampMs + SERVER_PROFILE.clockError.browserTickTruncationPerTimestampMs;
-  // Две conversions(now/origin) и subtraction на каждую read; ещё одна
-  // subtraction интервала. Origin одинаков, но его ошибка включена консервативно.
+  // Два преобразования (now/origin) и вычитание на каждое чтение; ещё одно
+  // вычитание для интервала. Начало отсчёта одинаково, но его погрешность включена консервативно.
   const errorMs = nextUp(nextUp(2 * endpointError) + nextUp(6 * binary64Ulp(upperMs) + binary64Ulp(measuredMs)));
   return { ...errorBounds(measuredMs, errorMs), measuredMs, errorMs };
 }
 
-// В perf интервале общий origin сокращается. Сопоставление document frame
-// с perf API включает три coarsened timestamps: frame, now и origin.
-// Та же закреплённая модель даёт три endpoint envelopes и девять ULP;
-// это semantic relation, не изменение uncertainty измеряемых API costs.
+// В интервале performance.now общее начало отсчёта сокращается. Сопоставление кадровых часов
+// документа с performance.now включает три метки сниженной точности: frame, now и origin.
+// Та же закреплённая модель даёт три границы конечных меток и девять ULP;
+// это связь семантических наблюдений, а не изменение погрешности измеряемой стоимости API.
 export function serverBrowserSemanticClockErrorMs(monotonicHostUpperNs) {
   return nextUp(1.5 * serverBrowserClockBounds({ beginMs: 0, endMs: 0 }, monotonicHostUpperNs).errorMs);
 }
@@ -85,7 +87,7 @@ function compactSemanticGroups(groups) {
 
 export function compactServerSemanticEvidence(evidence) {
   if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) return evidence;
-  // Отказ сохраняет приобретённый prefix и дополнительные поля, без создания отсутствующих наблюдений.
+  // Отказ сохраняет уже полученные наблюдения и дополнительные поля, не создавая отсутствующих наблюдений.
   const compact = { ...evidence };
   if (Array.isArray(evidence.checkpoints)) compact.checkpoints = evidence.checkpoints.map((checkpoint) =>
     checkpoint && typeof checkpoint === 'object' && !Array.isArray(checkpoint) && Object.hasOwn(checkpoint, 'groups')
@@ -123,7 +125,7 @@ function validateNormalMotion(evidence, scene, monotonicHostUpperNs) {
     onset.firstFrame.groups.length === calls, 'нет normal-motion first publication');
   onset.firstFrame = { ...onset.firstFrame, groups: onset.firstFrame.groups.map((group) => ({ ...group,
     positions: expandCoordinates(group?.positions, scene.targetsPerCall) })) };
-  // Clock/zero/phase law принадлежит общему oracle; decoder восстанавливает каждый target.
+  // Правила часов, нуля и фазы проверяются общей проверкой; декодировщик восстанавливает каждую цель.
   const expanded = { ...evidence, onset, checkpoints: evidence.checkpoints.map((checkpoint) => {
     invariant(Number.isFinite(checkpoint.frameTimestampMs), 'нет observed normal-motion frame timestamp');
     invariant(Array.isArray(checkpoint.groups) && checkpoint.groups.length === calls, 'потеряна normal-motion группа');
@@ -142,6 +144,51 @@ function validateNormalMotion(evidence, scene, monotonicHostUpperNs) {
     durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx }, calls), 'normal-motion oracle отверг intermediate/stagger/topology');
 }
 
+/** Предпосылка сборки текущего запуска; диагностика raw вне этой проекции не закрепляет эпоху. */
+export function verifyServerClockBuildEvidence(evidence, identity) {
+  const model = SERVER_PROFILE.clockError, build = model.kernelBuild;
+  const fail = (message) => {
+    throw Object.assign(new Error(`server profile: clock build ${message}`), { raw: { clockBuildEvidence: evidence } });
+  };
+  if (!build || identity?.release !== model.kernelRelease || identity.arch !== 'x64' || build.architecture !== 'amd64') fail('kernel/architecture не совпадает');
+  const text = (file) => {
+    const read = evidence?.files?.[file];
+    if (typeof read?.text !== 'string' || read.error) fail(`нет обязательного чтения ${file}`);
+    return read.text;
+  };
+  const flavor = model.kernelRelease.slice(model.kernelRelease.lastIndexOf('-') + 1);
+  const signature = text('/proc/version_signature').trim();
+  if (signature !== `Ubuntu ${build.sourceVersion}-${flavor} ${build.upstreamVersion}`) fail('version_signature не совпадает');
+  const configSha256 = createHash('sha256').update(text(`/boot/config-${model.kernelRelease}`), 'utf8').digest('hex');
+  if (configSha256 !== build.configSha256) fail('config bytes не совпадают');
+  if (!Array.isArray(evidence?.packages)) fail('нет package observations');
+  const packages = [];
+  for (const kind of ['image', 'modules']) {
+    const name = `linux-${kind}-${model.kernelRelease}`;
+    const records = evidence.packages.filter(record => record?.command === 'dpkg-query' &&
+      isDeepStrictEqual(record.args, ['-W', '-f=${binary:Package} ${Version} ${source:Package} ${source:Version}\n', name]));
+    if (records?.length !== 1) fail(`нет однозначного package ${name}`);
+    const record = records[0];
+    if (record.status !== 0 || record.signal !== null || record.error || typeof record.stdout !== 'string') fail(`package query отказал ${name}`);
+    const fields = record.stdout.trim().split(/\s+/);
+    const source = kind === 'modules' ? build.sourcePackage : build.sourcePackage.replace(/^linux-/, 'linux-signed-');
+    if (!isDeepStrictEqual(fields, [name, build.sourceVersion, source, build.sourceVersion])) fail(`package/source не совпадает ${name}`);
+    packages.push(fields);
+  }
+  const namespace = (file) => {
+    const read = evidence?.namespaces?.[file];
+    if (typeof read?.target !== 'string' || read.error || !/^time:\[[1-9]\d*\]$/.test(read.target)) fail(`нет time namespace ${file}`);
+    return read.target;
+  };
+  const active = namespace('/proc/self/ns/time'), children = namespace('/proc/self/ns/time_for_children');
+  if (active !== children) fail('self active/children namespace отличаются');
+  for (const file of ['/proc/self/timens_offsets', '/proc/1/timens_offsets']) {
+    const rows = text(file).trim().split(/\r?\n/).map(row => row.trim().split(/\s+/));
+    if (!isDeepStrictEqual(rows, [['monotonic', '0', '0'], ['boottime', '0', '0']])) fail(`offset premise не доказана ${file}`);
+  }
+  return { release: identity.release, architecture: build.architecture, signature, configSha256, packages, active, children };
+}
+
 export function verifyServerClockRegistration(registration) {
   const model = SERVER_PROFILE.clockError;
   invariant(registration.browser === model.browser && registration.browserVersion === model.browserVersion &&
@@ -150,6 +197,7 @@ export function verifyServerClockRegistration(registration) {
   const identity = registration.machine?.identity;
   invariant(identity?.platform === 'linux' && identity.release === model.kernelRelease && identity.node === model.nodeVersion && identity.nodeExecutableSha256 === model.nodeExecutableSha256,
     'Node binary/platform не сертифицированы clock model');
+  verifyServerClockBuildEvidence(identity.clockBuildEvidence, identity);
   for (const provenance of Object.values(registration.provenance ?? {})) invariant(provenance.environment?.node === model.nodeVersion &&
     provenance.environment.nodeExecutableSha256 === model.nodeExecutableSha256, 'source toolchain не совпадает с clock model');
   const clock = registration.engineClock;
@@ -426,8 +474,8 @@ function validateStartWitness(raw, scene, monotonicHostUpperNs) {
   const window = serverBrowserClockBounds({ beginMs: raw.startClock.beginMs, endMs: witness.readClock.endMs }, monotonicHostUpperNs);
   invariant(window.high < SERVER_PROFILE.durationMs * (1 - SERVER_PROFILE.browserSemantics.finalTolerancePx / SERVER_PROFILE.toPx),
     'start batch не разрешил окно до линейного endpoint');
-  // Каждый свежий owner вызван после batch begin, а CSS прочитан до read end.
-  // Общая верхняя граница elapsed учитывает обе clock reads и float roundoff.
+  // Каждый свежий запуск вызван после начала пакета, а CSS прочитан до конца чтений.
+  // Общая верхняя граница прошедшего времени учитывает оба чтения часов и округление чисел с плавающей точкой.
   const maximumPosition = nextUp(nextUp(nextUp(SERVER_PROFILE.toPx / SERVER_PROFILE.durationMs) * window.high) +
     SERVER_PROFILE.browserSemantics.movementThresholdPx);
   for (let call = 0; call < raw.calls; call++) {
@@ -437,6 +485,12 @@ function validateStartWitness(raw, scene, monotonicHostUpperNs) {
     invariant(position >= SERVER_PROFILE.browserSemantics.fromPx - SERVER_PROFILE.browserSemantics.movementThresholdPx &&
       position <= maximumPosition, 'timed onset не соответствует свежему началу и actual clock окну');
   }
+  const cancellationWindow = serverBrowserClockBounds({ beginMs: raw.startClock.beginMs, endMs: raw.cancelClock.endMs }, monotonicHostUpperNs);
+  const cutoffMs = SERVER_PROFILE.durationMs * (1 - SERVER_PROFILE.browserSemantics.finalTolerancePx / SERVER_PROFILE.toPx);
+  if (!(cancellationWindow.high < cutoffMs)) throw Object.assign(new Error('окно до конца cancellation не исключило endpoint'), {
+    code: 'SERVER_PROFILE_CANCEL_WINDOW_UNPROVEN',
+    raw: { startClock: raw.startClock, cancelClock: raw.cancelClock, cancellationWindow, cutoffMs },
+  });
 }
 
 function validateCancellationWitness(raw, targets) {
@@ -560,26 +614,109 @@ export function serverCalibrationVerdict(aa, positiveControl, samplePlan) {
   return { verdict: reasons.length ? 'UNPROVEN' : 'PASS', reasons };
 }
 
+// Проверяет сохранённые исходные наблюдения, не digest/summary сборщика.
+export function validateServerResourceIdentity(resource) {
+  const absolute = (value) => typeof value === 'string' && value.startsWith('/') &&
+    (value === '/' || value.split('/').slice(1).every((part) => part && part !== '.' && part !== '..')) && !/[\x00-\x1f]/.test(value);
+  const lines = resource?.membership?.text?.split('\n').filter((line) => line.startsWith('0::')) ?? [];
+  invariant(lines.length === 1 && absolute(lines[0].slice(3)) && !lines[0].includes(' (deleted)'), 'невалидная resource membership');
+  const member = lines[0].slice(3), mount = resource.mount;
+  invariant(mount?.root === '/' && absolute(mount.point) && mount.point !== '/' && mount.filesystem === 'cgroup2' && /^\d+$/.test(mount.id), 'неполное ancestor coverage');
+  invariant(typeof resource.mountinfo?.text === 'string', 'нет mountinfo');
+  const mounts = resource.mountinfo.text.split('\n').filter(Boolean).map((line) => {
+    const halves = line.split(' - '), fields = halves[0].split(' '), tail = halves[1]?.split(' ');
+    invariant(halves.length === 2 && fields.length >= 6 && tail?.length >= 3, 'невалидный mountinfo');
+    const decode = (value) => value.replace(/\\(040|011|012|134)/g, (_, octal) => String.fromCharCode(parseInt(octal, 8)));
+    return { id: fields[0], root: decode(fields[3]), point: decode(fields[4]), filesystem: tail[0] };
+  });
+  const candidates = mounts.filter((item) => item.filesystem === 'cgroup2');
+  invariant(candidates.length === 1 && isDeepStrictEqual(candidates[0], mount) &&
+    !mounts.some((item) => item !== candidates[0] && (item.point === mount.point || item.point.startsWith(mount.point + '/'))), 'неоднозначный/маскирующий cgroup mount');
+  invariant(resource.scheduler === '0', 'ресурсный контракт требует SCHED_OTHER');
+  // Linux v6.18.44/v7.0 sched-ext.rst и ext.c scx_attr_state_show:
+  // только явный disabled исключает полное переключение при policy 0.
+  const schedExt = resource.schedExtState;
+  invariant(schedExt?.model === 'linux-v6.18.44-v7.0-sched-ext-state' && schedExt.error === undefined && typeof schedExt.text === 'string' &&
+    ['disabled', 'enabling', 'enabled', 'disabling'].includes(schedExt.text), 'sched_ext applicability unknown: нет однозначного state read');
+  invariant(schedExt.text === 'disabled', 'sched_ext не disabled: fair-class applicability не доказана');
+  const chain = [member];
+  while (chain.at(-1) !== '/') { const current = chain.at(-1); chain.push(current.slice(0, current.lastIndexOf('/')) || '/'); }
+  invariant(chain.length > 1 && Array.isArray(resource.scopes) && resource.scopes.length === chain.length, 'неполная resource ancestor chain');
+  let numerator = 1n, denominator = 1n, memory = null, memoryKnown = true;
+  const readEvidence = (value) => value && ((typeof value.text === 'string' && value.error === undefined) ||
+    (value.text === undefined && typeof value.error?.message === 'string' && typeof value.error?.code === 'string'));
+  for (let index = 0; index < chain.length; index++) {
+    const scope = resource.scopes[index], root = index === chain.length - 1;
+    invariant(scope?.path === chain[index] && scope.directory === mount.point + (root ? '' : chain[index]) &&
+      /^[0-9]+$/.test(scope.dev) && /^[1-9][0-9]*$/.test(scope.ino) && scope.fsType === '1667723888' && scope.dev === resource.scopes[0].dev &&
+      resource.scopes.findIndex((item) => item.ino === scope.ino) === index, 'resource object/chain не воспроизводится');
+    invariant(['type', 'cpuMax', 'burst', 'memoryMax', 'controllers', 'subtreeControl'].every((key) => readEvidence(scope[key])), 'нет исходных resource reads');
+    invariant(typeof scope.controllers.text === 'string' && typeof scope.subtreeControl.text === 'string', 'нечитаемые cgroup core files');
+    if (root) {
+      // Linux cgroup_addrm_files: CFTYPE_NOT_ON_ROOT зависит от cgroup_parent,
+      // а не от namespace root. Маскирующие mounts отвергнуты выше.
+      invariant(scope.type.error?.code === 'ENOENT' && scope.cpuMax.error?.code === 'ENOENT' &&
+        scope.controllers.text.split(/\s+/).includes('cpu') && scope.subtreeControl.text.split(/\s+/).includes('cpu'), 'не доказан реальный hierarchy root');
+      continue;
+    }
+    invariant(scope.type.text === 'domain', 'неподдержанная threaded cgroup topology');
+    invariant(resource.scopes[index + 1].subtreeControl.text?.split(/\s+/).includes('cpu'), 'CPU controller не включён у предка');
+    const quota = /^(max|[1-9][0-9]*) ([1-9][0-9]*)$/.exec(scope.cpuMax.text ?? '');
+    invariant(quota && quota.slice(1).every((value) => value === 'max' || BigInt(value) <= 18446744073709551615n), 'невалидный cpu.max');
+    if (quota[1] !== 'max' && BigInt(quota[1]) * denominator < numerator * BigInt(quota[2])) {
+      numerator = BigInt(quota[1]); denominator = BigInt(quota[2]);
+    }
+    invariant(scope.burst.error?.code === 'ENOENT' || (/^(0|[1-9][0-9]*)$/.test(scope.burst.text ?? '') && BigInt(scope.burst.text) <= 18446744073709551615n), 'невалидный cpu.max.burst');
+    if (scope.memoryMax.text === 'max') continue;
+    if (/^(0|[1-9][0-9]*)$/.test(scope.memoryMax.text ?? '') && BigInt(scope.memoryMax.text) <= 18446744073709551615n) {
+      const limit = BigInt(scope.memoryMax.text); if (memory === null || limit < memory) memory = limit;
+    } else memoryKnown = false;
+  }
+  return { cpuCeiling: { numerator: String(numerator), denominator: String(denominator) },
+    memoryCeiling: memoryKnown ? memory === null ? 'max' : String(memory) : 'unknown' };
+}
+
+// Полный mountinfo проверяется до проекции и остаётся в raw artifact/journal.
+// Привязка epoch не зависит от посторонних mounts вне cgroup hierarchy.
+export function serverResourceBinding(resource) {
+  validateServerResourceIdentity(resource);
+  return { membership: resource.membership, mount: resource.mount, scheduler: resource.scheduler,
+    schedExtState: resource.schedExtState, scopes: resource.scopes };
+}
+
 export function serverResourceReasons(stages, identity) {
   const reasons = [];
-  invariant(/^\d+$/.test(identity?.affinity) && typeof identity.cgroupCpuMax === 'string' && identity.cgroupCpuMax.length > 0,
+  invariant(/^\d+$/.test(identity?.affinity) && identity.cgroupCpuMax === identity.resource?.scopes?.[0]?.cpuMax?.text,
     'ресурсные observations не связаны с зарегистрированным machine');
+  const registeredResource = serverResourceBinding(identity.resource);
   for (const stage of stages) {
     const rowsPerBlock = (SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length) * 2;
     invariant(Array.isArray(stage.blocks) && stage.blocks.length === stage.rows.length / rowsPerBlock, 'нет наблюдений ресурсов каждого парного блока');
     for (let index = 0; index < stage.blocks.length; index++) {
       const block = stage.blocks[index];
       invariant(block.block === index && block.before?.cpuStat && block.after?.cpuStat && /^\d+$/.test(block.before.affinity), 'невалидный ресурсный блок');
-      if (block.before.affinity !== block.after.affinity || block.before.cpuMax !== block.after.cpuMax) reasons.push(`${stage.name}: affinity/quota изменились`);
-      if ([block.before, block.after].some((snapshot) => snapshot.affinity !== identity.affinity || snapshot.cpuMax !== identity.cgroupCpuMax)) {
-        reasons.push(`${stage.name}: block ${index} отличается от зарегистрированных affinity/quota`);
+      if (block.before.affinity !== block.after.affinity || block.before.cpuMax !== block.after.cpuMax) reasons.push(stage.name + ': affinity/quota изменились');
+      for (const snapshot of [block.before, block.after]) {
+        const resource = serverResourceBinding(snapshot.resource);
+        if (snapshot.affinity !== identity.affinity || snapshot.cpuMax !== identity.cgroupCpuMax || !isDeepStrictEqual(resource, registeredResource)) {
+          reasons.push(stage.name + ': block ' + index + ' отличается от зарегистрированных affinity/quota');
+        }
+        invariant(Array.isArray(snapshot.scopes) && snapshot.scopes.length === snapshot.resource.scopes.length - 1 &&
+          isDeepStrictEqual(snapshot.cpuStat, snapshot.scopes[0].cpuStat), 'неполные resource scope counters');
       }
-      for (const key of ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec']) {
-        const before = block.before.cpuStat[key], after = block.after.cpuStat[key];
-        invariant(Number.isSafeInteger(before) && Number.isSafeInteger(after) && before >= 0 && after >= before && block.delta[key] === after - before,
-          'resource delta не воспроизводится');
+      invariant(block.before.scopes.length === block.after.scopes.length &&
+        block.before.scopes.length === registeredResource.scopes.length - 1, 'resource scope cardinality изменилась');
+      invariant(Array.isArray(block.scopeDeltas) && block.scopeDeltas.length === block.before.scopes.length &&
+        isDeepStrictEqual(block.delta, block.scopeDeltas[0].delta), 'неполные resource scope delta');
+      for (let scopeIndex = 0; scopeIndex < block.scopeDeltas.length; scopeIndex++) {
+        const before = block.before.scopes[scopeIndex], after = block.after.scopes[scopeIndex], delta = block.scopeDeltas[scopeIndex];
+        invariant(before.path === identity.resource.scopes[scopeIndex].path && after.path === before.path && delta.path === before.path, 'resource scope identity изменилась');
+        for (const key of ['usage_usec', 'user_usec', 'system_usec', 'nr_periods', 'nr_throttled', 'throttled_usec']) {
+          invariant(Number.isSafeInteger(before.cpuStat[key]) && Number.isSafeInteger(after.cpuStat[key]) && before.cpuStat[key] >= 0 &&
+            after.cpuStat[key] >= before.cpuStat[key] && delta.delta[key] === after.cpuStat[key] - before.cpuStat[key], 'resource delta не воспроизводится');
+        }
+        if (delta.delta.nr_throttled !== 0 || delta.delta.throttled_usec !== 0) reasons.push(stage.name + ': block ' + index + ' содержит cgroup CPU throttling: ' + before.path);
       }
-      if (block.delta.nr_throttled !== 0 || block.delta.throttled_usec !== 0) reasons.push(`${stage.name}: block ${index} содержит cgroup CPU throttling`);
     }
   }
   return reasons;
@@ -622,6 +759,8 @@ export function validateServerArtifact(artifact) {
     /^\d+$/.test(artifact.registration.machine.identity.affinity) && artifact.registration.machine.identity.platform === 'linux' &&
     typeof artifact.registration.machine.identity.cgroupCpuMax === 'string' && artifact.registration.machine.identity.cgroupCpuMax.length > 0 &&
     SHA256.test(artifact.registration.machine.identity.nodeExecutableSha256), 'machine identity не закреплена');
+  validateServerResourceIdentity(artifact.registration.machine.identity.resource);
+  invariant(artifact.registration.machine.identity.cgroupCpuMax === artifact.registration.machine.identity.resource.scopes[0].cpuMax.text, 'machine quota не относится к process cgroup');
   invariant(SHA256.test(artifact.registration.browserTree?.sha256) && Number.isSafeInteger(artifact.registration.browserTree?.files) &&
     artifact.registration.browserTree.files > 0, 'потерян browser tree hash');
   verifyServerClockRegistration(artifact.registration);
@@ -639,6 +778,33 @@ export function validateServerArtifact(artifact) {
     SHA256.test(artifact.registration.packages[id]?.tarballSha256), 'потерян comparator package');
   invariant(Object.keys(artifact.registration.transitivePackages ?? {}).length >= 3 &&
     Object.values(artifact.registration.transitivePackages).every((pkg) => SHA256.test(pkg.treeSha256) && SHA256.test(pkg.tarballSha256)), 'потеряны transitive tarballs');
+  if (artifact.registration.diagnostic?.id === OBSERVER_ABLATION.id) {
+    const diagnostic = artifact.registration.diagnostic;
+    invariant(Object.entries(OBSERVER_ABLATION).every(([key, value]) => isDeepStrictEqual(diagnostic[key], value)) &&
+      isDeepStrictEqual(artifact.diagnostic, diagnostic), 'observer ablation plan изменён');
+    invariant(diagnostic.sourceIds?.H0 === artifact.registration.harness['bench/profile/server-profile-runner.mjs']?.sha256 &&
+      diagnostic.sourceIds?.H1 === artifact.registration.harness['bench/profile/server-observer-ablation.mjs']?.sha256 &&
+      diagnostic.adapterSha256 === artifact.registration.harness['adapter:baseline']?.sha256 &&
+      diagnostic.baselineTarballSha256 === artifact.registration.packages.baseline.tarballSha256, 'observer arms не связаны с baseline/source');
+    invariant(artifact.verdict === 'UNPROVEN' && artifact.failures.length > 0 &&
+      !artifact.samplePlan && !artifact.pilot && !artifact.aa && !artifact.positive && !artifact.ab,
+      'observer diagnostic изменил qualification');
+    for (const row of artifact['observer-ablation']?.rows ?? []) for (const sample of Object.values(row.samples ?? {})) {
+      const scene = SERVER_PROFILE.browserScenes.find(scene => scene.id === row.scene);
+      validateServerBrowserSample(sample, scene, 1);
+      invariant(/^\d+$/.test(sample.fullSampleDurationNs) && BigInt(sample.fullSampleDurationNs) > 0n, 'потерян full sample duration');
+      for (const batch of [...sample.warmup, ...sample.raw]) {
+        invariant(batch.fullBatchClock?.beginMs <= batch.startClock.beginMs && batch.fullBatchClock?.endMs >= batch.cancelClock.endMs &&
+          Number.isFinite(batch.fullBatchClock.endMs), 'потерян full batch duration');
+        for (const witness of [batch.cancelWitness, sample.controlCancelWitness]) {
+          invariant(witness.collectorClocks?.length === SERVER_PROFILE.browserCancellationWitness.frames + 1 &&
+            witness.collectorClocks.every(clock => Number.isFinite(clock.beginMs) && Number.isFinite(clock.endMs) && clock.endMs >= clock.beginMs),
+          'потерян collector duration');
+        }
+      }
+    }
+    return { verification: 'observer-ablation-refusal-only', verdict: 'UNPROVEN', qualification: false };
+  }
   if (!artifact.pilot || !artifact.calibration) {
     invariant(artifact.verdict === 'UNPROVEN' && artifact.failures.length > 0 && !artifact.ab, 'незавершённое измерение объявлено успехом');
     return { verification: 'recorded-refusal-only', verdict: 'UNPROVEN' };
@@ -718,7 +884,7 @@ export function* serverArtifactChunks(artifact) {
       yield '[';
       for (let index = 0; index < value.length; index++) {
         if (index) yield ',';
-        yield JSON.stringify(value[index]) ?? 'null';
+        yield serverProfileStringify(value[index]) ?? 'null';
       }
       yield ']';
     } else if (value !== null && typeof value === 'object' && typeof value.toJSON !== 'function') {
@@ -729,7 +895,7 @@ export function* serverArtifactChunks(artifact) {
         yield `${JSON.stringify(key)}:`; yield* valueChunks(child);
       }
       yield '}';
-    } else yield JSON.stringify(value);
+    } else yield serverProfileStringify(value);
   }
   yield* valueChunks(artifact); yield '\n';
 }
@@ -804,9 +970,12 @@ export function parseServerJournalBytes(bytes) {
 }
 
 export function serverStagePlan(stage, runs) {
-  const orders = serverOrders(runs), plan = [];
+  const ablation = stage === 'observer-ablation';
+  invariant(!ablation || runs === OBSERVER_ABLATION.pairs, 'observer pair count изменён');
+  const orders = ablation ? OBSERVER_ABLATION.orders : serverOrders(runs), plan = [];
   for (let run = 0; run < runs; run++) {
-    for (const [kind, scenes] of [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]]) {
+    for (const [kind, scenes] of ablation ? [['browser', SERVER_PROFILE.browserScenes.filter(scene => OBSERVER_ABLATION.scenes.includes(scene.id))]]
+      : [['engine', SERVER_PROFILE.engineScenes], ['browser', SERVER_PROFILE.browserScenes]]) {
       for (const scene of scenes) for (const participant of orders[run]) plan.push({ stage, kind, scene: scene.id, run, participant,
         build: stage === 'ab' && participant === 'right' ? 'candidate' : 'baseline' });
     }
@@ -820,8 +989,9 @@ export function validateServerJournal(artifact, records, rawDigest) {
     artifact.samplePlan.runs >= SERVER_PROFILE.minRuns && artifact.samplePlan.runs <= SERVER_PROFILE.maxRuns, 'N журнала вне зарегистрированного ресурса');
   let previous = '0'.repeat(64), registration = false, frozen = false, calibration = false, calibrationRecorded = false, stopped = false;
   let baselineControl = false, candidateControl = false;
-  const phases = ['warmup', 'pilot', 'aa', 'positive', 'ab'];
-  const runsFor = (name) => name === 'warmup' ? SERVER_PROFILE.warmupRuns : name === 'pilot' ? SERVER_PROFILE.pilotRuns : artifact.samplePlan?.runs;
+  const ablation = artifact.registration?.diagnostic?.id === OBSERVER_ABLATION.id;
+  const phases = ablation ? ['observer-ablation'] : ['warmup', 'pilot', 'aa', 'positive', 'ab'];
+  const runsFor = (name) => name === 'observer-ablation' ? OBSERVER_ABLATION.pairs : name === 'warmup' ? SERVER_PROFILE.warmupRuns : name === 'pilot' ? SERVER_PROFILE.pilotRuns : artifact.samplePlan?.runs;
   const plans = Object.fromEntries(phases.map((name) => [name, runsFor(name) ? serverStagePlan(name, runsFor(name)) : []]));
   const counts = Object.fromEntries(phases.map((name) => [name, 0]));
   const resourceCounts = Object.fromEntries(phases.map((name) => [name, 0]));
@@ -863,8 +1033,8 @@ export function validateServerJournal(artifact, records, rawDigest) {
       else { seen.set(key, sample.value); counts[sample.stage]++; }
     } else if (record.type === 'resources-block') {
       const { stage, ...block } = record.value;
-      invariant(phases.includes(stage) && block.block === resourceCounts[stage] &&
-        counts[stage] === (block.block + 1) * (SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length) * 4 &&
+      invariant(registration && !stopped && phases.includes(stage) && block.block === resourceCounts[stage] &&
+        counts[stage] === (block.block + 1) * (ablation ? OBSERVER_ABLATION.scenes.length : SERVER_PROFILE.engineScenes.length + SERVER_PROFILE.browserScenes.length) * 4 &&
         isDeepStrictEqual(block, artifact[stage]?.blocks?.[block.block]), 'ресурсная квитанция не соответствует завершённому блоку');
       resourceCounts[stage]++;
     } else if (record.type === 'raw-controls-candidate-after-calibration') {
@@ -900,13 +1070,15 @@ export function validateServerJournal(artifact, records, rawDigest) {
   invariant(isDeepStrictEqual(failures, artifact.failures), 'failures потеряны или добавлены вне журнала');
   for (const failed of failedSamples) invariant(failures.some((failure) => failure.stage === failed.stage && isDeepStrictEqual(failure.error, failed.error)), 'failed sample исключён из failure union');
   if (stopped) invariant(artifact.verdict === 'UNPROVEN', 'сохранённый отказ объявлен PASS');
-  for (const stage of ['warmup', 'pilot', 'aa', 'positive', 'ab']) {
+  for (const stage of phases) {
     for (const row of artifact[stage]?.rows ?? []) for (const [id, sample] of Object.entries(row.samples)) {
       const key = `${stage}:${row.scene}:${row.run}:${id}`;
       invariant(isDeepStrictEqual(seen.get(key), sample), 'raw sample расходится с журналом'); seen.delete(key);
     }
   }
   invariant(seen.size === 0, 'samples журнала исключены из результата');
+  if (ablation && failures.some(failure => failure.error?.code === 'DIAGNOSTIC_ONLY'))
+    invariant(complete('observer-ablation'), 'diagnostic stop скрывает неполные восемь пар');
   for (const comparator of artifact.comparators ?? []) for (let run = 0; run < (comparator.rows ?? []).length; run++) {
     const key = `${comparator.scene}:${comparator.id}:${run}`;
     invariant(isDeepStrictEqual(comparatorSamples.get(key), comparator.rows[run]), 'comparator sample расходится с журналом'); comparatorSamples.delete(key);
