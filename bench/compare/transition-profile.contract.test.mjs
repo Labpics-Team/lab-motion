@@ -60,6 +60,36 @@ async function execute(directory, args, preload) {
 }
 
 describe('transition-profile: реальный Chromium и изменяемые внешние входы', () => {
+  it('startup diagnostic сохраняет профили, баланс и настоящий lifecycle', { timeout: 180_000 }, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'motion-startup-cli-'));
+    try {
+      const candidate = inputPackage(directory, 'candidate', 'success');
+      const output = join(directory, 'output');
+      const result = await execute(directory, [candidate, output, 'startup-diagnostic']);
+      assert.equal(result.code, 0, result.stderr);
+      assert.equal(existsSync(join(output, 'summary.json')), false);
+      const metadata = JSON.parse(readFileSync(join(output, 'metadata.json'), 'utf8'));
+      assert.deepEqual(metadata.scenario.counts, [1000]);
+      assert.equal(metadata.scenario.durationMs, 400);
+      assert.deepEqual(Object.keys(metadata.adapters), ['lab', 'waapi-ctl']);
+      for (let position = 0; position < 4; position++) {
+        assert.equal(new Set(metadata.orders.map(order => order[position])).size, 4);
+      }
+      const rows = readFileSync(join(output, 'samples.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+      assert.equal(rows.length, 16);
+      assert.ok(rows.every(row => row.valid && row.effects === 0 && row.endpoint.maxError <= 0.05 && row.offered === 1000 && row.accepted === 1000 && row.completed === 1000));
+      const diagnostic = JSON.parse(readFileSync(join(output, 'diagnostic.json'), 'utf8'));
+      assert.equal(diagnostic.completedStarts, 16);
+      assert.equal(diagnostic.coverage.length, 8);
+      for (const coverage of diagnostic.coverage) {
+        const profile = JSON.parse(readFileSync(join(output, coverage.profileFile), 'utf8'));
+        assert.ok(Array.isArray(profile.nodes));
+        assert.equal(coverage.samples, profile.samples?.length ?? 0);
+        assert.ok(coverage.startupSamples <= coverage.samples);
+        assert.equal(coverage.status, coverage.startupSamples ? 'sampled-startup' : 'inconclusive-no-startup-samples');
+      }
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
   for (const fault of ['success', 'seek', 'cleanup', 'adapter', 'dist']) it(`проверяет ${fault} через CLI`, { timeout: 180_000 }, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-transition-cli-'));
     try {

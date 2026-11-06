@@ -399,6 +399,9 @@ function assertNativeGraph(files: Map<string, string>) {
     }, performance_baseline: {
       description: 'Commit для парного сравнения полной стоимости движения',
       type: 'string', default: '',
+    }, startup_diagnostic: {
+      description: 'Только CDP startup diagnostic, без сравнительных утверждений',
+      type: 'boolean', default: false,
     } } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
@@ -410,10 +413,10 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(ci.jobs.performance).toEqual({
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' }}",
     uses: './.github/workflows/performance.yml',
-    with: { baseline: '${{ inputs.performance_baseline }}' },
+    with: { baseline: '${{ inputs.performance_baseline }}', startup_diagnostic: '${{ inputs.startup_diagnostic }}' },
   });
   const performance = workflows.get('performance.yml')!;
-  expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true } } } });
+  expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true }, startup_diagnostic: { type: 'boolean', default: false } } } });
   expect(performance.permissions).toEqual({ contents: 'read' });
   expect(performance.defaults).toBeUndefined();
   expect(Object.keys(performance.jobs)).toEqual(['compare']);
@@ -445,15 +448,16 @@ function assertNativeGraph(files: Map<string, string>) {
     .toEqual([
       { run: activatePnpm },
       { id: 'build', run: 'pnpm --dir baseline install --frozen-lockfile\npnpm --dir candidate install --frozen-lockfile\npnpm --dir baseline build\npnpm --dir candidate build' },
-      { run: 'mkdir -p "$RUNNER_TEMP/motion-performance"\nnode candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"' },
-      { run: 'node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"' },
+      { if: '${{ !inputs.startup_diagnostic }}', run: 'mkdir -p "$RUNNER_TEMP/motion-performance"\nnode candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"' },
+      { if: '${{ !inputs.startup_diagnostic }}', run: 'node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"' },
       { run: 'pnpm --dir candidate/bench/compare install --frozen-lockfile' },
       { run: 'pnpm --dir candidate/bench/compare exec playwright install --with-deps chromium' },
       { run: 'xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs' },
-      { shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/spring" spring-pair baseline\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline' },
-      { shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline' },
-      { 'working-directory': 'candidate/bench/compare', run: 'xvfb-run -a node bench.mjs' },
-      { if: "${{ !cancelled() && steps.build.outcome == 'success' }}", shell: 'bash', run: [
+      { if: '${{ inputs.startup_diagnostic }}', shell: 'bash', 'working-directory': 'candidate', env: { BASELINE: '${{ inputs.baseline }}' }, run: 'set -euo pipefail\ngit diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries\nxvfb-run -a node bench/compare/transition-profile.mjs . "$RUNNER_TEMP/motion-performance/startup-diagnostic" startup-diagnostic' },
+      { if: '${{ !inputs.startup_diagnostic }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/spring" spring-pair baseline\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline' },
+      { if: '${{ !inputs.startup_diagnostic }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline' },
+      { if: '${{ !inputs.startup_diagnostic }}', 'working-directory': 'candidate/bench/compare', run: 'xvfb-run -a node bench.mjs' },
+      { if: "${{ !inputs.startup_diagnostic && !cancelled() && steps.build.outcome == 'success' }}", shell: 'bash', run: [
         'set -euo pipefail', 'mkdir -p "$RUNNER_TEMP/motion-performance"', 'motion_size_status=0',
         'node baseline/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/baseline-size.txt" || motion_size_status=1',
         'node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt" || motion_size_status=1',

@@ -15,6 +15,10 @@ on:
         description: 'Commit для парного сравнения полной стоимости движения'
         type: string
         default: ''
+      startup_diagnostic:
+        description: 'Только CDP startup diagnostic, без сравнительных утверждений'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,6 +39,7 @@ jobs:
     uses: ./.github/workflows/performance.yml
     with:
       baseline: ${{ inputs.performance_baseline }}
+      startup_diagnostic: ${{ inputs.startup_diagnostic }}
 
   # Только явный baseline-запрос: обычный кандидат может менять runtime и
   # не обязан совпадать с зарегистрированным старым источником PROFILE-01.

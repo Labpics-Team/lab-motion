@@ -6,6 +6,9 @@ on:
       baseline:
         type: string
         required: true
+      startup_diagnostic:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -61,11 +64,13 @@ jobs:
           pnpm --dir candidate build
 
       - name: Измерить каждый публичный root-импорт
+        if: ${{ !inputs.startup_diagnostic }}
         run: |
           mkdir -p "$RUNNER_TEMP/motion-performance"
           node candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"
 
       - name: Сравнить численное ядро easing
+        if: ${{ !inputs.startup_diagnostic }}
         run: node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"
 
       - name: Установить зависимости сравнения
@@ -77,7 +82,19 @@ jobs:
       - name: Проверить контракты CLI в настоящем Chromium
         run: xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs
 
+      - name: Снять startup diagnostic без изменения product
+        if: ${{ inputs.startup_diagnostic }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries
+          xvfb-run -a node bench/compare/transition-profile.mjs . "$RUNNER_TEMP/motion-performance/startup-diagnostic" startup-diagnostic
+        working-directory: candidate
+        env:
+          BASELINE: ${{ inputs.baseline }}
+
       - name: Сравнить spring и JS-исполнение с baseline
+        if: ${{ !inputs.startup_diagnostic }}
         shell: bash
         run: |
           set -euo pipefail
@@ -85,17 +102,19 @@ jobs:
           xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline
 
       - name: Сравнить полную стоимость в одном браузере
+        if: ${{ !inputs.startup_diagnostic }}
         shell: bash
         run: |
           set -euo pipefail
           xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline
 
       - name: Проверить сравнительные утверждения
+        if: ${{ !inputs.startup_diagnostic }}
         working-directory: candidate/bench/compare
         run: xvfb-run -a node bench.mjs
 
       - name: Измерить потребительские сборки
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !inputs.startup_diagnostic && !cancelled() && steps.build.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
