@@ -81,14 +81,16 @@ writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null,
 const samples = [];
 const metrics = async c => Object.fromEntries((await c.send('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
 const settle = async page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-async function pageFor(id) {
+async function pageFor(id, acquired = () => {}) {
   const context = await browser.newContext({ viewport: metadata.scenario.viewport, deviceScaleFactor: 1, reducedMotion: 'no-preference' });
+  acquired(context);
   const page = await context.newPage();
   await page.goto(origin.url); await page.bringToFront();
   if (diagnostic) await page.addScriptTag({ content: readFileSync(adapters[id].path, 'utf8') + `\n//# sourceURL=motion-startup-${id}.js` });
   else await page.addScriptTag({ path: adapters[id].path });
   return { context, page };
 }
+let runError;
 try {
   if (paired) {
     // Сравнивается публичный seek в браузере; проверка не входит в timed samples.
@@ -136,10 +138,16 @@ try {
     for (const count of counts) for (const observation of orders[round]) {
       const [id, condition] = diagnostic ? observation.split(':') : [observation];
       const profiled = condition === 'profiled';
-      const { context, page } = await pageFor(id);
-      const cdp = await context.newCDPSession(page);
       const profileFile = `${round}-${id}.cpuprofile`;
+      let context, cdp, stage = 'context-acquire';
       let profiling = false, coverage, accepted = 0, completed = 0;
+      const errors = [];
+      const recordFailure = (error, failureStage) => {
+        errors.push(error);
+        appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify({
+          round, count, id, stage: failureStage, ...(diagnostic ? { condition, offered: count, accepted, completed, coverage } : {}), error: String(error?.stack ?? error),
+        }) + '\n');
+      };
       const stopProfile = async () => {
         const { profile } = await cdp.send('Profiler.stop');
         profiling = false;
@@ -147,16 +155,20 @@ try {
         const nodes = new Map(profile.nodes.map(node => [node.id, node]));
         const parents = new Map(profile.nodes.flatMap(node => (node.children ?? []).map(child => [child, node.id])));
         const startupSamples = (profile.samples ?? []).filter(nodeId => {
-          let adapter = false, startup = false;
+          let adapter = false;
           for (let node = nodes.get(nodeId); node; node = nodes.get(parents.get(node.id))) {
+            if (node.callFrame.functionName === 'startupDiagnosticStart') return adapter;
             adapter ||= node.callFrame.url === `motion-startup-${id}.js`;
-            startup ||= node.callFrame.functionName === 'startupDiagnosticStart';
           }
-          return adapter && startup;
+          return false;
         });
         return { profileFile, samples: profile.samples?.length ?? 0, startupSamples: startupSamples.length, status: startupSamples.length ? 'sampled-startup' : 'inconclusive-no-startup-samples' };
       };
       try {
+        const { page } = await pageFor(id, acquired => { context = acquired; stage = 'page-setup'; });
+        stage = 'cdp-session';
+        cdp = await context.newCDPSession(page);
+        stage = 'measurement';
         await page.evaluate(count => {
           window.__targets = Array.from({ length: count }, (_, i) => {
             const el = document.createElement('div'); el.className = 'box';
@@ -168,7 +180,14 @@ try {
         await settle(page);
         await cdp.send('Performance.enable', { timeDomain: 'threadTicks' });
         const before = await metrics(cdp);
-        if (profiled) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); profiling = true; }
+        if (profiled) {
+          stage = 'profiler-enable';
+          await cdp.send('Profiler.enable');
+          stage = 'profiler-start';
+          profiling = true; // Attempted start may succeed even when its response rejects.
+          await cdp.send('Profiler.start');
+        }
+        stage = 'start';
         const startCall = diagnostic ? function startupDiagnosticStart(duration) {
           const start = performance.now();
           window.__control = window.__adapterModule.start(window.__targets, 300, duration);
@@ -180,7 +199,8 @@ try {
         };
         const started = await page.evaluate(startCall, durationMs);
         accepted = count;
-        if (profiled) coverage = await stopProfile();
+        if (profiled) { stage = 'profiler-stop'; coverage = await stopProfile(); }
+        stage = 'completion';
         const completionMs = await page.evaluate(async ({ start, watchdogMs }) => {
           let watchdog;
           try {
@@ -193,6 +213,7 @@ try {
           } finally { clearTimeout(watchdog); }
         }, { start: started.start, watchdogMs });
         completed = count;
+        stage = 'validation-cleanup';
         await settle(page);
         const afterAnimation = await metrics(cdp);
         const endpoint = await page.evaluate(() => {
@@ -211,18 +232,22 @@ try {
         samples.push(sample); appendFileSync(path.join(output, 'samples.jsonl'), JSON.stringify(sample) + '\n');
         if (!sample.valid) throw new Error(`Invalid sample ${round}/${count}/${id}: ${JSON.stringify({ endpoint, effects })}`);
       } catch (error) {
-        appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify({
-          round, count, id, ...(diagnostic ? { condition, offered: count, accepted, completed, coverage } : {}), error: String(error?.stack ?? error),
-        }) + '\n');
+        recordFailure(error, stage);
         if (profiling) {
-          try { await stopProfile(); }
+          try { coverage = await stopProfile(); }
           catch (profileError) {
-            appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify({ round, count, id, condition, error: String(profileError?.stack ?? profileError), stage: 'profiler-stop-after-failure' }) + '\n');
-            throw new AggregateError([error, profileError], 'Start and profiler cleanup failed');
+            coverage = { profileFile, status: 'unrecoverable-profiler-stop' };
+            recordFailure(profileError, 'profiler-stop-after-failure');
           }
         }
-        throw error;
-      } finally { await context.close(); }
+      } finally {
+        if (context) {
+          try { await context.close(); }
+          catch (closeError) { recordFailure(closeError, 'context-close'); }
+        }
+      }
+      if (errors.length === 1) throw errors[0];
+      if (errors.length > 1) throw new AggregateError(errors, 'Observation and cleanup failed', { cause: errors[0] });
     }
     console.log(`ROUND ${round + 1}/${rounds}`);
   }
@@ -244,4 +269,17 @@ try {
   writeFileSync(path.join(output, 'summary.json'), JSON.stringify(summary, null, 2));
   console.log(JSON.stringify(summary));
   }
-} finally { await browser.close(); await origin.close(); }
+} catch (error) {
+  runError = error;
+} finally {
+  const errors = runError ? [runError] : [];
+  for (const [stage, close] of [['browser-close', () => browser.close()], ['origin-close', () => origin.close()]]) {
+    try { await close(); }
+    catch (error) {
+      errors.push(error);
+      appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify({ stage, error: String(error?.stack ?? error) }) + '\n');
+    }
+  }
+  if (errors.length === 1) throw errors[0];
+  if (errors.length > 1) throw new AggregateError(errors, 'Run and cleanup failed', { cause: errors[0] });
+}

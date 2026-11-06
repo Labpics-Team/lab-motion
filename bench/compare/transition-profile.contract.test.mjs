@@ -90,6 +90,118 @@ describe('transition-profile: реальный Chromium и изменяемые 
       }
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
+  for (const fault of ['page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'motion-startup-boundary-'));
+    try {
+      const candidate = inputPackage(directory, 'candidate', 'success');
+      const output = join(directory, 'output');
+      const receipt = join(directory, 'boundary.jsonl');
+      const preload = join(directory, 'boundary.mjs');
+      // Wrappers call real browser boundaries; only the selected response rejects.
+      writeFileSync(preload, `import { createRequire } from 'node:module';
+import { appendFileSync, readFileSync } from 'node:fs';
+const require = createRequire(${JSON.stringify(join(repository, 'bench/compare/package.json'))});
+const { chromium } = require('playwright');
+const fault = ${JSON.stringify(fault)}, receipt = ${JSON.stringify(receipt)};
+const record = event => appendFileSync(receipt, JSON.stringify({ event }) + '\\n');
+const launch = chromium.launch.bind(chromium);
+let armed = true, observation = 0;
+chromium.launch = async (...args) => {
+  const browser = await launch(...args), newContext = browser.newContext.bind(browser);
+  browser.newContext = async (...args) => {
+    const index = observation++;
+    const context = await newContext(...args), close = context.close.bind(context), newPage = context.newPage.bind(context), session = context.newCDPSession.bind(context);
+    context.close = async (...args) => {
+      await close(...args); record('context-closed');
+      if (armed && ['context-close', 'setup-and-close'].includes(fault)) { armed = false; throw new Error('FAULT_CONTEXT_CLOSE'); }
+    };
+    context.newPage = async (...args) => {
+      const page = await newPage(...args), goto = page.goto.bind(page);
+      page.goto = async (...args) => {
+        const result = await goto(...args);
+        if (armed && ['page-setup', 'setup-and-close'].includes(fault)) {
+          if (fault === 'page-setup') armed = false;
+          throw new Error('FAULT_PAGE_SETUP');
+        }
+        return result;
+      };
+      return page;
+    };
+    context.newCDPSession = async (...args) => {
+      const cdp = await session(...args);
+      if (armed && fault === 'cdp-session') { armed = false; throw new Error('FAULT_CDP_SESSION'); }
+      const send = cdp.send.bind(cdp);
+      cdp.send = async (method, ...args) => {
+        const result = await send(method, ...args);
+        if (method === 'Profiler.start') {
+          record('profiler-started');
+          if (armed && ['start-response', 'start-and-stop'].includes(fault)) { armed = false; throw new Error('FAULT_START_RESPONSE'); }
+        }
+        if (method === 'Profiler.stop') {
+          record('profiler-stopped');
+          if (fault === 'start-and-stop') throw new Error('FAULT_STOP_RESPONSE');
+          if (fault === 'coverage') {
+            // Deterministic profile data; the actual start/stop and lifecycle still run.
+            const metadata = JSON.parse(readFileSync(${JSON.stringify(join(output, 'metadata.json'))}, 'utf8'));
+            const id = metadata.orders.flat()[index].split(':')[0];
+            const frame = (functionName, url = '') => ({ functionName, url, scriptId: '1', lineNumber: 0, columnNumber: 0 });
+            const firstProfile = metadata.orders.flat().findIndex(value => value.endsWith(':profiled')) === index;
+            result.profile = { startTime: 0, endTime: 4, timeDeltas: [1,1,1,1], samples: firstProfile ? [3,4,5,6] : [4,5,6,5], nodes: [
+              { id: 1, callFrame: frame('(root)'), children: [2,4,5] },
+              { id: 2, callFrame: frame('startupDiagnosticStart'), children: [3] },
+              { id: 3, callFrame: frame('start', 'motion-startup-' + id + '.js') },
+              { id: 4, callFrame: frame('start', 'motion-startup-' + id + '.js'), children: [6] },
+              { id: 5, callFrame: frame('unrelated', 'other.js') },
+              { id: 6, callFrame: frame('startupDiagnosticStart') },
+            ] };
+          }
+        }
+        return result;
+      };
+      return cdp;
+    };
+    return context;
+  };
+  return browser;
+};`);
+      const result = await execute(directory, [candidate, output, 'startup-diagnostic'], preload);
+      const events = readFileSync(receipt, 'utf8').trim().split('\n').map(line => JSON.parse(line).event);
+      assert.ok(events.includes('context-closed'));
+      if (fault === 'coverage') {
+        assert.equal(result.code, 0, result.stderr);
+        const diagnostic = JSON.parse(readFileSync(join(output, 'diagnostic.json'), 'utf8'));
+        const first = diagnostic.coverage[0];
+        assert.equal(first.samples, 4);
+        assert.equal(first.startupSamples, 1); // An always-zero classifier fails deterministically.
+        assert.equal(first.status, 'sampled-startup');
+        assert.equal(JSON.parse(readFileSync(join(output, first.profileFile), 'utf8')).samples.length, 4);
+        for (const negative of diagnostic.coverage.slice(1)) {
+          assert.equal(negative.samples, 4);
+          assert.equal(negative.startupSamples, 0);
+          assert.equal(negative.status, 'inconclusive-no-startup-samples');
+        }
+      } else {
+        assert.notEqual(result.code, 0);
+        assert.equal(existsSync(join(output, 'diagnostic.json')), false);
+        const failures = readFileSync(join(output, 'failures.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+        const expected = fault === 'setup-and-close' ? ['page-setup', 'context-close'] : fault === 'start-and-stop' ? ['profiler-start', 'profiler-stop-after-failure'] : [fault === 'start-response' ? 'profiler-start' : fault];
+        assert.deepEqual(failures.map(row => row.stage), expected);
+        assert.ok(failures.every(row => row.round === 0 && row.count === 1000 && row.condition && row.offered === 1000));
+        for (const row of failures) assert.ok(result.stderr.includes(row.error.split('\n')[0]));
+        if (fault === 'context-close') {
+          const rows = readFileSync(join(output, 'samples.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+          assert.ok(rows.at(-1).valid);
+          assert.equal(failures[0].completed, 1000);
+        }
+        if (fault.startsWith('start-')) {
+          assert.ok(events.includes('profiler-started') && events.includes('profiler-stopped'));
+          const failed = failures[0];
+          if (fault === 'start-response') assert.ok(existsSync(join(output, failed.round + '-' + failed.id + '.cpuprofile')));
+          else assert.equal(failures[1].coverage.status, 'unrecoverable-profiler-stop');
+        }
+      }
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
   for (const fault of ['success', 'seek', 'cleanup', 'adapter', 'dist']) it(`проверяет ${fault} через CLI`, { timeout: 180_000 }, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-transition-cli-'));
     try {
