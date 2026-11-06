@@ -97,7 +97,7 @@ describe('transition-profile: реальный Chromium и изменяемые 
       const output = join(directory, 'output');
       const receipt = join(directory, 'boundary.jsonl');
       const preload = join(directory, 'boundary.mjs');
-      // Wrappers call real browser boundaries; only the selected response rejects.
+      // Обёртки вызывают настоящие границы браузера; отказывает только выбранный ответ.
       writeFileSync(preload, `import { createRequire } from 'node:module';
 import { appendFileSync, readFileSync } from 'node:fs';
 const require = createRequire(${JSON.stringify(join(repository, 'bench/compare/package.json'))});
@@ -141,7 +141,7 @@ chromium.launch = async (...args) => {
           record('profiler-stopped');
           if (fault === 'start-and-stop') throw new Error('FAULT_STOP_RESPONSE');
           if (fault === 'coverage') {
-            // Deterministic profile data; the actual start/stop and lifecycle still run.
+            // Данные профиля детерминированы; настоящие запуск, остановка и жизненный цикл выполняются.
             const metadata = JSON.parse(readFileSync(${JSON.stringify(join(output, 'metadata.json'))}, 'utf8'));
             const id = metadata.orders.flat()[index].split(':')[0];
             const frame = (functionName, url = '') => ({ functionName, url, scriptId: '1', lineNumber: 0, columnNumber: 0 });
@@ -172,7 +172,7 @@ chromium.launch = async (...args) => {
         const diagnostic = JSON.parse(readFileSync(join(output, 'diagnostic.json'), 'utf8'));
         const first = diagnostic.coverage[0];
         assert.equal(first.samples, 4);
-        assert.equal(first.startupSamples, 1); // An always-zero classifier fails deterministically.
+        assert.equal(first.startupSamples, 1); // Постоянный нулевой результат классификатора детерминированно нарушает проверку.
         assert.equal(first.status, 'sampled-startup');
         assert.equal(JSON.parse(readFileSync(join(output, first.profileFile), 'utf8')).samples.length, 4);
         for (const negative of diagnostic.coverage.slice(1)) {

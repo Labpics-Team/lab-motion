@@ -32,7 +32,7 @@ const optionalFile = file => { try { return readFileSync(file, 'utf8').trim(); }
 const group = process.argv[4] ?? 'full';
 if (!['full', 'native', 'spring-pair', 'js-pair', 'startup-diagnostic'].includes(group)) throw new Error('Unknown capability group');
 const diagnostic = group === 'startup-diagnostic';
-if (diagnostic && baselinePath) throw new Error('Startup diagnostic measures one immutable product, not a candidate comparison');
+if (diagnostic && baselinePath) throw new Error('Диагностика старта измеряет один неизменный продукт, а не сравнивает кандидатов');
 const paired = group.endsWith('-pair');
 if (paired && !baselinePath) throw new Error('Paired runtime profile requires an immutable baseline');
 const ids = diagnostic ? ['lab', 'waapi-ctl'] : paired ? ['lab'] : group === 'native'
@@ -75,7 +75,7 @@ const metadata = {
   environment: { cpu: os.cpus()[0].model, cpuMax: optionalFile('/sys/fs/cgroup/cpu.max'), memoryMax: optionalFile('/sys/fs/cgroup/memory.max') },
   scenario: { group, counts, rounds, durationMs: group === 'spring-pair' ? null : durationMs, watchdogMs, targetPx: 300, easing: group === 'spring-pair' ? 'default spring' : group === 'js-pair' ? 'p*p*(3-2*p), custom JS callback' : 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
   adapters, orders, sourceIdentity,
-  ...(diagnostic ? { diagnostic: { interpretation: 'attribution only; profiled timings are not speedup evidence', profiler: 'CDP Profiler, default sampling interval', observations, offeredStarts: rounds * observations.length, profileWindow: 'before start evaluation through its response; may include inspector overhead and microtasks', coverage: 'sampled adapter frame below startupDiagnosticStart; no samples means inconclusive' } } : {}),
+  ...(diagnostic ? { diagnostic: { interpretation: 'Только атрибуция; время под профайлером не доказывает ускорение', profiler: 'CDP Profiler, стандартный интервал выборки', observations, offeredStarts: rounds * observations.length, profileWindow: 'От начала вычисления запуска до его ответа; может включать расходы инспектора и микрозадачи', coverage: 'Образец кадра адаптера ниже startupDiagnosticStart; отсутствие образцов не даёт вывода' } } : {}),
 };
 writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
 const samples = [];
@@ -184,7 +184,7 @@ try {
           stage = 'profiler-enable';
           await cdp.send('Profiler.enable');
           stage = 'profiler-start';
-          profiling = true; // Attempted start may succeed even when its response rejects.
+          profiling = true; // Запуск мог состояться, даже если получение ответа завершилось отказом.
           await cdp.send('Profiler.start');
         }
         stage = 'start';
@@ -247,7 +247,7 @@ try {
         }
       }
       if (errors.length === 1) throw errors[0];
-      if (errors.length > 1) throw new AggregateError(errors, 'Observation and cleanup failed', { cause: errors[0] });
+      if (errors.length > 1) throw new AggregateError(errors, 'Отказ наблюдения и очистки', { cause: errors[0] });
     }
     console.log(`ROUND ${round + 1}/${rounds}`);
   }
@@ -281,5 +281,5 @@ try {
     }
   }
   if (errors.length === 1) throw errors[0];
-  if (errors.length > 1) throw new AggregateError(errors, 'Run and cleanup failed', { cause: errors[0] });
+  if (errors.length > 1) throw new AggregateError(errors, 'Отказ запуска и очистки', { cause: errors[0] });
 }

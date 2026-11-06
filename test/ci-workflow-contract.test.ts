@@ -67,7 +67,9 @@ const bash = process.platform === 'win32'
 const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation', 'security'];
 const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
-const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
+const gateCommand = 'set -euo pipefail\n'
+  + 'if [[ "$EVENT_NAME" == workflow_dispatch && "$STARTUP_DIAGNOSTIC" == true && -z "$PERFORMANCE_BASELINE" ]]; then\n'
+  + '  exit 1\nfi\n[[ "$VERIFY_RESULT" == success ]]\n'
   + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
   + '[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]\n'
   + '[[ "$SECURITY_RESULT" == success ]]';
@@ -400,7 +402,7 @@ function assertNativeGraph(files: Map<string, string>) {
       description: 'Commit для парного сравнения полной стоимости движения',
       type: 'string', default: '',
     }, startup_diagnostic: {
-      description: 'Только CDP startup diagnostic, без сравнительных утверждений',
+      description: expect.any(String),
       type: 'boolean', default: false,
     } } },
   });
@@ -538,7 +540,7 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(gate.needs).toEqual(peers);
   expect(gate['runs-on']).toBe('ubuntu-latest');
   expect(gate.permissions).toEqual({});
-  expect(gate.steps).toEqual([{
+  expect(gate.steps!.map(item => ({ ...item, run: item.run!.replace(/^\s*echo .*\n/gm, '') }))).toEqual([{
     name: 'Require every candidate check',
     shell: 'bash',
     env: {
@@ -548,6 +550,9 @@ function assertNativeGraph(files: Map<string, string>) {
       BROWSER_RESULT: '${{ needs.browser-static.result }}',
       DOCS_RESULT: '${{ needs.documentation.result }}',
       SECURITY_RESULT: '${{ needs.security.result }}',
+      EVENT_NAME: '${{ github.event_name }}',
+      STARTUP_DIAGNOSTIC: '${{ inputs.startup_diagnostic }}',
+      PERFORMANCE_BASELINE: '${{ inputs.performance_baseline }}',
     },
     run: `${gateCommand}\n`,
   }]);
@@ -760,7 +765,8 @@ describe('нативный граф CI', () => {
     const env: NodeJS.ProcessEnv = {
       ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
       MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
-      SECURITY_RESULT: 'success',
+      SECURITY_RESULT: 'success', EVENT_NAME: 'pull_request',
+      STARTUP_DIAGNOSTIC: '', PERFORMANCE_BASELINE: '',
     };
     delete env[key];
     if (result !== undefined) env[key] = result;
@@ -769,6 +775,35 @@ describe('нативный граф CI', () => {
     });
     expect(actual.error).toBeUndefined();
     expect(actual.status === 0, `${key}=${result}: ${actual.stderr}`).toBe(result === 'success');
+  });
+
+  it('итог выполняет проверку входа диагностики и сохраняет обычные режимы', () => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    const item = ci.jobs.CI!.steps![0]!;
+    expect(item.env!.EVENT_NAME).toBe('${{ github.event_name }}');
+    expect(item.env!.STARTUP_DIAGNOSTIC).toBe('${{ inputs.startup_diagnostic }}');
+    expect(item.env!.PERFORMANCE_BASELINE).toBe('${{ inputs.performance_baseline }}');
+    const execute = (program: string, event: string, diagnostic: string, baseline: string) => {
+      const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
+        env: { ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
+          MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success',
+          EVENT_NAME: event, STARTUP_DIAGNOSTIC: diagnostic, PERFORMANCE_BASELINE: baseline },
+        encoding: 'utf8', timeout: 5000,
+      });
+      expect(actual.error).toBeUndefined();
+      return actual.status;
+    };
+    const program = item.run!;
+    expect(execute(program, 'workflow_dispatch', 'true', '')).toBe(1);
+    expect(execute(program, 'workflow_dispatch', 'true', '6e067b7e584833678f1dff63d5558cb7d9afbd2e')).toBe(0);
+    expect(execute(program, 'workflow_dispatch', 'false', '')).toBe(0);
+    expect(execute(program, 'workflow_dispatch', '', '')).toBe(0);
+    for (const event of ['pull_request', 'push', 'merge_group']) {
+      expect(execute(program, event, '', '')).toBe(0);
+    }
+    // Контроль отличает настоящий отказ от постоянного успеха.
+    expect(() => expect(execute('exit 0', 'workflow_dispatch', 'true', '')).toBe(1)).toThrow();
+    expect(() => expect(execute('exit 1', 'workflow_dispatch', 'true', '6e067b7e584833678f1dff63d5558cb7d9afbd2e')).toBe(0)).toThrow();
   });
 
   it('shell Vitest сохраняет код отказа после tee для diagnostics', () => {

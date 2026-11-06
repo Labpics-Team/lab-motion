@@ -16,7 +16,7 @@ on:
         type: string
         default: ''
       startup_diagnostic:
-        description: 'Только CDP startup diagnostic, без сравнительных утверждений'
+        description: 'Диагностика старта через CDP без сравнительных утверждений; обязателен performance_baseline (полный SHA)'
         type: boolean
         default: false
 
@@ -314,8 +314,15 @@ jobs:
           BROWSER_RESULT: ${{ needs.browser-static.result }}
           DOCS_RESULT: ${{ needs.documentation.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          STARTUP_DIAGNOSTIC: ${{ inputs.startup_diagnostic }}
+          PERFORMANCE_BASELINE: ${{ inputs.performance_baseline }}
         run: |
           set -euo pipefail
+          if [[ "$EVENT_NAME" == workflow_dispatch && "$STARTUP_DIAGNOSTIC" == true && -z "$PERFORMANCE_BASELINE" ]]; then
+            echo "::error::Для startup_diagnostic обязателен performance_baseline (полный SHA)"
+            exit 1
+          fi
           [[ "$VERIFY_RESULT" == success ]]
           [[ "$TESTS_RESULT" == success ]]
           [[ "$MUTATION_RESULT" == success ]]
