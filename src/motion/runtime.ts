@@ -566,7 +566,7 @@ export class Runtime {
         if (equal) { run._own(existing!); continue; }
         if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!._from;
-        const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: first.map(() => 0),
+        const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: new Array<number>(first.length),
           _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _rate: 1, _paused: false };
         group._sample(track);
         run._own(track, draft._reduced); group._attach(track);
