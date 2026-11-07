@@ -111,6 +111,33 @@ async function recordScenario(browser, origin, scenario, adapter) {
   return failures;
 }
 
+export async function recordCaptureReplay(browser, origin, adapter, outputDirectory, capture = captureTrajectory) {
+  if (!path.isAbsolute(outputDirectory)) throw new Error('S5_CAPTURE_DIAGNOSTIC_DIR must be absolute');
+  mkdirSync(outputDirectory, { recursive: true });
+  const destination = path.join(outputDirectory, 'observation-replay');
+  mkdirSync(destination); // One attempt, never overwrite earlier evidence.
+  const adapterBytes = readFileSync(adapter.path);
+  if (createHash('sha256').update(adapterBytes).digest('hex') !== adapter.sha256) throw new Error('S5 replay adapter changed');
+  writeFileSync(path.join(destination, 'adapter.js'), adapterBytes);
+  const captureResult = await capture(browser, adapter.path, true, origin.url, {
+    replay: true,
+    retain({ frames, nativeDiagnostic, replay, errors }) {
+      const retained = frames.map(({ data, ...frame }, index) => {
+        const png = `${index.toString().padStart(4, '0')}.png`;
+        writeFileSync(path.join(destination, png), Buffer.from(data, 'base64'));
+        return { ...frame, png };
+      });
+      writeFileSync(path.join(destination, 'raw.json'), JSON.stringify({
+        mode: 'observation-replay', qualification: false, adapterSha256: adapter.sha256,
+        frames: retained, nativeDiagnostic, replay, errors,
+      }, null, 2));
+    },
+  });
+  // No oracle admission / compare pass is computed for observed replay.
+  writeFileSync(path.join(destination, 'capture.json'), JSON.stringify(captureResult, null, 2));
+  return captureResult;
+}
+
 export async function recordCaptureDiagnostic(browser, origin, adapter, outputDirectory, capture = captureTrajectory) {
   if (!path.isAbsolute(outputDirectory)) throw new Error('S5_CAPTURE_DIAGNOSTIC_DIR must be absolute');
   mkdirSync(outputDirectory, { recursive: true });
@@ -177,9 +204,11 @@ export async function recordCaptureDiagnostic(browser, origin, adapter, outputDi
 }
 
 async function main() {
+  const replay = process.env.S5_CAPTURE_REPLAY === '1';
   const diagnostic = process.env.S5_CAPTURE_DIAGNOSTIC === '1';
+  if (replay && diagnostic) throw new Error('S5 replay and qualification modes are mutually exclusive');
   const outputDirectory = process.env.S5_CAPTURE_DIAGNOSTIC_DIR;
-  if (diagnostic && (!outputDirectory || !path.isAbsolute(outputDirectory))) {
+  if ((diagnostic || replay) && (!outputDirectory || !path.isAbsolute(outputDirectory))) {
     throw new Error('S5_CAPTURE_DIAGNOSTIC_DIR must be absolute');
   }
   const esbuild = requireBenchmark('esbuild');
@@ -190,7 +219,7 @@ async function main() {
   let browser;
   let origin;
   try {
-    const adapters = buildAdapters(temporaryDirectory, diagnostic);
+    const adapters = buildAdapters(temporaryDirectory, diagnostic || replay);
     origin = await startBenchmarkOrigin();
     browser = await chromium.launch({
       headless: false,
@@ -208,7 +237,9 @@ async function main() {
       esbuild: esbuild.version,
       repeats: 1,
     }));
-    if (diagnostic) {
+    if (replay) {
+      await recordCaptureReplay(browser, origin, adapters['lab-spring'], outputDirectory);
+    } else if (diagnostic) {
       await recordCaptureDiagnostic(browser, origin, adapters['lab-spring'], outputDirectory);
     } else for (const scenario of [
       { label: 'lab-root-native', participant: 'lab', adapter: 'lab', expected: { baseline: 'pass', blocked: 'pass' } },
@@ -240,7 +271,8 @@ async function main() {
     }
   }
   if (errors.length > 0) throw new AggregateError(errors, 'S5 conformance smoke не пройден');
-  console.log(diagnostic ? 'PASS: 16 S5 diagnostic captures retained; no performance claims.'
+  console.log(replay ? 'RECORDED: one observer-effect S5 replay; NOT qualification or compare pass.'
+    : diagnostic ? 'PASS: 16 S5 diagnostic captures retained; no performance claims.'
     : 'PASS: семь реальных записей подтвердили ожидаемые вердикты S5; один запуск, без performance claims.');
 }
 
