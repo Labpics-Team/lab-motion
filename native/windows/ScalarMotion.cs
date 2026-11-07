@@ -139,7 +139,9 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         settings.InsertScalar("Target", initial * coordinateScale);
         settings.InsertScalar("Stiffness", 1);
         settings.InsertScalar("Damping", 1);
-        condition = compositor.CreateExpressionAnimation("true");
+        // Diagnostic: leave a repeated outside-bounds Inertia to native boundary correction.
+        condition = compositor.CreateExpressionAnimation(
+            $"this.Target.Position.{axis} >= this.Target.MinPosition.{axis} && this.Target.Position.{axis} <= this.Target.MaxPosition.{axis}");
         force = compositor.CreateExpressionAnimation(
             $"-settings.Stiffness * (this.Target.Position.{axis} - settings.Target) - settings.Damping * this.Target.PositionVelocityInPixelsPerSecond.{axis}");
         force.SetReferenceParameter("settings", settings);
