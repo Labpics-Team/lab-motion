@@ -90,7 +90,7 @@ describe('transition-profile: реальный Chromium и изменяемые 
       }
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
-  for (const fault of ['page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
+  for (const fault of ['ordering', 'page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-startup-boundary-'));
     try {
       const candidate = inputPackage(directory, 'candidate', 'success');
@@ -104,6 +104,7 @@ const require = createRequire(${JSON.stringify(join(repository, 'bench/compare/p
 const { chromium } = require('playwright');
 const fault = ${JSON.stringify(fault)}, receipt = ${JSON.stringify(receipt)};
 const record = event => appendFileSync(receipt, JSON.stringify({ event }) + '\\n');
+const witness = ['ordering', 'coverage'].includes(fault);
 const launch = chromium.launch.bind(chromium);
 let armed = true, observation = 0;
 chromium.launch = async (...args) => {
@@ -111,12 +112,32 @@ chromium.launch = async (...args) => {
   browser.newContext = async (...args) => {
     const index = observation++;
     const context = await newContext(...args), close = context.close.bind(context), newPage = context.newPage.bind(context), session = context.newCDPSession.bind(context);
+    let observedPage;
     context.close = async (...args) => {
+      if (witness) {
+        const events = await observedPage.evaluate(() => window.__startupWitness);
+        appendFileSync(receipt, JSON.stringify({ index, events }) + '\\n');
+      }
       await close(...args); record('context-closed');
       if (armed && ['context-close', 'setup-and-close'].includes(fault)) { armed = false; throw new Error('FAULT_CONTEXT_CLOSE'); }
     };
     context.newPage = async (...args) => {
-      const page = await newPage(...args), goto = page.goto.bind(page);
+      const page = await newPage(...args), goto = page.goto.bind(page), addScriptTag = page.addScriptTag.bind(page);
+      observedPage = page;
+      if (witness) page.addScriptTag = async (...args) => {
+        const result = await addScriptTag(...args);
+        // Синхронный свидетель в том же realm: обёртка вызывает настоящий адаптер.
+        await page.evaluate(() => {
+          window.__startupWitness = [];
+          const adapter = window.__adapterModule;
+          window.__adapterModule = { ...adapter, start(...args) {
+            window.__startupWitness.push('adapter-entry');
+            try { return adapter.start(...args); }
+            finally { window.__startupWitness.push('adapter-exit'); }
+          } };
+        });
+        return result;
+      };
       page.goto = async (...args) => {
         const result = await goto(...args);
         if (armed && ['page-setup', 'setup-and-close'].includes(fault)) {
@@ -132,8 +153,12 @@ chromium.launch = async (...args) => {
       if (armed && fault === 'cdp-session') { armed = false; throw new Error('FAULT_CDP_SESSION'); }
       const send = cdp.send.bind(cdp);
       cdp.send = async (method, ...args) => {
+        // Маркер отправки до настоящего stop; ack — только после настоящего start.
+        // Никакого сравнения часов или порядка доставки console-событий.
+        if (witness && method === 'Profiler.stop') await observedPage.evaluate(() => window.__startupWitness.push('profiler-stop-send'));
         const result = await send(method, ...args);
         if (method === 'Profiler.start') {
+          if (witness) await observedPage.evaluate(() => window.__startupWitness.push('profiler-start-ack'));
           record('profiler-started');
           if (armed && ['start-response', 'start-and-stop'].includes(fault)) { armed = false; throw new Error('FAULT_START_RESPONSE'); }
         }
@@ -165,8 +190,23 @@ chromium.launch = async (...args) => {
   return browser;
 };`);
       const result = await execute(directory, [candidate, output, 'startup-diagnostic'], preload);
-      const events = readFileSync(receipt, 'utf8').trim().split('\n').map(line => JSON.parse(line).event);
+      const receipts = readFileSync(receipt, 'utf8').trim().split('\n').map(line => JSON.parse(line));
+      const events = receipts.map(row => row.event);
       assert.ok(events.includes('context-closed'));
+      if (['ordering', 'coverage'].includes(fault)) {
+        assert.equal(result.code, 0, result.stderr);
+        const metadata = JSON.parse(readFileSync(join(output, 'metadata.json'), 'utf8'));
+        const observations = metadata.orders.flat();
+        const witnesses = receipts.filter(row => row.events);
+        assert.equal(witnesses.length, observations.length);
+        for (const [index, condition] of observations.entries()) {
+          const rows = witnesses.filter(row => row.index === index);
+          assert.equal(rows.length, 1);
+          assert.deepEqual(rows[0].events, condition.endsWith(':profiled')
+            ? ['profiler-start-ack', 'adapter-entry', 'adapter-exit', 'profiler-stop-send']
+            : ['adapter-entry', 'adapter-exit']);
+        }
+      }
       if (fault === 'coverage') {
         assert.equal(result.code, 0, result.stderr);
         const diagnostic = JSON.parse(readFileSync(join(output, 'diagnostic.json'), 'utf8'));
@@ -180,7 +220,7 @@ chromium.launch = async (...args) => {
           assert.equal(negative.startupSamples, 0);
           assert.equal(negative.status, 'inconclusive-no-startup-samples');
         }
-      } else {
+      } else if (fault !== 'ordering') {
         assert.notEqual(result.code, 0);
         assert.equal(existsSync(join(output, 'diagnostic.json')), false);
         const failures = readFileSync(join(output, 'failures.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
