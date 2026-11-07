@@ -50,6 +50,50 @@ it('sequence publishes a completed first segment before its following gap', asyn
   } finally { run?.stop(); ownership.mockRestore(); }
 });
 
+it('sequence clears live velocity at a completed segment and its following gap', async () => {
+  const h = harness();
+  const ownership = vi.spyOn(Run.prototype, '_own').mockImplementation(function (this: Run, track, reduced) {
+    own.call(this, track, reduced);
+  });
+  let run: Playback | undefined;
+  try {
+    run = h.runtime.sequence([
+      [h.element, { x: [0, 40], color: ['rgba(0,0,0,0)', '#fff'] }, { at: 0, duration: 100, ease: 'linear' }],
+      [h.element, { x: [40, 100], color: ['#fff', '#000'] }, { at: 200, ...linear }],
+    ]);
+    expect(ownership.mock.calls).toHaveLength(2);
+    const tracks = ownership.mock.calls.map(([track]) => track);
+    expect(tracks.map(track => track._program._key)).toEqual(['x', 'color']);
+    run.seek(50);
+    expect(h.x()).toBe(20);
+    for (const track of tracks) {
+      expect(track._velocity.length).toBe(track._program._final.length);
+      for (let i = 0; i < track._velocity.length; i++) {
+        expect(Number.isFinite(track._velocity[i])).toBe(true);
+        expect(track._velocity[i]).toBeGreaterThan(0);
+      }
+    }
+    for (const time of [100, 150]) {
+      run.seek(time);
+      expect(h.x()).toBe(40); expect(h.values.get('color')).toBe('rgba(255,255,255,1)');
+      for (const track of tracks) {
+        expect(track._group._tracks.get(track._program._key)).toBe(track);
+        expect(track._owner).toBe(run);
+        for (let i = 0; i < track._velocity.length; i++) expect(track._velocity[i]).toBe(0);
+      }
+    }
+    const finished = run.finished;
+    run.seek(1200);
+    expect(await finished).toEqual({ status: 'finished' });
+    expect(h.x()).toBe(100); expect(h.values.get('color')).toBe('rgba(0,0,0,1)');
+    expect(h.effects).toHaveLength(0);
+    expect(h.updates.size + h.renders.size).toBe(0);
+    for (const track of tracks) {
+      expect(track._owner).toBeUndefined(); expect(track._group._tracks.size).toBe(0);
+    }
+  } finally { run?.stop(); ownership.mockRestore(); }
+});
+
 for (const native of [false, true]) {
   for (const mode of ['normal', 'delayed', 'reduced', 'instant'] as const) {
     it(`startup samples every coordinate before ownership: native=${native}, mode=${mode}`, async () => {
