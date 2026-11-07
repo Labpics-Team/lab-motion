@@ -241,6 +241,7 @@ try {
             coverage = { profileFile, status: 'unrecoverable-profiler-stop' };
             recordFailure(profileError, 'profiler-stop-after-failure');
           }
+          failures[0].coverage = coverage;
         }
       } finally {
         if (context) {

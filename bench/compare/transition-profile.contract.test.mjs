@@ -80,7 +80,7 @@ function command(file, args, options = {}, spawnClient = spawn) {
   const onClose = code => { releaseListeners(); resolveClose({ code, stdout, stderr, errors: [...errors] }); };
   child.stdout.on('data', out); child.stderr.on('data', err);
   child.on('error', failed); child.once('close', onClose);
-  // Только transport release: не подтверждение остановки manager-owned service.
+  // Только освобождение транспорта: не подтверждение остановки службы под управлением менеджера.
   const release = () => { releaseListeners(); child.stdout.destroy(); child.stderr.destroy(); child.unref(); };
   return { closed, release, capture: () => ({ stdout, stderr, errors: [...errors] }) };
 }
@@ -205,7 +205,7 @@ renameSync(${JSON.stringify(join(directory, unit + '.json.tmp'))}, ${JSON.string
     } catch (error) {
       errors.push(error);
       if (run) {
-        // stop неизвестного имени не запрещает future start: сначала bounded allocation outcome.
+        // Остановка неизвестного имени не запрещает будущий запуск: сначала ограниченно ждём результат выделения службы.
         if (!acquired && !startSettled) {
           try {
             acquired = await deadlinePromise(Promise.race([handshake.ready, run.closed.then(result => {
@@ -395,7 +395,10 @@ const append = appendFileSync;
 const record = (event, index) => append(receipt, JSON.stringify({ event, index }) + '\\n');
 if (fault.startsWith('journal-')) {
   fs.appendFileSync = (file, ...args) => {
-    if (String(file).endsWith('failures.jsonl')) { record('journal-failed'); throw new Error('FAULT_JOURNAL_WRITE'); }
+    if (String(file).endsWith('failures.jsonl')) {
+      append(receipt, JSON.stringify({ event: 'journal-failed', failure: JSON.parse(args[0]) }) + '\\n');
+      throw new Error('FAULT_JOURNAL_WRITE');
+    }
     return append(file, ...args);
   };
   syncBuiltinESMExports();
@@ -620,6 +623,26 @@ chromium.launch = async (...args) => {
           const failed = failures[0];
           if (fault === 'start-response') assert.ok(existsSync(join(output, failed.round + '-' + failed.id + '.cpuprofile')));
           else assert.equal(failures[1].coverage.status, 'unrecoverable-profiler-stop');
+        }
+      }
+      if (['start-response', 'journal-start-response', 'journal-start-and-stop'].includes(fault)) {
+        const failure = fault.startsWith('journal-')
+          ? receipts.find(row => row.failure?.stage === 'profiler-start').failure
+          : JSON.parse(readFileSync(join(output, 'failures.jsonl'), 'utf8').trim().split('\n')[0]);
+        assert.equal(failure.accepted, 0);
+        assert.equal(failure.completed, 0);
+        assert.equal(failure.coverage.profileFile, failure.round + '-' + failure.id + '.cpuprofile');
+        assert.equal(existsSync(join(output, 'diagnostic.json')), false);
+        if (fault === 'journal-start-and-stop') {
+          assert.equal(failure.coverage.status, 'unrecoverable-profiler-stop');
+          assert.equal(failure.coverage.samples, undefined);
+          assert.equal(failure.coverage.startupSamples, undefined);
+        } else {
+          const profile = JSON.parse(readFileSync(join(output, failure.coverage.profileFile), 'utf8'));
+          assert.equal(failure.coverage.samples, profile.samples?.length ?? 0);
+          assert.ok(Number.isInteger(failure.coverage.startupSamples));
+          assert.ok(failure.coverage.startupSamples >= 0 && failure.coverage.startupSamples <= failure.coverage.samples);
+          assert.equal(failure.coverage.status, failure.coverage.startupSamples ? 'sampled-startup' : 'inconclusive-no-startup-samples');
         }
       }
     } finally { removeFixture(directory); }
