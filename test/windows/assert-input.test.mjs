@@ -182,6 +182,44 @@ test('post-start lifetime source contract retains cleanup, original error and th
   assertProcessCleanupSource(readSource(new URL('./verify.ps1', import.meta.url)));
 });
 
+function bootDiagnosticViolations(source) {
+  const branch = source.match(/if \(!\$finished -or \$identity\.exitCode -ne 0 -or !\$identity\.traceExists\) \{([\s\S]*?)\n    \}/)?.[1] ?? '';
+  return [
+    ['closed typed identity projection', !/\$summary = \[ordered\]@\{\s+completed = if \(\$identity\.completed -is \[bool\]\) \{ \$identity\.completed \} else \{ \$null \}\s+exitCode = if \(\$identity\.exitCode -is \[int\]\) \{ \$identity\.exitCode \} else \{ \$null \}\s+traceExists = if \(\$identity\.traceExists -is \[bool\]\) \{ \$identity\.traceExists \} else \{ \$null \}\s+\}/.test(branch)],
+    ['failure-only bounded output before original throw', !/Write-Host \('Нативный процесс: ' \+ \(\$summary \| ConvertTo-Json -Compress\)\)\s+\} catch \{[^}]*\}\s+throw 'Нативный процесс не подтвердил успешное завершение\.'/.test(branch)],
+    ['no new process or file observation', /\$process\.|\$exe|\$tracePath|\$_|Get-|Test-|Set-Content/.test(branch)],
+    ['single diagnostic output', (source.match(/Write-Host \('Нативный процесс: '/g) ?? []).length !== 1],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('boot failure logs only closed identity fields without changing the primary error', () => {
+  const source = readSource(new URL('./verify.ps1', import.meta.url));
+  assert.deepEqual(bootDiagnosticViolations(source), []);
+  assert.deepEqual(bootDiagnosticViolations(source.replaceAll('\n', '\r\n')), []);
+  for (const [before, after, expected] of [
+    ['$identity.completed -is [bool]', '$true', 'closed typed identity projection'],
+    ['$identity.exitCode -is [int]', '$true', 'closed typed identity projection'],
+    ['$identity.traceExists -is [bool]', '$true', 'closed typed identity projection'],
+    ['$summary | ConvertTo-Json -Compress', '$identity | ConvertTo-Json -Compress', 'failure-only bounded output before original throw'],
+    ["Write-Host ('Нативный процесс: '", "Write-Host ($process.Id + 'Нативный процесс: '", 'no new process or file observation'],
+    ["throw 'Нативный процесс не подтвердил успешное завершение.'", "throw 'changed'", 'failure-only bounded output before original throw'],
+  ]) assert(bootDiagnosticViolations(source.replace(before, after)).includes(expected), expected);
+});
+
+test('boot controls extract the actual AST branch and cover healthy silence, nullable types and output failure', () => {
+  const source = readSource(new URL('./process-cleanup.test.ps1', import.meta.url));
+  assert(source.includes('$bootBranch = $owner.Find('));
+  assert(source.includes('$bootBranch.Clauses[0].Item2.Statements'));
+  assert(source.includes('try { & $bootFailure } catch { $observed = $_ }'));
+  assert(source.includes('$script:bootMessages.Count -ne [int]$expectsBootMessage'));
+  for (const value of ['[int]::MinValue', '[int]::MaxValue', '[long]::MaxValue', "'private-completed'", "'private-exit'", "'private-trace'", "pid = 'private-pid'", "path = 'private-path'"]) {
+    assert(source.includes(value), value);
+  }
+  assert(source.includes('$script:bootMessages[0] -cne $expected'));
+  assert(source.includes('$script:bootMessages[0].Length -gt 128'));
+  assert(source.includes("function Write-Host { param($Object); throw [IO.IOException]::new('private-diagnostic-error') }"));
+});
+
 test('process witness retains getter faults, invalid identity and a non-effect .NET getter control', () => {
   const source = readSource(new URL('./process-cleanup.test.ps1', import.meta.url));
   for (const fault of ['handle', 'start-time', 'handle-null', 'handle-zero', 'start-time-null', 'start-time-invalid']) {

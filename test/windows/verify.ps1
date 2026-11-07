@@ -89,6 +89,16 @@ try {
     $identity.traceExists = Test-Path -LiteralPath $tracePath
     $identity | ConvertTo-Json | Set-Content -Encoding utf8 (Join-Path $output 'process.json')
     if (!$finished -or $identity.exitCode -ne 0 -or !$identity.traceExists) {
+        try {
+            $summary = [ordered]@{
+                completed = if ($identity.completed -is [bool]) { $identity.completed } else { $null }
+                exitCode = if ($identity.exitCode -is [int]) { $identity.exitCode } else { $null }
+                traceExists = if ($identity.traceExists -is [bool]) { $identity.traceExists } else { $null }
+            }
+            Write-Host ('Нативный процесс: ' + ($summary | ConvertTo-Json -Compress))
+        } catch {
+            # Диагностика не заменяет первичный отказ и не выводит сырую ошибку.
+        }
         throw 'Нативный процесс не подтвердил успешное завершение.'
     }
 } catch {

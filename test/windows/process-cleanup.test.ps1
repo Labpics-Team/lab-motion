@@ -7,6 +7,13 @@ $ast = [Management.Automation.Language.Parser]::ParseInput([IO.File]::ReadAllTex
 if ($errors.Count) { throw 'Invalid process harness syntax' }
 $owner = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.TryStatementAst] })[-1]
 $lifetime = [scriptblock]::Create($owner.Extent.Text)
+$bootBranch = $owner.Find({
+    param($node)
+    $node -is [Management.Automation.Language.IfStatementAst] -and
+        $node.Clauses[0].Item1.Extent.Text -eq '!$finished -or $identity.exitCode -ne 0 -or !$identity.traceExists'
+}, $true)
+if (!$bootBranch) { throw 'Отсутствует исходная ветка отказа нативного процесса.' }
+$bootFailure = [scriptblock]::Create(($bootBranch.Clauses[0].Item2.Statements | ForEach-Object { $_.Extent.Text }) -join "`n")
 
 # Исполняется настоящий try/catch/finally; подменены только process/file boundaries.
 $originalOutput = $env:LAB_MOTION_PROBE_OUTPUT
@@ -25,6 +32,7 @@ try {
         $script:disposed = $false
         $script:pidStopped = $false
         $script:warned = $false
+        $script:bootMessages = @()
         $script:waitReached = $false
         $script:getterReached = $false
         $exe = 'owned.exe'
@@ -95,6 +103,7 @@ try {
             process { if ($script:fault -eq 'evidence') { throw [IO.IOException]::new('primary-evidence') } }
         }
         function Write-Warning { param($Message, $WarningAction); $script:warned = $true }
+        function Write-Host { param($Object); $script:bootMessages += [string]$Object }
         $observed = $null
         try { & $lifetime } catch { $observed = $_ }
         if ($env:LAB_MOTION_PROBE_OUTPUT -ne $previousOutput) { throw "Environment restore failed: $fault" }
@@ -110,6 +119,8 @@ try {
         if ($fault -eq 'none') {
             if ($observed) { throw $observed }
         } elseif (!$observed) { throw "Expected failure missing: $fault" }
+        $expectsBootMessage = $fault -in @('own-timeout', 'foreign-pid')
+        if ($script:bootMessages.Count -ne [int]$expectsBootMessage) { throw "Диагностика вне boot-отказа: $fault" }
         if ($fault -in @('handle', 'handle-null', 'handle-zero')) {
             if ($observed.Exception.Message -notmatch 'Не получен действительный handle') { throw "Handle validation error missing: $fault" }
         }
@@ -121,5 +132,30 @@ try {
         }
         $cases++
     }
+
+    # Настоящая AST-ветка получает только identity: здесь нет Process или файловых reads.
+    $bootCases = @(
+        @{ completed = $false; exitCode = $null; traceExists = $true; expected = '{"completed":false,"exitCode":null,"traceExists":true}' },
+        @{ completed = $true; exitCode = -1; traceExists = $true; expected = '{"completed":true,"exitCode":-1,"traceExists":true}' },
+        @{ completed = $true; exitCode = 0; traceExists = $false; expected = '{"completed":true,"exitCode":0,"traceExists":false}' },
+        @{ completed = $true; exitCode = [int]::MinValue; traceExists = $false; expected = '{"completed":true,"exitCode":-2147483648,"traceExists":false}' },
+        @{ completed = $true; exitCode = [int]::MaxValue; traceExists = $false; expected = '{"completed":true,"exitCode":2147483647,"traceExists":false}' },
+        @{ completed = 'private-completed'; exitCode = 'private-exit'; traceExists = 'private-trace'; expected = '{"completed":null,"exitCode":null,"traceExists":null}' },
+        @{ completed = 1; exitCode = [long]::MaxValue; traceExists = 0; expected = '{"completed":null,"exitCode":null,"traceExists":null}' },
+        @{ completed = $null; exitCode = $null; traceExists = $null; expected = '{"completed":null,"exitCode":null,"traceExists":null}' }
+    )
+    foreach ($control in $bootCases) {
+        $identity = [ordered]@{ completed = $control.completed; exitCode = $control.exitCode; traceExists = $control.traceExists; pid = 'private-pid'; path = 'private-path' }
+        $script:bootMessages = @()
+        $observed = $null
+        try { & $bootFailure } catch { $observed = $_ }
+        if (!$observed -or $observed.Exception.Message -ne 'Нативный процесс не подтвердил успешное завершение.') { throw 'Boot-диагностика заменила первичную ошибку.' }
+        $expected = 'Нативный процесс: ' + $control.expected
+        if ($script:bootMessages.Count -ne 1 -or $script:bootMessages[0] -cne $expected -or $script:bootMessages[0].Length -gt 128) { throw 'Boot-диагностика нарушила закрытый bounded контракт.' }
+    }
+    function Write-Host { param($Object); throw [IO.IOException]::new('private-diagnostic-error') }
+    $observed = $null
+    try { & $bootFailure } catch { $observed = $_ }
+    if (!$observed -or $observed.Exception.Message -ne 'Нативный процесс не подтвердил успешное завершение.') { throw 'Отказ вывода замаскировал boot-ошибку.' }
 } finally { $env:LAB_MOTION_PROBE_OUTPUT = $originalOutput }
-"process cleanup: $cases PASS; getter primitive: PASS"
+"process cleanup: $cases PASS; getter primitive: PASS; boot projection: $($bootCases.Count) PASS; output failure: PASS"
