@@ -1,0 +1,48 @@
+name: Disposable static PNG raster calibration
+
+on:
+  push:
+    branches: [bench/s5-raster-st01a1b363]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      COREPACK_DEFAULT_TO_LATEST: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.19.0'
+      - name: Retain route identity before dependency setup
+        run: |
+          mkdir -p "$RUNNER_TEMP/s5-raster-calibration"
+          printf 'PLAYWRIGHT_BROWSERS_PATH=%s/s5-raster-calibration-browsers\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+          printf 'source=%s\nrun=%s\nattempt=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/s5-raster-calibration/route.txt"
+      - name: Install existing pinned comparison dependencies only
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm --dir bench/compare install --frozen-lockfile
+          pnpm --dir bench/compare exec playwright install --with-deps chromium
+      - name: Machine-property controls (no browser)
+        run: node --test bench/compare/s5-raster-calibration.test.mjs
+      - name: Six fresh static PNG fixture cases
+        run: |
+          mkdir -p "$RUNNER_TEMP/s5-raster-calibration"
+          xvfb-run -a node bench/compare/s5-raster-calibration.mjs "$RUNNER_TEMP/s5-raster-calibration"
+      - name: Retain complete or partial boundary evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: s5-raster-calibration-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/s5-raster-calibration/
+          retention-days: 5
+          if-no-files-found: error
