@@ -24,14 +24,36 @@ test('три переназначения opacity сохраняют одног�
       first.finish(); second.stop();
       const runningEffects = element.getAnimations().length, active = third.state;
       c.play(); await third.finished;
-      return { before, after, runningEffects, active, outcomes: await Promise.all(runs.map(run => run.finished)),
-        final: Number(getComputedStyle(element).opacity), remaining: element.getAnimations().length };
+      const outcomes = await Promise.all(runs.map(run => run.finished));
+      const final = Number(getComputedStyle(element).opacity), remaining = element.getAnimations().length;
+      // Отдельный handoff сохраняет исходный witness .35 выше: finish OLD
+      // меняет native-позу на endpoint до назначения NEW в том же JS turn.
+      const old = animate(element, { opacity: .9 }, options); runs.push(old);
+      const oldEffect = effect(); oldEffect.pause(); oldEffect.currentTime = 200;
+      let deliveries = 0;
+      const oldNativeCompletion = oldEffect.finished.then(() => { deliveries++; });
+      oldEffect.finish();
+      const successor = animate(element, { opacity: .2 }, options); runs.push(successor);
+      const successorEffect = effect(); successorEffect.pause(); successorEffect.currentTime = 0;
+      const successorPose = Number(getComputedStyle(element).opacity);
+      await oldNativeCompletion;
+      const handoff = { deliveries, oldState: old.state, newState: successor.state,
+        sameEffect: effect() === successorEffect, effects: element.getAnimations().length,
+        before: successorPose, after: Number(getComputedStyle(element).opacity) };
+      successorEffect.finish();
+      const handoffOutcomes = await Promise.all([old.finished, successor.finished]);
+      return { before, after, runningEffects, active, outcomes, final, remaining, handoff, handoffOutcomes,
+        handoffFinal: Number(getComputedStyle(element).opacity), handoffRemaining: element.getAnimations().length };
     } finally { for (const run of runs) run.stop(); element.remove(); }
   });
   expect(result.before).toBeCloseTo(.35, 4); expect(result.after).toBeCloseTo(result.before, 4);
   expect(result.runningEffects).toBe(1); expect(result.active).toBe('running');
   expect(result.outcomes).toEqual([{ status: 'stopped' }, { status: 'stopped' }, { status: 'finished' }]);
   expect(result.final).toBeCloseTo(.1, 5); expect(result.remaining).toBe(0);
+  expect(result.handoff).toMatchObject({ deliveries: 1, oldState: 'stopped', newState: 'running', sameEffect: true, effects: 1 });
+  expect(result.handoff.before).toBeCloseTo(.9, 5); expect(result.handoff.after).toBeCloseTo(result.handoff.before, 5);
+  expect(result.handoffOutcomes).toEqual([{ status: 'stopped' }, { status: 'finished' }]);
+  expect(result.handoffFinal).toBeCloseTo(.2, 5); expect(result.handoffRemaining).toBe(0);
 });
 test('область снимает DOM-listener с однажды прочитанным capture', async ({ page }) => {
   const result = await page.evaluate(async () => {

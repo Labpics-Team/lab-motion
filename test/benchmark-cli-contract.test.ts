@@ -6,7 +6,7 @@ import { createContext, runInContext } from 'node:vm';
 import { execFileSync, spawn } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { captureTrajectory, installNativeCaptureDiagnostics } from '../bench/compare/bench.mjs';
 import { recordCaptureDiagnostic, recordCaptureReplay } from '../bench/compare/conformance-smoke.mjs';
@@ -23,15 +23,21 @@ function put(root: string, path: string, text: string) {
   writeFileSync(join(root, path), text);
 }
 
+function copyFixtureSources(sourceRoot: string, root: string) {
+  mkdirSync(join(root, 'scripts'), { recursive: true });
+  for (const name of ['size-gate.mjs', 'compression-oracle.mjs', 'compression-policy.mjs']) {
+    cpSync(join(sourceRoot, 'scripts', name), join(root, 'scripts', name));
+  }
+  cpSync(join(sourceRoot, 'bench/compare'), join(root, 'bench/compare'), {
+    recursive: true,
+    filter: source => !relative(join(sourceRoot, 'bench/compare'), source).split(/[\\/]/).some(part => ['node_modules', 'results', 'evidence'].includes(part)),
+  });
+}
+
 function fixture(directory: string, name: string) {
   const root = join(directory, name);
   mkdirSync(root);
-  for (const path of ['scripts', 'bench/compare']) {
-    cpSync(join(repository, path), join(root, path), {
-      recursive: true,
-      filter: source => !source.split(/[\\/]/).some(part => ['node_modules', 'results', 'evidence'].includes(part)),
-    });
-  }
+  copyFixtureSources(repository, root);
   symlinkSync(join(repository, 'node_modules'), join(root, 'node_modules'), 'junction');
   // Только чтение существующего HEAD: фикстура не создаёт Git-коммиты.
   const gitDirectory = execFileSync('git', ['rev-parse', '--absolute-git-dir'], { cwd: repository, encoding: 'utf8' }).trim();
@@ -578,6 +584,23 @@ describe('S5 opt-in native capture diagnostics', () => {
 });
 
 describe('контракты настоящих CLI сравнительных измерений', () => {
+  it.each(['source', 'evidence', 'results', 'node_modules'])('фикстура копирует зависимости внутри %s без временных результатов компилятора', ancestor => {
+    const directory = mkdtempSync(join(tmpdir(), 'motion-cli-inputs-'));
+    const source = join(directory, ancestor, 'source'), target = join(directory, 'target');
+    const scripts = ['size-gate.mjs', 'compression-oracle.mjs', 'compression-policy.mjs'];
+    try {
+      for (const name of scripts) put(source, `scripts/${name}`, readFileSync(join(repository, 'scripts', name), 'utf8'));
+      put(source, 'scripts/.compiler-acceptance-tmp/surface.js', 'transient compiler output');
+      put(source, 'bench/compare/provenance.mjs', readFileSync(join(repository, 'bench/compare/provenance.mjs'), 'utf8'));
+      for (const name of ['node_modules', 'results', 'evidence']) put(source, `bench/compare/${name}/transient.json`, '{}');
+      copyFixtureSources(source, target);
+      expect(existsSync(join(target, 'scripts/.compiler-acceptance-tmp'))).toBe(false);
+      for (const name of scripts) expect(readFileSync(join(target, 'scripts', name), 'utf8')).toBe(readFileSync(join(source, 'scripts', name), 'utf8'));
+      expect(readFileSync(join(target, 'bench/compare/provenance.mjs'), 'utf8')).toBe(readFileSync(join(source, 'bench/compare/provenance.mjs'), 'utf8'));
+      for (const name of ['node_modules', 'results', 'evidence']) expect(existsSync(join(target, 'bench/compare', name))).toBe(false);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
   it('consumer-size сохраняет восемь реальных esbuild-графов и неизменность входов', async () => {
     await isolated(async (directory, baseline, candidate) => {
       const output = join(directory, 'report.json');
