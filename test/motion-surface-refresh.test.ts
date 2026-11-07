@@ -30,6 +30,23 @@ for (const native of [false, true]) it(`предварительное чтен�
   expect(h.updates.size + h.renders.size).toBe(0);
 });
 
+for (const native of [false, true]) it(`свежая none-поза изолирована между Surface и сбрасывает составные оси, native=${native}`, () => {
+  const a = harness(native), b = harness(native);
+  a.values.set('transform', 'translate(20px, 40px) rotate(45deg) scale(2,3)');
+  a.runtime.animate(a.element, { x: 100 }, options).finish();
+  a.values.set('transform', 'none');
+  const first = a.runtime.animate(a.element, { x: 100, y: 40 }, options);
+  const second = a.runtime.animate(b.element, { x: 200 }, options);
+  try {
+    first.seek(500); second.seek(500);
+    expect(a.x()).toBe(50); expect(a.y()).toBe(20);
+    expect(b.x()).toBe(100); expect(b.y()).toBe(0);
+    expect(a.values.get('transform')).toContain('rotate(0deg) skew(0deg,0deg) scale(1,1)');
+    expect(b.values.get('transform')).toContain('rotate(0deg) skew(0deg,0deg) scale(1,1)');
+  } finally { first.stop(); second.stop(); }
+  expect(a.updates.size + a.renders.size).toBe(0);
+});
+
 for (const callback of ['styles', 'now'] as const) it(`повторный вход host.${callback} сохраняет выбранную группу и живой y`, () => {
   const h = harness(); const styles = h.host.styles; const now = h.host.now;
   let entered = false; let nested: Playback | undefined;

@@ -61,10 +61,10 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
   }
   return [...new Set(result)];
 }
-function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
-  const values = { ...TRANSFORMS };
+function initialTransforms(style: CSSStyleDeclaration): Readonly<Record<string, number>> {
   const text = style.getPropertyValue('transform');
-  if (!text || text === 'none') return values;
+  if (!text || text === 'none') return TRANSFORMS;
+  const values = { ...TRANSFORMS };
   if (typeof DOMMatrixReadOnly !== 'undefined') {
     const matrix = new DOMMatrixReadOnly(text);
     if (!matrix.is2D) failMotion('x/y: нужен 2D transform');
