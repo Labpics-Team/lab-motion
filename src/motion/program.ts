@@ -120,8 +120,13 @@ export function sample(program: Program, time: number, value: number[], velocity
     for (let i = 0; i < program._final.length; i++) { value[i] = program._final[i]!; velocity[i] = 0; }
     return;
   }
-  let at = 0;
-  while (at + 1 < _segments.length && time >= _segments[at + 1]!._at) at++;
+  // Последнее начало <= time: совпадающие границы и обратный seek сохраняют семантику.
+  let at = 0, end = _segments.length;
+  while (at + 1 < end) {
+    const middle = (at + end) >>> 1;
+    if (time >= _segments[middle]!._at) at = middle;
+    else end = middle;
+  }
   const segment = _segments[at]!;
   const _elapsed = Math.max(0, time - segment._at), duration = segment._end - segment._at;
   if (time >= segment._end) {
