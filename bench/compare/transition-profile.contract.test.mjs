@@ -119,7 +119,7 @@ function cgroupEmpty(cgroup) {
       else { failure = error; for (const waiter of waiters) waiter.reject(error); }
     }
   };
-  // kernfs IN_MODIFY: подписка до stop. Каждый await проверяет СВЕЖЕЕ состояние после settlement.
+  // kernfs IN_MODIFY: подписка до stop. Каждый await проверяет СВЕЖЕЕ состояние после завершения операции.
   try {
     watcher = watch(events, inspect);
     watcher.on('error', error => { failure = error; for (const waiter of waiters) waiter.reject(error); });
@@ -179,7 +179,7 @@ renameSync(${JSON.stringify(join(directory, unit + '.json.tmp'))}, ${JSON.string
         '--property=TimeoutStopSec=' + stopMs / 1000, '--property=SendSIGKILL=yes', ...env,
         process.execPath, '--import', pathToFileURL(ownership).href, ...(preload ? ['--import', pathToFileURL(preload).href] : []), runner, ...args], { output });
       control.started?.();
-      // Start race: отмена не отказывается от будущего unit; ждём handshake/start outcome ограниченно.
+      // Гонка запуска: отмена не отказывается от будущей службы; ограниченно ждём подтверждение или результат запуска.
       acquired = await deadlinePromise(Promise.race([
         handshake.ready,
         run.closed.then(result => {
