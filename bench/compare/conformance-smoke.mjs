@@ -61,12 +61,13 @@ function buildAdapters(temporaryDirectory, diagnostic = false) {
 }
 
 function assessCaptures(participant, captures) {
-  const evidence = {};
+  const evidence = { measurement: {} };
   const rawFrames = {};
   for (const [mode, capture] of Object.entries(captures)) {
     evidence[mode] = capture.decoded;
     evidence[`${mode}Witness`] = capture.witness;
     evidence[`${mode}Clock`] = capture.clock;
+    evidence.measurement[mode] = capture.measurement;
     rawFrames[mode] = capture.rawFrames;
   }
   // Пустые массивы обозначают неизмеренные пути. Это вход oracle, не fixture отчёта.
@@ -85,8 +86,8 @@ async function recordScenario(browser, origin, scenario, adapter) {
   const run = assessCaptures(scenario.participant, captures);
   const failures = [];
   for (const [mode, expected] of Object.entries(scenario.expected)) {
-    const target = run[mode];
-    const witness = run.witness[mode];
+    const target = run.diagnostic[mode];
+    const witness = run.diagnostic.witness[mode];
     const capture = run.capture[mode];
     const accepted = capture.verdict === 'pass' && witness.verdict === 'pass' && target.verdict === expected;
     console.log(JSON.stringify({

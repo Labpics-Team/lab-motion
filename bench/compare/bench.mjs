@@ -1130,6 +1130,7 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl, 
     return {
       decoded,
       witness,
+      measurement: { target: 'png-threshold-v1', witness: 'png-threshold-v1' },
       clock,
       finalX: terminal.finalX,
       timing: terminal.timing,
@@ -1201,7 +1202,10 @@ async function runFreezePair(browser, adapterPath, blockedFirst, pageUrl) {
   if (Number.isFinite(windowStart) && Number.isFinite(windowEnd)) {
     for (let t = windowStart; t <= windowEnd; t += 0.1) grid.push(t);
   }
-  const evidence = createFreezeEvidence(blocked.decoded, baseline.decoded, grid);
+  const evidence = createFreezeEvidence(blocked.decoded, baseline.decoded, grid, {
+    baseline: baseline.measurement,
+    blocked: blocked.measurement,
+  });
   evidence.baselineWitness = baseline.witness;
   evidence.blockedWitness = blocked.witness;
   evidence.baselineClock = baseline.clock;

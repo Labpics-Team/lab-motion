@@ -1215,7 +1215,7 @@ export function scoreAgainstBaseline(blocked, baseline, grid) {
 }
 
 /** JSON-доказательство, из которого score S5 пересчитывается без скрытого состояния. */
-export function createFreezeEvidence(blocked, baseline, grid) {
+export function createFreezeEvidence(blocked, baseline, grid, measurement = {}) {
   const copyPoints = (points, label) => {
     if (!Array.isArray(points)) throw new Error(`S5 raw: ${label} не массив`);
     return points.map((point, index) => {
@@ -1232,6 +1232,7 @@ export function createFreezeEvidence(blocked, baseline, grid) {
     blocked: copyPoints(blocked, 'blocked'),
     baseline: copyPoints(baseline, 'baseline'),
     grid: [...grid],
+    measurement: structuredClone(measurement),
   };
 }
 

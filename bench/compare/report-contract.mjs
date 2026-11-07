@@ -108,10 +108,16 @@ function qualifyMotionCapture(run, mode) {
   }
   // IEEE-754 epoch timestamps добавляют собственное округление сверх page timer.
   const uncertaintyMs = clock.markerToApiUpperMs + 8 * Number.EPSILON * clock.startedAtSeconds * 1000;
+  if (uncertaintyMs > S5_MOTION_CONTRACT.timeToleranceMs) {
+    return { verdict: 'inconclusive', reason: 'clock-uncertainty-exceeds-contract', uncertaintyMs };
+  }
+  // Происхождение — диагностика, не доказательство CSS-геометрии. Допущенного источника пока нет.
   return {
-    verdict: uncertaintyMs <= S5_MOTION_CONTRACT.timeToleranceMs ? 'pass' : 'inconclusive',
-    reason: uncertaintyMs <= S5_MOTION_CONTRACT.timeToleranceMs ? 'paired-frames-and-clock' : 'clock-uncertainty-exceeds-contract',
-    uncertaintyMs,
+    verdict: 'inconclusive', reason: 'raster-to-css-unproven', uncertaintyMs,
+    measurement: {
+      target: typeof evidence?.measurement?.[mode]?.target === 'string' ? evidence.measurement[mode].target : 'unknown',
+      witness: typeof evidence?.measurement?.[mode]?.witness === 'string' ? evidence.measurement[mode].witness : 'unknown',
+    },
   };
 }
 
@@ -126,12 +132,19 @@ export function createBenchmarkMotionConformance(results) {
         baseline: capture.baseline.uncertaintyMs ?? NaN,
         blocked: capture.blocked.uncertaintyMs ?? NaN,
       };
-      return {
+      const diagnostic = {
         ...evaluateFreezeConformance(id, run, uncertainty),
-        capture,
         witness: {
           baseline: evaluateTrajectoryConformance(run.evidence?.baselineWitness, 'linear', uncertainty.baseline),
           blocked: evaluateTrajectoryConformance(run.evidence?.blockedWitness, 'linear', uncertainty.blocked),
+        },
+      };
+      const unqualified = (mode) => ({ ...diagnostic[mode], verdict: 'inconclusive', reason: capture[mode].reason });
+      return {
+        baseline: unqualified('baseline'), blocked: unqualified('blocked'), capture, diagnostic,
+        witness: {
+          baseline: { ...diagnostic.witness.baseline, verdict: 'inconclusive', reason: capture.baseline.reason },
+          blocked: { ...diagnostic.witness.blocked, verdict: 'inconclusive', reason: capture.blocked.reason },
         },
       };
     });
@@ -145,6 +158,10 @@ export function createBenchmarkMotionConformance(results) {
         run.capture.baseline.verdict === 'pass' && run.capture.blocked.verdict === 'pass' &&
         run.witness.baseline.verdict === 'pass' && run.witness.blocked.verdict === 'pass'
       )) ? 'pass' : 'inconclusive',
+      diagnostic: {
+        baseline: aggregateConformance(runs.map(run => run.diagnostic.baseline.verdict)),
+        blocked: aggregateConformance(runs.map(run => run.diagnostic.blocked.verdict)),
+      },
       runs,
     }];
   }));
@@ -648,6 +665,9 @@ export function renderBenchmarkMarkdown(payload) {
     'сверяется с уравнением времени, пружина — с независимым решением ОДУ; собственный baseline не служит эталоном.',
     'Зелёный native-свидетель снимается в том же кадре и обеспечивает наблюдение неподвижной красной цели.',
     'CDP start marker связывается с часами этого page realm; измеренная неопределённость вычитается из временного допуска.',
+    'PNG threshold — диагностика пикселей, не доказанная CSS-геометрия. Источник target/witness хранится отдельно от raw t,x.',
+    'Сейчас нет допущенного геометрического источника: геометрический verdict inconclusive запрещает публикацию.',
+    'Исходные точечные PASS/FAIL сохранены отдельно в diagnostic; происхождение само по себе не открывает допуск.',
     '',
     '| Путь | Запись кадров | Без блокировки | С блокировкой |',
     '|---|---|---|---|',

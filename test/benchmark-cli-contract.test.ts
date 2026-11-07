@@ -11,6 +11,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { captureTrajectory, installNativeCaptureDiagnostics } from '../bench/compare/bench.mjs';
 import { recordCaptureDiagnostic, recordCaptureReplay } from '../bench/compare/conformance-smoke.mjs';
 import { startClock, timerEvidence } from './benchmark-clock-fixture.js';
+import { createFreezeEvidence } from '../bench/compare/methodology.mjs';
+import { createBenchmarkMotionConformance, S5_MOTION_REQUIREMENTS } from '../bench/compare/report-contract.mjs';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
 const exportsSource = ['animate', 'sequence', 'scope', 'layout', 'value', 'playhead', 'MotionError']
@@ -457,6 +459,24 @@ describe('S5 opt-in native capture diagnostics', () => {
       await control.readyThenCancel();
       completion.complete();
       const result = await capture;
+      expect(result.measurement).toEqual({ target: 'png-threshold-v1', witness: 'png-threshold-v1' });
+      const evidence = createFreezeEvidence(result.decoded, result.decoded, [], {
+        baseline: result.measurement, blocked: result.measurement,
+      });
+      Object.assign(evidence, {
+        baselineWitness: result.witness, blockedWitness: result.witness,
+        baselineClock: result.clock, blockedClock: result.clock,
+      });
+      const stored = JSON.parse(JSON.stringify({ evidence, rawFrames: { baseline: result.rawFrames, blocked: result.rawFrames } }));
+      const results = Object.fromEntries(S5_MOTION_REQUIREMENTS.baseline.map(id => [
+        id, { raw: { freeze: id === 'lab-spring' ? [stored] : [] } },
+      ]));
+      const qualification = createBenchmarkMotionConformance(results)['lab-spring'].runs[0];
+      for (const mode of ['baseline', 'blocked']) {
+        expect(stored.evidence.measurement[mode]).toEqual(result.measurement);
+        expect(qualification.capture[mode]).toMatchObject({ verdict: 'inconclusive', reason: 'raster-to-css-unproven' });
+        expect(qualification[mode].verdict).toBe('inconclusive');
+      }
       expect(result.nativeDiagnostic.records.map((record: { ready: { status: string }; terminal: { status: string } }) => ({
         ready: record.ready.status, terminal: record.terminal.status,
       }))).toEqual([{ ready: 'complete', terminal: 'incomplete' }, { ready: 'complete', terminal: 'incomplete' }]);
@@ -537,9 +557,13 @@ describe('S5 opt-in native capture diagnostics', () => {
       expect(report.rounds).toHaveLength(8);
       expect(report.errors.some((error: { message: string }) => error.message.includes('native timing incomplete'))).toBe(false);
       for (let round = 1; round < 8; round++) for (const mode of ['baseline', 'blocked']) {
-        expect(report.rounds[round].assessment.capture[mode].verdict).toBe('pass');
-        expect(report.rounds[round].assessment.witness[mode].verdict).toBe('pass');
-        expect(report.rounds[round].assessment[mode].verdict).toBe('fail');
+        expect(report.rounds[round].assessment.capture[mode]).toMatchObject({
+          verdict: 'inconclusive', reason: 'raster-to-css-unproven',
+        });
+        expect(report.rounds[round].assessment.witness[mode].verdict).toBe('inconclusive');
+        expect(report.rounds[round].assessment[mode].verdict).toBe('inconclusive');
+        expect(report.rounds[round].assessment.diagnostic.witness[mode].verdict).toBe('pass');
+        expect(report.rounds[round].assessment.diagnostic[mode].verdict).toBe('fail');
         expect(report.errors.some((error: { message: string }) => error.message.includes(`round-${round}.${mode}: S5 contract failed`))).toBe(true);
         expect(aggregate.errors.some((error: Error) => error.message === `round-${round}.${mode}: S5 contract failed`)).toBe(true);
       }

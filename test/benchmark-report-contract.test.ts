@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+import { colorLeftEdge } from '../bench/compare/bench.mjs';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -362,6 +364,7 @@ type MotionClock = {
   timerEvidence: ReturnType<typeof timerEvidence>;
 };
 type MotionEvidence = {
+  measurement?: Partial<Record<'baseline' | 'blocked', { target?: string; witness?: string }>>;
   baseline: MotionPoint[];
   blocked: MotionPoint[];
   baselineWitness?: MotionPoint[];
@@ -560,8 +563,59 @@ describe('failed start semantic diagnostics', () => {
 });
 
 describe('schema 10 motion conformance admission', () => {
-  it('публикация принимает отчёт с обязательным качеством движения', () => {
-    expect(() => validateBenchmarkReportForPublication(motionFixture())).not.toThrow();
+  it('публикация отклоняет аналитические точки без доказанной геометрии', () => {
+    expect(() => validateBenchmarkReportForPublication(motionFixture())).toThrow(/motion conformance/);
+  });
+
+  it.each(['baseline', 'blocked'] as const)('происхождение %s переживает JSON, но не доказывает геометрию', (mode) => {
+    for (const source of [undefined, 'legacy', 'unknown', 'png-threshold-v1', 'analytic-test-v1']) {
+      for (const channel of ['target', 'witness'] as const) {
+        const report = motionFixture();
+        const run = report.payload.results.lab.raw.freeze[0];
+        run.evidence.measurement = { [mode]: { target: 'png-threshold-v1', witness: 'png-threshold-v1', [channel]: source } };
+        Object.assign(run.evidence.measurement[mode], { qualifiedGeometry: true, oracle: 'trusted', trusted: true });
+        report.payload.results.lab.raw.freeze[0] = JSON.parse(JSON.stringify(run));
+        refreshMotionReport(report);
+        const result = report.payload.motionConformance.lab.runs[0];
+        expect(result.capture[mode]).toMatchObject({
+          verdict: 'inconclusive', reason: 'raster-to-css-unproven',
+          measurement: { [channel]: source ?? 'unknown' },
+        });
+        expect(result.diagnostic[mode].verdict).toBe('pass');
+        expect(result[mode].verdict).toBe('inconclusive');
+        expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+        expect(() => validateBenchmarkReportForPublication(report)).toThrow(/motion conformance/);
+      }
+    }
+  });
+
+  it('конечные целочисленные и субпиксельные PNG-контроли не открывают CSS-допуск', () => {
+    const { PNG } = createRequire(import.meta.url)('pngjs');
+    for (const authoredX of [117, 117.375, 117.5]) {
+      const png = new PNG({ width: 800, height: 200 });
+      png.data.fill(255);
+      for (let y = 20; y < 50; y++) {
+        for (let x = Math.floor(authoredX); x < Math.ceil(authoredX + 30); x++) {
+          const offset = (y * png.width + x) * 4;
+          // Known bytes, not a browser blending or CSS-coordinate model.
+          const edge = !Number.isInteger(authoredX) && x === Math.floor(authoredX);
+          const green = edge ? (authoredX === 117.5 ? 128 : 93) : 0;
+          png.data[offset + 1] = green;
+          png.data[offset + 2] = green;
+        }
+      }
+      const x = colorLeftEdge(PNG.sync.write(png, { colorType: 2 }), 0);
+      expect(x).toBe(authoredX === 117.5 ? 118 : 117);
+      const report = motionFixture();
+      const run = report.payload.results.lab.raw.freeze[0];
+      run.evidence.blocked[24]!.x = x;
+      run.evidence.measurement = { blocked: { target: 'png-threshold-v1', witness: 'png-threshold-v1' } };
+      refreshMotionReport(report);
+      expect(report.payload.motionConformance.lab.runs[0].capture.blocked).toMatchObject({
+        verdict: 'inconclusive', reason: 'raster-to-css-unproven',
+      });
+      expect(() => validateBenchmarkReportForPublication(report)).toThrow(/motion conformance/);
+    }
   });
 
   it('публикация требует motion conformance', () => {
@@ -576,7 +630,7 @@ describe('schema 10 motion conformance admission', () => {
       refreshMotionReport(report);
       expect(() => validateBenchmarkReportPair(report)).not.toThrow();
       expect(() => validateBenchmarkReportForPublication({ ...report, motionRequirements }))
-        .toThrow(/motion-mini\.blocked = fail/);
+        .toThrow(/motion conformance/);
     },
   );
 
@@ -591,18 +645,18 @@ describe('schema 10 motion conformance admission', () => {
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).not.toThrow();
+    })).toThrow(/motion conformance/);
     expect(Object.keys(report.payload.motionConformance)).toEqual(FREEZE);
     for (const id of FREEZE) {
       const conformance = report.payload.motionConformance[id];
-      expect(conformance).toMatchObject({ baseline: 'pass', blocked: 'pass', capture: 'pass' });
+      expect(conformance).toMatchObject({ baseline: 'inconclusive', blocked: 'inconclusive', capture: 'inconclusive', diagnostic: { baseline: 'pass', blocked: 'pass' } });
       expect(conformance.runs).toHaveLength(8);
       for (const run of conformance.runs) {
-        expect(run.baseline.samples).toBe(121);
-        expect(run.blocked.samples).toBe(121);
+        expect(run.diagnostic.baseline.samples).toBe(121);
+        expect(run.diagnostic.blocked.samples).toBe(121);
       }
     }
-    expect(report.payload.motionConformance['lab-spring'].runs[0].baseline.maxErrorPx)
+    expect(report.payload.motionConformance['lab-spring'].runs[0].diagnostic.baseline.maxErrorPx)
       .toBeLessThan(0.000001);
     expect(report.markdown).toContain('Независимый контракт движения');
     expect(report.markdown).toContain('не выполнение требований движения');
@@ -627,14 +681,14 @@ describe('schema 10 motion conformance admission', () => {
     expect(run.valid).toBe(true);
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();
     expect(report.payload.motionConformance.lab).toMatchObject({
-      baseline: 'pass', blocked: 'fail', capture: 'pass',
+      baseline: 'inconclusive', blocked: 'inconclusive', capture: 'inconclusive', diagnostic: { baseline: 'pass', blocked: 'fail' },
     });
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: { baseline: ['lab'], blocked: ['lab'] },
-    })).toThrow(/motion conformance: lab\.blocked = fail/);
+    })).toThrow(/motion conformance/);
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion conformance: lab\.blocked = fail/);
+    })).toThrow(/motion conformance/);
   });
 
   it('отклоняет одинаковое неверное движение baseline и blocked при score 100 и valid=true', () => {
@@ -648,11 +702,11 @@ describe('schema 10 motion conformance admission', () => {
     expect(report.payload.results.lab.raw.freeze.every((run: { valid: boolean }) => run.valid)).toBe(true);
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();
     expect(report.payload.motionConformance.lab).toMatchObject({
-      baseline: 'fail', blocked: 'fail', capture: 'pass',
+      baseline: 'inconclusive', blocked: 'inconclusive', capture: 'inconclusive', diagnostic: { baseline: 'fail', blocked: 'fail' },
     });
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion conformance: lab\.baseline = fail/);
+    })).toThrow(/motion conformance/);
   });
 
   it.each(['motion', 'motion-mini'])(
@@ -663,11 +717,11 @@ describe('schema 10 motion conformance admission', () => {
       refreshMotionReport(report);
       expect(report.payload.results[id].summary.freeze.score.p50).toBe(100);
       expect(report.payload.motionConformance[id].runs.filter(
-        (run: { blocked: { verdict: string } }) => run.blocked.verdict === 'pass',
+        (run: { diagnostic: { blocked: { verdict: string } } }) => run.diagnostic.blocked.verdict === 'pass',
       )).toHaveLength(7);
       expect(() => validateBenchmarkReportPair(report)).not.toThrow();
       expect(() => validateBenchmarkReportForPublication(report))
-        .toThrow('motion conformance: ' + id + '.blocked = fail');
+        .toThrow(/motion conformance/);
     },
   );
 
@@ -676,9 +730,9 @@ describe('schema 10 motion conformance admission', () => {
     report.payload.results.gsap.raw.freeze[0].evidence.blocked = freeze25To65();
     refreshMotionReport(report);
     expect(report.payload.motionConformance.gsap).toMatchObject({
-      baseline: 'pass', blocked: 'fail', capture: 'pass',
+      baseline: 'inconclusive', blocked: 'inconclusive', capture: 'inconclusive', diagnostic: { baseline: 'pass', blocked: 'fail' },
     });
-    expect(() => validateBenchmarkReportForPublication(report)).not.toThrow();
+    expect(() => validateBenchmarkReportForPublication(report)).toThrow(/motion conformance/);
   });
 
   it('не принимает подделанный cached PASS даже с каноническими Markdown и SHA', () => {
@@ -741,10 +795,11 @@ describe('schema 10 motion conformance admission', () => {
     expect(conformance.capture).toBe('inconclusive');
     expect(conformance[mode]).toBe('inconclusive');
     expect(conformance.runs[0].witness[mode].verdict).toBe('inconclusive');
+    expect(conformance.runs[0].capture[mode].reason).toBe('unpaired-frame-observations');
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(new RegExp(`motion-mini\\.${mode} = inconclusive`));
+    })).toThrow(/motion conformance/);
   });
 
   it('не квалифицирует неподвижный witness, хотя целевая траектория правильная', () => {
@@ -755,10 +810,11 @@ describe('schema 10 motion conformance admission', () => {
     expect(report.payload.motionConformance['motion-mini']).toMatchObject({
       blocked: 'inconclusive', capture: 'inconclusive',
     });
+    expect(report.payload.motionConformance['motion-mini'].runs[0].diagnostic.witness.blocked.verdict).toBe('fail');
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion-mini\.blocked = inconclusive/);
+    })).toThrow(/motion conformance/);
   });
 
   it('не нормализует общий поздний native-старт по Animation.startTime', () => {
@@ -771,7 +827,9 @@ describe('schema 10 motion conformance admission', () => {
     expect(report.payload.motionConformance['motion-mini']).toMatchObject({
       blocked: 'inconclusive', capture: 'inconclusive',
     });
-    expect(() => validateBenchmarkReportForPublication(report)).toThrow(/motion-mini\.blocked = inconclusive/);
+    expect(report.payload.motionConformance['motion-mini'].runs[0].diagnostic.blocked.verdict).toBe('fail');
+    expect(report.payload.motionConformance['motion-mini'].runs[0].diagnostic.witness.blocked.verdict).toBe('fail');
+    expect(() => validateBenchmarkReportForPublication(report)).toThrow(/motion conformance/);
   });
 
   it('не достраивает пропущенные кадры из верных редких положений цели и witness', () => {
@@ -783,13 +841,13 @@ describe('schema 10 motion conformance admission', () => {
     expect(report.payload.motionConformance['motion-mini']).toMatchObject({
       blocked: 'inconclusive', capture: 'inconclusive',
     });
-    expect(report.payload.motionConformance['motion-mini'].runs[0].blocked).toMatchObject({
+    expect(report.payload.motionConformance['motion-mini'].runs[0].diagnostic.blocked).toMatchObject({
       verdict: 'inconclusive', reason: 'observation-gap-exceeds-contract', samples: 31,
     });
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion-mini\.blocked = inconclusive/);
+    })).toThrow(/motion conformance/);
   });
 
   it('не подставляет witness из других кадров при правильных отдельных траекториях', () => {
@@ -800,10 +858,11 @@ describe('schema 10 motion conformance admission', () => {
     expect(report.payload.motionConformance['motion-mini']).toMatchObject({
       blocked: 'inconclusive', capture: 'inconclusive',
     });
+    expect(report.payload.motionConformance['motion-mini'].runs[0].capture.blocked.reason).toBe('unpaired-frame-observations');
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion-mini\.blocked = inconclusive/);
+    })).toThrow(/motion conformance/);
   });
 
   it('не удаляет одинаковые кадры из обеих сеток при сохранённом счётчике захвата', () => {
@@ -816,8 +875,9 @@ describe('schema 10 motion conformance admission', () => {
     report.payload.motionConformance = createBenchmarkMotionConformance(report.payload.results);
     renderMotionPair(report);
     expect(report.payload.motionConformance['motion-mini'].blocked).toBe('inconclusive');
+    expect(report.payload.motionConformance['motion-mini'].runs[0].capture.blocked.reason).toBe('unpaired-frame-observations');
     expect(() => validateBenchmarkReportPair({ ...report, motionRequirements: S5_MOTION_REQUIREMENTS }))
-      .toThrow(/motion-mini\.blocked = inconclusive/);
+      .toThrow(/motion conformance/);
   });
 
   it.each(['baseline', 'blocked'] as const)('требует отдельную привязку часов %s', (mode) => {
@@ -827,10 +887,11 @@ describe('schema 10 motion conformance admission', () => {
     const conformance = report.payload.motionConformance['motion-mini'];
     expect(conformance.capture).toBe('inconclusive');
     expect(conformance[mode]).toBe('inconclusive');
+    expect(conformance.runs[0].capture[mode].reason).toBe('unverified-cdp-start-clock');
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(new RegExp(`motion-mini\\.${mode} = inconclusive`));
+    })).toThrow(/motion conformance/);
   });
 
   it('28 мс между CDP marker и API не проходят как допустимый сдвиг движения', () => {
@@ -841,10 +902,11 @@ describe('schema 10 motion conformance admission', () => {
     expect(report.payload.motionConformance['motion-mini']).toMatchObject({
       blocked: 'inconclusive', capture: 'inconclusive',
     });
+    expect(report.payload.motionConformance['motion-mini'].runs[0].capture.blocked.reason).toBe('clock-uncertainty-exceeds-contract');
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion-mini\.blocked = inconclusive/);
+    })).toThrow(/motion conformance/);
   });
 
   it('не принимает CDP marker другого realm даже при малом численном интервале', () => {
@@ -855,9 +917,10 @@ describe('schema 10 motion conformance admission', () => {
     expect(report.payload.motionConformance['motion-mini']).toMatchObject({
       blocked: 'inconclusive', capture: 'inconclusive',
     });
+    expect(report.payload.motionConformance['motion-mini'].runs[0].capture.blocked.reason).toBe('unverified-cdp-start-clock');
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion-mini\.blocked = inconclusive/);
+    })).toThrow(/motion conformance/);
   });
 
   it('измеренная неопределённость расходует временной бюджет движения', () => {
@@ -868,17 +931,18 @@ describe('schema 10 motion conformance admission', () => {
     refreshMotionReport(report);
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).not.toThrow();
+    })).toThrow(/motion conformance/);
+    expect(report.payload.motionConformance['motion-mini'].runs[0].diagnostic.blocked.verdict).toBe('pass');
     run.evidence.blockedClock.startClock.pageApiNowMs =
       run.evidence.blockedClock.startClock.pageBeforeNowMs + 10;
     refreshMotionReport(report);
     expect(report.payload.motionConformance['motion-mini']).toMatchObject({
-      blocked: 'fail', capture: 'pass',
+      blocked: 'inconclusive', capture: 'inconclusive', diagnostic: { blocked: 'fail' },
     });
     expect(() => validateBenchmarkReportPair(report)).not.toThrow();
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion-mini\.blocked = fail/);
+    })).toThrow(/motion conformance/);
   });
 
   it.each(['retained null', 'dropped frames'])('потеря красной цели через кадр: %s', (representation) => {
@@ -894,7 +958,7 @@ describe('schema 10 motion conformance admission', () => {
     }
     expect(() => validateBenchmarkReportPair({
       ...report, motionRequirements: S5_MOTION_REQUIREMENTS,
-    })).toThrow(/motion-mini\.blocked = inconclusive/);
+    })).toThrow(/motion conformance/);
   });
 });
 
