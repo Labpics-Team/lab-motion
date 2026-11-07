@@ -539,14 +539,15 @@ export class Runtime {
     const reduced = clock._reduced || this._host.reduced();
     const author = authoredTiming(clock);
     // Одна неизменяемая программа на свойство в пределах группы; снимки host читаются по-прежнему.
-    const reuse: Array<{ _program: Program | undefined; _offset: number } | undefined> | undefined = elements.length > 1 ? props.map(property =>
+    const reuse: Array<Program | null | undefined> | undefined = elements.length > 1 ? props.map(property =>
       (isTransform(property._key) || property._key === 'opacity') && property._literal &&
       property._values.every(value => typeof value === 'number') && !(property._authored ? author : clock)._spring
-        ? { _program: undefined, _offset: 0 } : undefined) : undefined;
+        ? null : undefined) : undefined;
+    let previousOffset = offset;
     const result: Draft[] = [], synced = new Set<Surface>();
     try {
       for (let i = 0; i < elements.length; i++) {
-        const element = elements[i]!;
+        const element = elements[i]!, start = offset + i * clock._stagger;
         for (let j = 0; j < props.length; j++) {
           const property = props[j]!;
           const group = this._surface(element, property._key);
@@ -554,15 +555,15 @@ export class Runtime {
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
-          const start = offset + i * clock._stagger;
-          const slot = reuse?.[j], previous = slot?._program, first = previous?._segments[0];
-          // Допущенные transform/opacity имеют ровно одну координату и скорость.
-          const spec = previous && Object.is(start, slot!._offset) && Object.is(current._unit, previous._unit) &&
+          const previous = reuse?.[j], first = previous?._segments[0];
+          // Все слоты обновляются для каждой цели; точный offset общий для её свойств.
+          const spec = previous && Object.is(start, previousOffset) && Object.is(current._unit, previous._unit) &&
             Object.is(current._coordinates[0], first!._from[0]) && Object.is(current._velocity[0], first!._velocity[0])
             ? previous : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, start);
-          if (slot) { slot._program = spec; slot._offset = start; }
+          if (previous !== undefined) reuse![j] = spec;
           result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });
         }
+        previousOffset = start;
       }
     } finally {
       // План хранит значения; пустая CSS-поверхность не нужна между стадиями.
