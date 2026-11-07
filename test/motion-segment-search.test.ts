@@ -19,6 +19,47 @@ function read(program: Program, time: number) {
 }
 
 describe('поиск сегмента при произвольном времени', () => {
+  it('первый интервал читает постоянное число начал и сохраняет initial velocity', () => {
+    const { program, segments } = trajectory(4096);
+    let reads = 0;
+    for (const segment of segments) {
+      const at = segment._at;
+      Object.defineProperty(segment, '_at', { get() { reads++; return at; } });
+    }
+    const first: Program = { ...program, _segments: [
+      { ...segments[0]!, _velocity: [7] }, ...segments.slice(1),
+    ] };
+    reads = 0;
+    expect(read(first, 0)).toEqual({ value: 0, velocity: 7 });
+    expect(reads).toBeLessThanOrEqual(2);
+    reads = 0;
+    expect(read(program, 5).value).toBe(0.5);
+    expect(reads).toBeLessThanOrEqual(2);
+  });
+
+  it('NaN не выбирает другой callback, а throwing easing сохраняет error и порядок', () => {
+    const { program, segments } = trajectory(4);
+    const calls: number[] = [];
+    const failure = new Error();
+    const throwing: Program = { ...program, _segments: segments.map((segment, index) => ({
+      ...segment, _timing: { ...clock, _ease: (progress: number) => {
+        calls.push(index, progress); throw failure;
+      } },
+    })) };
+    const value = [123], velocity = [456];
+    expect(() => sample(throwing, NaN, value, velocity)).toThrow();
+    expect(calls).toEqual([]);
+    expect(value).toEqual([123]); expect(velocity).toEqual([456]);
+    for (const [time, index] of [[25, 2], [5, 0]]) {
+      calls.length = 0;
+      let caught: unknown;
+      try { sample(throwing, time!, value, velocity); } catch (error) { caught = error; }
+      expect(caught).toBe(failure);
+      expect(calls).toEqual([index, 0.501]);
+      expect(value).toEqual([123]); expect(velocity).toEqual([456]);
+    }
+  });
+
   it('читает логарифмическое число начал, включая перемотку назад', () => {
     const { program, segments } = trajectory(4096);
     let reads = 0;
