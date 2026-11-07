@@ -26,10 +26,11 @@ jobs:
           mkdir -p "$RUNNER_TEMP/s5-raster-calibration"
           printf 'PLAYWRIGHT_BROWSERS_PATH=%s/s5-raster-calibration-browsers\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
           printf 'source=%s\nrun=%s\nattempt=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/s5-raster-calibration/route.txt"
-      - name: Install existing pinned comparison dependencies only
+      - name: Install existing locked harness and comparison dependencies
         run: |
           corepack enable
           corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile --ignore-scripts
           pnpm --dir bench/compare install --frozen-lockfile
           pnpm --dir bench/compare exec playwright install --with-deps chromium
       - name: Machine-property controls (no browser)
