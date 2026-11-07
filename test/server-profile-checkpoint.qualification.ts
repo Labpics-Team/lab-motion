@@ -221,7 +221,8 @@ async function checkpointEndpointControl(browser: Browser, adapter: Awaited<Retu
     evidence.falseAdmission = false;
     evidence.verdict = 'INCOMPLETE';
   }
-  const directory = resolve('scratchpad', 'resource-evidence'); mkdirSync(directory, { recursive: true });
+  const evidenceRoot = resolve('scratchpad', 'resource-evidence'); mkdirSync(evidenceRoot, { recursive: true });
+  const directory = mkdtempSync(join(evidenceRoot, 'checkpoint-'));
   const file = join(directory, 'checkpoint-endpoint-control.json');
   writeFileSync(file, serverProfileStringify(records.preserveRawNumbers(evidence)) + '\n', { flag: 'wx' });
   console.log(JSON.stringify({ resourceEvidence: 1, file: 'checkpoint-endpoint-control.json', content: readFileSync(file, 'utf8') }));

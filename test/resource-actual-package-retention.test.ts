@@ -125,7 +125,9 @@ describe('RESOURCE-01: реальные байты установленного 
     const invoke = () => probe(`receipt-${outcome}`, false, 'root', script);
     if (outcome === 'success') expect(invoke()).toEqual({ status: 'pass', corpus: 'root' });
     else if (outcome === 'exit') expect(invoke).toThrow(expect.objectContaining({ status: 1, signal: null }));
-    else expect(invoke).toThrow(expect.objectContaining({ status: null, signal: 'SIGTERM' }));
+    else expect(invoke).toThrow(expect.objectContaining(WINDOWS_SHELL
+      ? { status: 1, signal: null }
+      : { status: null, signal: 'SIGTERM' }));
     expect(readFileSync(join(evidenceRun, `receipt-${outcome}-root.stderr.log`), 'utf8')).toBe(stderr);
     expect(JSON.parse(readFileSync(join(evidenceRun, `receipt-${outcome}-root.stdout.log`), 'utf8'))).toEqual({ status: 'pass', corpus: 'root' });
   });

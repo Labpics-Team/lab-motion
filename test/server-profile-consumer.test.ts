@@ -60,9 +60,15 @@ it('classification fault exports both acquired outcomes before deferred failure'
     }, cleanupErrors: [], reasons: [], falseAdmission: false, verdict: 'INCOMPLETE' };
     const envelopes: string[] = [];
     const compiled = esbuild.transformSync('(() => { ' + source.slice(begin, end) + ' })()', { loader: 'ts', target: 'esnext' }).code;
-    const result = runInNewContext(compiled, { evidence, records, SERVER_PROFILE, count: 3200,
-      serverBrowserClockBounds, serverProfileStringify, resolve: () => directory, join, mkdirSync, writeFileSync, readFileSync,
+    const exportDirectories: string[] = [];
+    const exportControl = (currentEvidence: typeof evidence) => runInNewContext(compiled, {
+      evidence: currentEvidence, records, SERVER_PROFILE, count: 3200,
+      serverBrowserClockBounds, serverProfileStringify, resolve: () => directory, join, mkdirSync,
+      mkdtempSync: (prefix: string) => {
+        const created = mkdtempSync(prefix); exportDirectories.push(created); return created;
+      }, writeFileSync, readFileSync,
       console: { log: (line: string) => envelopes.push(line) } });
+    const result = exportControl(evidence);
     expect(result.verdict).toBe('INCOMPLETE');
     expect(result.classificationError.name).toBe('TypeError');
     expect(result.falseAdmission).toBe(false);
@@ -70,11 +76,31 @@ it('classification fault exports both acquired outcomes before deferred failure'
     const envelope = JSON.parse(envelopes[0]);
     expect(envelope.resourceEvidence).toBe(1);
     expect(envelope.file).toBe('checkpoint-endpoint-control.json');
-    expect(envelope.content).toBe(readFileSync(join(directory, envelope.file), 'utf8'));
+    expect(exportDirectories).toHaveLength(1);
+    const firstFile = join(exportDirectories[0]!, envelope.file);
+    expect(envelope.content).toBe(readFileSync(firstFile, 'utf8'));
     const exported = JSON.parse(envelope.content);
     expect(exported.outcomes).toEqual(evidence.outcomes);
     expect(exported.classificationError.name).toBe('TypeError');
     expect(exported.verdict).toBe('INCOMPLETE');
+    const secondEvidence = structuredClone(evidence);
+    secondEvidence.outcomes.held.error.message = 'second retained';
+    const secondResult = exportControl(secondEvidence);
+    expect(secondResult.verdict).toBe('INCOMPLETE');
+    expect(exportDirectories).toHaveLength(2);
+    expect(exportDirectories[1]).not.toBe(exportDirectories[0]);
+    expect(envelopes).toHaveLength(2);
+    const secondEnvelope = JSON.parse(envelopes[1]);
+    const secondFile = join(exportDirectories[1]!, secondEnvelope.file);
+    expect(secondEnvelope.content).toBe(readFileSync(secondFile, 'utf8'));
+    expect(JSON.parse(secondEnvelope.content).outcomes.held.error.message).toBe('second retained');
+    expect(readFileSync(firstFile, 'utf8')).toBe(envelope.content);
+    expect(secondEnvelope.content).not.toBe(envelope.content);
+    for (const file of [firstFile, secondFile]) {
+      expect(() => writeFileSync(file, 'overwrite', { flag: 'wx' })).toThrow(expect.objectContaining({ code: 'EEXIST' }));
+    }
+    expect(readFileSync(firstFile, 'utf8')).toBe(envelope.content);
+    expect(readFileSync(secondFile, 'utf8')).toBe(secondEnvelope.content);
     const assertionsBegin = source.lastIndexOf('\n  if (checkpointDiagnostic) {') + 1;
     const assertionsEnd = source.indexOf('\n  }', assertionsBegin) + 4;
     expect(result.reasons.length).toBeGreaterThan(0);

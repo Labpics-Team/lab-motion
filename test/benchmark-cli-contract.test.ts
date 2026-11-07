@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execFileSync, spawn } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
@@ -21,7 +21,7 @@ function copyFixtureSources(sourceRoot: string, root: string) {
   }
   cpSync(join(sourceRoot, 'bench/compare'), join(root, 'bench/compare'), {
     recursive: true,
-    filter: source => !source.split(/[\\/]/).some(part => ['node_modules', 'results', 'evidence'].includes(part)),
+    filter: source => !relative(join(sourceRoot, 'bench/compare'), source).split(/[\\/]/).some(part => ['node_modules', 'results', 'evidence'].includes(part)),
   });
 }
 
@@ -93,9 +93,9 @@ process.on('uncaughtExceptionMonitor', error => {
 }
 
 describe('контракты настоящих CLI сравнительных измерений', () => {
-  it('фикстура копирует исходные зависимости без временных результатов компилятора', () => {
+  it.each(['source', 'evidence', 'results', 'node_modules'])('фикстура копирует зависимости внутри %s без временных результатов компилятора', ancestor => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-cli-inputs-'));
-    const source = join(directory, 'source'), target = join(directory, 'target');
+    const source = join(directory, ancestor, 'source'), target = join(directory, 'target');
     const scripts = ['size-gate.mjs', 'compression-oracle.mjs', 'compression-policy.mjs'];
     try {
       for (const name of scripts) put(source, `scripts/${name}`, readFileSync(join(repository, 'scripts', name), 'utf8'));
