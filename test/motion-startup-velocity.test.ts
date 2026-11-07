@@ -56,7 +56,7 @@ for (const native of [false, true]) {
       const h = harness(native);
       const samples: Array<{ key: string; value: number[]; velocity: number[] }> = [];
       const ownership = vi.spyOn(Run.prototype, '_own').mockImplementation(function (this: Run, track, reduced) {
-        // Observe the real publication boundary without replacing sampling or ownership.
+        // Наблюдаем реальную границу публикации, не подменяя выборку или владение.
         expect(track._owner).toBeUndefined();
         expect(track._value.length).toBe(track._program._final.length);
         expect(track._velocity.length).toBe(track._value.length);
