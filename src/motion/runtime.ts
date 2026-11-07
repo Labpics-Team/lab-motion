@@ -538,12 +538,6 @@ export class Runtime {
     if (elements.length * props.reduce((sum, p) => sum + p._values.length, 0) > MAX_CHANNELS) failMotion('Слишком много каналов');
     const reduced = clock._reduced || this._host.reduced();
     const author = authoredTiming(clock);
-    // Одна неизменяемая программа на свойство в пределах группы; снимки host читаются по-прежнему.
-    const reuse: Array<Program | null | undefined> | undefined = elements.length > 1 ? props.map(property =>
-      (isTransform(property._key) || property._key === 'opacity') && property._literal &&
-      property._values.every(value => typeof value === 'number') && !(property._authored ? author : clock)._spring
-        ? null : undefined) : undefined;
-    let previousOffset = offset;
     const result: Draft[] = [], synced = new Set<Surface>();
     try {
       for (let i = 0; i < elements.length; i++) {
@@ -555,15 +549,16 @@ export class Runtime {
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
-          const previous = reuse?.[j], first = previous?._segments[0];
-          // Все слоты обновляются для каждой цели; точный offset общий для её свойств.
-          const spec = previous && Object.is(start, previousOffset) && Object.is(current._unit, previous._unit) &&
+          // До push индекс i * props.length + j; предыдущая цель владеет тем же свойством.
+          const previous = i > 0 && !property._authored && property._literal && values.length === 1 &&
+            typeof values[0] === 'number' && (isTransform(property._key) || property._key === 'opacity') && !clock._spring
+            ? result[result.length - props.length]!._program : undefined;
+          const first = previous?._segments[0];
+          const spec = previous && Object.is(start, offset + (i - 1) * clock._stagger) && Object.is(current._unit, previous._unit) &&
             Object.is(current._coordinates[0], first!._from[0]) && Object.is(current._velocity[0], first!._velocity[0])
             ? previous : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, start);
-          if (previous !== undefined) reuse![j] = spec;
           result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });
         }
-        previousOffset = start;
       }
     } finally {
       // План хранит значения; пустая CSS-поверхность не нужна между стадиями.

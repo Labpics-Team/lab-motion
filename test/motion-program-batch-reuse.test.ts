@@ -8,18 +8,19 @@ const options = { duration: 1000, ease: 'linear' } as const;
 it('shares one Program per numeric property only within a multi-target draft batch', () => {
   const a = harness(), b = harness(), c = harness();
   const targets = [a.element, b.element, c.element];
-  const input = properties({ x: 100, opacity: [0, 1] });
+  const input = properties({ x: 100, width: 100, opacity: 0 });
   const clock = timing(options);
   const reads = vi.spyOn(a.host, 'styles');
   const drafts = a.runtime._draft(targets, input, clock);
-  expect(reads.mock.calls.map(([element]) => element)).toEqual([a.element, b.element, c.element]);
-  expect(drafts).toHaveLength(6);
-  for (const index of [2, 4]) {
+  expect(reads.mock.calls.map(([element]) => element)).toEqual([a.element, a.element, a.element, b.element, b.element, b.element, c.element, c.element, c.element]);
+  expect(drafts).toHaveLength(9);
+  for (const index of [3, 6]) {
     expect(drafts[index]).not.toBe(drafts[0]);
     expect(drafts[index]!._program).toBe(drafts[0]!._program);
-    expect(drafts[index + 1]!._program).toBe(drafts[1]!._program);
+    expect(drafts[index + 1]!._program).not.toBe(drafts[1]!._program);
+    expect(drafts[index + 2]!._program).toBe(drafts[2]!._program);
   }
-  expect(drafts[0]!._program).not.toBe(drafts[1]!._program);
+  expect(drafts[0]!._program).not.toBe(drafts[2]!._program);
   const again = a.runtime._draft(targets, input, clock);
   expect(again[0]!._program).not.toBe(drafts[0]!._program);
   const single = a.runtime._draft(a.element, input, clock);
@@ -76,10 +77,12 @@ it('keeps signed-zero origin snapshots distinct', () => {
   expect(Object.is(drafts[1]!._program._segments[0]!._from[0], 0)).toBe(true);
 });
 
-it('leaves spring, string literal and non-motion property Programs unshared', () => {
+it('leaves spring, authored, string literal and non-motion property Programs unshared', () => {
   const a = harness(), b = harness();
   for (const [props, clock] of [
     [properties({ x: 100 }), timing(undefined)],
+    [properties({ x: [0, 100] }), timing(options)],
+    [properties({ opacity: [0, 1] }), timing(options)],
     [properties({ width: '100px' }), timing(options)],
     [properties({ width: 100 }), timing(options)],
   ] as const) {
@@ -164,12 +167,12 @@ it('sequence copies shared draft Programs before extending a single target histo
   } finally { run.stop(); draft.mockRestore(); execute.mockRestore(); }
 });
 
-for (const reduced of [false, true]) it(`shared Programs publish synchronous completion without effects, reduced=${reduced}`, async () => {
+for (const reduced of [false, true]) it(`authored Programs publish synchronous completion without effects, reduced=${reduced}`, async () => {
   const a = harness(true), b = harness(true);
   const drafts = a.runtime._draft([a.element, b.element], properties({ x: [20, 100] }), timing({
     ...options, duration: reduced ? 1000 : 0, reducedMotion: reduced ? 'always' : 'user',
   }));
-  expect(drafts[0]!._program).toBe(drafts[1]!._program);
+  expect(drafts[0]!._program).not.toBe(drafts[1]!._program);
   const run = a.runtime._execute(drafts);
   expect(a.x()).toBe(100); expect(b.x()).toBe(100);
   expect(await run.finished).toEqual({ status: 'finished' });
