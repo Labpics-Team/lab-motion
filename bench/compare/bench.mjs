@@ -799,19 +799,87 @@ const FREEZE_DURATION_MS = S5_MOTION_CONTRACT.durationMs;
 const BLOCK_AT_MS = 300;
 const BLOCK_MS = 900;
 
-export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
+// Самодостаточная функция: исполняется в page realm и проверяется без браузера.
+export function installNativeCaptureDiagnostics(realm = globalThis) {
+  const prototype = realm.Element.prototype;
+  const original = prototype.animate;
+  const records = [];
+  const now = () => realm.performance.now();
+  const snapshot = (animation) => {
+    const startTime = animation.startTime;
+    const defaultTimeline = animation.timeline !== null && animation.timeline === realm.document.timeline;
+    const complete = defaultTimeline && Number.isFinite(startTime);
+    return {
+      observedNowMs: now(), pending: animation.pending,
+      startTime, currentTime: animation.currentTime,
+      timeline: defaultTimeline ? 'default-document' : 'unsupported',
+      status: complete ? 'complete' : 'incomplete',
+      reason: complete ? null : defaultTimeline ? 'unresolved-start-time' : 'unsupported-timeline',
+      startEpochMs: complete ? realm.performance.timeOrigin + startTime : null,
+    };
+  };
+  prototype.animate = function (...args) {
+    if (this.id !== 'probe' && this.id !== 'capture-witness') {
+      return Reflect.apply(original, this, args);
+    }
+    const apiBeforeNowMs = now();
+    const animation = Reflect.apply(original, this, args);
+    const apiAfterNowMs = now();
+    records.push({ element: this.id, animation, apiBeforeNowMs, apiAfterNowMs, ready: null });
+    return animation;
+  };
+  let observed = false;
+  realm.__s5NativeCapture = {
+    observe() {
+      if (observed) return;
+      observed = true;
+      for (const record of records) {
+        record.afterStartup = snapshot(record.animation);
+        record.animation.ready.then(() => {
+          record.ready = { ...snapshot(record.animation), outcome: 'resolved' };
+        }, (error) => {
+          record.ready = { ...snapshot(record.animation), outcome: 'rejected', error: String(error) };
+        });
+      }
+    },
+    finish() {
+      prototype.animate = original;
+      return {
+        timeOriginMs: realm.performance.timeOrigin,
+        status: records.some((record) => record.element === 'probe')
+          && records.some((record) => record.element === 'capture-witness') ? 'recorded' : 'incomplete',
+        records: records.map(({ animation, ...record }) => ({
+          ...record, terminal: snapshot(animation),
+        })),
+      };
+    },
+  };
+}
+
+export function captureDiagnosticError(error) {
+  return {
+    name: error?.name ?? 'Error', message: String(error),
+    ...(error instanceof AggregateError ? { errors: Array.from(error.errors, captureDiagnosticError) } : {}),
+  };
+}
+
+export async function captureTrajectory(browser, adapterPath, blocked, pageUrl, diagnostic = undefined) {
   const { context, page } = await newPage(browser, adapterPath, pageUrl);
   const cdp = await context.newCDPSession(page);
   await cdp.send('Runtime.enable');
   const timerBefore = await measurePageTimerProbe(page, 'before');
   const frames = [];
+  const failures = [];
+  let nativeDiagnostic;
   let screencastActive = false;
   const stopScreencast = async () => {
     if (!screencastActive) return;
     screencastActive = false;
-    await cdp.send('Page.stopScreencast').catch(() => {});
+    if (diagnostic === undefined) await cdp.send('Page.stopScreencast').catch(() => {});
+    else await cdp.send('Page.stopScreencast');
   };
   try {
+    if (diagnostic !== undefined) await page.evaluate(installNativeCaptureDiagnostics);
     await page.evaluate(({ adapter, blocked }) => {
       const p = document.createElement('div');
       p.id = 'probe';
@@ -832,7 +900,11 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
     // и возвращает кадр уже ПОСЛЕ разблокировки — это давало бы wall-clock-прыжку
     // RAF-библиотек фальшивые 100% (проверено первым прогоном этого файла).
     cdp.on('Page.screencastFrame', (ev) => {
-      frames.push({ ts: ev.metadata.timestamp, data: ev.data });
+      frames.push({ ts: ev.metadata.timestamp, data: ev.data,
+        ...(diagnostic === undefined ? {} : {
+          metadata: ev.metadata, sessionId: ev.sessionId, receivedHrtimeNs: process.hrtime.bigint().toString(),
+        }),
+      });
       cdp.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => {});
     });
     await cdp.send('Page.startScreencast', {
@@ -846,7 +918,7 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
     // Runtime marker и кадры имеют один CDP clock domain; page realm ограничивает
     // задержку marker→API. RTT Node↔page не входит в начало траектории.
     const startClock = await readCdpStartClock(page, cdp, ({ clockToken, config }) => {
-      const { px, duration, shouldBlock, blockAt, blockMs } = config;
+      const { px, duration, shouldBlock, blockAt, blockMs, diagnosticEnabled } = config;
       const el = document.getElementById('probe');
       const epoch = () => (performance.timeOrigin + performance.now()) / 1000;
       const pageTimeOriginMs = performance.timeOrigin;
@@ -869,8 +941,11 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
         while (performance.now() < end) { /* реальная блокировка main-thread */ }
         window.__benchTiming.blockEndedAt = epoch();
       }, blockAt);
+      // Только после обоих синхронных start и исходного планирования блока.
+      if (diagnosticEnabled) window.__s5NativeCapture.observe();
       return { pageTimeOriginMs, pageBeforeNowMs, pageApiNowMs };
     }, {
+      diagnosticEnabled: diagnostic !== undefined,
       px: FREEZE_PX,
       duration: FREEZE_DURATION_MS,
       shouldBlock: blocked,
@@ -893,6 +968,9 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
         timing: window.__benchTiming,
       };
     });
+    if (diagnostic !== undefined) {
+      nativeDiagnostic = await page.evaluate(() => window.__s5NativeCapture.finish());
+    }
     const clock = {
       startClock,
       timerEvidence: {
@@ -916,10 +994,36 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
       finalX: terminal.finalX,
       timing: terminal.timing,
       rawFrames: frames.length,
+      ...(diagnostic === undefined ? {} : { nativeDiagnostic }),
     };
+  } catch (error) {
+    if (diagnostic === undefined) throw error;
+    failures.push({ phase: 'capture', error });
   } finally {
-    await stopScreencast();
-    await context.close();
+    if (diagnostic === undefined) {
+      try { await stopScreencast(); } finally { await context.close(); }
+    } else {
+      try { await stopScreencast(); } catch (error) { failures.push({ phase: 'stop', error }); }
+      if (nativeDiagnostic === undefined) {
+        try {
+          nativeDiagnostic = await page.evaluate(() => window.__s5NativeCapture?.finish() ?? {
+            status: 'incomplete', reason: 'instrumentation-not-installed', records: [],
+          });
+        } catch (error) {
+          failures.push({ phase: 'snapshot', error });
+          nativeDiagnostic = { status: 'incomplete', reason: 'snapshot-failed', error: captureDiagnosticError(error), records: [] };
+        }
+      }
+      try {
+        await diagnostic.retain({ frames, nativeDiagnostic,
+          errors: failures.map(({ phase, error }) => ({ phase, error: captureDiagnosticError(error) })),
+        });
+      } catch (error) { failures.push({ phase: 'retain', error }); }
+      try { await context.close(); } catch (error) { failures.push({ phase: 'cleanup', error }); }
+      if (failures.length > 0) {
+        throw new AggregateError(failures.map(({ error }) => error), 'S5 capture or diagnostic teardown failed');
+      }
+    }
   }
 }
 
