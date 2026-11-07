@@ -94,7 +94,7 @@ export function tracedBrowserMeasure(out, index, measure = measureServerBrowser,
           return page;
         } };
       } };
-      sample = await measure(observingBrowser, origin, adapter, scene, workMultiplier);
+      sample = await measure(observingBrowser, origin, adapter, scene, workMultiplier, observation, { observationTiming: true });
     } catch (error) { failure = error; errors.push({ phase: 'measurement', error: errorRecord(error) }); }
     finally {
       if (startAttempted) {

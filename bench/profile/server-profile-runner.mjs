@@ -456,10 +456,21 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
   const sampleBeginNs = diagnosticObserver ? process.hrtime.bigint() : null;
   const context = await withBrowserTimeout(browser.newContext({ viewport: SERVER_PROFILE.viewport, deviceScaleFactor: SERVER_PROFILE.deviceScaleFactor }), 'контекст браузера');
   const partial = [];
+  const observationTiming = diagnosticObserver?.observationTiming ? { qualification: false, hostClock: 'process.hrtime.bigint/ns', hostRetention: [] } : null;
   let before, sampleResult, failure;
   try {
     const page = await context.newPage(); await page.goto(origin.url, { waitUntil: 'load' });
-    await page.exposeFunction('__serverSavePartial', (value) => { partial.push(preserveRawNumbers(value)); });
+    await page.exposeFunction('__serverSavePartial', (value) => {
+      if (!observationTiming) { partial.push(preserveRawNumbers(value)); return; }
+      const timing = { phase: value.phase, repetition: value.repetition, beginNs: process.hrtime.bigint().toString(), outcome: 'rejected' };
+      observationTiming.hostRetention.push(timing);
+      try {
+        const retained = preserveRawNumbers(value);
+        timing.convertedNs = process.hrtime.bigint().toString();
+        partial.push(retained);
+        timing.outcome = 'retained';
+      } finally { timing.endNs = process.hrtime.bigint().toString(); }
+    });
     if (!(await page.evaluate(() => crossOriginIsolated))) throw new Error('server profile: отсутствует изоляция среды исполнения часов');
     const source = readFileSync(adapter.path, 'utf8');
     const coldImportMs = await withBrowserTimeout(page.evaluate((source) => {
@@ -545,15 +556,37 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
           const startClock = { beginMs, endMs: performance.now() };
           const batchStartMs = startClock.endMs - startClock.beginMs;
           const readBeginMs = performance.now();
+          const observationClocks = config.diagnosticObserver?.observationTiming ? { clock: 'performance.now/ms', qualification: false } : null;
           const targets = groups.flat();
           let connectedTargets = 0;
           for (const element of targets) if (element.isConnected) connectedTargets++;
-          const startWitness = { connectedTargets,
-            activeWaapi: targets.reduce((sum, element) => sum + element.getAnimations().length, 0),
-            leadingPositions: compact(groups.map((elements) => new DOMMatrixReadOnly(getComputedStyle(elements[0]).transform).e)),
-            readClock: { beginMs: readBeginMs, endMs: performance.now() } };
-          await window.__serverSavePartial({ phase: 'batch-started-before-cancel', repetition, calls, startClock, startWitness,
-            acquiredBatchStartMs: batchStartMs, ownersStarted: owners.length });
+          if (observationClocks) observationClocks.flattenConnectivity = { beginMs: readBeginMs, endMs: performance.now() };
+          const animationsBeginMs = observationClocks ? performance.now() : null;
+          const activeWaapi = targets.reduce((sum, element) => sum + element.getAnimations().length, 0);
+          if (observationClocks) observationClocks.getAnimations = { beginMs: animationsBeginMs, endMs: performance.now() };
+          const stylesBeginMs = observationClocks ? performance.now() : null;
+          const leadingPositions = compact(groups.map((elements) => new DOMMatrixReadOnly(getComputedStyle(elements[0]).transform).e));
+          if (observationClocks) observationClocks.leadingStylesCompact = { beginMs: stylesBeginMs, endMs: performance.now() };
+          const startWitness = { connectedTargets, activeWaapi, leadingPositions,
+            readClock: { beginMs: readBeginMs, endMs: performance.now() },
+            ...(observationClocks ? { observationClocks } : {}) };
+          const bindingBeginMs = observationClocks ? performance.now() : null;
+          try {
+            await window.__serverSavePartial({ phase: 'batch-started-before-cancel', repetition, calls, startClock, startWitness,
+              acquiredBatchStartMs: batchStartMs, ownersStarted: owners.length });
+          } catch (error) {
+            if (observationClocks) {
+              observationClocks.bindingWait = { beginMs: bindingBeginMs, endMs: performance.now(), outcome: 'rejected' };
+              try { await window.__serverSavePartial({ phase: 'diagnostic-binding-rejected', repetition, observationClocks }); }
+              catch (publicationError) {
+                // Playwright передаёт свойства результата, но не вложенные свойства выброшенного Error.
+                return { diagnosticBindingFailure: { repetition, observationClocks, causes: [error, publicationError].map(cause => ({
+                  name: cause?.name ?? typeof cause, message: String(cause?.message ?? cause) })) } };
+              }
+            }
+            throw error;
+          }
+          if (observationClocks) observationClocks.bindingWait = { beginMs: bindingBeginMs, endMs: performance.now(), outcome: 'resolved' };
           let ownersCancelled = 0;
           const cancelBegin = performance.now();
           try { for (const owner of owners) { owner.cancel(); ownersCancelled++; } } catch (error) {
@@ -582,6 +615,12 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
     }, { scene, workMultiplier, repetitions: SERVER_PROFILE.repetitions, durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx,
       batchCalls: SERVER_PROFILE.browserBatchCalls, cancellation: SERVER_PROFILE.browserCancellationWitness,
       ...(diagnosticObserver ? { diagnosticObserver } : {}) }), 'образец API браузера');
+    if (observationTiming && result.diagnosticBindingFailure) {
+      const envelope = result.diagnosticBindingFailure;
+      throw Object.assign(new AggregateError(envelope.causes.map(cause => Object.assign(new Error(cause.message), { name: cause.name })),
+        'diagnostic binding evidence publication failed'), { raw: { partial, timerBefore: before, scene, workMultiplier,
+          diagnosticBindingFailure: envelope } });
+    }
     const after = await browserTimerProbe(page, 'after');
     const timerEvidence = { crossOriginIsolated: true, probes: [before, after] };
     const timerStepMs = deriveRealmTimerStep('server browser', timerEvidence);
@@ -600,6 +639,10 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       failure = Object.assign(new AggregateError([...(failure ? [failure] : []), error], 'server profile: очистка браузера не завершена'),
         { raw: sampleResult ?? failure?.raw ?? { partial, timerBefore: before, scene, workMultiplier } });
     }
+  }
+  if (observationTiming) {
+    if (sampleResult) sampleResult.observationTiming = observationTiming;
+    else if (failure) failure.raw = { ...failure.raw, observationTiming };
   }
   if (sampleBeginNs !== null && sampleResult) sampleResult.fullSampleDurationNs = (process.hrtime.bigint() - sampleBeginNs).toString();
   if (failure) throw failure;

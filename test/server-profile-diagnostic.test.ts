@@ -115,7 +115,7 @@ describe('actual runner raw-number preservation', () => {
     expect(error.raw).toBe(raw); expect(error.timerEvidence).toBe(timerEvidence);
   });
 
-  it.each(['success', 'snapshot-throw', 'recursive-throw'] as const)('converts before actual checkpoint push and receipt: %s', async (phase) => {
+  it.each([false, true].flatMap(diagnostic => ['success', 'snapshot-throw', 'recursive-throw'].map(phase => ({ diagnostic, phase }))))('converts before actual checkpoint push and receipt: $phase diagnostic=$diagnostic', async ({ diagnostic, phase }) => {
     const reads: string[] = [], partial: unknown[] = [];
     const failure = new Error('getter failure');
     const child = Object.freeze({ get nested() { reads.push('nested'); if (phase === 'recursive-throw') throw failure; return Infinity; } });
@@ -124,8 +124,12 @@ describe('actual runner raw-number preservation', () => {
       get last() { reads.push('last'); return undefined; } });
     let save: (value: unknown) => unknown = () => { throw new Error('callback not registered'); };
     const callbackBegin = source.indexOf("    await page.exposeFunction('__serverSavePartial',");
-    const callbackEnd = source.indexOf('\n', callbackBegin);
-    const realm = createContext({ partial, page: { exposeFunction: async (_name: string, callback: typeof save) => { save = callback; } } });
+    const callbackEnd = source.indexOf('\n    if (!(await page.evaluate', callbackBegin);
+    const hostRetention: unknown[] = [];
+    let hostNs = 10_000n;
+    const realm = createContext({ partial, observationTiming: diagnostic ? { hostRetention } : null,
+      process: { hrtime: { bigint: () => { hostNs += 100n; return hostNs; } } },
+      page: { exposeFunction: async (_name: string, callback: typeof save) => { save = callback; } } });
     await runInContext(`(async () => { ${source.slice(recordBegin, recordEnd)} ${source.slice(callbackBegin, callbackEnd)} })()`, realm);
     const descriptors = Object.getOwnPropertyDescriptors(input);
 
@@ -141,6 +145,10 @@ describe('actual runner raw-number preservation', () => {
       expect(reads).toEqual(phase === 'snapshot-throw' ? ['first', 'second'] : ['first', 'second', 'last', 'nested']);
     }
     expect(Object.getOwnPropertyDescriptors(input)).toEqual(descriptors);
+    expect(hostRetention).toEqual(!diagnostic ? [] : [phase === 'success'
+      ? { phase: undefined, repetition: undefined, beginNs: '10100', convertedNs: '10200', endNs: '10300', outcome: 'retained' }
+      : { phase: undefined, repetition: undefined, beginNs: '10100', endNs: '10200', outcome: 'rejected' }]);
+    if (!diagnostic) expect(hostNs).toBe(10_000n);
   });
 });
 
@@ -318,7 +326,10 @@ describe('bounded intrusive baseline diagnostic', () => {
     const timerEvidence = { probes: [{ phase: 'before', performanceNowDeltasMs: [0.005] }] };
     const sample = { measurementTimeOriginMs: 1, raw: [{ calls: 32, batchCancelMs: 2 }], warmup: [{ calls: 32 }], timerEvidence };
     const acquisitionFailure = Object.assign(new Error('measurement rejected'), { raw: sample, timerEvidence });
-    const measure = async (facade: any) => {
+    const measure = async (facade: any, _origin: unknown, _adapter: unknown, _scene: unknown, _multiplier: number,
+      observation: { stage: string; run: number; participant: string }, diagnosticObserver: unknown) => {
+      expect(observation).toMatchObject({ stage: 'warmup', run: 0, participant: 'left' });
+      expect(diagnosticObserver).toEqual({ observationTiming: true });
       const actual = await facade.newContext({});
       const observed = await actual.newPage();
       await observed.goto('http://test.invalid');

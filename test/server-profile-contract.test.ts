@@ -373,7 +373,7 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
   durationMultiplier?: number; shape?: 'quadratic'; rafStepMs?: number; readCostMs?: number; timerLagMs?: number;
   initialProgress?: number; initialProgressAt?: number; onsetReadAt?: number; documentClock?: 'missing' | 'unstable' | 'unrelated';
   documentOriginLagMs?: number; quarterAtFirstFrame?: boolean; quarterAtFrame?: number;
-  checkpoint?: boolean; closeError?: Error;
+  checkpoint?: boolean; closeError?: Error; diagnosticPublicationError?: Error;
   completion?: 'absent' | 'missing' | 'rejected' | 'never' | 'early' | 'late-early' } = {}) {
   const directory = mkdtempSync(path.join(os.tmpdir(), 'motion-server-synthetic-'));
   const source = path.join(directory, 'adapter.js'); writeFileSync(source, '// Синтетический adapter задан VM.\n');
@@ -479,6 +479,7 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
   const realm = createContext(sandbox);
   const page = { goto: async () => {}, exposeFunction: async (name: string, fn: (value: Record<string, unknown>) => unknown) => {
     sandbox[name] = async (value: Record<string, unknown>) => {
+      if (value.phase === 'diagnostic-binding-rejected' && options.diagnosticPublicationError) throw options.diagnosticPublicationError;
       await fn(value); // Преобразование и сохранение у настоящего владельца предшествуют задержанной квитанции.
       if (options.checkpoint && name === '__serverSavePartial' && value.phase === 'batch-started-before-cancel' && value.repetition === 0) {
         checkpointHeld = true;
@@ -489,7 +490,14 @@ function syntheticBrowser(options: { startCostMs?: number; snap?: boolean; snapA
   },
     async evaluate(fn: Function, argument?: any) {
       if (options.rejectTiming && fn.toString().includes('const raw = [], warmup')) throw undefined;
-      return runInContext(`(${fn.toString()})`, realm)(argument);
+      try {
+        const result = await runInContext(`(${fn.toString()})`, realm)(argument);
+        return options.checkpoint ? structuredClone(result) : result;
+      } catch (error) {
+        // Chromium Playwright evaluation reconstructs a textual Error, not AggregateError.errors.
+        if (options.checkpoint) throw new Error(String(error instanceof Error ? error.stack ?? error.message : error));
+        throw error;
+      }
     } };
   const context = { newPage: async () => page, close: async () => {
     contextClosed = true;
@@ -518,13 +526,28 @@ async function checkpointSignal<T>(signal: Promise<T>): Promise<T> {
 }
 
 describe('deterministic checkpoint ACK integration', () => {
-  it.each(['early', 'endpoint'] as const)('actual owner and validator preserve %s receipt ordering', async (mode) => {
+  it('models evaluation exceptions as text while preserving plain returned failure data', async () => {
+    const fake = syntheticBrowser({ checkpoint: true });
+    try {
+      const failure = await fake.page.evaluate(() => { throw new AggregateError([new Error('nested cause')], 'outer failure'); })
+        .then(() => undefined, (error: unknown) => error);
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toHaveProperty('errors');
+      expect((failure as Error).message).toContain('outer failure');
+      expect((failure as Error).message).not.toContain('nested cause');
+      expect(await fake.page.evaluate(() => ({ causes: [{ name: 'Error', message: 'nested cause' }] })))
+        .toEqual({ causes: [{ name: 'Error', message: 'nested cause' }] });
+    } finally { fake.dispose(); }
+  });
+
+  it.each([false, true].flatMap(diagnostic => ['early', 'endpoint'].map(mode => ({ diagnostic, mode }))))('actual owner and validator preserve $mode receipt ordering diagnostic=$diagnostic', async ({ diagnostic, mode }) => {
     // Дано: оба сигнала созданы до настоящего сбора данных. Настенные часы не продвигают модель.
-    const scene = SERVER_PROFILE.browserScenes[0], fake = syntheticBrowser({ checkpoint: true });
+    const scene = SERVER_PROFILE.browserScenes[diagnostic ? 1 : 0], fake = syntheticBrowser({ checkpoint: true });
     const count = scene.targetsPerCall * SERVER_PROFILE.browserBatchCalls;
     const endpointSignal = fake.checkpoint.endpoint;
     // Сразу наблюдаем отказ, даже если сбор данных не достигнет передачи квитанции.
-    const measured = measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, scene)
+    const measured = measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, scene, 1, undefined,
+      diagnostic ? { observationTiming: true } : undefined)
       .then(sample => ({ status: 'resolved' as const, sample }), (error: unknown) => ({ status: 'rejected' as const, error }));
     try {
       const acquired = await checkpointSignal(fake.checkpoint.entered);
@@ -535,9 +558,9 @@ describe('deterministic checkpoint ACK integration', () => {
       expect(before.connected).toBe(count);
       expect(fake.checkpoint.held()).toBe(true);
       if (mode === 'endpoint') {
-        // Первый кадр запускает ожидающие анимации; следующие девять кадров превышают 128 мс.
+        // Первый кадр запускает анимации; для s3 также завершаем закреплённый stagger всех 200 целей.
         // Это причинная пауза планировщика, а не истечение времени хоста или подмена raw.
-        for (let frame = 0; frame < 10; frame++) fake.checkpoint.advanceFrame();
+        for (let frame = 0; frame < (diagnostic ? 80 : 10); frame++) fake.checkpoint.advanceFrame();
         expect(await checkpointSignal(endpointSignal)).toEqual(Array(count).fill(SERVER_PROFILE.toPx));
         expect(fake.read()).toEqual(before);
         expect(fake.checkpoint.held()).toBe(true);
@@ -566,6 +589,35 @@ describe('deterministic checkpoint ACK integration', () => {
         for (const frame of row.cancelWitness.frames) expect(frame.transforms).toEqual(row.cancelWitness.transformsBefore);
         expect(() => validateServerBrowserSample(sample, scene)).toThrow(expect.objectContaining({ code: 'SERVER_PROFILE_CANCEL_WINDOW_UNPROVEN' }));
       }
+      const sample = outcome.status === 'resolved' ? outcome.sample : Reflect.get(outcome.error as AggregateError, 'raw');
+      if (diagnostic) {
+        expect(sample.observationTiming).toMatchObject({ qualification: false, hostClock: 'process.hrtime.bigint/ns' });
+        const retained = sample.observationTiming.hostRetention.filter((value: { phase: string }) => value.phase === 'batch-started-before-cancel');
+        expect(retained.map((value: { repetition: number }) => value.repetition)).toEqual([-1, 0, 1, 2, 3, 4, 5, 6, 7]);
+        for (const value of retained) {
+          expect(value.outcome).toBe('retained');
+          expect(BigInt(value.convertedNs) >= BigInt(value.beginNs)).toBe(true);
+          expect(BigInt(value.endNs) >= BigInt(value.convertedNs)).toBe(true);
+        }
+        for (const row of [sample.warmup[0], ...sample.raw]) {
+          const clocks = row.startWitness.observationClocks;
+          expect(clocks).toMatchObject({ qualification: false, clock: 'performance.now/ms', bindingWait: { outcome: 'resolved' } });
+          let previous = row.startClock.endMs;
+          for (const key of ['flattenConnectivity', 'getAnimations', 'leadingStylesCompact', 'bindingWait']) {
+            expect(clocks[key].beginMs).toBeGreaterThanOrEqual(previous);
+            expect(clocks[key].endMs).toBeGreaterThanOrEqual(clocks[key].beginMs);
+            previous = clocks[key].endMs;
+          }
+          expect(row.cancelClock.beginMs).toBeGreaterThanOrEqual(previous);
+          expect(row.calls).toBe(32);
+          expect(row.startWitness.connectedTargets).toBe(6400);
+        }
+        if (mode === 'endpoint') expect(sample.raw[0].startWitness.observationClocks.bindingWait.endMs -
+          sample.raw[0].startWitness.observationClocks.bindingWait.beginMs).toBeGreaterThanOrEqual(160);
+      } else {
+        expect(sample).not.toHaveProperty('observationTiming');
+        expect(sample.raw[0].startWitness).not.toHaveProperty('observationClocks');
+      }
       // Проверяем: вся работа отменена, настоящий владелец закрыл контекст при любом исходе.
       expect(fake.read().starts).toBe(fake.read().cancels);
       expect(fake.checkpoint.connectedOnClose()).toBe(0);
@@ -578,12 +630,17 @@ describe('deterministic checkpoint ACK integration', () => {
     }
   });
 
-  it.each([false, true])('rejected ACK retains the acquired prefix and cleanup failure=%s', async (cleanupFails) => {
+  it.each([false, true].flatMap(diagnostic => [false, true].flatMap(cleanupFails =>
+    (diagnostic ? [false, true] : [false]).map(publicationFails => ({ diagnostic, cleanupFails, publicationFails })))))(
+    'rejected ACK retains prefix diagnostic=$diagnostic cleanup=$cleanupFails publication=$publicationFails', async ({ diagnostic, cleanupFails, publicationFails }) => {
     // Дано: настоящий callback хоста сохраняет данные, после чего квитанция отклоняется.
     const ackError = new Error('synthetic ACK rejection'), closeError = new Error('synthetic context close rejection');
-    const fake = syntheticBrowser({ checkpoint: true, ...(cleanupFails ? { closeError } : {}) });
-    const scene = SERVER_PROFILE.browserScenes[0];
-    const measured = measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, scene)
+    const publicationError = new Error('synthetic diagnostic publication rejection');
+    const fake = syntheticBrowser({ checkpoint: true, ...(cleanupFails ? { closeError } : {}),
+      ...(publicationFails ? { diagnosticPublicationError: publicationError } : {}) });
+    const scene = SERVER_PROFILE.browserScenes[diagnostic ? 1 : 0];
+    const measured = measureServerBrowser(fake.browser, { url: 'synthetic://profile' }, fake.adapter, scene, 1, undefined,
+      diagnostic ? { observationTiming: true } : undefined)
       .then(() => undefined, (error: unknown) => error);
     try {
       const acquired = await checkpointSignal(fake.checkpoint.entered);
@@ -594,11 +651,38 @@ describe('deterministic checkpoint ACK integration', () => {
       const error = await checkpointSignal(measured);
       if (!(error instanceof AggregateError)) throw new Error('missing acquired-prefix failure');
       const acquisition = cleanupFails ? error.errors[0] : error;
-      expect(acquisition.errors).toEqual([ackError]);
-      if (cleanupFails) expect(error.errors).toEqual([acquisition, closeError]);
+      const expectedCauses = [{ name: 'Error', message: ackError.message }, { name: 'Error', message: publicationError.message }];
+      if (publicationFails) {
+        expect(acquisition.errors[0].errors.map((cause: Error) => ({ name: cause.name, message: cause.message }))).toEqual(expectedCauses);
+        expect(Reflect.get(error, 'raw').diagnosticBindingFailure).toMatchObject({ repetition: 0, causes: expectedCauses,
+          observationClocks: { bindingWait: { outcome: 'rejected' } } });
+      } else {
+        expect(acquisition.errors).toHaveLength(1);
+        expect(acquisition.errors[0].message).toContain(ackError.message);
+      }
+      if (cleanupFails) expect(error.errors[1]).toMatchObject({ name: 'Error', message: closeError.message });
+      const runnerSource = readFileSync(new URL('../bench/profile/server-profile-runner.mjs', import.meta.url), 'utf8');
+      const recordBegin = runnerSource.indexOf('function preserveRawNumbers('), recordEnd = runnerSource.indexOf('function readOptional(', recordBegin);
+      const record = runInContext(`(() => { ${runnerSource.slice(recordBegin, recordEnd)} return errorRecord; })()`, createContext({}));
+      const exported = JSON.parse(JSON.stringify(record(error)));
+      const exportedAcquisition = cleanupFails ? exported.errors[0] : exported;
+      if (publicationFails) {
+        expect(exportedAcquisition.errors[0].errors).toEqual(expectedCauses);
+        expect(exported.raw.diagnosticBindingFailure.causes).toEqual(expectedCauses);
+      } else expect(exportedAcquisition.errors[0].message).toContain(ackError.message);
+      if (cleanupFails) expect(exported.errors[1]).toEqual({ name: 'Error', message: closeError.message });
       const partial = Reflect.get(error, 'raw').partial;
-      expect(partial.at(-1)).toEqual(snapshot);
-      expect(partial.at(-1)).not.toBe(acquired);
+      const retained = partial.find((row: { phase: string; repetition?: number }) => row.phase === 'batch-started-before-cancel' && row.repetition === 0);
+      expect(retained).toEqual(snapshot);
+      expect(retained).not.toBe(acquired);
+      if (diagnostic && !publicationFails) {
+        expect(partial.at(-1)).toMatchObject({ phase: 'diagnostic-binding-rejected', repetition: 0,
+          observationClocks: { bindingWait: { outcome: 'rejected' } } });
+        const wait = partial.at(-1).observationClocks.bindingWait;
+        expect(wait.endMs).toBeGreaterThanOrEqual(wait.beginMs);
+        expect(Reflect.get(error, 'raw').observationTiming.hostRetention).toContainEqual(expect.objectContaining({
+          phase: 'batch-started-before-cancel', repetition: 0, outcome: 'retained' }));
+      } else expect(partial.at(-1)).toEqual(snapshot);
       expect(partial.some((row: { phase: string; repetition?: number }) => row.phase === 'warmup' && row.repetition === -1)).toBe(true);
       expect(fake.read().cancels).toBe(before.cancels);
       expect(fake.checkpoint.connectedOnClose()).toBe(scene.targetsPerCall * SERVER_PROFILE.browserBatchCalls);
@@ -635,11 +719,11 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
     const timingBegin = source.indexOf('const raw = [], warmup');
     expect(timingBegin).toBeGreaterThanOrEqual(0);
     const begin = source.indexOf('          const readBeginMs = performance.now();', timingBegin);
-    const end = source.indexOf('          await window.__serverSavePartial(', begin);
+    const end = source.indexOf('          const bindingBeginMs = ', begin);
     expect(begin).toBeGreaterThan(timingBegin);
     expect(end).toBeGreaterThan(begin);
     const actual = source.slice(begin, end);
-    const legacy = actual.replace(/          let connectedTargets = 0;\n          for \(const element of targets\) if \(element.isConnected\) connectedTargets\+\+;\n          const startWitness = \{ connectedTargets,/, '          const startWitness = { connectedTargets: targets.filter((element) => element.isConnected).length,');
+    const legacy = actual.replace(/          let connectedTargets = 0;\n          for \(const element of targets\) if \(element.isConnected\) connectedTargets\+\+;/, '          const connectedTargets = targets.filter((element) => element.isConnected).length;');
     expect(legacy).not.toBe(actual);
     const evaluationBegin = source.indexOf('const result = await withBrowserTimeout(page.evaluate');
     expect(evaluationBegin).toBeGreaterThanOrEqual(0);
@@ -648,7 +732,7 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
     expect(compactBegin).toBeGreaterThan(evaluationBegin);
     expect(compactEnd).toBeGreaterThan(compactBegin);
     const compactSource = source.slice(compactBegin, compactEnd);
-    const run = (block: string) => {
+    const run = (block: string, diagnostic = false) => {
       const events: string[] = [], identities: object[] = [];
       let index = 0;
       const groups = connectivity.map((group, groupIndex) => group.map((connected) => {
@@ -659,7 +743,8 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
       }));
       const before = groups.flat();
       let clock = 0;
-      const realm = createContext({ groups, performance: { now() { events.push('clock:' + clock); return ++clock; } },
+      const realm = createContext({ groups, config: { diagnosticObserver: diagnostic ? { observationTiming: true } : undefined },
+        performance: { now() { events.push('clock:' + clock); return ++clock; } },
         getComputedStyle(element: { id: number; groupIndex: number }) { events.push('transform:' + element.id); return { transform: transforms[element.groupIndex] }; },
         DOMMatrixReadOnly: class { e: number; constructor(transform: number) { this.e = transform; } } });
       const result = runInContext('(() => {\n' + compactSource + block + '\nreturn { startWitness, targets }; })()', realm);
@@ -669,16 +754,21 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
       const witness = JSON.parse(JSON.stringify(result.startWitness));
       const expected = ['clock:0', ...identities.map((_, i) => 'connected:' + i), ...identities.map((_, i) => 'animations:' + i),
         ...groups.map((group) => 'transform:' + group[0].id), 'clock:1'];
-      expect(events).toEqual(expected);
+      if (diagnostic) expect(events.filter(event => !event.startsWith('clock:'))).toEqual(expected.filter(event => !event.startsWith('clock:')));
+      else expect(events).toEqual(expected);
       expect(witness).toEqual({ connectedTargets: connectivity.flat().filter(Boolean).length,
         activeWaapi: animations.reduce((sum, count) => sum + count, 0),
         leadingPositions: transforms.every((value) => Object.is(value, transforms[0]))
           ? { encoding: 'repeat', count: transforms.length, ...(transforms.length ? { value: transforms[0] } : {}) }
           : { encoding: 'rle', count: transforms.length, runs: transforms.map((value) => [1, value]) },
-        readClock: { beginMs: 1, endMs: 2 } });
+        readClock: { beginMs: 1, endMs: diagnostic ? 7 : 2 },
+        ...(diagnostic ? { observationClocks: { clock: 'performance.now/ms', qualification: false,
+          flattenConnectivity: { beginMs: 1, endMs: 2 }, getAnimations: { beginMs: 3, endMs: 4 },
+          leadingStylesCompact: { beginMs: 5, endMs: 6 } } } : {}) });
       return { witness, events };
     };
     expect(run(actual)).toEqual(run(legacy));
+    expect(run(actual, true)).toEqual(run(legacy, true));
   });
 
 
