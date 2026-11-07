@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { installKeyboardCollector, firstInputInterval, analyzeKeyboardSamples, KEYBOARD_PLAN } from './keyboard-timing.mjs';
+import { installKeyboardCollector, firstInputInterval, analyzeKeyboardSamples, KEYBOARD_PLAN, nativeOrders, completedThreadCpu, analyzeNativeSamples, prepareKeyboardCpu, finishKeyboardCpu, runKeyboardSample } from './keyboard-timing.mjs';
 
 function fixture() {
   const order = [], listeners = new Map(), timers = new Map();
@@ -171,4 +171,165 @@ test('analysis enforces round identity, useful parity and sensor discrimination 
   assert.equal(analyzeKeyboardSamples(samples).comparisons, undefined);
   samples[6].useful = true; samples[6].round = 1;
   assert.equal(analyzeKeyboardSamples(samples).comparisons, undefined);
+});
+
+test('native insertion preserves root relative order and balances each position five times', () => {
+  const roots = Array.from({ length: 20 }, () => ['lab', 'motion', 'anime']);
+  const expanded = nativeOrders(roots);
+  assert.deepEqual(expanded.map(order => order.filter(id => id !== 'lab-native')), roots);
+  assert.deepEqual([0, 1, 2, 3].map(position => expanded.filter(order => order[position] === 'lab-native').length), [5, 5, 5, 5]);
+});
+
+test('threadTicks ledger excludes geometry gap and rejects unavailable/regressing clocks', () => {
+  const raw = { before: { ThreadTime: 1 }, afterAnimation: { ThreadTime: 1.125 },
+    beforeCleanup: { ThreadTime: 2 }, afterCleanup: { ThreadTime: 2.0625 } };
+  assert.equal(completedThreadCpu(raw), 187.5);
+  assert.equal(completedThreadCpu({}), null);
+  raw.afterCleanup.ThreadTime = 1;
+  assert.equal(completedThreadCpu(raw), null);
+  raw.afterCleanup.ThreadTime = NaN;
+  assert.equal(completedThreadCpu(raw), null);
+});
+
+for (const stage of ['before', 'afterAnimation', 'beforeCleanup', 'afterCleanup']) {
+  for (const value of [undefined, NaN, Infinity, -Infinity, -1]) test(`CPU stage ${stage} rejects ${value}`, () => {
+    const raw = { before: { ThreadTime: 1 }, afterAnimation: { ThreadTime: 2 },
+      beforeCleanup: { ThreadTime: 3 }, afterCleanup: { ThreadTime: 4 } };
+    if (value === undefined) delete raw[stage]; else raw[stage].ThreadTime = value;
+    assert.equal(completedThreadCpu(raw), null);
+  });
+  test(`CPU stage ${stage} rejects nonmonotonic clocks`, () => {
+    const raw = { before: { ThreadTime: 1 }, afterAnimation: { ThreadTime: 2 },
+      beforeCleanup: { ThreadTime: 3 }, afterCleanup: { ThreadTime: 4 } };
+    raw[stage].ThreadTime = stage === 'before' ? 5 : 0;
+    assert.equal(completedThreadCpu(raw), null);
+  });
+}
+
+function deferred() {
+  let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve };
+}
+
+async function integratedNativeSample(failure) {
+  const f = fixture(), order = [], triggered = deferred(), completion = deferred();
+  const frames = Array.from({ length: 4 }, deferred);
+  let nextFrame = 0, threadTime = 1, clock = 10, metricStage, activeEffects = 0;
+  const cpu = { status: 'UNAVAILABLE', raw: {}, errors: [] };
+  f.env.performance.now = () => clock;
+  f.env.__targets = Array.from({ length: 1000 }, (_, index) => ({ index, remove() { order.push('remove-target'); } }));
+  f.env.__adapterModule = { start() {
+    order.push('start'); threadTime += 0.125; activeEffects = 1;
+    return { finished() { order.push('subscribe-finished'); return completion.promise; },
+      cancel() { order.push('cancel'); threadTime += 0.0625; activeEffects = 0; } };
+  } };
+  const oldGetElement = f.env.document.getElementById;
+  f.env.document.getElementById = id => {
+    const element = oldGetElement(id);
+    element.remove = () => { order.push('remove-control'); };
+    return element;
+  };
+  f.env.document.getAnimations = () => Array.from({ length: activeEffects }, () => ({}));
+  const originalObserve = f.env.PerformanceObserver.prototype.observe;
+  f.env.PerformanceObserver.prototype.observe = function(options) { order.push('observe-input'); originalObserve.call(this, options); };
+  const context = { async newCDPSession() { return { async send(method, options) {
+    if (method === 'Performance.enable') {
+      order.push('enable'); assert.deepEqual(options, { timeDomain: 'threadTicks' });
+      if (failure === 'enable') throw new Error('enable failure');
+      return {};
+    }
+    assert.equal(method, 'Performance.getMetrics'); order.push(`metrics-${metricStage}`);
+    if (failure === metricStage) throw new Error(`metrics ${metricStage} failure`);
+    return { metrics: [{ name: 'ThreadTime', value: threadTime }] };
+  } }; } };
+  const page = {
+    async exposeFunction(name, fn) {
+      f.env[name] = async stage => { metricStage = stage; return fn(stage); };
+    },
+    async evaluate(fn, config) {
+      if (fn === installKeyboardCollector) { order.push('install'); return fn(config, f.env); }
+      return fn(config);
+    },
+    keyboard: { async press(key) {
+      assert.equal(key, 'Space'); order.push('Space'); clock = 20; f.trigger(); triggered.resolve();
+    } },
+  };
+  const globals = { window: f.env, document: f.env.document,
+    requestAnimationFrame: callback => { const index = nextFrame++; order.push(`request-frame-${index}`); frames[index].resolve(callback); },
+    setTimeout: f.env.setTimeout, clearTimeout: f.env.clearTimeout,
+    getComputedStyle: element => {
+      order.push('geometry'); threadTime += 0.001; return { transform: String(element.index) };
+    },
+    DOMMatrixReadOnly: class { constructor() { this.e = 300; } },
+  };
+  const saved = Object.fromEntries(Object.keys(globals).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  for (const [key, value] of Object.entries(globals)) Object.defineProperty(globalThis, key, { value, configurable: true, writable: true });
+  try {
+    await prepareKeyboardCpu(context, page, cpu);
+    const running = runKeyboardSample(page, { ...KEYBOARD_PLAN, kind: 'vendor', nativeDiscriminator: true });
+    await triggered.promise;
+    // Exact input and public finished signals, then four exact frame callbacks.
+    clock = 40; order.push('input-delivery'); f.deliver();
+    order.push('finished-delivery'); completion.resolve();
+    for (let index = 0; index < frames.length; index++) {
+      const callback = await frames[index].promise; order.push(`frame-${index}`); callback(40 + index * 16);
+    }
+    const result = await running; finishKeyboardCpu(cpu);
+    assert.equal(result.receipt.status, 'ENTRY');
+    assert.deepEqual(result.endpoint, { count: 1000, finite: true, maxError: 0 });
+    assert.equal(result.useful, true); assert.equal(result.effects, 0); assert.equal(result.finished.completed, true);
+    assert.equal(f.listeners.size, 0); assert.equal(f.timers.size, 0);
+    const before = (a, b) => {
+      assert.ok(order.includes(a) && order.includes(b));
+      assert.ok(order.indexOf(a) < order.indexOf(b), `${a} must precede ${b}`);
+    };
+    before('metrics-before', 'install'); before('install', 'observe-input'); before('observe-input', 'Space');
+    before('subscribe-finished', 'input-delivery'); before('input-delivery', 'metrics-afterAnimation');
+    before('finished-delivery', 'frame-0'); before('frame-1', 'metrics-afterAnimation');
+    before('metrics-afterAnimation', 'geometry');
+    assert.ok(order.lastIndexOf('geometry') < order.indexOf('metrics-beforeCleanup'));
+    before('metrics-beforeCleanup', 'cancel'); before('cancel', 'remove-target');
+    assert.ok(order.lastIndexOf('remove-control') < order.indexOf('frame-2'));
+    before('frame-3', 'metrics-afterCleanup');
+    return { result, cpu, order };
+  } finally {
+    for (const [key, descriptor] of Object.entries(saved)) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];
+    }
+  }
+}
+
+test('actual native CPU bridge + sample excludes geometry and preserves exact observer/completion order', { timeout: 2000 }, async () => {
+  const { cpu } = await integratedNativeSample();
+  assert.equal(cpu.status, 'AVAILABLE');
+  assert.ok(Math.abs(cpu.raw.beforeCleanup.ThreadTime - cpu.raw.afterAnimation.ThreadTime - 1) < 1e-9);
+  assert.ok(Math.abs(cpu.threadCpuMs - 187.5) < 1e-9);
+});
+for (const stage of ['enable', 'before', 'afterAnimation', 'beforeCleanup', 'afterCleanup'])
+  test(`actual CPU owner ${stage} failure retains ENTRY/endpoints/cleanup and UNAVAILABLE`, { timeout: 2000 }, async () => {
+    const { cpu } = await integratedNativeSample(stage);
+    assert.equal(cpu.status, 'UNAVAILABLE'); assert.equal(cpu.errors.length, 1);
+    assert.match(cpu.errors[0], /failure/);
+    if (stage !== 'enable') assert.equal(cpu.raw[stage], undefined);
+    assert.ok(Object.keys(cpu.raw).length >= 3);
+  });
+
+test('native analysis preserves original vendor family and requires same-job CPU protection', () => {
+  const samples = [];
+  for (let round = 0; round < 3; round++) {
+    samples.push({ kind: 'empty', round, useful: true, receipt: receipt(16) });
+    const blocking = receipt(48); blocking.raw[0].processingEnd = 41;
+    samples.push({ kind: 'blocking', round, useful: true, receipt: blocking });
+  }
+  for (let round = 0; round < 20; round++) for (const id of ['lab', 'motion', 'anime', 'lab-native'])
+    samples.push({ kind: 'vendor', round, id, useful: true, receipt: receipt(id === 'lab-native' ? 32 : 80),
+      cpu: { status: 'AVAILABLE', raw: { before: { ThreadTime: 1 }, afterAnimation: { ThreadTime: 1.125 },
+        beforeCleanup: { ThreadTime: 2 }, afterCleanup: { ThreadTime: 2.0625 } } } });
+  const result = analyzeNativeSamples(samples);
+  assert.deepEqual(result.original, analyzeKeyboardSamples(samples.filter(s => s.id !== 'lab-native')));
+  assert.equal(result.status, 'STRUCTURAL_PROPOSAL_JUSTIFIED');
+  samples.find(s => s.id === 'lab-native').cpu = { status: 'UNAVAILABLE', raw: {} };
+  const unavailable = analyzeNativeSamples(samples);
+  assert.equal(unavailable.status, 'CPU_TRADEOFF_UNRESOLVED');
+  assert.equal(unavailable.cpu.status, 'UNAVAILABLE');
+  assert.equal(analyzeNativeSamples(samples.slice(1)).status, 'INCONCLUSIVE');
 });

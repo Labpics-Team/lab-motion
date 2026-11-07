@@ -10,6 +10,71 @@ export const KEYBOARD_PLAN = Object.freeze({ schema: 1, rounds: 20, vendors: ['l
   analysis: 'paired-round bootstrap; worst-case rounding endpoints; Holm two loss comparisons; no p99; missing/control failure/overlap INCONCLUSIVE',
 });
 
+export const NATIVE_PLAN = Object.freeze({ ...KEYBOARD_PLAN, schema: 2, maxLifecycles: 86,
+  participant: 'lab-native', contract: 'whole-transform native control, not equivalent root ownership/ranking',
+  latencyFamilySize: 1, cpuNonInferiorityRatio: 1.05,
+  decision: 'native materially faster + same-job CPU protected => structural proposal only; not faster => no backend-substitution evidence; missing CPU => UNAVAILABLE',
+});
+
+export function nativeOrders(rootOrders) {
+  return rootOrders.map((order, round) => {
+    const expanded = [...order]; expanded.splice(round % 4, 0, NATIVE_PLAN.participant); return expanded;
+  });
+}
+
+export function completedThreadCpu(raw) {
+  const stages = ['before', 'afterAnimation', 'beforeCleanup', 'afterCleanup'];
+  if (stages.some(stage => !Number.isFinite(raw?.[stage]?.ThreadTime) || raw[stage].ThreadTime < 0)) return null;
+  const ticks = stages.map(stage => raw[stage].ThreadTime);
+  if (ticks.some((tick, index) => index > 0 && tick < ticks[index - 1])) return null;
+  return 1000 * (ticks[1] - ticks[0] + ticks[3] - ticks[2]);
+}
+
+export async function prepareKeyboardCpu(context, page, cpu) {
+  let cdp;
+  try {
+    cdp = await context.newCDPSession(page);
+    await cdp.send('Performance.enable', { timeDomain: 'threadTicks' });
+  } catch (error) { cpu.errors.push(String(error)); }
+  await page.exposeFunction('__keyboardSnapshot', async stage => {
+    try {
+      if (cdp) cpu.raw[stage] = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
+    } catch (error) { cpu.errors.push(String(error)); }
+  });
+  await page.evaluate(() => window.__keyboardSnapshot('before'));
+}
+
+export function finishKeyboardCpu(cpu) {
+  const threadCpuMs = completedThreadCpu(cpu.raw);
+  if (threadCpuMs !== null && cpu.errors.length === 0) { cpu.status = 'AVAILABLE'; cpu.threadCpuMs = threadCpuMs; }
+}
+
+export function analyzeNativeSamples(samples) {
+  const original = analyzeKeyboardSamples(samples.filter(sample => sample.id !== NATIVE_PLAN.participant));
+  const rows = id => samples.filter(s => s.kind === 'vendor' && s.id === id).sort((a, b) => a.round - b.round);
+  const root = rows('lab'), native = rows(NATIVE_PLAN.participant);
+  if (samples.length !== 86 || !original.comparisons || [root, native].some(group => group.length !== 20 ||
+    group.some((s, i) => s.round !== i || !s.useful || !firstInputInterval(s.receipt) || firstInputInterval(s.receipt).low <= 0)))
+    return { status: 'INCONCLUSIVE', original, reason: 'fixed denominator/semantic/sensor failed', contract: NATIVE_PLAN.contract };
+  const clusters = (group, value) => group.map(s => ({ run: s.round, semantic: true, samples: [value(s)] }));
+  const options = { seed: KEYBOARD_PLAN.seed + 2, iterations: KEYBOARD_PLAN.bootstrapIterations };
+  const practicalNative = clusters(native, s => {
+    const high = firstInputInterval(s.receipt).high; return high + Math.max(8, 0.05 * high);
+  });
+  const latency = pairedClusterBootstrap(practicalNative, clusters(root, s => firstInputInterval(s.receipt).low), options);
+  const claim = applyHolmCorrection([{ id: 'native-vs-root', pValue: latency.pValue }], KEYBOARD_PLAN.alpha)[0];
+  const faster = claim.accepted && latency.p50.high < 1;
+  const cpuAvailable = [...root, ...native].every(s => s.cpu?.status === 'AVAILABLE' && completedThreadCpu(s.cpu.raw) > 0);
+  const cpu = cpuAvailable ? pairedClusterBootstrap(clusters(native, s => completedThreadCpu(s.cpu.raw)),
+    clusters(root, s => completedThreadCpu(s.cpu.raw)), options) : null;
+  const cpuProtected = cpu !== null && cpu.p50.high <= 1.05 && cpu.p95.high <= 1.05;
+  const notFaster = pairedClusterBootstrap(clusters(native, s => firstInputInterval(s.receipt).low),
+    clusters(root, s => firstInputInterval(s.receipt).high), options).p50.low >= 1;
+  return { status: faster && cpuProtected ? 'STRUCTURAL_PROPOSAL_JUSTIFIED' : faster ? 'CPU_TRADEOFF_UNRESOLVED' :
+    notFaster ? 'NO_BACKEND_SUBSTITUTION_EVIDENCE' : 'INCONCLUSIVE',
+    original, latency, claim, faster, cpu: cpu ?? { status: 'UNAVAILABLE' }, cpuProtected, contract: NATIVE_PLAN.contract };
+}
+
 // Один serializable owner для настоящего браузера и deterministic fake environment.
 export function installKeyboardCollector(config, environment = globalThis) {
   const { performance, PerformanceObserver, document, setTimeout, clearTimeout } = environment;
@@ -157,14 +222,17 @@ export async function runKeyboardSample(page, config) {
         new Promise(resolve => { timeout = setTimeout(() => resolve({ error: 'finished watchdog' }), config.timeoutMs); })]);
       clearTimeout(timeout);
       await settle();
+      if (config.nativeDiscriminator) await window.__keyboardSnapshot('afterAnimation');
       const receipt = capture.receipt();
       const xs = config.kind === 'vendor' ? window.__targets.map(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).e) : [];
       const endpoint = { count: xs.length, finite: xs.every(Number.isFinite), maxError: xs.length ? Math.max(...xs.map(x => Math.abs(x - config.targetPx))) : 0 };
       const acknowledgement = document.getElementById('keyboard-ack').textContent;
+      if (config.nativeDiscriminator) await window.__keyboardSnapshot('beforeCleanup');
       window.__control?.cancel();
       for (const element of window.__targets) element.remove();
       document.getElementById('keyboard-action').remove(); document.getElementById('keyboard-ack').remove();
       await settle();
+      if (config.nativeDiscriminator) await window.__keyboardSnapshot('afterCleanup');
       const effects = document.getAnimations().length;
       return { receipt, finished, endpoint, acknowledgement, effects,
         useful: finished.completed === true && acknowledgement === 'done' && effects === 0 &&

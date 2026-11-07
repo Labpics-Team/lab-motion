@@ -29,7 +29,9 @@ mkdirSync(output);
 mkdirSync(path.join(output, 'adapters'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const optionalFile = file => { try { return readFileSync(file, 'utf8').trim(); } catch { return null; } };
+const nativeDiscriminator = process.env.KEYBOARD_NATIVE_DISCRIMINATOR === '1';
 const group = process.argv[4] ?? 'full';
+if (nativeDiscriminator && group !== 'keyboard-diagnostic') throw new Error('Native discriminator requires keyboard route');
 const keyboardDiagnostic = group === 'keyboard-diagnostic';
 if (!['full', 'native', 'spring-pair', 'js-pair', 'keyboard-diagnostic'].includes(group)) throw new Error('Unknown capability group');
 const paired = group.endsWith('-pair');
@@ -64,14 +66,15 @@ const installed = Object.fromEntries(Object.entries(manifest.devDependencies).ma
   if (actual !== expected) throw new Error('Installed package differs from manifest: ' + name);
   return [name, actual];
 }));
-const orders = keyboardDiagnostic ? Array.from({ length: rounds }, (_, round) => {
+const rootOrders = keyboardDiagnostic ? Array.from({ length: rounds }, (_, round) => {
   const permutations = [['lab', 'motion', 'anime'], ['motion', 'anime', 'lab'], ['anime', 'lab', 'motion'],
     ['anime', 'motion', 'lab'], ['lab', 'anime', 'motion'], ['motion', 'lab', 'anime']];
   return permutations[round % permutations.length];
 }) : makeRoundRobinOrders(ids, rounds, 0x5A71);
 const keyboard = keyboardDiagnostic ? await load('bench/compare/keyboard-timing.mjs') : null;
+const orders = nativeDiscriminator ? keyboard.nativeOrders(rootOrders) : rootOrders;
 if (keyboardDiagnostic) writeFileSync(path.join(output, 'keyboard-preregistration.json'), JSON.stringify({
-  plan: keyboard.KEYBOARD_PLAN, orders, moduleSha256: hash(readFileSync(path.join(benchPath, 'keyboard-timing.mjs'))),
+  plan: nativeDiscriminator ? keyboard.NATIVE_PLAN : keyboard.KEYBOARD_PLAN, rootOrders, orders, moduleSha256: hash(readFileSync(path.join(benchPath, 'keyboard-timing.mjs'))),
   productSource: hashFileTree(path.join(rootPath, 'src')),
   locks: Object.fromEntries(['package.json', 'pnpm-lock.yaml', 'bench/compare/package.json', 'bench/compare/pnpm-lock.yaml']
     .map(file => [file, hash(readFileSync(path.join(rootPath, file)))])),
@@ -121,6 +124,7 @@ try {
     for (let round = 0; round < rounds; round++) for (const id of orders[round]) tasks.push({ round, id, kind: 'vendor' });
     for (const task of tasks) {
       let context, page;
+      const cpu = { status: 'UNAVAILABLE', raw: {}, errors: [] };
       try {
         ({ context, page } = await pageFor(task.kind === 'vendor' ? task.id : 'lab'));
         await page.evaluate(count => {
@@ -134,18 +138,23 @@ try {
           document.body.append(control, ack); control.focus();
         }, keyboard.KEYBOARD_PLAN.targets);
         await settle(page);
-        const result = await keyboard.runKeyboardSample(page, { ...keyboard.KEYBOARD_PLAN, kind: task.kind });
-        const sample = { ...task, ...result };
+        if (nativeDiscriminator) await keyboard.prepareKeyboardCpu(context, page, cpu);
+        const result = await keyboard.runKeyboardSample(page, { ...keyboard.KEYBOARD_PLAN, kind: task.kind, nativeDiscriminator });
+        if (nativeDiscriminator) keyboard.finishKeyboardCpu(cpu);
+        const sample = { ...task, ...result, ...(nativeDiscriminator ? { cpu } : {}) };
         samples.push(sample); appendFileSync(path.join(output, 'samples.jsonl'), JSON.stringify(sample) + '\n');
       } catch (error) {
         let receipt = null, receiptFailure = null;
         try { receipt = page ? await page.evaluate(() => window.__keyboardCapture?.receipt() ?? null) : null; }
         catch (captureError) { receiptFailure = String(captureError); }
-        const sample = { ...task, useful: false, failure: String(error), receipt, receiptFailure };
+        const sample = { ...task, useful: false, failure: String(error), receipt, receiptFailure,
+          ...(nativeDiscriminator ? { cpu } : {}) };
         samples.push(sample); appendFileSync(path.join(output, 'samples.jsonl'), JSON.stringify(sample) + '\n');
       } finally { await context?.close(); }
     }
-    writeFileSync(path.join(output, 'keyboard-analysis.json'), JSON.stringify(keyboard.analyzeKeyboardSamples(samples), null, 2));
+    writeFileSync(path.join(output, 'keyboard-analysis.json'), JSON.stringify(keyboard.analyzeKeyboardSamples(
+      nativeDiscriminator ? samples.filter(s => s.id !== 'lab-native') : samples), null, 2));
+    if (nativeDiscriminator) writeFileSync(path.join(output, 'native-contract-analysis.json'), JSON.stringify(keyboard.analyzeNativeSamples(samples), null, 2));
   }
   if (paired) {
     // Сравнивается публичный seek в браузере; проверка не входит в timed samples.

@@ -48,6 +48,8 @@ jobs:
       - name: Deterministic collector contracts
         run: node --test bench/compare/keyboard-timing.test.mjs
       - name: Один fixed keyboard capture
+        env:
+          KEYBOARD_NATIVE_DISCRIMINATOR: '1'
         run: xvfb-run -a node bench/compare/transition-profile.mjs . "$RUNNER_TEMP/keyboard-diagnostic" keyboard-diagnostic
       - name: Raw export даже при inconclusive
         if: ${{ always() }}
