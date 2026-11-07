@@ -197,6 +197,8 @@ try {
           window.__control = window.__adapterModule.start(window.__targets, 300, duration);
           return { apiMs: performance.now() - start, start };
         };
+        // После отправки start отсутствие ответа не подтверждает нулевую работу.
+        if (diagnostic) { accepted = null; completed = null; }
         const started = await page.evaluate(startCall, durationMs);
         accepted = count;
         if (profiled) { stage = 'profiler-stop'; coverage = await stopProfile(); }

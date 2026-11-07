@@ -90,7 +90,7 @@ describe('transition-profile: реальный Chromium и изменяемые 
       }
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
-  for (const fault of ['ordering', 'label-missing', 'label-renamed', 'label-wrong-last', 'page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
+  for (const fault of ['ordering', 'label-missing', 'label-renamed', 'label-wrong-last', 'page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'adapter-start-response', 'partial-adapter-throw', 'completion-response', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-startup-boundary-'));
     try {
       const candidate = inputPackage(directory, 'candidate', 'success');
@@ -133,12 +133,39 @@ chromium.launch = async (...args) => {
         const events = await observedPage.evaluate(() => window.__startupWitness);
         appendFileSync(receipt, JSON.stringify({ index, events }) + '\\n');
       }
+      if (fault === 'partial-adapter-throw') {
+        const partial = await observedPage.evaluate(() => window.__partialWitness);
+        appendFileSync(receipt, JSON.stringify({ partial }) + '\\n');
+      }
       await close(...args); record('context-closed');
       if (armed && ['context-close', 'setup-and-close'].includes(fault)) { armed = false; throw new Error('FAULT_CONTEXT_CLOSE'); }
     };
     context.newPage = async (...args) => {
-      const page = await newPage(...args), goto = page.goto.bind(page), addScriptTag = page.addScriptTag.bind(page);
+      const page = await newPage(...args), goto = page.goto.bind(page), addScriptTag = page.addScriptTag.bind(page), evaluate = page.evaluate.bind(page);
       observedPage = page;
+      page.evaluate = async (callback, argument) => {
+        const result = await evaluate(callback, argument);
+        const lostStart = fault === 'adapter-start-response' && callback.name === 'startupDiagnosticStart';
+        const lostCompletion = fault === 'completion-response' && argument?.watchdogMs !== undefined;
+        if (armed && (lostStart || lostCompletion)) {
+          armed = false;
+          record(lostStart ? 'adapter-start-returned' : 'completion-returned');
+          throw new Error(lostStart ? 'FAULT_ADAPTER_START_RESPONSE' : 'FAULT_COMPLETION_RESPONSE');
+        }
+        return result;
+      };
+      if (fault === 'partial-adapter-throw') page.addScriptTag = async (...args) => {
+        const result = await addScriptTag(...args);
+        await evaluate(() => {
+          const adapter = window.__adapterModule;
+          window.__adapterModule = { ...adapter, start(elements, ...args) {
+            window.__partialControl = adapter.start(elements.slice(0, 1), ...args);
+            window.__partialWitness = { accepted: 1, effects: document.getAnimations().length };
+            throw new Error('FAULT_PARTIAL_ADAPTER_START');
+          } };
+        });
+        return result;
+      };
       if (labelControl) page.addScriptTag = async (...args) => {
         assert.equal(++injections, 1);
         const id = conditions[index].split(':')[0];
@@ -246,14 +273,26 @@ chromium.launch = async (...args) => {
         assert.notEqual(result.code, 0);
         assert.equal(existsSync(join(output, 'diagnostic.json')), false);
         const failures = readFileSync(join(output, 'failures.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
-        const expected = fault === 'setup-and-close' ? ['page-setup', 'context-close'] : fault === 'start-and-stop' ? ['profiler-start', 'profiler-stop-after-failure'] : [fault.startsWith('label-') ? 'page-setup' : fault === 'start-response' ? 'profiler-start' : fault];
+        const expected = fault === 'setup-and-close' ? ['page-setup', 'context-close'] : fault === 'start-and-stop' ? ['profiler-start', 'profiler-stop-after-failure'] : [fault.startsWith('label-') ? 'page-setup' : fault === 'start-response' ? 'profiler-start' : ['adapter-start-response', 'partial-adapter-throw'].includes(fault) ? 'start' : fault === 'completion-response' ? 'completion' : fault];
         assert.deepEqual(failures.map(row => row.stage), expected);
         assert.ok(failures.every(row => row.round === 0 && row.count === 1000 && row.condition && row.offered === 1000));
         for (const row of failures) assert.ok(result.stderr.includes(row.error.split('\n')[0]));
         if (fault.startsWith('label-')) assert.ok(result.stderr.includes('SOURCE_URL_BOUNDARY'));
+        if (['adapter-start-response', 'partial-adapter-throw', 'completion-response'].includes(fault)) {
+          assert.equal(failures[0].accepted, fault === 'completion-response' ? 1000 : null);
+          assert.equal(failures[0].completed, null);
+          assert.equal(existsSync(join(output, 'samples.jsonl')), false);
+          if (fault === 'partial-adapter-throw') {
+            assert.deepEqual(receipts.find(row => row.partial)?.partial, { accepted: 1, effects: 1 });
+            assert.ok(result.stderr.includes('FAULT_PARTIAL_ADAPTER_START'));
+          } else assert.ok(events.includes(fault === 'completion-response' ? 'completion-returned' : 'adapter-start-returned'));
+        } else if (fault !== 'context-close') {
+          assert.ok(failures.every(row => row.accepted === 0 && row.completed === 0));
+        }
         if (fault === 'context-close') {
           const rows = readFileSync(join(output, 'samples.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
           assert.ok(rows.at(-1).valid);
+          assert.equal(failures[0].accepted, 1000);
           assert.equal(failures[0].completed, 1000);
         }
         if (fault.startsWith('start-')) {
