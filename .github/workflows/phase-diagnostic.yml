@@ -1,0 +1,49 @@
+name: Диагностика useful-work фаз
+
+on:
+  push:
+    branches: ['diagnostic/useful-work-phases-01a1b3b1']
+
+permissions:
+  contents: read
+
+env:
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+  COREPACK_DEFAULT_TO_LATEST: '0'
+
+jobs:
+  phase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Проверить неизменный production source
+        run: |
+          set -euo pipefail
+          git diff --exit-code 56e5b8bb61b7e090950959d2e98bd99b23fc9cb1 HEAD -- src bench/compare/entries package.json pnpm-lock.yaml bench/compare/package.json bench/compare/pnpm-lock.yaml
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24.19.0'
+      - name: Установить закреплённые зависимости и собрать reference
+        run: |
+          corepack enable
+          corepack install --global pnpm@11.11.0
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm --dir bench/compare install --frozen-lockfile
+          pnpm --dir bench/compare exec playwright install --with-deps chromium
+      - name: Проверить offline CPU accounting
+        run: node --test bench/compare/phase-ledger.test.mjs
+      - name: Один bounded diagnostic capture
+        run: xvfb-run -a node bench/compare/transition-profile.mjs . "$RUNNER_TEMP/phase-diagnostic" phase-diagnostic
+      - name: Сохранить raw даже при отказе
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: phase-diagnostic-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/phase-diagnostic/
+          retention-days: 7
+          if-no-files-found: error

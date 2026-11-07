@@ -30,15 +30,18 @@ mkdirSync(path.join(output, 'adapters'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const optionalFile = file => { try { return readFileSync(file, 'utf8').trim(); } catch { return null; } };
 const group = process.argv[4] ?? 'full';
-if (!['full', 'native', 'spring-pair', 'js-pair'].includes(group)) throw new Error('Unknown capability group');
+if (!['full', 'native', 'spring-pair', 'js-pair', 'phase-diagnostic'].includes(group)) throw new Error('Unknown capability group');
+const phaseDiagnostic = group === 'phase-diagnostic';
+const { sourceLedgerPlugin, installPhaseLedger, exclusiveMarkerCpu, phaseLifecycle } = await load('bench/compare/phase-ledger.mjs');
 const paired = group.endsWith('-pair');
 if (paired && !baselinePath) throw new Error('Paired runtime profile requires an immutable baseline');
-const ids = paired ? ['lab'] : group === 'native'
+const ids = phaseDiagnostic ? ['lab', 'motion', 'anime'] : paired ? ['lab'] : group === 'native'
   ? ['lab', 'lab-native', 'motion-mini', 'waapi-ctl']
   : ['lab', 'motion', 'gsap', 'anime', 'waapi-ctl'];
 if (baselinePath) ids.push('baseline');
-const counts = [1, 100, 1000];
-const rounds = Math.ceil(20 / ids.length) * ids.length, durationMs = 400, watchdogMs = 10_000;
+const counts = phaseDiagnostic ? [1000] : [1, 100, 1000];
+const rounds = phaseDiagnostic ? 3 : Math.ceil(20 / ids.length) * ids.length, durationMs = 400, watchdogMs = 10_000;
+if (phaseDiagnostic && baselinePath) throw new Error('Diagnostic has one immutable production source, no candidate baseline pair');
 const entries = { 'lab-native': 'lab-native', lab: 'lab', motion: 'motion', gsap: 'gsap', anime: 'anime', 'waapi-ctl': 'waapi-control', 'motion-mini': 'motion-mini', 'anime-waapi': 'anime-waapi' };
 if (baselinePath) entries.baseline = 'lab';
 const adapters = Object.fromEntries(Object.entries(entries).map(([id, entry]) => {
@@ -55,6 +58,18 @@ const adapters = Object.fromEntries(Object.entries(entries).map(([id, entry]) =>
   const bytes = readFileSync(outputPath);
   return [id, { path: outputPath, sha256: hash(bytes), raw: bytes.length, gzip: canonicalGzip(bytes).length, brotli: observationalBrotli(bytes).length }];
 }));
+if (phaseDiagnostic) {
+  const source = path.join(rootPath, 'src/motion/index.ts');
+  const contents = `import { animate } from ${JSON.stringify(source)}; export function start(els, px, duration) { const run = animate(els, {x:px}, {duration, ease:'linear'}); return {finished: () => run.finished, cancel: () => run.stop()}; }`;
+  for (const mode of ['source-reference', 'diagnostic']) {
+    const outputPath = path.join(output, 'adapters', `lab-${mode}.js`);
+    await esbuild.build({ ...PRODUCTION_ADAPTER_PROFILE, stdin: { contents, resolveDir: rootPath, loader: 'js' },
+      plugins: mode === 'diagnostic' ? [sourceLedgerPlugin()] : [], format: 'iife', globalName: '__adapterModule', outfile: outputPath });
+    const bytes = readFileSync(outputPath);
+    adapters[`lab-${mode}`] = { path: outputPath, sha256: hash(bytes), raw: bytes.length,
+      gzip: canonicalGzip(bytes).length, brotli: observationalBrotli(bytes).length };
+  }
+}
 const root = JSON.parse(readFileSync(path.join(rootPath, 'package.json')));
 const manifest = JSON.parse(readFileSync(path.join(benchPath, 'package.json')));
 const installed = Object.fromEntries(Object.entries(manifest.devDependencies).map(([name, expected]) => {
@@ -72,15 +87,22 @@ const metadata = {
   environment: { cpu: os.cpus()[0].model, cpuMax: optionalFile('/sys/fs/cgroup/cpu.max'), memoryMax: optionalFile('/sys/fs/cgroup/memory.max') },
   scenario: { group, counts, rounds, durationMs: group === 'spring-pair' ? null : durationMs, watchdogMs, targetPx: 300, easing: group === 'spring-pair' ? 'default spring' : group === 'js-pair' ? 'p*p*(3-2*p), custom JS callback' : 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
   adapters, orders, sourceIdentity,
+  ...(phaseDiagnostic ? { diagnostic: { modes: ['reference', 'diagnostic', 'lab-only-source-reference'], rounds: 3, maxLifecycles: 21,
+    productSourceSha256: hashFileTree(path.join(rootPath, 'src')).sha256,
+    ledgerSha256: hash(readFileSync(path.join(benchPath, 'phase-ledger.mjs'))),
+    attribution: 'Only paired actual marker tts CPU; no wall-as-CPU; unmarked/competitor setup attribution UNAVAILABLE',
+    reference: 'Uninstrumented dist root adapters; additional lab source-reference correctness receipt, same production compile profile',
+    overhead: 'paired reference/diagnostic totals; counts checkpoints/endpoints/cleanup equality; no fixed acceptable speed claim' } } : {}),
 };
 writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
 const samples = [];
 const metrics = async c => Object.fromEntries((await c.send('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
 const settle = async page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-async function pageFor(id) {
+async function pageFor(id, diagnostic = false) {
   const context = await browser.newContext({ viewport: metadata.scenario.viewport, deviceScaleFactor: 1, reducedMotion: 'no-preference' });
   const page = await context.newPage();
   await page.goto(origin.url); await page.bringToFront();
+  if (diagnostic) await page.evaluate(installPhaseLedger);
   await page.addScriptTag({ path: adapters[id].path });
   return { context, page };
 }
@@ -115,7 +137,7 @@ try {
     if (!exact) throw new Error('Baseline and candidate public trajectories differ');
   }
   // Сохраняется исходная проверка траектории вместе с её отказами.
-  for (const id of ids) {
+  for (const id of phaseDiagnostic ? [] : ids) {
     const { context, page } = await pageFor(id);
     try {
       if (!await page.evaluate(() => typeof window.__adapterModule.startStagger === 'function')) {
@@ -128,8 +150,12 @@ try {
     } finally { await context.close(); }
   }
   for (let round = 0; round < rounds; round++) {
-    for (const count of counts) for (const id of orders[round]) {
-      const { context, page } = await pageFor(id);
+    for (const count of counts) for (const id of orders[round]) for (const mode of phaseDiagnostic
+      ? (id === 'lab' ? (round % 2 ? ['diagnostic', 'source-reference', 'reference'] : ['reference', 'source-reference', 'diagnostic'])
+        : (round % 2 ? ['diagnostic', 'reference'] : ['reference', 'diagnostic'])) : ['reference']) {
+      const diagnostic = phaseDiagnostic && mode === 'diagnostic';
+      const adapterId = phaseDiagnostic && id === 'lab' && mode !== 'reference' ? `lab-${mode}` : id;
+      const { context, page } = await pageFor(adapterId, diagnostic);
       const cdp = await context.newCDPSession(page);
       try {
         await page.evaluate(count => {
@@ -142,13 +168,21 @@ try {
         }, count);
         await settle(page);
         await cdp.send('Performance.enable', { timeDomain: 'threadTicks' });
+        const traceEvents = [];
+        const onTrace = event => traceEvents.push(...event.value);
+        if (diagnostic) {
+          cdp.on('Tracing.dataCollected', onTrace);
+          await cdp.send('Tracing.start', { categories: 'devtools.timeline,blink.console,toplevel',
+            options: 'record-as-much-as-possible', transferMode: 'ReportEvents' });
+          await page.evaluate(() => window.__phase.targetList(window.__targets));
+        }
         const before = await metrics(cdp);
-        const started = await page.evaluate(duration => {
+        const started = phaseDiagnostic ? await phaseLifecycle(page, durationMs, watchdogMs, diagnostic) : await page.evaluate(duration => {
           const start = performance.now();
           window.__control = window.__adapterModule.start(window.__targets, 300, duration);
           return { apiMs: performance.now() - start, start };
         }, durationMs);
-        const completionMs = await page.evaluate(async ({ start, watchdogMs }) => {
+        const completionMs = phaseDiagnostic ? started.completionMs : await page.evaluate(async ({ start, watchdogMs }) => {
           let watchdog;
           try {
             const finished = window.__control.finished();
@@ -161,17 +195,36 @@ try {
         }, { start: started.start, watchdogMs });
         await settle(page);
         const afterAnimation = await metrics(cdp);
+        if (diagnostic) await page.evaluate(() => window.__phase.disable());
         const endpoint = await page.evaluate(() => {
           const positions = window.__targets.map(el => new DOMMatrixReadOnly(getComputedStyle(el).transform).e);
           return { count: positions.length, maxError: Math.max(...positions.map(x => Math.abs(x - 300))), finite: positions.every(Number.isFinite) };
         });
         const beforeCleanup = await metrics(cdp);
+        if (diagnostic) await page.evaluate(() => { window.__phase.checkpoint('cleanup-start'); window.__phase.enable(); });
         await page.evaluate(() => { window.__control.cancel(); for (const el of window.__targets) el.remove(); window.__control = undefined; window.__targets = undefined; });
         await settle(page);
         const afterCleanup = await metrics(cdp);
         const effects = await page.evaluate(() => document.getAnimations().length);
+        let ledger, attribution;
+        if (diagnostic) {
+          ledger = await page.evaluate(() => { window.__phase.checkpoint('cleanup'); window.__phase.disable();
+            return { rows: window.__phase.rows, native: window.__phase.native, reads: window.__phase.reads,
+              cancels: window.__phase.cancels, transformGetter: window.__phase.transformGetter }; });
+          let traceWatchdog;
+          const completed = new Promise((resolve, reject) => {
+            cdp.once('Tracing.tracingComplete', resolve);
+            traceWatchdog = setTimeout(() => reject(new Error('Trace completion watchdog')), watchdogMs);
+          });
+          let traceCompletion;
+          try { await cdp.send('Tracing.end'); traceCompletion = await completed; }
+          finally { clearTimeout(traceWatchdog); }
+          cdp.off('Tracing.dataCollected', onTrace);
+          writeFileSync(path.join(output, `trace-${round}-${id}.json`), JSON.stringify({ traceEvents, traceCompletion }));
+          attribution = exclusiveMarkerCpu(traceEvents, ledger.rows, traceCompletion);
+        }
         const delta = key => 1000 * ((afterAnimation[key] - before[key]) + (afterCleanup[key] - beforeCleanup[key]));
-        const sample = { round, count, id, apiMs: started.apiMs, completionMs, taskCpuMs: delta('TaskDuration'), threadCpuMs: delta('ThreadTime'), scriptCpuMs: delta('ScriptDuration'), styleCpuMs: delta('RecalcStyleDuration'), layoutCpuMs: delta('LayoutDuration'), endpoint, effects, raw: { before, afterAnimation, beforeCleanup, afterCleanup } };
+        const sample = { round, count, id, ...(phaseDiagnostic ? { mode, snapshots: started.snapshots, ledger, attribution } : {}), apiMs: started.apiMs, completionMs, taskCpuMs: delta('TaskDuration'), threadCpuMs: delta('ThreadTime'), scriptCpuMs: delta('ScriptDuration'), styleCpuMs: delta('RecalcStyleDuration'), layoutCpuMs: delta('LayoutDuration'), endpoint, effects, raw: { before, afterAnimation, beforeCleanup, afterCleanup } };
         sample.valid = endpoint.count === count && endpoint.finite && endpoint.maxError <= 0.05 && effects === 0 && ['apiMs', 'completionMs', 'taskCpuMs', 'threadCpuMs', 'scriptCpuMs', 'styleCpuMs', 'layoutCpuMs'].every(k => Number.isFinite(sample[k]) && sample[k] >= 0);
         samples.push(sample); appendFileSync(path.join(output, 'samples.jsonl'), JSON.stringify(sample) + '\n');
         if (!sample.valid) throw new Error(`Invalid sample ${round}/${count}/${id}: ${JSON.stringify({ endpoint, effects })}`);
@@ -184,6 +237,25 @@ try {
     }
     console.log(`ROUND ${round + 1}/${rounds}`);
   }
+  if (phaseDiagnostic) {
+    const equivalence = [];
+    for (let round = 0; round < rounds; round++) for (const id of ids) {
+      const reference = samples.find(s => s.round === round && s.id === id && s.mode === 'reference');
+      const diagnostic = samples.find(s => s.round === round && s.id === id && s.mode === 'diagnostic');
+      const checkpointCounts = row => ['return', 'post-frame-commit', 'finished'].map(name =>
+        [name, row.snapshots.find(s => s.name === name)?.outstandingEffects]);
+      const sourceReference = id === 'lab' ? samples.find(s => s.round === round && s.id === id && s.mode === 'source-reference') : reference;
+      const countsEqual = JSON.stringify(checkpointCounts(reference)) === JSON.stringify(checkpointCounts(diagnostic)) &&
+        JSON.stringify(checkpointCounts(reference)) === JSON.stringify(checkpointCounts(sourceReference));
+      equivalence.push({ round, id, countsEqual, endpointsValid: reference.valid && diagnostic.valid && sourceReference.valid,
+        sourceReferenceTaskCpuMs: sourceReference.taskCpuMs,
+        taskCpuOverheadMs: diagnostic.taskCpuMs - reference.taskCpuMs,
+        threadCpuOverheadMs: diagnostic.threadCpuMs - reference.threadCpuMs,
+        apiWallOverheadMs: diagnostic.apiMs - reference.apiMs });
+    }
+    writeFileSync(path.join(output, 'diagnostic-equivalence.json'), JSON.stringify(equivalence, null, 2));
+    if (equivalence.some(e => !e.countsEqual || !e.endpointsValid)) throw new Error('Instrumentation changed useful result/checkpoint counts');
+  }
   for (const [id, adapter] of Object.entries(adapters)) if (hash(readFileSync(adapter.path)) !== adapter.sha256) throw new Error(`Adapter changed: ${id}`);
   for (const [id, directory] of Object.entries(measuredRoots)) {
     if (hashFileTree(path.join(directory, 'dist')).sha256 !== sourceIdentity[id].dist.sha256)
@@ -191,7 +263,7 @@ try {
   }
   const quantile = (values, p) => [...values].sort((a, b) => a - b)[Math.ceil(values.length * p) - 1];
   const summary = counts.flatMap(count => ids.map(id => {
-    const rows = samples.filter(s => s.count === count && s.id === id);
+    const rows = samples.filter(s => s.count === count && s.id === id && (!phaseDiagnostic || s.mode === 'reference'));
     return { count, id, n: rows.length, taskP50: quantile(rows.map(s => s.taskCpuMs), .5), taskP95: quantile(rows.map(s => s.taskCpuMs), .95), threadP50: quantile(rows.map(s => s.threadCpuMs), .5), apiP50: quantile(rows.map(s => s.apiMs), .5), completionP50: quantile(rows.map(s => s.completionMs), .5), styleP50: quantile(rows.map(s => s.styleCpuMs), .5), layoutP50: quantile(rows.map(s => s.layoutCpuMs), .5), scriptP50: quantile(rows.map(s => s.scriptCpuMs), .5) };
   }));
   writeFileSync(path.join(output, 'summary.json'), JSON.stringify(summary, null, 2));
