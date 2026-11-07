@@ -125,7 +125,7 @@ function controlledCapture(faults: { terminal?: Error; snapshot?: Error; cleanup
     DOMMatrixReadOnly: class { e = 600; },
   });
   runInContext('window = globalThis; __adapterModule = { start(elements) { elements[0].animate([], {}); return {}; } };', realm);
-  const PNG = createRequire(new URL('../bench/compare/package.json', import.meta.url))('pngjs').PNG;
+  const PNG = createRequire(new URL('../package.json', import.meta.url))('pngjs').PNG;
   const image = new PNG({ width: 2, height: 1 });
   image.data.set([255, 0, 0, 255, 0, 255, 0, 255]);
   const png: Buffer = PNG.sync.write(image);
