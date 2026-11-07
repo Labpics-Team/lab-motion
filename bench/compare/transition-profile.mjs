@@ -11,6 +11,8 @@ const startupScenario = process.env.MOTION_STARTUP_DIAGNOSTIC_SCENARIO ?? '';
 if (startupScenario && (group !== 'startup-diagnostic' || startupScenario !== 's2-warm'))
   throw new Error('MOTION_STARTUP_DIAGNOSTIC_SCENARIO requires startup-diagnostic and s2-warm');
 const s2Warm = startupScenario === 's2-warm';
+const captureAblation = process.env.MOTION_S2_CAPTURE_ABLATION === '1';
+if (captureAblation && !s2Warm) throw new Error('Capture ablation requires the existing S2 diagnostic');
 const rootPath = realpathSync(process.argv[2] ?? process.cwd());
 const baselinePath = process.argv[5] ? realpathSync(process.argv[5]) : undefined;
 if (baselinePath === rootPath) throw new Error('Baseline and candidate must be distinct checkouts');
@@ -46,7 +48,9 @@ if (baselinePath) ids.push('baseline');
 const counts = diagnostic ? [s2Warm ? START_SCENARIO_MANIFEST.s2.targetsPerCall : 1000] : [1, 100, 1000];
 const rounds = diagnostic ? s2Warm ? 6 : 4 : Math.ceil(20 / ids.length) * ids.length;
 const durationMs = s2Warm ? START_SCENARIO_MANIFEST.s2.durationMs : 400, watchdogMs = 10_000;
-const observations = diagnostic ? s2Warm ? ids.flatMap(id => [`${id}:plain`, `${id}:profiled`]) : ['lab:plain', 'lab:profiled', 'waapi-ctl:plain', 'waapi-ctl:profiled'] : ids;
+const observations = captureAblation
+  ? ['lab:counter', 'lab:sparse', 'motion:plain', 'motion:profiled', 'anime:plain', 'anime:profiled']
+  : diagnostic ? s2Warm ? ids.flatMap(id => [`${id}:plain`, `${id}:profiled`]) : ['lab:plain', 'lab:profiled', 'waapi-ctl:plain', 'waapi-ctl:profiled'] : ids;
 const entries = { 'lab-native': 'lab-native', lab: 'lab', motion: 'motion', gsap: 'gsap', anime: 'anime', 'waapi-ctl': 'waapi-control', 'motion-mini': 'motion-mini', 'anime-waapi': 'anime-waapi' };
 if (baselinePath) entries.baseline = 'lab';
 const adapters = Object.fromEntries(Object.entries(entries).filter(([id]) => !diagnostic || ids.includes(id)).map(([id, entry]) => {
@@ -70,7 +74,27 @@ const installed = Object.fromEntries(Object.entries(manifest.devDependencies).ma
   if (actual !== expected) throw new Error('Installed package differs from manifest: ' + name);
   return [name, actual];
 }));
-const orders = makeRoundRobinOrders(observations, rounds, 0x5A71);
+// Each condition occupies each of the six positions once; Lab order is 3/3 balanced.
+const orders = captureAblation ? Array.from({ length: rounds }, (_, round) =>
+  [0, 1, 5, 2, 4, 3].map(index => observations[(index + round) % observations.length]))
+  : makeRoundRobinOrders(observations, rounds, 0x5A71);
+let captureAdapter, qualifyCapture;
+if (captureAblation) {
+  ({ qualifyCapture } = await import('./capture-boundaries.mjs'));
+  const { captureBuild } = await import('./capture-build.mjs');
+  const { observer, plugin } = captureBuild(rootPath, output);
+  const actualEntry = readFileSync(path.join(benchPath, 'entries/lab.entry.mjs'), 'utf8');
+  const entry = actualEntry.replace("'../../../dist/motion/index.js'", JSON.stringify(path.join(rootPath, 'src/motion/index.ts')));
+  if (entry === actualEntry) throw new Error('Actual Lab public entry import anchor changed');
+  const outputPath = path.join(output, 'adapters/lab-capture.js');
+  await esbuild.build({ ...PRODUCTION_ADAPTER_PROFILE, stdin: {
+    contents: entry + '\nexport { captureObserver } from ' + JSON.stringify(observer) + ';',
+    resolveDir: benchPath, sourcefile: 'lab-capture.entry.mjs', loader: 'js',
+  }, plugins: [plugin], format: 'iife', globalName: '__adapterModule', outfile: outputPath });
+  const bytes = readFileSync(outputPath);
+  captureAdapter = { path: outputPath, sha256: hash(bytes), raw: bytes.length,
+    gzip: canonicalGzip(bytes).length, brotli: observationalBrotli(bytes).length };
+}
 const origin = await startBenchmarkOrigin();
 const browser = await chromium.launch({ headless: false, args: ['--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'] });
 const metadata = {
@@ -80,6 +104,15 @@ const metadata = {
   environment: { cpu: os.cpus()[0].model, cpuMax: optionalFile('/sys/fs/cgroup/cpu.max'), memoryMax: optionalFile('/sys/fs/cgroup/memory.max') },
   scenario: { group, counts, rounds, durationMs: group === 'spring-pair' ? null : durationMs, watchdogMs, targetPx: 300, easing: group === 'spring-pair' ? 'default spring' : group === 'js-pair' ? 'p*p*(3-2*p), custom JS callback' : 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: s2Warm ? 'before/after total: profiler-start inspector overhead, DOM construction, one warmup and seven five-call starts, immediate cancel/remove/microtask/one-rAF drain; excludes profiler-stop and context-close; no natural completion' : 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
   adapters, orders, sourceIdentity,
+  ...(captureAblation ? { captureAblation: { adapter: captureAdapter, productionAdapter: adapters.lab,
+    runtimeSource: 'src/motion/runtime.ts', buildManifest: 'capture-build/manifest.json',
+    observationAdapter: 'lab-capture.js', semanticAdapter: 'original production lab.js',
+    qualification: 'disposable source build, not byte-identical production adapter; no optimization claim',
+    stride: 64, timerControlPairsPerBatch: 16, modes: ['counter', 'sparse'],
+    samplingScope: 'call1+64k per boundary per batch; fixed cohort, not randomized latency distribution',
+    recordStorage: 'both modes preallocate128 span slots per boundary and16 timer slots; identical record writes/materialization, sparse clocks only',
+    inputCategories: 'single returned transform string: empty, none, nonidentity (nonempty/non-none, not numeric matrix identity), unknown; throws separate',
+    clock: 'performance.now elapsed spans, not CPU', productionRuntimeUnchanged: true } } : {}),
   ...(s2Warm ? { startupScenario, warmBatch: { ...START_SCENARIO_MANIFEST.s2, warmupBatches: 1, samples: 7, calls: 5 },
     cpuWindow: 'total thread CPU across DOM setup, one warmup and seven five-call batches, immediate cancel/remove/microtask/one-rAF drain; includes inspector overhead; no natural completion',
     phaseCpuMs: { start: null, cancel: null, cleanup: null }, phaseCpuStatus: 'unsupported: sampled stacks are attribution, not exact phase CPU' } : {}),
@@ -89,15 +122,16 @@ writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null,
 const samples = [];
 const metrics = async c => Object.fromEntries((await c.send('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
 const settle = async page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-async function pageFor(id, acquired = () => {}) {
+async function pageFor(id, acquired = () => {}, capture = false) {
   const context = await browser.newContext({ viewport: metadata.scenario.viewport, deviceScaleFactor: 1, reducedMotion: 'no-preference' });
   acquired(context);
   const page = await context.newPage();
   await page.goto(origin.url); await page.bringToFront();
-  if (diagnostic) await page.addScriptTag({ content: readFileSync(adapters[id].path, 'utf8') + `\n//# sourceURL=motion-startup-${id}.js` });
+  if (diagnostic) await page.addScriptTag({ content: readFileSync(capture ? captureAdapter.path : adapters[id].path, 'utf8') + `\n//# sourceURL=motion-startup-${id}.js` });
   else await page.addScriptTag({ path: adapters[id].path });
   return { context, page };
 }
+
 let runError;
 try {
   if (paired) {
@@ -143,23 +177,62 @@ try {
       if (s2Warm && !evidence.valid) throw new Error(`S2 semantic probe failed: ${id}`);
     } finally { await context.close(); }
   }
+  if (captureAblation) {
+    // Original three gates above are unchanged; also fail closed on the disposable build.
+    const { context, page } = await pageFor('lab', () => {}, true);
+    try {
+      const evidence = await runSemanticStartCheck(page, START_SCENARIO_MANIFEST.s2, 5);
+      writeFileSync(path.join(output, 'lab-capture-semantic.json'), JSON.stringify(evidence));
+      if (!evidence.valid) throw new Error('Instrumented Lab semantic probe failed');
+      const hostEvidence = await page.evaluate(() => {
+        const element = document.createElement('div'), rule = document.createElement('style');
+        rule.textContent = '.capture-parent .capture-target { transform: translate(30px,40px) rotate(45deg); }';
+        const parent = document.createElement('div'); parent.className = 'capture-parent';
+        element.className = 'capture-target'; parent.appendChild(element);
+        document.head.appendChild(rule); document.body.appendChild(parent);
+        let control;
+        try {
+          __adapterModule.captureObserver.begin(false);
+          control = __adapterModule.start([element], 300, 1200);
+          const first = new DOMMatrixReadOnly(element.style.transform);
+          const firstPose = { x: first.e, y: first.f, a: first.a, b: first.b };
+          control.cancel();
+          rule.textContent = '.capture-parent .capture-target { transform: translate(60px,80px) rotate(45deg); }';
+          element.style.removeProperty('transform');
+          control = __adapterModule.start([element], 300, 1200);
+          const second = new DOMMatrixReadOnly(element.style.transform);
+          const secondPose = { x: second.e, y: second.f, a: second.a, b: second.b };
+          const close = (a, b) => Math.abs(a - b) < 0.001;
+          return { first: firstPose, second: secondPose, capture: __adapterModule.captureObserver.snapshot(),
+            valid: close(first.e, 30) && close(first.f, 40) && close(first.a, Math.SQRT1_2) && close(first.b, Math.SQRT1_2) &&
+              close(second.e, 60) && close(second.f, 80) && close(second.a, Math.SQRT1_2) && close(second.b, Math.SQRT1_2) };
+        } finally { control?.cancel(); parent.remove(); rule.remove(); }
+      });
+      hostEvidence.poseValid = hostEvidence.valid;
+      hostEvidence.captureValid = qualifyCapture(hostEvidence.capture, 'counter', true);
+      hostEvidence.valid = hostEvidence.poseValid && hostEvidence.captureValid;
+      writeFileSync(path.join(output, 'lab-capture-host-control.json'), JSON.stringify(hostEvidence));
+      if (!hostEvidence.valid) throw new Error('Instrumented computed-pose/capture control failed');
+    } finally { await context.close(); }
+  }
   for (let round = 0; round < rounds; round++) {
     for (const count of counts) for (const observation of orders[round]) {
       const [id, condition] = diagnostic ? observation.split(':') : [observation];
-      const profiled = condition === 'profiled';
-      const profileFile = `${round}-${id}.cpuprofile`;
+      const capture = captureAblation && id === 'lab';
+      const profiled = condition === 'profiled' || capture;
+      const profileFile = `${round}-${id}${capture ? '-' + condition : ''}.cpuprofile`;
       let context, cdp, stage = 'context-acquire';
       let profiling = false, coverage, accepted = 0, completed = 0;
       let batchEvidence = { startAttempts: 0, acquiredCalls: 0, cancelReturnedCalls: 0, removedTargets: 0 };
-      const errors = [];
+      const errors = [], failures = [];
       const recordFailure = (error, failureStage) => {
         errors.push(error);
-        appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify({
+        failures.push({
           round, count, id, stage: failureStage, ...(diagnostic ? s2Warm ? { condition, offeredCalls: 40, offeredTargets: 4000, naturalCompletedCalls: null,
             startAttempts: batchEvidence.startAttempts, acquiredCalls: batchEvidence.acquiredCalls,
             cancelReturnedCalls: batchEvidence.cancelReturnedCalls, removedTargets: batchEvidence.removedTargets, coverage }
             : { condition, offered: count, accepted, completed, coverage } : {}), error: String(error?.stack ?? error),
-        }) + '\n');
+        });
       };
       const stopProfile = async () => {
         const { profile } = await cdp.send('Profiler.stop');
@@ -193,7 +266,7 @@ try {
           status: startupSamples.length ? 'sampled-startup' : 'inconclusive-no-startup-samples' };
       };
       try {
-        const { page } = await pageFor(id, acquired => { context = acquired; stage = 'page-setup'; });
+        const { page } = await pageFor(id, acquired => { context = acquired; stage = 'page-setup'; }, capture);
         stage = 'cdp-session';
         cdp = await context.newCDPSession(page);
         stage = 'measurement';
@@ -245,6 +318,8 @@ try {
                 const element = document.createElement('div'); element.className = 'box'; document.body.appendChild(element); return element;
               }));
               const controls = [];
+              const captureObserver = config.capture ? __adapterModule.captureObserver : undefined;
+              captureObserver?.begin(config.capture === 'sparse');
               let batchElapsedMs;
               try { batchElapsedMs = startupDiagnosticStart(groups, controls); }
               catch (error) { errors.push({ phase: 'start', error: String(error?.stack ?? error) }); }
@@ -252,12 +327,14 @@ try {
               await Promise.resolve();
               await new Promise(resolve => requestAnimationFrame(function startupDiagnosticDrain() { resolve(); }));
               documentEffects = document.getAnimations().length;
-              rows.push({ warmup: index === -1, batchElapsedMs, connectedDocumentEffects: documentEffects });
+              captureObserver?.timerControl();
+              rows.push({ warmup: index === -1, batchElapsedMs, connectedDocumentEffects: documentEffects,
+                ...(captureObserver ? { capture: captureObserver.snapshot() } : {}) });
               if (errors.length) break;
             }
             return { rows, startAttempts, acquiredCalls, cancelReturnedCalls, removedTargets, connectedDocumentEffects: documentEffects, errors };
           };
-          const batch = await page.evaluate(`(${batchCall.toString()})(${JSON.stringify(START_SCENARIO_MANIFEST.s2)})\n//# sourceURL=motion-s2-wrapper.js`);
+          const batch = await page.evaluate(`(${batchCall.toString()})(${JSON.stringify({ ...START_SCENARIO_MANIFEST.s2, ...(capture ? { capture: condition } : {}) })})\n//# sourceURL=motion-s2-wrapper.js`);
           batchEvidence = { startAttempts: batch.startAttempts, acquiredCalls: batch.acquiredCalls,
             cancelReturnedCalls: batch.cancelReturnedCalls, removedTargets: batch.removedTargets };
           stage = 's2-after-metrics';
@@ -280,6 +357,10 @@ try {
             batch.cancelReturnedCalls === offeredCalls && batch.removedTargets === offeredCalls * count && effects === 0 &&
             batch.rows.every(sample => sample.connectedDocumentEffects === 0 && Number.isFinite(sample.batchElapsedMs) && sample.batchElapsedMs >= 0) &&
             ['taskCpuMs', 'threadCpuMs', 'scriptCpuMs', 'styleCpuMs', 'layoutCpuMs'].every(key => Number.isFinite(row[key]) && row[key] >= 0);
+          if (capture) {
+            row.captureValid = batch.rows.every(sample => qualifyCapture(sample.capture, condition));
+            row.valid = row.valid && row.captureValid;
+          }
           samples.push(row); appendFileSync(path.join(output, 'samples.jsonl'), JSON.stringify(row) + '\n');
           if (!row.valid) {
             stage = 's2-lifecycle-validation';
@@ -348,12 +429,18 @@ try {
           catch (closeError) { recordFailure(closeError, 'context-close'); }
         }
       }
+      // Журнал не должен прерывать восстановление профайлера и закрытие контекста.
+      for (const failure of failures) {
+        try { appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify(failure) + '\n'); }
+        catch (writeError) { errors.push(writeError); }
+      }
       if (errors.length === 1) throw errors[0];
       if (errors.length > 1) throw new AggregateError(errors, 'Отказ наблюдения и очистки', { cause: errors[0] });
     }
     console.log(`ROUND ${round + 1}/${rounds}`);
   }
-  for (const [id, adapter] of Object.entries(adapters)) if (hash(readFileSync(adapter.path)) !== adapter.sha256) throw new Error(`Adapter changed: ${id}`);
+  for (const [id, adapter] of Object.entries({ ...adapters, ...(captureAdapter ? { 'lab-capture': captureAdapter } : {}) }))
+    if (hash(readFileSync(adapter.path)) !== adapter.sha256) throw new Error(`Adapter changed: ${id}`);
   for (const [id, directory] of Object.entries(measuredRoots)) {
     if (hashFileTree(path.join(directory, 'dist')).sha256 !== sourceIdentity[id].dist.sha256)
       throw new Error(`Measured dist changed: ${id}`);
@@ -365,7 +452,7 @@ try {
       offeredTargets: samples.reduce((sum, row) => sum + row.offeredTargets, 0), removedTargets: samples.reduce((sum, row) => sum + row.removedTargets, 0),
       warmupCalls: samples.reduce((sum, row) => sum + row.warmupCalls, 0), measuredCalls: samples.reduce((sum, row) => sum + row.measuredCalls, 0),
       naturalCompletedCalls: null, phaseCpuMs: metadata.phaseCpuMs,
-      coverage: samples.filter(row => row.condition === 'profiled').map(({ round, id, coverage }) => ({ round, id, ...coverage })) }
+      coverage: samples.filter(row => row.coverage).map(({ round, id, condition, coverage }) => ({ round, id, condition, ...coverage })) }
       : { interpretation: metadata.diagnostic.interpretation, offeredStarts: metadata.diagnostic.offeredStarts, completedStarts: samples.filter(row => row.valid).length, offeredTargets: samples.reduce((sum, row) => sum + row.offered, 0), completedTargets: samples.reduce((sum, row) => sum + row.completed, 0), coverage: samples.filter(row => row.condition === 'profiled').map(({ round, id, coverage }) => ({ round, id, ...coverage })) };
     writeFileSync(path.join(output, 'diagnostic.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result));
@@ -381,13 +468,18 @@ try {
 } catch (error) {
   runError = error;
 } finally {
-  const errors = runError ? [runError] : [];
+  const errors = runError ? [runError] : [], failures = [];
   for (const [stage, close] of [['browser-close', () => browser.close()], ['origin-close', () => origin.close()]]) {
     try { await close(); }
     catch (error) {
       errors.push(error);
-      appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify({ stage, error: String(error?.stack ?? error) }) + '\n');
+      failures.push({ stage, error: String(error?.stack ?? error) });
     }
+  }
+  // Сначала пробуем всю очистку, затем сохраняем журнал и ошибки его записи.
+  for (const failure of failures) {
+    try { appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify(failure) + '\n'); }
+    catch (writeError) { errors.push(writeError); }
   }
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1) throw new AggregateError(errors, 'Отказ запуска и очистки', { cause: errors[0] });

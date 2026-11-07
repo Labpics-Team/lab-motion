@@ -74,6 +74,10 @@ const gateCommand = 'set -euo pipefail\n'
   + '  [[ "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ]]\n'
   + '  [[ "$STARTUP_DIAGNOSTIC" != true && "$PROFILE_BASELINE" != true ]]\n'
   + 'fi\nif [[ "$EVENT_NAME" == workflow_dispatch ]]; then\n'
+  + '  if [[ "$S2_CAPTURE_ABLATION" == true ]]; then\n'
+  + '    [[ "$STARTUP_DIAGNOSTIC" == true && "$STARTUP_SCENARIO" == s2-warm && "$PROFILE_BASELINE" != true && "$PERFORMANCE_CONTRACT_ONLY" != true ]]\n'
+  + '    [[ "$PERFORMANCE_BASELINE" == cb1292ffdc11efbce0bed8b710ea4749d2adf656 ]]\n'
+  + '  fi\n'
   + '  [[ "$STARTUP_DIAGNOSTIC" != true || "$PROFILE_BASELINE" != true ]]\n'
   + '  [[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "$STARTUP_DIAGNOSTIC" == true && "$PROFILE_BASELINE" != true && "$PERFORMANCE_CONTRACT_ONLY" != true && "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ) ]]\n'
   + 'fi\n[[ "$VERIFY_RESULT" == success ]]\n'
@@ -161,6 +165,7 @@ const testCommands = [
   activatePnpm,
   'pnpm install --frozen-lockfile',
   'pnpm build',
+  'node --test bench/compare/capture-boundaries.contract.test.mjs',
   vitestCommand,
   'node test/fixtures/server-thread-cpu-clock-check.mjs',
 ];
@@ -303,7 +308,7 @@ const requiredActions = {
       }
     },
     {
-      "index": 6,
+      "index": 7,
       "name": "Setup registered native-clock Node",
       "uses": "actions/setup-node@<sha>",
       "with": {
@@ -415,6 +420,8 @@ function assertNativeGraph(files: Map<string, string>) {
       type: 'boolean', default: false,
     }, startup_scenario: {
       type: 'string', default: '',
+    }, s2_capture_ablation: {
+      type: 'boolean', default: false,
     } } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
@@ -424,17 +431,18 @@ function assertNativeGraph(files: Map<string, string>) {
     uses: './.github/workflows/profile-01.yml',
   });
   expect(ci.jobs.performance).toEqual({
+    needs: ['CI'],
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.performance_contract_only && (inputs.startup_diagnostic || inputs.profile_baseline)) && !(inputs.startup_diagnostic && inputs.profile_baseline) && (inputs.startup_scenario == '' || (inputs.startup_diagnostic && inputs.startup_scenario == 's2-warm')) }}",
     uses: './.github/workflows/performance.yml',
-    with: { baseline: '${{ inputs.performance_baseline }}', startup_diagnostic: '${{ inputs.startup_diagnostic }}', startup_scenario: '${{ inputs.startup_scenario }}', performance_contract_only: '${{ inputs.performance_contract_only }}' },
+    with: { baseline: '${{ inputs.performance_baseline }}', startup_diagnostic: '${{ inputs.startup_diagnostic }}', startup_scenario: '${{ inputs.startup_scenario }}', performance_contract_only: '${{ inputs.performance_contract_only }}', s2_capture_ablation: '${{ inputs.s2_capture_ablation }}' },
   });
   const performance = workflows.get('performance.yml')!;
-  expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true }, startup_diagnostic: { type: 'boolean', default: false }, startup_scenario: { type: 'string', default: '' }, performance_contract_only: { type: 'boolean', default: false } } } });
+  expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true }, startup_diagnostic: { type: 'boolean', default: false }, startup_scenario: { type: 'string', default: '' }, performance_contract_only: { type: 'boolean', default: false }, s2_capture_ablation: { type: 'boolean', default: false } } } });
   expect(performance.permissions).toEqual({ contents: 'read' });
   expect(performance.defaults).toBeUndefined();
   expect(Object.keys(performance.jobs)).toEqual(['compare']);
   const compare = performance.jobs.compare!;
-  expect(compare['runs-on']).toBe('ubuntu-latest');
+  expect(compare['runs-on']).toBe('ubuntu-24.04');
   expect(compare['timeout-minutes']).toBe(90);
   expect(compare.strategy).toBeUndefined();
   expect(compare['continue-on-error']).toBeUndefined();
@@ -444,12 +452,22 @@ function assertNativeGraph(files: Map<string, string>) {
   const { name: _baselineName, ...baselineValidation } = compare.steps![0]!;
   expect(baselineValidation).toEqual({
     shell: 'bash', env: { BASELINE: '${{ inputs.baseline }}', STARTUP_SCENARIO: '${{ inputs.startup_scenario }}' },
-    run: 'set -euo pipefail\n[[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]\n[[ "${{ inputs.startup_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]\n[[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "${{ inputs.startup_diagnostic }}" == true && "${{ inputs.performance_contract_only }}" != true ) ]]\n',
+    run: [
+        "set -euo pipefail",
+        "[[ \"$BASELINE\" =~ ^[0-9a-f]{40}$ ]]",
+        "[[ \"${{ inputs.startup_diagnostic }}\" != true || \"${{ inputs.performance_contract_only }}\" != true ]]",
+        "[[ -z \"$STARTUP_SCENARIO\" || ( \"$STARTUP_SCENARIO\" == s2-warm && \"${{ inputs.startup_diagnostic }}\" == true && \"${{ inputs.performance_contract_only }}\" != true ) ]]",
+        "if [[ \"${{ inputs.s2_capture_ablation }}\" == true ]]; then",
+        "  [[ \"$BASELINE\" == cb1292ffdc11efbce0bed8b710ea4749d2adf656 ]]",
+        "  [[ \"$STARTUP_SCENARIO\" == s2-warm && \"${{ inputs.startup_diagnostic }}\" == true && \"${{ inputs.performance_contract_only }}\" != true ]]",
+        "fi",
+        "",
+      ].join('\n'),
   });
   const checkouts = compare.steps!.filter(item => item.uses?.startsWith('actions/checkout@'));
   expect(checkouts.map(({ name: _name, uses, ...contract }) => ({ ...contract, uses: unpin(uses!) })))
     .toEqual([
-      { uses: 'actions/checkout@<sha>', with: { path: 'candidate', 'persist-credentials': false, 'fetch-depth': 0 } },
+      { uses: 'actions/checkout@<sha>', with: { path: 'candidate', ref: '${{ github.sha }}', 'persist-credentials': false, 'fetch-depth': 0 } },
       { uses: 'actions/checkout@<sha>', with: { path: 'baseline', ref: '${{ inputs.baseline }}', 'persist-credentials': false, 'fetch-depth': 0 } },
     ]);
   const setup = compare.steps!.filter(item => item.uses?.startsWith('actions/setup-node@'));
@@ -459,6 +477,21 @@ function assertNativeGraph(files: Map<string, string>) {
   const performanceRuns = compare.steps!.filter(item => item.run).slice(1);
   expect(performanceRuns.map(({ name: _name, ...contract }) => ({ ...contract, run: contract.run!.trim() })))
     .toEqual([
+      { if: '${{ inputs.s2_capture_ablation }}', shell: 'bash', 'working-directory': 'candidate', env: { EXPECTED_HEAD: '${{ github.sha }}', BASELINE: '${{ inputs.baseline }}' }, run: [
+        "set -euo pipefail",
+        "test \"$(git rev-parse HEAD)\" = \"$EXPECTED_HEAD\"",
+        "git merge-base --is-ancestor 741755754fb189776d25832ecb01b99c8f577425 HEAD",
+        "git diff --exit-code \"$BASELINE\" HEAD -- src bench/compare/entries package.json pnpm-lock.yaml pnpm-workspace.yaml bench/compare/package.json bench/compare/pnpm-lock.yaml",
+        "git diff --exit-code 741755754fb189776d25832ecb01b99c8f577425 HEAD -- src bench/compare/entries package.json pnpm-lock.yaml pnpm-workspace.yaml bench/compare/package.json bench/compare/pnpm-lock.yaml",
+        "sha256sum --check --strict <<'SOURCE_PINS'",
+        "4bc21ef080d10c84b8a3df7f15c35cf2adc69b306ee6f37ed14c20c2a2011abe  bench/compare/transition-profile.mjs",
+        "7923b35795223bbd84d0f00790f31bb6d20be3435c6f1c4606174d4e05a43637  bench/compare/capture-build.mjs",
+        "4fe2c03612ded247b2183fe93f8a1552d9b0018c9407bca6a1eb8f94562e5186  bench/compare/capture-boundaries.mjs",
+        "3aedf4ae253d1785dab3c2fc02a6785460ffede0f231a8a699491a804bee9a7c  bench/compare/capture-boundaries.contract.test.mjs",
+        "SOURCE_PINS",
+        "mkdir -p \"$RUNNER_TEMP/motion-performance\"",
+        "printf 'head=%s\\nbaseline=%s\\nsource_patch_sha256=a45d6ef14b06d4c6a22c87e4c45d618c42e5a813a53746ca9601c18c2fc1adf8\\nmode=s2-capture-ablation\\n' \"$EXPECTED_HEAD\" \"$BASELINE\" > \"$RUNNER_TEMP/motion-performance/capture-route.txt\"",
+      ].join('\n') },
       { run: activatePnpm },
       { id: 'build', run: 'pnpm --dir baseline install --frozen-lockfile\npnpm --dir candidate install --frozen-lockfile\npnpm --dir baseline build\npnpm --dir candidate build' },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', run: 'mkdir -p "$RUNNER_TEMP/motion-performance"\nnode candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"' },
@@ -466,8 +499,96 @@ function assertNativeGraph(files: Map<string, string>) {
       { run: 'pnpm --dir candidate/bench/compare install --frozen-lockfile' },
       { run: 'pnpm --dir candidate/bench/compare exec playwright install --with-deps chromium' },
       { if: '${{ inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nmkdir -p "$RUNNER_TEMP/motion-performance"\nprintf \'mode=performance-contract-only\\n\' > "$RUNNER_TEMP/motion-performance/contract-only.txt"' },
-      { run: 'xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs' },
-      { if: '${{ inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', 'working-directory': 'candidate', env: { BASELINE: '${{ inputs.baseline }}', MOTION_STARTUP_DIAGNOSTIC_SCENARIO: '${{ inputs.startup_scenario }}' }, run: 'set -euo pipefail\ngit diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries\nxvfb-run -a node bench/compare/transition-profile.mjs . "$RUNNER_TEMP/motion-performance/startup-diagnostic" startup-diagnostic' },
+      { if: '${{ inputs.s2_capture_ablation }}', 'working-directory': 'candidate', run: 'pnpm exec vitest run test/motion-surface-refresh.test.ts test/motion-runtime-adversarial.test.ts test/motion-owner-regression.test.ts test/motion-reentrant-control.test.ts' },
+      { shell: 'bash', run: [
+        "set -euo pipefail",
+        "mkdir -p \"$RUNNER_TEMP/motion-performance\"",
+        "sha256sum --check --strict <<'CLI_PINS'",
+        "59060cbe5d1a71bcc51991cf586366ecc27d73abc620a5a2a185b5dc8e4aad69  candidate/bench/compare/transition-contract-host.mjs",
+        "118c2dae2ac08f9e6659ca0cbe0ce01cdc7f683357228b4c2b42f26608d18ace  candidate/bench/compare/transition-profile.contract.test.mjs",
+        "CLI_PINS",
+        "printf 'owner_patch_sha256=83b53ce5de2dd5e2ec0da5551f2df8cb73cabbd1b03daf795a8d7a9536bb73f9\\nowner_suite_lf=6ac327c43a2cfff4829d7c424b87e8d442229b8e5c84ff119fb89659a4d91d1d\\ncomposed_cases_planned=41\\nowner_cases=31\\ns2_cases=10\\nexecution_status=not-yet-run\\n' > \"$RUNNER_TEMP/motion-performance/cli-source-identity.txt\"",
+        "node --input-type=module - <<'JS' 2>&1 | tee \"$RUNNER_TEMP/motion-performance/cli-host-prerequisite.txt\"",
+        "import { assertTransitionContractHost, TRANSITION_CONTRACT_LIMITS } from './candidate/bench/compare/transition-contract-host.mjs';",
+        "const host = assertTransitionContractHost();",
+        "console.log(JSON.stringify({ host, limits: TRANSITION_CONTRACT_LIMITS,",
+        "  probe: 'shared-test-host-only; not service allocation, environment access or cleanup PASS' }));",
+        "JS",
+      ].join('\n') },
+      { shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs 2>&1 | tee "$RUNNER_TEMP/motion-performance/cli-contracts.tap"' },
+      { if: '${{ inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', 'working-directory': 'candidate', env: { BASELINE: '${{ inputs.baseline }}', MOTION_STARTUP_DIAGNOSTIC_SCENARIO: '${{ inputs.startup_scenario }}', MOTION_S2_CAPTURE_ABLATION: "${{ inputs.s2_capture_ablation && '1' || '0' }}" }, run: 'set -euo pipefail\ngit diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries\nxvfb-run -a node bench/compare/transition-profile.mjs . "$RUNNER_TEMP/motion-performance/startup-diagnostic" startup-diagnostic' },
+      { if: '${{ inputs.s2_capture_ablation }}', shell: 'bash', env: { RAW: '${{ runner.temp }}/motion-performance/startup-diagnostic' }, run: [
+        "set -euo pipefail",
+        "python3 - <<'PY'",
+        "import json, math, os, pathlib",
+        "root = pathlib.Path(os.environ['RAW'])",
+        "rows = [json.loads(line) for line in (root / 'samples.jsonl').read_text().splitlines()]",
+        "assert len(rows) == 36",
+        "assert len({(r['round'], r['id'], r['condition']) for r in rows}) == 36",
+        "assert all(r['valid'] and not r['errors'] and r['naturalCompletedCalls'] is None for r in rows)",
+        "profiles = list(root.glob('*.cpuprofile'))",
+        "assert len(profiles) == 24",
+        "for path in profiles:",
+        "    profile = json.loads(path.read_text())",
+        "    assert profile['nodes'] and profile['samples']",
+        "    assert len(profile['samples']) == len(profile['timeDeltas'])",
+        "for mode in ('counter', 'sparse'):",
+        "    lab = [r for r in rows if r['id'] == 'lab' and r['condition'] == mode]",
+        "    assert len(lab) == 6",
+        "    for row in lab:",
+        "        assert row['captureValid']",
+        "        assert len(row['rows']) == 8 and [b['warmup'] for b in row['rows']] == [True] + [False] * 7",
+        "        for batch in row['rows']:",
+        "            capture = batch['capture']",
+        "            assert capture['mode'] == mode and capture['clockErrors'] == 0 and capture['overflow'] == 0",
+        "            assert capture['stride'] == 64 and capture['spanCapacity'] == 128",
+        "            buckets = capture['boundaries']",
+        "            assert set(buckets) == {'styles', 'transformProperty', 'matrixDecode'}",
+        "            assert all(b['calls'] == b['returned'] + b['threw'] and b['threw'] == 0 for b in buckets.values())",
+        "            assert buckets['styles']['calls'] > 0 and buckets['transformProperty']['calls'] > 0",
+        "            assert buckets['styles']['returned'] == buckets['transformProperty']['calls']",
+        "            inputs = buckets['transformProperty']['inputs']",
+        "            assert set(inputs) == {'empty', 'none', 'nonidentity', 'unknown'} and inputs['unknown'] == 0",
+        "            assert sum(inputs.values()) == buckets['transformProperty']['returned']",
+        "            assert buckets['matrixDecode']['calls'] == inputs['nonidentity']",
+        "            assert len(capture['timerControl']) == 16",
+        "            for boundary in buckets.values():",
+        "                assert len(boundary['spans']) == (boundary['calls'] + 63) // 64",
+        "                assert [s['call'] for s in boundary['spans']] == list(range(1, boundary['calls'] + 1, 64))",
+        "            records = capture['timerControl'] + [s for b in buckets.values() for s in b['spans']]",
+        "            for record in records:",
+        "                assert record['timed'] == (mode == 'sparse')",
+        "                if mode == 'counter':",
+        "                    assert all(record[k] is None for k in ('beforeMs', 'afterMs', 'elapsedMs'))",
+        "                else:",
+        "                    assert all(isinstance(record[k], (int, float)) and math.isfinite(record[k]) for k in ('beforeMs', 'afterMs', 'elapsedMs'))",
+        "                    assert record['elapsedMs'] >= 0",
+        "for name in ('lab', 'motion', 'anime', 'lab-capture'):",
+        "    assert json.loads((root / (name + '-original-semantic.json' if name != 'lab-capture' else 'lab-capture-semantic.json')).read_text())['valid']",
+        "host = json.loads((root / 'lab-capture-host-control.json').read_text())",
+        "assert host['valid'] and host['poseValid'] and host['captureValid']",
+        "assert all(host['capture']['boundaries'][name]['calls'] > 0 for name in ('styles', 'transformProperty', 'matrixDecode'))",
+        "diagnostic = json.loads((root / 'diagnostic.json').read_text())",
+        "coverage = diagnostic['coverage']",
+        "assert diagnostic['observations'] == 36 and len(coverage) == 24",
+        "assert len({(c['round'], c['id'], c['condition']) for c in coverage}) == 24",
+        "assert sum(c['id'] == 'lab' for c in coverage) == 12",
+        "assert {c['profileFile'] for c in coverage} == {p.name for p in profiles}",
+        "manifest = json.loads((root / 'capture-build/manifest.json').read_text())",
+        "assert manifest['engaged'] and len(manifest['loads']) == 1",
+        "assert manifest['loads'][0]['inputSha256'] == manifest['originalSha256']",
+        "assert manifest['loads'][0]['suppliedSha256'] == manifest['instrumentedSha256']",
+        "for name in ('runtime.original.ts', 'runtime.instrumented.ts', 'observer.mjs', 'manifest.json'):",
+        "    assert (root / 'capture-build' / name).is_file()",
+        "matrix = {phase: sum(batch['capture']['boundaries']['matrixDecode']['calls']",
+        "    for row in rows if row['id'] == 'lab' for batch in row['rows'] if batch['warmup'] == warmup)",
+        "    for phase, warmup in (('warmup', True), ('measured', False))}",
+        "decision = {'entries': matrix, 'positiveControlEntries': host['capture']['boundaries']['matrixDecode']['calls'],",
+        "    'decoderCandidate': 'reject-zero-entries' if matrix['measured'] == 0 else 'entries-observed-no-cpu-claim'}",
+        "(root / 'matrix-entry-decision.json').write_text(json.dumps(decision))",
+        "print('CAPTURE_RAW_PASS observations=36 profiles=24 ' + json.dumps(decision))",
+        "PY",
+      ].join('\n') },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/spring" spring-pair baseline\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline' },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline' },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', 'working-directory': 'candidate/bench/compare', run: 'xvfb-run -a node bench.mjs' },
@@ -568,6 +689,7 @@ function assertNativeGraph(files: Map<string, string>) {
       PROFILE_BASELINE: '${{ inputs.profile_baseline }}',
       PERFORMANCE_BASELINE: '${{ inputs.performance_baseline }}',
       STARTUP_SCENARIO: '${{ inputs.startup_scenario }}',
+      S2_CAPTURE_ABLATION: '${{ inputs.s2_capture_ablation }}',
     },
     run: `${gateCommand}\n`,
   }]);
@@ -593,6 +715,10 @@ describe('нативный граф CI', () => {
       const performance = parse(sources().get('performance.yml')!) as Workflow;
       w.jobs[id]!.steps!.push(performance.jobs.compare!.steps!.at(-1)!);
     }] as const),
+    ['performance без полного CI', 'ci.yml', (w: Workflow) => { delete w.jobs.performance!.needs; }],
+    ['ablation без caller input', 'ci.yml', (w: Workflow) => { delete w.jobs.performance!.with!.s2_capture_ablation; }],
+    ['ablation включена по умолчанию', 'ci.yml', (w: Workflow) => { (w.on.workflow_dispatch as { inputs: Record<string, { default: boolean }> }).inputs.s2_capture_ablation!.default = true; }],
+    ['observer отсутствует в ordinary CI', 'ci.yml', (w: Workflow) => { w.jobs.tests!.steps = w.jobs.tests!.steps!.filter(item => item.run !== 'node --test bench/compare/capture-boundaries.contract.test.mjs'); }],
     ['performance без ручного события', 'ci.yml', (w: Workflow) => { w.jobs.performance!.if = "${{ inputs.performance_baseline != '' }}"; }],
     ['performance без явного baseline', 'ci.yml', (w: Workflow) => { w.jobs.performance!.if = "${{ github.event_name == 'workflow_dispatch' }}"; }],
     ['performance с подменой baseline', 'ci.yml', (w: Workflow) => { w.jobs.performance = { ...w.jobs.performance, with: { baseline: 'main' } };  }],
@@ -610,6 +736,17 @@ describe('нативный граф CI', () => {
     ['performance пропускает baseline validation', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.if = false; }],
     ['performance ослабляет identity baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.run = 'true\n'; }],
     ['performance подменяет input baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.env!.BASELINE = 'main'; }],
+    ['performance подменяет checkout candidate', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![1]!.with!.ref = 'main'; }],
+    ['performance меняет qualified host', 'performance.yml', (w: Workflow) => { w.jobs.compare!['runs-on'] = 'ubuntu-latest'; }],
+    ['ablation обходит exact baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.run = w.jobs.compare!.steps![0]!.run!.replace('cb1292ffdc11efbce0bed8b710ea4749d2adf656', 'main'); }],
+    ...['4bc21ef080d10c84b8a3df7f15c35cf2adc69b306ee6f37ed14c20c2a2011abe', '7923b35795223bbd84d0f00790f31bb6d20be3435c6f1c4606174d4e05a43637', '4fe2c03612ded247b2183fe93f8a1552d9b0018c9407bca6a1eb8f94562e5186', '3aedf4ae253d1785dab3c2fc02a6785460ffede0f231a8a699491a804bee9a7c', '59060cbe5d1a71bcc51991cf586366ecc27d73abc620a5a2a185b5dc8e4aad69', '118c2dae2ac08f9e6659ca0cbe0ce01cdc7f683357228b4c2b42f26608d18ace'].map((pin) => [`source pin изменён ${pin}`, 'performance.yml', (w: Workflow) => {
+      const item = w.jobs.compare!.steps!.find(item => item.run?.includes(pin))!; item.run = item.run!.replace(pin, '0'.repeat(64));
+    }] as const),
+    ['ablation source guard пропущен', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run?.includes('SOURCE_PINS'))!.if = false; }],
+    ['shared probe отказ скрыт', 'performance.yml', (w: Workflow) => { const item = w.jobs.compare!.steps!.find(item => item.run?.includes('assertTransitionContractHost'))!; item.run += ' || true'; }],
+    ['CLI TAP теряет pipefail', 'performance.yml', (w: Workflow) => { const item = w.jobs.compare!.steps!.find(item => item.run?.includes('cli-contracts.tap'))!; item.run = item.run!.replace('set -euo pipefail', 'set -eu'); }],
+    ['raw population ослаблена', 'performance.yml', (w: Workflow) => { const item = w.jobs.compare!.steps!.find(item => item.run?.includes('CAPTURE_RAW_PASS'))!; item.run = item.run!.replace('len(rows) == 36', 'len(rows) > 0'); }],
+    ['raw guard пропущен', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run?.includes('CAPTURE_RAW_PASS'))!.if = false; }],
     ['performance подменяет checkout baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![2]!.with!.ref = 'main'; }],
     ['performance скрывает исходный failure', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!['continue-on-error'] = true; }],
     ['performance подменяет Node', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.uses?.startsWith('actions/setup-node@'))!.with!['node-version'] = '24'; }],
@@ -781,7 +918,7 @@ describe('нативный граф CI', () => {
       ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
       MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
       SECURITY_RESULT: 'success', PERFORMANCE_CONTRACT_ONLY: '', PROFILE_BASELINE: '', EVENT_NAME: 'pull_request',
-      STARTUP_DIAGNOSTIC: '', STARTUP_SCENARIO: '', PERFORMANCE_BASELINE: '',
+      STARTUP_DIAGNOSTIC: '', STARTUP_SCENARIO: '', PERFORMANCE_BASELINE: '', S2_CAPTURE_ABLATION: 'false',
     };
     delete env[key];
     if (result !== undefined) env[key] = result;
@@ -802,7 +939,7 @@ describe('нативный граф CI', () => {
       const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
         env: { ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
           MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success',
-          EVENT_NAME: event, STARTUP_DIAGNOSTIC: diagnostic, STARTUP_SCENARIO: '', PERFORMANCE_BASELINE: baseline, PERFORMANCE_CONTRACT_ONLY: 'false', PROFILE_BASELINE: 'false' },
+          EVENT_NAME: event, STARTUP_DIAGNOSTIC: diagnostic, STARTUP_SCENARIO: '', PERFORMANCE_BASELINE: baseline, S2_CAPTURE_ABLATION: 'false', PERFORMANCE_CONTRACT_ONLY: 'false', PROFILE_BASELINE: 'false' },
         encoding: 'utf8', timeout: 5000,
       });
       expect(actual.error).toBeUndefined();
@@ -837,7 +974,7 @@ describe('нативный граф CI', () => {
     const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', ci.jobs.CI!.steps![0]!.run!], {
       encoding: 'utf8', timeout: 5000,
       env: { ...process.env, EVENT_NAME: 'workflow_dispatch', STARTUP_DIAGNOSTIC: startup,
-        PERFORMANCE_CONTRACT_ONLY: contract, PROFILE_BASELINE: profile, PERFORMANCE_BASELINE: baseline, STARTUP_SCENARIO: '',
+        PERFORMANCE_CONTRACT_ONLY: contract, PROFILE_BASELINE: profile, PERFORMANCE_BASELINE: baseline, STARTUP_SCENARIO: '', S2_CAPTURE_ABLATION: 'false',
         VERIFY_RESULT: 'success', TESTS_RESULT: 'success', MUTATION_RESULT: 'success',
         BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success' },
     });
@@ -862,7 +999,7 @@ describe('нативный граф CI', () => {
       encoding: 'utf8', timeout: 5000,
       env: { ...process.env, EVENT_NAME: 'workflow_dispatch', STARTUP_SCENARIO: scenario,
         STARTUP_DIAGNOSTIC: startup, PERFORMANCE_CONTRACT_ONLY: contract,
-        PROFILE_BASELINE: profile, PERFORMANCE_BASELINE: baseline,
+        PROFILE_BASELINE: profile, PERFORMANCE_BASELINE: baseline, S2_CAPTURE_ABLATION: 'false',
         VERIFY_RESULT: 'success', TESTS_RESULT: 'success', MUTATION_RESULT: 'success',
         BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success' },
     });
@@ -880,7 +1017,8 @@ describe('нативный граф CI', () => {
     const performance = parse(sources().get('performance.yml')!) as Workflow;
     const first = performance.jobs.compare!.steps![0]!;
     const program = first.run!.replaceAll('${{ inputs.startup_diagnostic }}', String(startup))
-      .replaceAll('${{ inputs.performance_contract_only }}', String(contract));
+      .replaceAll('${{ inputs.performance_contract_only }}', String(contract))
+      .replaceAll('${{ inputs.s2_capture_ablation }}', 'false');
     const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
       encoding: 'utf8', timeout: 5000,
       env: { ...process.env, BASELINE: 'a'.repeat(40), STARTUP_SCENARIO: scenario },
@@ -890,16 +1028,18 @@ describe('нативный граф CI', () => {
   });
 
   it.each([
-    { s5: false, contract: false, cli: true, measurements: true },
-    { s5: true, contract: false, cli: true, measurements: false },
-    { s5: false, contract: true, cli: true, measurements: false },
-  ])('actual route selection startup=$s5 contract=$contract', ({ s5, contract, cli, measurements }) => {
+    { s5: false, contract: false, ablation: false, cli: true, measurements: true },
+    { s5: true, contract: false, ablation: false, cli: true, measurements: false },
+    { s5: false, contract: true, ablation: false, cli: true, measurements: false },
+    { s5: true, contract: false, ablation: true, cli: true, measurements: false },
+  ])('actual route selection startup=$s5 contract=$contract ablation=$ablation', ({ s5, contract, ablation, cli, measurements }) => {
     const workflow = parse(sources().get('performance.yml')!) as Workflow;
     const selected = (item: Step) => {
       if (item.if === undefined) return true;
       const expression = String(item.if).replace(/^\$\{\{\s*|\s*\}\}$/g, '')
         .replaceAll('inputs.startup_diagnostic', String(s5))
         .replaceAll('inputs.performance_contract_only', String(contract))
+        .replaceAll('inputs.s2_capture_ablation', String(ablation))
         .replaceAll('!cancelled()', 'true').replaceAll("steps.build.outcome == 'success'", 'true');
       if (!/^[truefals\s!&|()]+$/.test(expression)) throw new Error(`Unsupported route expression: ${expression}`);
       return Function(`return (${expression})`)() as boolean;
@@ -909,10 +1049,67 @@ describe('нативный граф CI', () => {
     for (const item of steps.filter(item => item.run?.match(/consumer-size\.mjs|easing-pair\.mjs|spring-pair baseline|full baseline|node bench\.mjs|size-gate\.mjs/))) {
       expect(selected(item)).toBe(measurements);
     }
-    expect(selected(steps.find(item => item.run?.includes('git diff --exit-code'))!)).toBe(s5);
+    expect(selected(steps.find(item => item.run?.includes('xvfb-run -a node bench/compare/transition-profile.mjs .'))!)).toBe(s5);
+    for (const marker of ['SOURCE_PINS', 'CAPTURE_RAW_PASS', 'test/motion-surface-refresh.test.ts']) {
+      expect(selected(steps.find(item => item.run?.includes(marker))!)).toBe(ablation);
+    }
+    expect(selected(steps.find(item => item.run?.includes('assertTransitionContractHost'))!)).toBe(true);
     const receipt = steps.findIndex(item => item.run?.includes('mode=performance-contract-only'));
     expect(selected(steps[receipt]!)).toBe(contract);
     expect(receipt).toBeLessThan(steps.findIndex(item => item.run?.includes('node --test candidate/bench/compare/transition-profile')));
+  });
+
+  it.each([
+    { ablation: true, scenario: 's2-warm', startup: true, contract: false, profile: false, baseline: 'cb1292ffdc11efbce0bed8b710ea4749d2adf656', passes: true },
+    ...[
+      { scenario: '' }, { scenario: 'unknown' }, { startup: false }, { contract: true },
+      { profile: true }, { baseline: '' }, { baseline: 'main' }, { baseline: 'a'.repeat(40) },
+    ].map(overrides => ({ ablation: true, scenario: 's2-warm', startup: true, contract: false, profile: false,
+      baseline: 'cb1292ffdc11efbce0bed8b710ea4749d2adf656', passes: false, ...overrides })),
+    { ablation: false, scenario: '', startup: false, contract: true, profile: false, baseline: 'a'.repeat(40), passes: true },
+  ])('actual ablation admission $ablation/$scenario/$startup/$contract/$profile/$baseline', ({ ablation, scenario, startup, contract, profile, baseline, passes }) => {
+    const files = sources();
+    const aggregate = (parse(files.get('ci.yml')!) as Workflow).jobs.CI!.steps![0]!;
+    const first = (parse(files.get('performance.yml')!) as Workflow).jobs.compare!.steps![0]!;
+    const run = (program: string) => {
+      const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
+        encoding: 'utf8', timeout: 5000,
+        env: { ...process.env, EVENT_NAME: 'workflow_dispatch', S2_CAPTURE_ABLATION: String(ablation),
+          STARTUP_DIAGNOSTIC: String(startup), STARTUP_SCENARIO: scenario, PERFORMANCE_CONTRACT_ONLY: String(contract),
+          PROFILE_BASELINE: String(profile), PERFORMANCE_BASELINE: baseline, BASELINE: baseline,
+          VERIFY_RESULT: 'success', TESTS_RESULT: 'success', MUTATION_RESULT: 'success',
+          BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success' },
+      });
+      expect(actual.error).toBeUndefined();
+      return actual.status === 0;
+    };
+    expect(run(aggregate.run!), 'aggregate admission').toBe(passes);
+    const reusable = first.run!.replaceAll('${{ inputs.startup_diagnostic }}', String(startup))
+      .replaceAll('${{ inputs.performance_contract_only }}', String(contract))
+      .replaceAll('${{ inputs.s2_capture_ablation }}', String(ablation));
+    // profile_baseline belongs to the aggregate, not the reusable workflow boundary.
+    if (!profile) expect(run(reusable), 'reusable admission').toBe(passes);
+    expect(() => expect(run('exit 0')).toBe(false)).toThrow();
+    expect(() => expect(run('exit 1')).toBe(true)).toThrow();
+  });
+
+  it('CLI TAP shell retains native failure without running Chromium', () => {
+    const workflow = parse(sources().get('performance.yml')!) as Workflow;
+    const program = workflow.jobs.compare!.steps!.find(item => item.run?.includes('cli-contracts.tap'))!.run!;
+    const cwd = mkdtempSync(join(tmpdir(), 'motion-ci-cli-tap-'));
+    try {
+      for (const code of [0, 17]) {
+        const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c',
+          `mkdir -p "$RUNNER_TEMP/motion-performance"
+xvfb-run() { printf 'TAP version 13\\n'; return ${code}; }
+${program}`], {
+          cwd, env: { ...process.env, RUNNER_TEMP: cwd.replaceAll('\\', '/') }, encoding: 'utf8', timeout: 5000,
+        });
+        expect(actual.error).toBeUndefined();
+        expect(actual.status, actual.stderr).toBe(code);
+        expect(readFileSync(join(cwd, 'motion-performance/cli-contracts.tap'), 'utf8')).toBe('TAP version 13\n');
+      }
+    } finally { rmSync(cwd, { recursive: true, force: true }); }
   });
 
   it('shell Vitest сохраняет код отказа после tee для diagnostics', () => {

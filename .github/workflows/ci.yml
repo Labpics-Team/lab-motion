@@ -27,6 +27,10 @@ on:
         description: 'Сценарий startup diagnostic: пусто (default) или s2-warm'
         type: string
         default: ''
+      s2_capture_ablation:
+        description: 'Временный capture experiment; только s2-warm с identity baseline cb1292'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -43,6 +47,8 @@ env:
 
 jobs:
   performance:
+    # Эксперимент разрешён только после всех обычных product checks этого SHA.
+    needs: [CI]
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.performance_contract_only && (inputs.startup_diagnostic || inputs.profile_baseline)) && !(inputs.startup_diagnostic && inputs.profile_baseline) && (inputs.startup_scenario == '' || (inputs.startup_diagnostic && inputs.startup_scenario == 's2-warm')) }}
     uses: ./.github/workflows/performance.yml
     with:
@@ -50,6 +56,7 @@ jobs:
       startup_diagnostic: ${{ inputs.startup_diagnostic }}
       startup_scenario: ${{ inputs.startup_scenario }}
       performance_contract_only: ${{ inputs.performance_contract_only }}
+      s2_capture_ablation: ${{ inputs.s2_capture_ablation }}
 
   # Только явный baseline-запрос: обычный кандидат может менять runtime и
   # не обязан совпадать с зарегистрированным старым источником PROFILE-01.
@@ -203,6 +210,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Capture observer contracts
+        run: node --test bench/compare/capture-boundaries.contract.test.mjs
+
       - name: Vitest
         id: vitest
         shell: bash
@@ -330,6 +340,7 @@ jobs:
           PROFILE_BASELINE: ${{ inputs.profile_baseline }}
           PERFORMANCE_BASELINE: ${{ inputs.performance_baseline }}
           STARTUP_SCENARIO: ${{ inputs.startup_scenario }}
+          S2_CAPTURE_ABLATION: ${{ inputs.s2_capture_ablation }}
         run: |
           set -euo pipefail
           if [[ "$EVENT_NAME" == workflow_dispatch && "$STARTUP_DIAGNOSTIC" == true && -z "$PERFORMANCE_BASELINE" ]]; then
@@ -341,6 +352,10 @@ jobs:
             [[ "$STARTUP_DIAGNOSTIC" != true && "$PROFILE_BASELINE" != true ]]
           fi
           if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            if [[ "$S2_CAPTURE_ABLATION" == true ]]; then
+              [[ "$STARTUP_DIAGNOSTIC" == true && "$STARTUP_SCENARIO" == s2-warm && "$PROFILE_BASELINE" != true && "$PERFORMANCE_CONTRACT_ONLY" != true ]]
+              [[ "$PERFORMANCE_BASELINE" == cb1292ffdc11efbce0bed8b710ea4749d2adf656 ]]
+            fi
             [[ "$STARTUP_DIAGNOSTIC" != true || "$PROFILE_BASELINE" != true ]]
             [[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "$STARTUP_DIAGNOSTIC" == true && "$PROFILE_BASELINE" != true && "$PERFORMANCE_CONTRACT_ONLY" != true && "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ) ]]
           fi
