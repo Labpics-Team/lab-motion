@@ -6,10 +6,13 @@ on:
       baseline:
         type: string
         required: true
-      performance_contract_only:
+      s5_capture_diagnostic:
         type: boolean
         default: false
       startup_diagnostic:
+        type: boolean
+        default: false
+      performance_contract_only:
         type: boolean
         default: false
 
@@ -22,7 +25,8 @@ env:
 
 jobs:
   compare:
-    runs-on: ubuntu-latest
+    # Контрактный launcher использует transient systemd >=255 service/cgroup v2.
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
       - name: Проверить identity baseline
@@ -32,7 +36,8 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]
-          [[ "${{ inputs.startup_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]
+          [[ "${{ inputs.s5_capture_diagnostic }}" != true || ( "${{ inputs.performance_contract_only }}" != true && "${{ inputs.startup_diagnostic }}" != true ) ]]
+          [[ "${{ inputs.performance_contract_only }}" != true || "${{ inputs.startup_diagnostic }}" != true ]]
 
       - name: Получить проверяемый источник
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,6 +53,16 @@ jobs:
           ref: ${{ inputs.baseline }}
           persist-credentials: false
           fetch-depth: 0
+
+      - name: Проверить неизменность product для S5
+        if: ${{ inputs.s5_capture_diagnostic }}
+        working-directory: candidate
+        shell: bash
+        env:
+          BASELINE: ${{ inputs.baseline }}
+        run: |
+          set -euo pipefail
+          git diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries
 
       - name: Настроить Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -68,13 +83,13 @@ jobs:
           pnpm --dir candidate build
 
       - name: Измерить каждый публичный root-импорт
-        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
+        if: ${{ !inputs.s5_capture_diagnostic && !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         run: |
           mkdir -p "$RUNNER_TEMP/motion-performance"
           node candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"
 
       - name: Сравнить численное ядро easing
-        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
+        if: ${{ !inputs.s5_capture_diagnostic && !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         run: node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"
 
       - name: Установить зависимости сравнения
@@ -92,10 +107,11 @@ jobs:
           printf 'mode=performance-contract-only\n' > "$RUNNER_TEMP/motion-performance/contract-only.txt"
 
       - name: Проверить контракты CLI в настоящем Chromium
+        if: ${{ !inputs.s5_capture_diagnostic }}
         run: xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs
 
       - name: Снять startup diagnostic без изменения product
-        if: ${{ inputs.startup_diagnostic && !inputs.performance_contract_only }}
+        if: ${{ inputs.startup_diagnostic && !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}
         shell: bash
         run: |
           set -euo pipefail
@@ -105,8 +121,26 @@ jobs:
         env:
           BASELINE: ${{ inputs.baseline }}
 
+      - name: Проверить адресные контракты S5 и workflow
+        if: ${{ inputs.s5_capture_diagnostic }}
+        working-directory: candidate
+        run: pnpm exec vitest run test/benchmark-cli-contract.test.ts test/ci-workflow-contract.test.ts
+
+      - name: Снять 16 S5 captures с полными raw и PNG
+        if: ${{ inputs.s5_capture_diagnostic }}
+        working-directory: candidate
+        shell: bash
+        env:
+          S5_CAPTURE_DIAGNOSTIC: '1'
+          S5_CAPTURE_DIAGNOSTIC_DIR: ${{ runner.temp }}/motion-performance/s5-capture
+        run: |
+          set -euo pipefail
+          [[ "$S5_CAPTURE_DIAGNOSTIC_DIR" = /* ]]
+          mkdir -p "$RUNNER_TEMP/motion-performance"
+          xvfb-run -a node bench/compare/conformance-smoke.mjs
+
       - name: Сравнить spring и JS-исполнение с baseline
-        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
+        if: ${{ !inputs.s5_capture_diagnostic && !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         shell: bash
         run: |
           set -euo pipefail
@@ -114,19 +148,19 @@ jobs:
           xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline
 
       - name: Сравнить полную стоимость в одном браузере
-        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
+        if: ${{ !inputs.s5_capture_diagnostic && !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         shell: bash
         run: |
           set -euo pipefail
           xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline
 
       - name: Проверить сравнительные утверждения
-        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
+        if: ${{ !inputs.s5_capture_diagnostic && !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         working-directory: candidate/bench/compare
         run: xvfb-run -a node bench.mjs
 
       - name: Измерить потребительские сборки
-        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only && !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !inputs.s5_capture_diagnostic && !inputs.startup_diagnostic && !inputs.performance_contract_only && !cancelled() && steps.build.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail

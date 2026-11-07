@@ -15,12 +15,16 @@ on:
         description: 'Commit для парного сравнения полной стоимости движения'
         type: string
         default: ''
-      performance_contract_only:
-        description: 'Только контракты CLI в Chromium без парных измерений; обязателен performance_baseline (полный SHA)'
+      s5_capture_diagnostic:
+        description: 'Диагностика S5 с полными raw/PNG; обязателен performance_baseline (полный SHA)'
         type: boolean
         default: false
       startup_diagnostic:
         description: 'Диагностика старта через CDP без сравнительных утверждений; обязателен performance_baseline (полный SHA)'
+        type: boolean
+        default: false
+      performance_contract_only:
+        description: 'Только контракты CLI в Chromium без парных измерений; обязателен performance_baseline (полный SHA)'
         type: boolean
         default: false
 
@@ -39,17 +43,18 @@ env:
 
 jobs:
   performance:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.performance_contract_only && (inputs.startup_diagnostic || inputs.profile_baseline)) && !(inputs.startup_diagnostic && inputs.profile_baseline) }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.profile_baseline && (inputs.s5_capture_diagnostic || inputs.performance_contract_only || inputs.startup_diagnostic)) && !(inputs.s5_capture_diagnostic && (inputs.performance_contract_only || inputs.startup_diagnostic)) && !(inputs.performance_contract_only && inputs.startup_diagnostic) }}
     uses: ./.github/workflows/performance.yml
     with:
       baseline: ${{ inputs.performance_baseline }}
+      s5_capture_diagnostic: ${{ inputs.s5_capture_diagnostic }}
       startup_diagnostic: ${{ inputs.startup_diagnostic }}
       performance_contract_only: ${{ inputs.performance_contract_only }}
 
   # Только явный baseline-запрос: обычный кандидат может менять runtime и
   # не обязан совпадать с зарегистрированным старым источником PROFILE-01.
   profile-baseline:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline && !inputs.performance_contract_only && !inputs.startup_diagnostic }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline && !inputs.s5_capture_diagnostic && !inputs.performance_contract_only && !inputs.startup_diagnostic }}
     uses: ./.github/workflows/profile-01.yml
 
   verify:
@@ -320,22 +325,18 @@ jobs:
           DOCS_RESULT: ${{ needs.documentation.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
           EVENT_NAME: ${{ github.event_name }}
+          S5_CAPTURE_DIAGNOSTIC: ${{ inputs.s5_capture_diagnostic }}
           STARTUP_DIAGNOSTIC: ${{ inputs.startup_diagnostic }}
           PERFORMANCE_CONTRACT_ONLY: ${{ inputs.performance_contract_only }}
           PROFILE_BASELINE: ${{ inputs.profile_baseline }}
           PERFORMANCE_BASELINE: ${{ inputs.performance_baseline }}
         run: |
           set -euo pipefail
-          if [[ "$EVENT_NAME" == workflow_dispatch && "$STARTUP_DIAGNOSTIC" == true && -z "$PERFORMANCE_BASELINE" ]]; then
-            echo "::error::Для startup_diagnostic обязателен performance_baseline (полный SHA)"
-            exit 1
-          fi
-          if [[ "$EVENT_NAME" == workflow_dispatch && "$PERFORMANCE_CONTRACT_ONLY" == true ]]; then
+          if [[ "$EVENT_NAME" == workflow_dispatch && ( "$S5_CAPTURE_DIAGNOSTIC" == true || "$PERFORMANCE_CONTRACT_ONLY" == true || "$STARTUP_DIAGNOSTIC" == true ) ]]; then
             [[ "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ]]
-            [[ "$STARTUP_DIAGNOSTIC" != true && "$PROFILE_BASELINE" != true ]]
-          fi
-          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
-            [[ "$STARTUP_DIAGNOSTIC" != true || "$PROFILE_BASELINE" != true ]]
+            [[ "$PROFILE_BASELINE" != true ]]
+            [[ "$S5_CAPTURE_DIAGNOSTIC" != true || ( "$PERFORMANCE_CONTRACT_ONLY" != true && "$STARTUP_DIAGNOSTIC" != true ) ]]
+            [[ "$PERFORMANCE_CONTRACT_ONLY" != true || "$STARTUP_DIAGNOSTIC" != true ]]
           fi
           [[ "$VERIFY_RESULT" == success ]]
           [[ "$TESTS_RESULT" == success ]]
