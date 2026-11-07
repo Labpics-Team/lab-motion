@@ -193,7 +193,7 @@ try {
   const panels = [
     { name: 'realistic-authored-hold-full-trajectory', programs: holdPrograms, trace: holdTrace, repeats: 16 },
     { name: 'long-jumps-regression', programs: longPrograms, trace: longTrace, repeats: 16 },
-    { name: 'single-interval-negative', programs: singlePrograms, trace: singleTrace, repeats: 1 },
+    { name: 'single-interval-negative', programs: singlePrograms, trace: singleTrace, repeats: 200 },
   ];
   const panelMetadata = panels.map(panel => ({ name: panel.name,
     times: panel.trace, authoredTimes: panel.programs[0]._segments.map(s => s._at),
