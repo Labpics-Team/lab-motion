@@ -90,7 +90,7 @@ async function pageFor(id, acquired = () => {}) {
   else await page.addScriptTag({ path: adapters[id].path });
   return { context, page };
 }
-let runError;
+let runError, diagnosticResult;
 try {
   if (paired) {
     // Сравнивается публичный seek в браузере; проверка не входит в timed samples.
@@ -264,9 +264,7 @@ try {
       throw new Error(`Measured dist changed: ${id}`);
   }
   if (diagnostic) {
-    const result = { interpretation: metadata.diagnostic.interpretation, offeredStarts: metadata.diagnostic.offeredStarts, completedStarts: samples.filter(row => row.valid).length, offeredTargets: samples.reduce((sum, row) => sum + row.offered, 0), completedTargets: samples.reduce((sum, row) => sum + row.completed, 0), coverage: samples.filter(row => row.condition === 'profiled').map(({ round, id, coverage }) => ({ round, id, ...coverage })) };
-    writeFileSync(path.join(output, 'diagnostic.json'), JSON.stringify(result, null, 2));
-    console.log(JSON.stringify(result));
+    diagnosticResult = { interpretation: metadata.diagnostic.interpretation, offeredStarts: metadata.diagnostic.offeredStarts, completedStarts: samples.filter(row => row.valid).length, offeredTargets: samples.reduce((sum, row) => sum + row.offered, 0), completedTargets: samples.reduce((sum, row) => sum + row.completed, 0), coverage: samples.filter(row => row.condition === 'profiled').map(({ round, id, coverage }) => ({ round, id, ...coverage })) };
   } else {
   const quantile = (values, p) => [...values].sort((a, b) => a - b)[Math.ceil(values.length * p) - 1];
   const summary = counts.flatMap(count => ids.map(id => {
@@ -294,4 +292,8 @@ try {
   }
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1) throw new AggregateError(errors, 'Отказ запуска и очистки', { cause: errors[0] });
+}
+if (diagnostic) {
+  writeFileSync(path.join(output, 'diagnostic.json'), JSON.stringify(diagnosticResult, null, 2));
+  console.log(JSON.stringify(diagnosticResult));
 }

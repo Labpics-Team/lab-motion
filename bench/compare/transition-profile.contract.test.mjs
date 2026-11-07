@@ -51,7 +51,7 @@ export function start(elements) { const run = animate(elements); return { finish
 }
 
 const { runtimeMs, startupMs, stopMs, reportMs } = TRANSITION_CONTRACT_LIMITS;
-// Fixture/start + runtime + stop client + identity + pipe settlement + empty confirmation.
+// Подготовка и запуск, выполнение, остановка клиента, проверка идентичности, завершение каналов и подтверждение пустоты.
 const testTimeoutMs = 2 * startupMs + runtimeMs + stopMs + 5 * reportMs;
 const retainedFixtures = new Set();
 const allowedEnvironment = ['DISPLAY', 'XAUTHORITY', 'PATH', 'HOME', 'TMPDIR', 'PLAYWRIGHT_BROWSERS_PATH', 'PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD', 'NODE_PATH', 'BENCH_RUNS', 'BENCH_FREEZE_RUNS'];
@@ -584,6 +584,7 @@ chromium.launch = async (...args) => {
           assert.ok(events.indexOf('profiler-stopped') < events.indexOf('context-closed', events.indexOf('profiler-started')));
           assert.equal(existsSync(join(output, 'diagnostic.json')), false);
         } else {
+          assert.equal(existsSync(join(output, 'diagnostic.json')), false);
           const rows = readFileSync(join(output, 'samples.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
           assert.equal(rows.length, 16);
           assert.ok(rows.every(row => row.valid && row.accepted === 1000 && row.completed === 1000));

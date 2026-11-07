@@ -398,7 +398,7 @@ function assertNativeGraph(files: Map<string, string>) {
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
   const ciEvents = structuredClone(ci.on);
-  // Descriptions are prose, not the dispatch interface under test.
+  // Описания — текст, а не проверяемый интерфейс запуска.
   const dispatch = ciEvents.workflow_dispatch as { inputs: Record<string, { description?: string }> };
   for (const input of Object.values(dispatch.inputs)) delete input.description;
   expect(ciEvents).toEqual({
