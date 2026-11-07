@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
+import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { createContext, runInContext } from 'node:vm';
 import { execFileSync, spawn } from 'node:child_process';
@@ -8,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { captureTrajectory, installNativeCaptureDiagnostics } from '../bench/compare/bench.mjs';
-import { recordCaptureDiagnostic } from '../bench/compare/conformance-smoke.mjs';
+import { recordCaptureDiagnostic, recordCaptureReplay } from '../bench/compare/conformance-smoke.mjs';
 import { startClock, timerEvidence } from './benchmark-clock-fixture.js';
 
 const repository = fileURLToPath(new URL('../', import.meta.url));
@@ -92,13 +93,18 @@ process.on('uncaughtExceptionMonitor', error => {
   return preload;
 }
 
-function controlledCapture(faults: { terminal?: Error; snapshot?: Error; cleanup?: Error; badPng?: boolean } = {}) {
+function controlledCapture(faults: { terminal?: Error; lateTerminal?: Error; snapshot?: Error; cleanup?: Error; badPng?: boolean; latePose?: boolean } = {}) {
   const events = new EventEmitter();
   const signals: string[] = [];
+  const acknowledgements: string[] = [];
   const nodes = new Map<string, object>();
   const animations: { pending: boolean; startTime: number | null; currentTime: number | null; ready: Promise<void>; resolve(): void }[] = [];
   const timeline = {};
   let now = 0;
+  let startupResolve!: () => void;
+  const startup = new Promise<void>(accept => { startupResolve = accept; });
+  let poseReadResolve!: () => void;
+  const poseRead = new Promise<void>(accept => { poseReadResolve = accept; });
   class Element {
     id = ''; style = {}; textContent = '';
     animate() {
@@ -106,7 +112,9 @@ function controlledCapture(faults: { terminal?: Error; snapshot?: Error; cleanup
       let resolve!: () => void;
       const ready = new Promise<void>(accept => { resolve = accept; });
       const animation = { timeline, pending: true, startTime: null as number | null, currentTime: 0 as number | null,
-        ready, resolve };
+        effect: { getKeyframes: () => { signals.push(`keyframes:${this.id}`); return [{ offset: 0, transform: 'translateX(0px)' }]; },
+          getTiming: () => ({ duration: 2400, easing: 'linear' }) },
+        ready, finished: new Promise<void>(() => {}), resolve };
       // Preserve the originating element, not the getter's animation receiver.
       Object.defineProperty(animation, 'ready', { get: () => { signals.push(`ready:${this.id}`); return ready; } });
       animations.push(animation);
@@ -114,14 +122,18 @@ function controlledCapture(faults: { terminal?: Error; snapshot?: Error; cleanup
     }
   }
   const realm = createContext({ Element, crossOriginIsolated: true,
-    document: { timeline, title: '', createElement: () => new Element(),
+    document: { timeline, title: '', visibilityState: 'visible', addEventListener() {}, removeEventListener() {}, createElement: () => new Element(),
       body: { appendChild: (node: Element) => nodes.set(node.id, node) }, getElementById: (id: string) => nodes.get(id) },
     performance: { timeOrigin: startClock().pageTimeOriginMs, now: () => now += 0.1 },
     console: { debug: (token: string) => events.emit('Runtime.consoleAPICalled', {
       args: [{ value: token }], timestamp: startClock().pageTimeOriginMs + now,
     }) },
     setTimeout: (_callback: unknown, delay: number) => { signals.push(`block:${delay}`); },
-    getComputedStyle: () => { if (faults.terminal) throw faults.terminal; return { transform: 'matrix(1,0,0,1,600,0)' }; },
+    getComputedStyle: () => {
+      if (faults.terminal) throw faults.terminal;
+      if (faults.latePose) realm.__benchTiming.blockStartedAt = (startClock().pageTimeOriginMs + now) / 1000;
+      return { transform: 'matrix(1,0,0,1,600,0)' };
+    },
     DOMMatrixReadOnly: class { e = 600; },
   });
   runInContext('window = globalThis; __adapterModule = { start(elements) { elements[0].animate([], {}); return {}; } };', realm);
@@ -139,12 +151,17 @@ function controlledCapture(faults: { terminal?: Error; snapshot?: Error; cleanup
     async evaluate(callback: { toString(): string }, argument?: unknown) {
       const source = callback.toString();
       if (faults.snapshot && source.includes('__s5NativeCapture?.finish')) throw faults.snapshot;
+      if (faults.lateTerminal && source.includes('finalX:')) throw faults.lateTerminal;
       realm.argument = argument;
-      return await runInContext(`(${source})(argument)`, realm);
+      const result = await runInContext(`(${source})(argument)`, realm);
+      if (source.includes('diagnosticEnabled') && source.includes('pageApiNowMs')) startupResolve();
+      if (source.includes('__s5NativeCapture.readPose()')) poseReadResolve();
+      return result;
     },
   };
   const cdp = Object.assign(events, { async send(method: string) {
     if (method === 'Page.startScreencast') emitFrame();
+    if (method === 'Page.screencastFrameAck') acknowledgements.push(method);
     if (method === 'Page.stopScreencast') {
       signals.push('stop');
       if (faults.badPng) events.emit('Page.screencastFrame', { data: 'invalid', sessionId: ++frame,
@@ -153,7 +170,23 @@ function controlledCapture(faults: { terminal?: Error; snapshot?: Error; cleanup
   } });
   const context = { async newPage() { return page; }, async newCDPSession() { return cdp; },
     async close() { signals.push('close'); if (faults.cleanup) throw faults.cleanup; } };
-  return { browser: { async newContext() { return context; } }, signals, png,
+  return { browser: { async newContext() { return context; } }, signals, acknowledgements, png, startup, poseRead,
+    async invalidFrame(bytes: Buffer) {
+      // Transport delivery occurs after the caller has subscribed, outside capture's awaited call stack.
+      await new Promise<void>((accept, reject) => queueMicrotask(() => {
+        try {
+          events.emit('Page.screencastFrame', { data: bytes.toString('base64'), sessionId: ++frame,
+            metadata: { timestamp: (startClock().pageTimeOriginMs + now) / 1000 } });
+          accept();
+        } catch (error) { reject(error); }
+      }));
+    },
+    async ready() {
+      for (const animation of animations) { animation.pending = false; animation.startTime = 0; animation.currentTime = 130; animation.resolve(); }
+      await Promise.all(animations.map(animation => animation.ready));
+    },
+    selectedFrame() { now = 140; emitFrame(); },
+    finishReplay(rejected = false) { events.emit('Runtime.consoleAPICalled', { args: [{ value: rejected ? 'lab-motion-s5-replay-rejected' : 'lab-motion-s5-replay-finished' }], timestamp: startClock().pageTimeOriginMs + now }); },
     async readyThenCancel() {
       const settled = Promise.all(animations.map(animation => animation.ready));
       for (const animation of animations) { animation.pending = false; animation.startTime = 25; animation.resolve(); }
@@ -182,6 +215,157 @@ function captureCompletionSignal() {
 }
 
 describe('S5 opt-in native capture diagnostics', () => {
+  it.each([false, true])('one event-selected observation replay retains native curve; latePose=%s', async latePose => {
+    const control = controlledCapture({ latePose });
+    const directory = mkdtempSync(join(tmpdir(), 's5-replay-control-'));
+    const adapterPath = join(directory, 'lab-spring.js');
+    const adapterBytes = Buffer.from('retained adapter bytes');
+    writeFileSync(adapterPath, adapterBytes);
+    const destination = join(directory, 'output');
+    try {
+      const resultPromise = recordCaptureReplay(control.browser, { url: 'fixture' }, {
+        path: adapterPath, sha256: createHash('sha256').update(adapterBytes).digest('hex'),
+      }, destination);
+      // Register result handlers before signalling READY/frame/finished.
+      const result = resultPromise.then(value => ({ value, error: undefined }), error => ({ value: undefined, error }));
+      await control.startup;
+      expect(control.signals.slice(0, 5)).toEqual(['start:capture-witness', 'start:probe', 'block:300',
+        'ready:capture-witness', 'ready:probe']);
+      await control.ready();
+      control.selectedFrame();
+      control.finishReplay();
+      const settled = await result;
+      expect(settled.error).toBeUndefined();
+      const capture = settled.value!;
+      expect(capture.replay.qualification).toBe(false);
+      expect(capture.replay.assessment.bitmapPoseEquality).toBe('unproven');
+      expect(capture.replay.assessment.status).toBe(latePose ? 'unknown' : 'bounded-post-event-read');
+      if (latePose) expect(capture.replay.assessment.reasons).toContain('block-or-start-boundary');
+      expect(capture.replay.selectedFrame.frameIndex).toBe(1);
+      expect(capture.replay.selectedFrame.sessionId).toBe(2);
+      expect(capture.replay.pose.poses.map((pose: { element: string }) => pose.element)).toEqual(['capture-witness', 'probe']);
+      expect(capture.nativeDiagnostic.records.every((record: { effect: { keyframes: unknown[]; timing: { duration: number } } }) => (
+        record.effect.keyframes.length === 1 && record.effect.timing.duration === 2400
+      ))).toBe(true);
+      expect(control.signals.filter(signal => signal.startsWith('keyframes:'))).toHaveLength(2);
+      const output = join(destination, 'observation-replay');
+      expect(readFileSync(join(output, 'adapter.js'))).toEqual(adapterBytes);
+      const raw = JSON.parse(readFileSync(join(output, 'raw.json'), 'utf8'));
+      expect(raw.qualification).toBe(false);
+      expect(raw.frames).toHaveLength(2);
+      expect(raw.replay.selectedFrame.frameIndex).toBe(1);
+      expect(readFileSync(join(output, raw.frames[1].png))).toEqual(control.png);
+      expect(raw.errors).toEqual([]);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
+  it('replay pose read failure retains the selected raw frame and cleans up', async () => {
+    const control = controlledCapture({ terminal: new Error('pose read failed') });
+    const retained: { frames: { data: string }[]; replay: { assessment: { status: string } }; errors: unknown[] }[] = [];
+    const capture = captureTrajectory(control.browser, 'lab-spring.js', true, 'fixture', {
+      replay: true, retain: (evidence: typeof retained[number]) => { retained.push(evidence); },
+    });
+    const rejected = capture.then(() => undefined, (error: AggregateError) => error);
+    await control.startup;
+    await control.ready();
+    control.selectedFrame();
+    control.finishReplay();
+    const error = await rejected;
+    expect(error).toBeInstanceOf(AggregateError);
+    expect(retained).toHaveLength(1);
+    expect(retained[0].frames).toHaveLength(2);
+    expect(Buffer.from(retained[0].frames[1].data, 'base64')).toEqual(control.png);
+    expect(retained[0].replay.assessment.status).toBe('unknown');
+    expect(retained[0].errors).toHaveLength(1);
+    expect(control.signals.slice(-2)).toEqual(['stop', 'close']);
+  });
+
+  it('asynchronously delivered invalid replay PNG is acknowledged and retained as unknown', async () => {
+    const control = controlledCapture();
+    const bytes = Buffer.from('not a PNG: exact asynchronous transport bytes');
+    const retained: { frames: { data: string }[]; replay: { assessment: { status: string; reasons: string[] } }; errors: { phase: string }[] }[] = [];
+    const capture = captureTrajectory(control.browser, 'lab-spring.js', true, 'fixture', {
+      replay: true, retain: (evidence: typeof retained[number]) => { retained.push(evidence); },
+    });
+    const rejected = capture.then(() => undefined, (error: AggregateError) => error);
+    await control.startup;
+    await control.ready();
+    const acksBefore = control.acknowledgements.length;
+    // The transport promise rejects if the callback throws; do not mask that failure.
+    await control.invalidFrame(bytes);
+    const error = await rejected;
+    expect(error).toBeInstanceOf(AggregateError);
+    expect(control.acknowledgements).toHaveLength(acksBefore + 1);
+    expect(retained).toHaveLength(1);
+    expect(Buffer.from(retained[0].frames[1].data, 'base64')).toEqual(bytes);
+    expect(retained[0].replay.assessment.status).toBe('unknown');
+    expect(retained[0].replay.assessment.reasons).toContain('failure:frame-decode');
+    expect(retained[0].errors.map(error => error.phase)).toEqual(['frame-decode']);
+    expect(control.signals.slice(-2)).toEqual(['stop', 'close']);
+  });
+
+  it.each(['complete', 'finished-rejected', 'finished-timeout', 'terminal-read-failed', 'cleanup-failed'] as const)(
+    'retains bounded pose but overall replay reflects late outcome %s', async outcome => {
+      vi.useFakeTimers();
+      const control = controlledCapture({
+        ...(outcome === 'terminal-read-failed' ? { lateTerminal: new Error('late terminal read failed') } : {}),
+        ...(outcome === 'cleanup-failed' ? { cleanup: new Error('late cleanup failed') } : {}),
+      });
+      const retained: { frames: { data: string }[]; replay: {
+        pose: { beforeNowMs: number; afterNowMs: number; poses: unknown[] };
+        assessment: { status: string; reasons: string[]; readDurationMs: number; bitmapPoseEquality: string;
+          partialReadAssessment?: { status: string; reasons: string[] } };
+      }; errors: { phase: string }[] }[] = [];
+      try {
+        const capture = captureTrajectory(control.browser, 'lab-spring.js', true, 'fixture', {
+          replay: true, retain: (evidence: typeof retained[number]) => { retained.push(evidence); },
+        });
+        const settled = capture.then(value => ({ value, error: undefined }), error => ({ value: undefined, error }));
+        await control.startup;
+        await control.ready();
+        control.selectedFrame();
+        await control.poseRead;
+        if (outcome === 'finished-timeout') {
+          // Drive the registered completion deadline, not elapsed wall time or polling.
+          await vi.advanceTimersByTimeAsync(6000);
+        } else control.finishReplay(outcome === 'finished-rejected');
+        const result = await settled;
+        expect(retained).toHaveLength(1);
+        const evidence = retained[0];
+        expect(evidence.replay.pose.poses).toHaveLength(2);
+        expect(evidence.replay.pose.afterNowMs).toBeGreaterThanOrEqual(evidence.replay.pose.beforeNowMs);
+        expect(evidence.replay.assessment.readDurationMs).toBeGreaterThanOrEqual(0);
+        expect(evidence.replay.assessment.bitmapPoseEquality).toBe('unproven');
+        expect(evidence.frames).toHaveLength(2);
+        expect(Buffer.from(evidence.frames[1].data, 'base64')).toEqual(control.png);
+        if (outcome === 'complete') {
+          expect(result.error).toBeUndefined();
+          expect(evidence.replay.assessment.status).toBe('bounded-post-event-read');
+          expect(evidence.errors).toEqual([]);
+        } else {
+          expect(result.error).toBeInstanceOf(AggregateError);
+          expect(evidence.replay.assessment.status).toBe('unknown');
+          expect(evidence.replay.assessment.partialReadAssessment).toMatchObject({ status: 'bounded-post-event-read', reasons: [] });
+          expect(evidence.replay.assessment.reasons).toContain(outcome === 'cleanup-failed' ? 'failure:cleanup' : 'failure:capture');
+          expect(evidence.errors).toHaveLength(1);
+        }
+        expect(control.signals.slice(-2)).toEqual(['stop', 'close']);
+      } finally { vi.useRealTimers(); }
+    },
+  );
+
+  it('replay adapter mismatch refuses before any capture attempt', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 's5-replay-control-'));
+    try {
+      const adapterPath = join(directory, 'lab-spring.js');
+      writeFileSync(adapterPath, 'actual adapter');
+      let attempted = false;
+      await expect(recordCaptureReplay({}, { url: 'fixture' }, { path: adapterPath, sha256: 'wrong' }, join(directory, 'output'),
+        async () => { attempted = true; })).rejects.toThrow('adapter changed');
+      expect(attempted).toBe(false);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+
   it('preserves receiver, arguments and Animation identity; observes ready only after startup', async () => {
     const timeline = {};
     let clock = 10;
