@@ -6,6 +6,15 @@ on:
       baseline:
         type: string
         required: true
+      performance_contract_only:
+        type: boolean
+        default: false
+      startup_diagnostic:
+        type: boolean
+        default: false
+      startup_scenario:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -23,9 +32,12 @@ jobs:
         shell: bash
         env:
           BASELINE: ${{ inputs.baseline }}
+          STARTUP_SCENARIO: ${{ inputs.startup_scenario }}
         run: |
           set -euo pipefail
           [[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${{ inputs.startup_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]
+          [[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "${{ inputs.startup_diagnostic }}" == true && "${{ inputs.performance_contract_only }}" != true ) ]]
 
       - name: Получить проверяемый источник
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -61,11 +73,13 @@ jobs:
           pnpm --dir candidate build
 
       - name: Измерить каждый публичный root-импорт
+        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         run: |
           mkdir -p "$RUNNER_TEMP/motion-performance"
           node candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"
 
       - name: Сравнить численное ядро easing
+        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         run: node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"
 
       - name: Установить зависимости сравнения
@@ -74,10 +88,31 @@ jobs:
       - name: Установить Chromium
         run: pnpm --dir candidate/bench/compare exec playwright install --with-deps chromium
 
+      - name: Сохранить receipt contract-only до запуска контрактов
+        if: ${{ inputs.performance_contract_only }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/motion-performance"
+          printf 'mode=performance-contract-only\n' > "$RUNNER_TEMP/motion-performance/contract-only.txt"
+
       - name: Проверить контракты CLI в настоящем Chromium
         run: xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs
 
+      - name: Снять startup diagnostic без изменения product
+        if: ${{ inputs.startup_diagnostic && !inputs.performance_contract_only }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries
+          xvfb-run -a node bench/compare/transition-profile.mjs . "$RUNNER_TEMP/motion-performance/startup-diagnostic" startup-diagnostic
+        working-directory: candidate
+        env:
+          BASELINE: ${{ inputs.baseline }}
+          MOTION_STARTUP_DIAGNOSTIC_SCENARIO: ${{ inputs.startup_scenario }}
+
       - name: Сравнить spring и JS-исполнение с baseline
+        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         shell: bash
         run: |
           set -euo pipefail
@@ -85,17 +120,19 @@ jobs:
           xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline
 
       - name: Сравнить полную стоимость в одном браузере
+        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         shell: bash
         run: |
           set -euo pipefail
           xvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline
 
       - name: Проверить сравнительные утверждения
+        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         working-directory: candidate/bench/compare
         run: xvfb-run -a node bench.mjs
 
       - name: Измерить потребительские сборки
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only && !cancelled() && steps.build.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail

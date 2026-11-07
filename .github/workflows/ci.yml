@@ -15,6 +15,18 @@ on:
         description: 'Commit для парного сравнения полной стоимости движения'
         type: string
         default: ''
+      performance_contract_only:
+        description: 'Только контракты CLI в Chromium без парных измерений; обязателен performance_baseline (полный SHA)'
+        type: boolean
+        default: false
+      startup_diagnostic:
+        description: 'Диагностика старта через CDP без сравнительных утверждений; обязателен performance_baseline (полный SHA)'
+        type: boolean
+        default: false
+      startup_scenario:
+        description: 'Сценарий startup diagnostic: пусто (default) или s2-warm'
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -31,15 +43,18 @@ env:
 
 jobs:
   performance:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.performance_contract_only && (inputs.startup_diagnostic || inputs.profile_baseline)) && !(inputs.startup_diagnostic && inputs.profile_baseline) && (inputs.startup_scenario == '' || (inputs.startup_diagnostic && inputs.startup_scenario == 's2-warm')) }}
     uses: ./.github/workflows/performance.yml
     with:
       baseline: ${{ inputs.performance_baseline }}
+      startup_diagnostic: ${{ inputs.startup_diagnostic }}
+      startup_scenario: ${{ inputs.startup_scenario }}
+      performance_contract_only: ${{ inputs.performance_contract_only }}
 
   # Только явный baseline-запрос: обычный кандидат может менять runtime и
   # не обязан совпадать с зарегистрированным старым источником PROFILE-01.
   profile-baseline:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline && !inputs.performance_contract_only && !inputs.startup_diagnostic && inputs.startup_scenario == '' }}
     uses: ./.github/workflows/profile-01.yml
 
   verify:
@@ -309,8 +324,26 @@ jobs:
           BROWSER_RESULT: ${{ needs.browser-static.result }}
           DOCS_RESULT: ${{ needs.documentation.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          STARTUP_DIAGNOSTIC: ${{ inputs.startup_diagnostic }}
+          PERFORMANCE_CONTRACT_ONLY: ${{ inputs.performance_contract_only }}
+          PROFILE_BASELINE: ${{ inputs.profile_baseline }}
+          PERFORMANCE_BASELINE: ${{ inputs.performance_baseline }}
+          STARTUP_SCENARIO: ${{ inputs.startup_scenario }}
         run: |
           set -euo pipefail
+          if [[ "$EVENT_NAME" == workflow_dispatch && "$STARTUP_DIAGNOSTIC" == true && -z "$PERFORMANCE_BASELINE" ]]; then
+            echo "::error::Для startup_diagnostic обязателен performance_baseline (полный SHA)"
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" == workflow_dispatch && "$PERFORMANCE_CONTRACT_ONLY" == true ]]; then
+            [[ "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ]]
+            [[ "$STARTUP_DIAGNOSTIC" != true && "$PROFILE_BASELINE" != true ]]
+          fi
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            [[ "$STARTUP_DIAGNOSTIC" != true || "$PROFILE_BASELINE" != true ]]
+            [[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "$STARTUP_DIAGNOSTIC" == true && "$PROFILE_BASELINE" != true && "$PERFORMANCE_CONTRACT_ONLY" != true && "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ) ]]
+          fi
           [[ "$VERIFY_RESULT" == success ]]
           [[ "$TESTS_RESULT" == success ]]
           [[ "$MUTATION_RESULT" == success ]]
