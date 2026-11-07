@@ -14,7 +14,6 @@ jobs:
     env:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
       COREPACK_DEFAULT_TO_LATEST: '0'
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/cdp-boundary-browsers
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -25,6 +24,7 @@ jobs:
       - name: Retain route identity before dependency setup
         run: |
           mkdir -p "$RUNNER_TEMP/cdp-boundary"
+          printf 'PLAYWRIGHT_BROWSERS_PATH=%s/cdp-boundary-browsers\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
           printf 'source=%s\nrun=%s\nattempt=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > "$RUNNER_TEMP/cdp-boundary/route.txt"
       - name: Install existing pinned comparison dependencies only
         run: |
