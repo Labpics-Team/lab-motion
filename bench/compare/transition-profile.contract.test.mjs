@@ -268,7 +268,7 @@ const child = spawn(process.execPath, ['--input-type=module', '-e',
 child.stdout.pipe(process.stdout); child.stderr.pipe(process.stderr);
 process.on('SIGTERM', () => {});`);
   let observed = '';
-  // outer controller is the context signal; real test cancellation is also retained.
+  // Внешний контроллер задаёт сигнал контекста; отмена самого теста также сохранена.
   const context = { signal: AbortSignal.any([test.signal, outer.signal]), after: hook => test.after(hook) };
   try {
     const result = execute(context, deadline, directory, [], undefined, runner,

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-// TEST launcher only; public transition runner has no dependency on this host policy.
+// Только тестовый запускатель; публичный runner переходов не зависит от этой политики хоста.
 export const TRANSITION_CONTRACT_LIMITS = Object.freeze({ runtimeMs: 180_000, startupMs: 15_000, stopMs: 10_000, reportMs: 5_000 });
 
 export function assertTransitionContractHost() {
