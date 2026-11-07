@@ -177,8 +177,9 @@ for (const reduced of [false, true]) it(`authored Programs publish synchronous c
   }));
   const run = a.runtime._execute(drafts);
   expect(a.x()).toBe(100); expect(b.x()).toBe(100);
-  expect(await run.finished).toEqual({ status: 'finished' });
+  expect(run.state).toBe('finished');
   expect(a.effects.length + b.effects.length).toBe(0);
   expect(a.updates.size + a.renders.size).toBe(0);
   expect(b.updates.size + b.renders.size).toBe(0);
+  expect(await run.finished).toEqual({ status: 'finished' });
 });
