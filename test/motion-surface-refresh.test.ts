@@ -20,6 +20,16 @@ for (const native of [false, true]) it(`внешний transform обновля�
   finally { run.stop(); }
 });
 
+for (const native of [false, true]) it(`предварительное чтение не заменяет свежую составную позу, native=${native}`, () => {
+  const h = harness(native);
+  h.values.set('transform', 'translate(20px, 40px) rotate(45deg)');
+  expect(h.host.styles(h.element).getPropertyValue('transform')).toBe('translate(20px, 40px) rotate(45deg)');
+  const run = h.runtime.animate(h.element, { x: 100 }, options);
+  try { run.seek(500); expect(h.x()).toBe(60); expect(h.y()).toBe(40); }
+  finally { run.stop(); }
+  expect(h.updates.size + h.renders.size).toBe(0);
+});
+
 for (const callback of ['styles', 'now'] as const) it(`повторный вход host.${callback} сохраняет выбранную группу и живой y`, () => {
   const h = harness(); const styles = h.host.styles; const now = h.host.now;
   let entered = false; let nested: Playback | undefined;

@@ -8,9 +8,10 @@ import os from 'node:os';
 
 const group = process.argv[4] ?? 'full';
 const startupScenario = process.env.MOTION_STARTUP_DIAGNOSTIC_SCENARIO ?? '';
-if (startupScenario && (group !== 'startup-diagnostic' || startupScenario !== 's2-warm'))
-  throw new Error('MOTION_STARTUP_DIAGNOSTIC_SCENARIO requires startup-diagnostic and s2-warm');
-const s2Warm = startupScenario === 's2-warm';
+if (startupScenario && (group !== 'startup-diagnostic' || !['s2-warm', 's2-pre-read'].includes(startupScenario)))
+  throw new Error('MOTION_STARTUP_DIAGNOSTIC_SCENARIO requires startup-diagnostic and s2-warm or s2-pre-read');
+const preReadProbe = startupScenario === 's2-pre-read';
+const s2Warm = startupScenario === 's2-warm' || preReadProbe;
 const rootPath = realpathSync(process.argv[2] ?? process.cwd());
 const baselinePath = process.argv[5] ? realpathSync(process.argv[5]) : undefined;
 if (baselinePath === rootPath) throw new Error('Baseline and candidate must be distinct checkouts');
@@ -46,7 +47,7 @@ if (baselinePath) ids.push('baseline');
 const counts = diagnostic ? [s2Warm ? START_SCENARIO_MANIFEST.s2.targetsPerCall : 1000] : [1, 100, 1000];
 const rounds = diagnostic ? s2Warm ? 6 : 4 : Math.ceil(20 / ids.length) * ids.length;
 const durationMs = s2Warm ? START_SCENARIO_MANIFEST.s2.durationMs : 400, watchdogMs = 10_000;
-const observations = diagnostic ? s2Warm ? ids.flatMap(id => [`${id}:plain`, `${id}:profiled`]) : ['lab:plain', 'lab:profiled', 'waapi-ctl:plain', 'waapi-ctl:profiled'] : ids;
+const observations = diagnostic ? s2Warm ? ids.flatMap(id => preReadProbe ? [`${id}:control`, `${id}:pre-read`] : [`${id}:plain`, `${id}:profiled`]) : ['lab:plain', 'lab:profiled', 'waapi-ctl:plain', 'waapi-ctl:profiled'] : ids;
 const entries = { 'lab-native': 'lab-native', lab: 'lab', motion: 'motion', gsap: 'gsap', anime: 'anime', 'waapi-ctl': 'waapi-control', 'motion-mini': 'motion-mini', 'anime-waapi': 'anime-waapi' };
 if (baselinePath) entries.baseline = 'lab';
 const adapters = Object.fromEntries(Object.entries(entries).filter(([id]) => !diagnostic || ids.includes(id)).map(([id, entry]) => {
@@ -78,12 +79,17 @@ const metadata = {
   profileSha256: hash(readFileSync(new URL(import.meta.url))),
   versions: { lab: root.version, ...installed, chromium: browser.version(), node: process.version },
   environment: { cpu: os.cpus()[0].model, cpuMax: optionalFile('/sys/fs/cgroup/cpu.max'), memoryMax: optionalFile('/sys/fs/cgroup/memory.max') },
-  scenario: { group, counts, rounds, durationMs: group === 'spring-pair' ? null : durationMs, watchdogMs, targetPx: 300, easing: group === 'spring-pair' ? 'default spring' : group === 'js-pair' ? 'p*p*(3-2*p), custom JS callback' : 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: s2Warm ? 'before/after total: profiler-start inspector overhead, DOM construction, one warmup and seven five-call starts, immediate cancel/remove/microtask/one-rAF drain; excludes profiler-stop and context-close; no natural completion' : 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
+  scenario: { group, counts, rounds, durationMs: group === 'spring-pair' ? null : durationMs, watchdogMs, targetPx: 300, easing: group === 'spring-pair' ? 'default spring' : group === 'js-pair' ? 'p*p*(3-2*p), custom JS callback' : 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: s2Warm ? 'before/after total: optional profiler-start inspector overhead, DOM construction, one warmup and seven five-call starts, immediate cancel/remove/microtask/one-rAF drain; excludes profiler-stop and context-close; no natural completion' : 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
   adapters, orders, sourceIdentity,
+  ...(preReadProbe ? { preReadProbe: { conditions: ['control', 'pre-read'], profiler: false,
+    runtimeSha256: hash(readFileSync(path.join(rootPath, 'src/motion/runtime.ts'))),
+    position: 'first target before each of five public starts; returned computed transform retained',
+    accounting: 'pre-read inside before/after CPU and batch whole wall window including construction, start, cancel, remove and existing drain',
+    interpretation: 'paired cost relocation falsifier; not an optimization, exact phase CPU or natural-completion measurement' } } : {}),
   ...(s2Warm ? { startupScenario, warmBatch: { ...START_SCENARIO_MANIFEST.s2, warmupBatches: 1, samples: 7, calls: 5 },
     cpuWindow: 'total thread CPU across DOM setup, one warmup and seven five-call batches, immediate cancel/remove/microtask/one-rAF drain; includes inspector overhead; no natural completion',
     phaseCpuMs: { start: null, cancel: null, cleanup: null }, phaseCpuStatus: 'unsupported: sampled stacks are attribution, not exact phase CPU' } : {}),
-  ...(diagnostic ? { diagnostic: { interpretation: 'Только атрибуция; время под профайлером не доказывает ускорение', profiler: 'CDP Profiler, стандартный интервал выборки', observations, ...(s2Warm ? { offeredCalls: rounds * observations.length * 40, offeredTargets: rounds * observations.length * 4000, warmupCalls: rounds * observations.length * 5, measuredCalls: rounds * observations.length * 35 } : { offeredStarts: rounds * observations.length }), profileWindow: s2Warm ? 'S2 immediate-cancel batch lifecycle; includes setup, warmup and drain; attribution only' : 'От начала вычисления запуска до его ответа; может включать расходы инспектора и микрозадачи', coverage: 'Образец кадра адаптера ниже startupDiagnosticStart; отсутствие образцов не даёт вывода' } } : {}),
+  ...(diagnostic ? { diagnostic: { interpretation: preReadProbe ? 'Paired pre-read cost relocation falsifier; compare whole useful work, not start-only speedup' : 'Только атрибуция; время под профайлером не доказывает ускорение', profiler: preReadProbe ? null : 'CDP Profiler, стандартный интервал выборки', observations, ...(s2Warm ? { offeredCalls: rounds * observations.length * 40, offeredTargets: rounds * observations.length * 4000, warmupCalls: rounds * observations.length * 5, measuredCalls: rounds * observations.length * 35 } : { offeredStarts: rounds * observations.length }), profileWindow: s2Warm ? 'S2 immediate-cancel batch lifecycle; includes setup, warmup and drain; attribution only' : 'От начала вычисления запуска до его ответа; может включать расходы инспектора и микрозадачи', coverage: 'Образец кадра адаптера ниже startupDiagnosticStart; отсутствие образцов не даёт вывода' } } : {}),
 };
 writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
 const samples = [];
@@ -141,6 +147,34 @@ try {
       writeFileSync(path.join(output, `${id}-original-semantic.json`), JSON.stringify(evidence));
       console.log(`ORIGINAL_ORACLE ${id} ${evidence.valid}`);
       if (s2Warm && !evidence.valid) throw new Error(`S2 semantic probe failed: ${id}`);
+    } finally { await context.close(); }
+  }
+  if (preReadProbe) {
+    const { context, page } = await pageFor('lab');
+    try {
+      const evidence = await page.evaluate(async () => {
+        const sheet = document.createElement('style');
+        sheet.textContent = '.pre-read-pose { transform: translate(20px, 40px) rotate(45deg); }';
+        const element = document.createElement('div'); element.className = 'box pre-read-pose';
+        document.head.appendChild(sheet); document.body.appendChild(element);
+        let control;
+        try {
+          const text = getComputedStyle(element).getPropertyValue('transform');
+          const before = new DOMMatrixReadOnly(text);
+          if (Math.abs(before.e - 20) > 0.05 || Math.abs(before.f - 40) > 0.05 || Math.abs(before.b - Math.SQRT1_2) > 0.05)
+            throw new Error('Stylesheet pose control not engaged');
+          control = window.__adapterModule.start([element], 300, 0);
+          await control.finished();
+          const after = new DOMMatrixReadOnly(getComputedStyle(element).transform);
+          if (Math.abs(after.e - 300) > 0.05 || Math.abs(after.f - 40) > 0.05 || Math.abs(after.b - Math.SQRT1_2) > 0.05)
+            throw new Error('Pre-read changed composed stylesheet pose');
+          control.cancel();
+          if (element.getAnimations().length !== 0) throw new Error('Pre-read pose control retained animation');
+          return { transform: text, before: { x: before.e, y: before.f, b: before.b },
+            after: { x: after.e, y: after.f, b: after.b }, valid: true };
+        } finally { control?.cancel(); element.remove(); sheet.remove(); }
+      });
+      writeFileSync(path.join(output, 'pre-read-pose-control.json'), JSON.stringify(evidence, null, 2));
     } finally { await context.close(); }
   }
   for (let round = 0; round < rounds; round++) {
@@ -222,12 +256,25 @@ try {
             const rows = [], errors = [];
             let documentEffects = 0;
             let acquiredCalls = 0, cancelReturnedCalls = 0, removedTargets = 0, startAttempts = 0;
-            function startupDiagnosticStart(groups, controls) {
+            function startupDiagnosticStart(groups, controls, calls) {
               const began = performance.now();
               for (const elements of groups) {
+                const callBegan = config.preReadProbe ? performance.now() : null;
+                let preReadElapsedMs = null, transform = null;
+                if (config.preReadProbe && config.preRead) {
+                  const readBegan = performance.now();
+                  transform = getComputedStyle(elements[0]).getPropertyValue('transform');
+                  preReadElapsedMs = performance.now() - readBegan;
+                }
+                const startBegan = config.preReadProbe ? performance.now() : null;
                 startAttempts++;
                 controls.push(window.__adapterModule.start(elements, config.toPx, config.durationMs));
                 acquiredCalls++;
+                if (config.preReadProbe) {
+                  const ended = performance.now();
+                  calls.push({ call: calls.length, preReadElapsedMs, transform,
+                    startElapsedMs: ended - startBegan, combinedElapsedMs: ended - callBegan });
+                }
               }
               return performance.now() - began;
             }
@@ -241,23 +288,25 @@ try {
               for (const elements of groups) for (const element of elements) { element.remove(); removedTargets++; }
             }
             for (let index = -1; index < config.warmSamples; index++) {
+              const wholeBegan = config.preReadProbe ? performance.now() : null;
               const groups = Array.from({ length: config.warmCalls }, () => Array.from({ length: config.targetsPerCall }, () => {
                 const element = document.createElement('div'); element.className = 'box'; document.body.appendChild(element); return element;
               }));
-              const controls = [];
+              const controls = [], calls = [];
               let batchElapsedMs;
-              try { batchElapsedMs = startupDiagnosticStart(groups, controls); }
+              try { batchElapsedMs = startupDiagnosticStart(groups, controls, calls); }
               catch (error) { errors.push({ phase: 'start', error: String(error?.stack ?? error) }); }
               finally { startupDiagnosticCancel(controls); startupDiagnosticCleanup(groups); }
               await Promise.resolve();
               await new Promise(resolve => requestAnimationFrame(function startupDiagnosticDrain() { resolve(); }));
               documentEffects = document.getAnimations().length;
-              rows.push({ warmup: index === -1, batchElapsedMs, connectedDocumentEffects: documentEffects });
+              rows.push({ warmup: index === -1, batchElapsedMs, connectedDocumentEffects: documentEffects,
+                ...(config.preReadProbe ? { calls, wholeElapsedMs: performance.now() - wholeBegan } : {}) });
               if (errors.length) break;
             }
             return { rows, startAttempts, acquiredCalls, cancelReturnedCalls, removedTargets, connectedDocumentEffects: documentEffects, errors };
           };
-          const batch = await page.evaluate(`(${batchCall.toString()})(${JSON.stringify(START_SCENARIO_MANIFEST.s2)})\n//# sourceURL=motion-s2-wrapper.js`);
+          const batch = await page.evaluate(`(${batchCall.toString()})(${JSON.stringify({ ...START_SCENARIO_MANIFEST.s2, preReadProbe, preRead: condition === 'pre-read' })})\n//# sourceURL=motion-s2-wrapper.js`);
           batchEvidence = { startAttempts: batch.startAttempts, acquiredCalls: batch.acquiredCalls,
             cancelReturnedCalls: batch.cancelReturnedCalls, removedTargets: batch.removedTargets };
           stage = 's2-after-metrics';
@@ -280,6 +329,14 @@ try {
             batch.cancelReturnedCalls === offeredCalls && batch.removedTargets === offeredCalls * count && effects === 0 &&
             batch.rows.every(sample => sample.connectedDocumentEffects === 0 && Number.isFinite(sample.batchElapsedMs) && sample.batchElapsedMs >= 0) &&
             ['taskCpuMs', 'threadCpuMs', 'scriptCpuMs', 'styleCpuMs', 'layoutCpuMs'].every(key => Number.isFinite(row[key]) && row[key] >= 0);
+          if (preReadProbe) row.valid = row.valid && batch.rows.every(sample =>
+            Number.isFinite(sample.wholeElapsedMs) && sample.wholeElapsedMs >= sample.batchElapsedMs &&
+            sample.calls.length === START_SCENARIO_MANIFEST.s2.warmCalls && sample.calls.every((call, i) =>
+              call.call === i && Number.isFinite(call.startElapsedMs) && call.startElapsedMs >= 0 &&
+              Number.isFinite(call.combinedElapsedMs) && call.combinedElapsedMs >= call.startElapsedMs &&
+              (condition === 'pre-read' ? typeof call.transform === 'string' &&
+                Number.isFinite(call.preReadElapsedMs) && call.preReadElapsedMs >= 0 &&
+                call.combinedElapsedMs >= call.preReadElapsedMs : call.transform === null && call.preReadElapsedMs === null)));
           samples.push(row); appendFileSync(path.join(output, 'samples.jsonl'), JSON.stringify(row) + '\n');
           if (!row.valid) {
             stage = 's2-lifecycle-validation';
@@ -358,6 +415,8 @@ try {
     if (hashFileTree(path.join(directory, 'dist')).sha256 !== sourceIdentity[id].dist.sha256)
       throw new Error(`Measured dist changed: ${id}`);
   }
+  if (preReadProbe && hash(readFileSync(path.join(rootPath, 'src/motion/runtime.ts'))) !== metadata.preReadProbe.runtimeSha256)
+    throw new Error('Production runtime source changed during pre-read probe');
   if (diagnostic) {
     const result = s2Warm ? { interpretation: metadata.diagnostic.interpretation, scenario: startupScenario,
       observations: samples.length, offeredCalls: samples.reduce((sum, row) => sum + row.offeredCalls, 0),

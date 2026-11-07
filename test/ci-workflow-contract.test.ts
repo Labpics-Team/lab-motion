@@ -75,7 +75,7 @@ const gateCommand = 'set -euo pipefail\n'
   + '  [[ "$STARTUP_DIAGNOSTIC" != true && "$PROFILE_BASELINE" != true ]]\n'
   + 'fi\nif [[ "$EVENT_NAME" == workflow_dispatch ]]; then\n'
   + '  [[ "$STARTUP_DIAGNOSTIC" != true || "$PROFILE_BASELINE" != true ]]\n'
-  + '  [[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "$STARTUP_DIAGNOSTIC" == true && "$PROFILE_BASELINE" != true && "$PERFORMANCE_CONTRACT_ONLY" != true && "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ) ]]\n'
+  + '  [[ -z "$STARTUP_SCENARIO" || ( ( "$STARTUP_SCENARIO" == s2-warm || "$STARTUP_SCENARIO" == s2-pre-read ) && "$STARTUP_DIAGNOSTIC" == true && "$PROFILE_BASELINE" != true && "$PERFORMANCE_CONTRACT_ONLY" != true && "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ) ]]\n'
   + 'fi\n[[ "$VERIFY_RESULT" == success ]]\n'
   + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
   + '[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]\n'
@@ -424,7 +424,8 @@ function assertNativeGraph(files: Map<string, string>) {
     uses: './.github/workflows/profile-01.yml',
   });
   expect(ci.jobs.performance).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.performance_contract_only && (inputs.startup_diagnostic || inputs.profile_baseline)) && !(inputs.startup_diagnostic && inputs.profile_baseline) && (inputs.startup_scenario == '' || (inputs.startup_diagnostic && inputs.startup_scenario == 's2-warm')) }}",
+    needs: ['CI'],
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.performance_contract_only && (inputs.startup_diagnostic || inputs.profile_baseline)) && !(inputs.startup_diagnostic && inputs.profile_baseline) && (inputs.startup_scenario == '' || (inputs.startup_diagnostic && (inputs.startup_scenario == 's2-warm' || inputs.startup_scenario == 's2-pre-read'))) }}",
     uses: './.github/workflows/performance.yml',
     with: { baseline: '${{ inputs.performance_baseline }}', startup_diagnostic: '${{ inputs.startup_diagnostic }}', startup_scenario: '${{ inputs.startup_scenario }}', performance_contract_only: '${{ inputs.performance_contract_only }}' },
   });
@@ -444,12 +445,12 @@ function assertNativeGraph(files: Map<string, string>) {
   const { name: _baselineName, ...baselineValidation } = compare.steps![0]!;
   expect(baselineValidation).toEqual({
     shell: 'bash', env: { BASELINE: '${{ inputs.baseline }}', STARTUP_SCENARIO: '${{ inputs.startup_scenario }}' },
-    run: 'set -euo pipefail\n[[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]\n[[ "${{ inputs.startup_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]\n[[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "${{ inputs.startup_diagnostic }}" == true && "${{ inputs.performance_contract_only }}" != true ) ]]\n',
+    run: 'set -euo pipefail\n[[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]\n[[ "${{ inputs.startup_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]\n[[ -z "$STARTUP_SCENARIO" || ( ( "$STARTUP_SCENARIO" == s2-warm || "$STARTUP_SCENARIO" == s2-pre-read ) && "${{ inputs.startup_diagnostic }}" == true && "${{ inputs.performance_contract_only }}" != true ) ]]\n',
   });
   const checkouts = compare.steps!.filter(item => item.uses?.startsWith('actions/checkout@'));
   expect(checkouts.map(({ name: _name, uses, ...contract }) => ({ ...contract, uses: unpin(uses!) })))
     .toEqual([
-      { uses: 'actions/checkout@<sha>', with: { path: 'candidate', 'persist-credentials': false, 'fetch-depth': 0 } },
+      { uses: 'actions/checkout@<sha>', with: { path: 'candidate', ref: '${{ github.sha }}', 'persist-credentials': false, 'fetch-depth': 0 } },
       { uses: 'actions/checkout@<sha>', with: { path: 'baseline', ref: '${{ inputs.baseline }}', 'persist-credentials': false, 'fetch-depth': 0 } },
     ]);
   const setup = compare.steps!.filter(item => item.uses?.startsWith('actions/setup-node@'));
@@ -459,6 +460,18 @@ function assertNativeGraph(files: Map<string, string>) {
   const performanceRuns = compare.steps!.filter(item => item.run).slice(1);
   expect(performanceRuns.map(({ name: _name, ...contract }) => ({ ...contract, run: contract.run!.trim() })))
     .toEqual([
+      { if: "${{ inputs.startup_scenario == 's2-pre-read' }}", shell: 'bash', 'working-directory': 'candidate', env: { EXPECTED_HEAD: '${{ github.sha }}' }, run: [
+        "set -euo pipefail",
+        "test \"$(git rev-parse HEAD)\" = \"$EXPECTED_HEAD\"",
+        "git merge-base --is-ancestor 741755754fb189776d25832ecb01b99c8f577425 HEAD",
+        "git diff --exit-code 741755754fb189776d25832ecb01b99c8f577425 HEAD -- src bench/compare/entries",
+        "sha256sum --check --strict <<'PRODUCTION_PINS'",
+        "fce7beaf7fdbf5ee08fff61a80abf20926851a83520e20ed29cd36c6c8894d38  src/motion/runtime.ts",
+        "32757fe65d3a3bbbe55a293b314124df04478b6155dd84e8ea9aef238db2a9ae  bench/compare/entries/lab.entry.mjs",
+        "982ee2a8db956e275ca8664dd26b6e37acd5c21c242e728da611a51ea179cc91  bench/compare/entries/motion.entry.mjs",
+        "6ebf96c859f44b05fc824a64022855594d35c3e87d52fd4019b94e522e6531b0  bench/compare/entries/anime.entry.mjs",
+        "PRODUCTION_PINS",
+      ].join('\n') },
       { run: activatePnpm },
       { id: 'build', run: 'pnpm --dir baseline install --frozen-lockfile\npnpm --dir candidate install --frozen-lockfile\npnpm --dir baseline build\npnpm --dir candidate build' },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', run: 'mkdir -p "$RUNNER_TEMP/motion-performance"\nnode candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"' },
@@ -466,8 +479,54 @@ function assertNativeGraph(files: Map<string, string>) {
       { run: 'pnpm --dir candidate/bench/compare install --frozen-lockfile' },
       { run: 'pnpm --dir candidate/bench/compare exec playwright install --with-deps chromium' },
       { if: '${{ inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nmkdir -p "$RUNNER_TEMP/motion-performance"\nprintf \'mode=performance-contract-only\\n\' > "$RUNNER_TEMP/motion-performance/contract-only.txt"' },
-      { run: 'xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs' },
+      { if: "${{ inputs.startup_scenario != 's2-pre-read' }}", run: 'xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs' },
       { if: '${{ inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', 'working-directory': 'candidate', env: { BASELINE: '${{ inputs.baseline }}', MOTION_STARTUP_DIAGNOSTIC_SCENARIO: '${{ inputs.startup_scenario }}' }, run: 'set -euo pipefail\ngit diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries\nxvfb-run -a node bench/compare/transition-profile.mjs . "$RUNNER_TEMP/motion-performance/startup-diagnostic" startup-diagnostic' },
+      { if: "${{ inputs.startup_scenario == 's2-pre-read' }}", shell: 'bash', env: { RAW: '${{ runner.temp }}/motion-performance/startup-diagnostic' }, run: [
+        "set -euo pipefail",
+        "node --input-type=module - <<'JS'",
+        "import assert from 'node:assert/strict';",
+        "import { readFileSync, readdirSync } from 'node:fs';",
+        "const root = process.env.RAW;",
+        "const json = file => JSON.parse(readFileSync(root + '/' + file, 'utf8'));",
+        "const rows = readFileSync(root + '/samples.jsonl', 'utf8').trim().split('\\n').map(JSON.parse);",
+        "assert.equal(rows.length, 36);",
+        "assert.equal(new Set(rows.map(r => r.round + ':' + r.id + ':' + r.condition)).size, 36);",
+        "assert.deepEqual([...new Set(rows.map(r => r.id))].sort(), ['anime', 'lab', 'motion']);",
+        "assert.deepEqual([...new Set(rows.map(r => r.condition))].sort(), ['control', 'pre-read']);",
+        "for (const row of rows) {",
+        "  assert.equal(row.valid, true);",
+        "  assert.equal(row.rows.length, 8);",
+        "  assert.equal(row.rows.filter(b => b.warmup).length, 1);",
+        "  assert.equal(row.offeredCalls, 40);",
+        "  assert.equal(row.acquiredCalls, 40);",
+        "  assert.equal(row.cancelReturnedCalls, 40);",
+        "  assert.equal(row.removedTargets, 4000);",
+        "  for (const batch of row.rows) {",
+        "    assert.equal(batch.calls.length, 5);",
+        "    assert.equal(batch.connectedDocumentEffects, 0);",
+        "    assert.ok(Number.isFinite(batch.wholeElapsedMs) && batch.wholeElapsedMs >= batch.batchElapsedMs);",
+        "    for (const [index, call] of batch.calls.entries()) {",
+        "      assert.equal(call.call, index);",
+        "      assert.ok(Number.isFinite(call.startElapsedMs) && call.startElapsedMs >= 0);",
+        "      assert.ok(Number.isFinite(call.combinedElapsedMs) && call.combinedElapsedMs >= call.startElapsedMs);",
+        "      if (row.condition === 'pre-read') {",
+        "        assert.equal(typeof call.transform, 'string');",
+        "        assert.ok(Number.isFinite(call.preReadElapsedMs) && call.preReadElapsedMs >= 0);",
+        "        assert.ok(call.combinedElapsedMs >= call.preReadElapsedMs);",
+        "      } else {",
+        "        assert.equal(call.transform, null);",
+        "        assert.equal(call.preReadElapsedMs, null);",
+        "      }",
+        "    }",
+        "  }",
+        "}",
+        "for (const id of ['lab', 'motion', 'anime']) assert.equal(json(id + '-original-semantic.json').valid, true);",
+        "assert.equal(json('pre-read-pose-control.json').valid, true);",
+        "assert.equal(readdirSync(root).filter(f => f.endsWith('.cpuprofile')).length, 0);",
+        "assert.equal(json('metadata.json').preReadProbe.profiler, false);",
+        "console.log('PRE_READ_RAW_PASS observations=36 publicCalls=1440 profiles=0');",
+        "JS",
+      ].join('\n') },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/spring" spring-pair baseline\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline' },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline' },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', 'working-directory': 'candidate/bench/compare', run: 'xvfb-run -a node bench.mjs' },
@@ -848,6 +907,8 @@ describe('нативный граф CI', () => {
   it.each([
     { scenario: '', startup: 'false', contract: 'false', profile: 'false', baseline: '', passes: true },
     { scenario: '', startup: 'true', contract: 'false', profile: 'false', baseline: 'a'.repeat(40), passes: true },
+    { scenario: 's2-pre-read', startup: 'true', contract: 'false', profile: 'false', baseline: 'a'.repeat(40), passes: true },
+    { scenario: 's2-pre-read', startup: 'false', contract: 'false', profile: 'false', baseline: 'a'.repeat(40), passes: false },
     { scenario: 's2-warm', startup: 'true', contract: 'false', profile: 'false', baseline: 'a'.repeat(40), passes: true },
     { scenario: 's2-warm', startup: 'false', contract: 'false', profile: 'false', baseline: 'a'.repeat(40), passes: false },
     { scenario: 's2-warm', startup: 'true', contract: 'false', profile: 'false', baseline: '', passes: false },
@@ -872,6 +933,9 @@ describe('нативный граф CI', () => {
 
   it.each([
     { scenario: '', startup: false, contract: false, passes: true },
+    { scenario: 's2-pre-read', startup: true, contract: false, passes: true },
+    { scenario: 's2-pre-read', startup: false, contract: false, passes: false },
+    { scenario: 's2-pre-read', startup: true, contract: true, passes: false },
     { scenario: 's2-warm', startup: true, contract: false, passes: true },
     { scenario: 's2-warm', startup: false, contract: false, passes: false },
     { scenario: 's2-warm', startup: true, contract: true, passes: false },
@@ -890,16 +954,19 @@ describe('нативный граф CI', () => {
   });
 
   it.each([
-    { s5: false, contract: false, cli: true, measurements: true },
-    { s5: true, contract: false, cli: true, measurements: false },
-    { s5: false, contract: true, cli: true, measurements: false },
-  ])('actual route selection startup=$s5 contract=$contract', ({ s5, contract, cli, measurements }) => {
+    { s5: false, contract: false, scenario: '', cli: true, measurements: true },
+    { s5: true, contract: false, scenario: '', cli: true, measurements: false },
+    { s5: false, contract: true, scenario: '', cli: true, measurements: false },
+    { s5: true, contract: false, scenario: 's2-pre-read', cli: false, measurements: false },
+  ])('actual route selection startup=$s5 contract=$contract scenario=$scenario', ({ s5, contract, scenario, cli, measurements }) => {
     const workflow = parse(sources().get('performance.yml')!) as Workflow;
     const selected = (item: Step) => {
       if (item.if === undefined) return true;
       const expression = String(item.if).replace(/^\$\{\{\s*|\s*\}\}$/g, '')
         .replaceAll('inputs.startup_diagnostic', String(s5))
         .replaceAll('inputs.performance_contract_only', String(contract))
+        .replaceAll("inputs.startup_scenario == 's2-pre-read'", String(scenario === 's2-pre-read'))
+        .replaceAll("inputs.startup_scenario != 's2-pre-read'", String(scenario !== 's2-pre-read'))
         .replaceAll('!cancelled()', 'true').replaceAll("steps.build.outcome == 'success'", 'true');
       if (!/^[truefals\s!&|()]+$/.test(expression)) throw new Error(`Unsupported route expression: ${expression}`);
       return Function(`return (${expression})`)() as boolean;
@@ -909,7 +976,9 @@ describe('нативный граф CI', () => {
     for (const item of steps.filter(item => item.run?.match(/consumer-size\.mjs|easing-pair\.mjs|spring-pair baseline|full baseline|node bench\.mjs|size-gate\.mjs/))) {
       expect(selected(item)).toBe(measurements);
     }
-    expect(selected(steps.find(item => item.run?.includes('git diff --exit-code'))!)).toBe(s5);
+    expect(selected(steps.find(item => item.run?.includes('xvfb-run -a node bench/compare/transition-profile.mjs'))!)).toBe(s5);
+    expect(selected(steps.find(item => item.run?.includes('PRODUCTION_PINS'))!)).toBe(scenario === 's2-pre-read');
+    expect(selected(steps.find(item => item.run?.includes('PRE_READ_RAW_PASS'))!)).toBe(scenario === 's2-pre-read');
     const receipt = steps.findIndex(item => item.run?.includes('mode=performance-contract-only'));
     expect(selected(steps[receipt]!)).toBe(contract);
     expect(receipt).toBeLessThan(steps.findIndex(item => item.run?.includes('node --test candidate/bench/compare/transition-profile')));

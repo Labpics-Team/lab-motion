@@ -24,7 +24,7 @@ on:
         type: boolean
         default: false
       startup_scenario:
-        description: 'Сценарий startup diagnostic: пусто (default) или s2-warm'
+        description: 'Сценарий startup diagnostic: пусто (default) или s2-warm или s2-pre-read'
         type: string
         default: ''
 
@@ -43,7 +43,8 @@ env:
 
 jobs:
   performance:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.performance_contract_only && (inputs.startup_diagnostic || inputs.profile_baseline)) && !(inputs.startup_diagnostic && inputs.profile_baseline) && (inputs.startup_scenario == '' || (inputs.startup_diagnostic && inputs.startup_scenario == 's2-warm')) }}
+    needs: [CI]
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.performance_contract_only && (inputs.startup_diagnostic || inputs.profile_baseline)) && !(inputs.startup_diagnostic && inputs.profile_baseline) && (inputs.startup_scenario == '' || (inputs.startup_diagnostic && (inputs.startup_scenario == 's2-warm' || inputs.startup_scenario == 's2-pre-read'))) }}
     uses: ./.github/workflows/performance.yml
     with:
       baseline: ${{ inputs.performance_baseline }}
@@ -342,7 +343,7 @@ jobs:
           fi
           if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
             [[ "$STARTUP_DIAGNOSTIC" != true || "$PROFILE_BASELINE" != true ]]
-            [[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "$STARTUP_DIAGNOSTIC" == true && "$PROFILE_BASELINE" != true && "$PERFORMANCE_CONTRACT_ONLY" != true && "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ) ]]
+            [[ -z "$STARTUP_SCENARIO" || ( ( "$STARTUP_SCENARIO" == s2-warm || "$STARTUP_SCENARIO" == s2-pre-read ) && "$STARTUP_DIAGNOSTIC" == true && "$PROFILE_BASELINE" != true && "$PERFORMANCE_CONTRACT_ONLY" != true && "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ) ]]
           fi
           [[ "$VERIFY_RESULT" == success ]]
           [[ "$TESTS_RESULT" == success ]]

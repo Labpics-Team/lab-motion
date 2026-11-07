@@ -37,12 +37,13 @@ jobs:
           set -euo pipefail
           [[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]
           [[ "${{ inputs.startup_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]
-          [[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "${{ inputs.startup_diagnostic }}" == true && "${{ inputs.performance_contract_only }}" != true ) ]]
+          [[ -z "$STARTUP_SCENARIO" || ( ( "$STARTUP_SCENARIO" == s2-warm || "$STARTUP_SCENARIO" == s2-pre-read ) && "${{ inputs.startup_diagnostic }}" == true && "${{ inputs.performance_contract_only }}" != true ) ]]
 
       - name: Получить проверяемый источник
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           path: candidate
+          ref: ${{ github.sha }}
           persist-credentials: false
           fetch-depth: 0
 
@@ -54,6 +55,23 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Проверить production source paired probe
+        if: ${{ inputs.startup_scenario == 's2-pre-read' }}
+        shell: bash
+        working-directory: candidate
+        env:
+          EXPECTED_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git merge-base --is-ancestor 741755754fb189776d25832ecb01b99c8f577425 HEAD
+          git diff --exit-code 741755754fb189776d25832ecb01b99c8f577425 HEAD -- src bench/compare/entries
+          sha256sum --check --strict <<'PRODUCTION_PINS'
+          fce7beaf7fdbf5ee08fff61a80abf20926851a83520e20ed29cd36c6c8894d38  src/motion/runtime.ts
+          32757fe65d3a3bbbe55a293b314124df04478b6155dd84e8ea9aef238db2a9ae  bench/compare/entries/lab.entry.mjs
+          982ee2a8db956e275ca8664dd26b6e37acd5c21c242e728da611a51ea179cc91  bench/compare/entries/motion.entry.mjs
+          6ebf96c859f44b05fc824a64022855594d35c3e87d52fd4019b94e522e6531b0  bench/compare/entries/anime.entry.mjs
+          PRODUCTION_PINS
       - name: Настроить Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -97,6 +115,7 @@ jobs:
           printf 'mode=performance-contract-only\n' > "$RUNNER_TEMP/motion-performance/contract-only.txt"
 
       - name: Проверить контракты CLI в настоящем Chromium
+        if: ${{ inputs.startup_scenario != 's2-pre-read' }}
         run: xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs
 
       - name: Снять startup diagnostic без изменения product
@@ -111,6 +130,56 @@ jobs:
           BASELINE: ${{ inputs.baseline }}
           MOTION_STARTUP_DIAGNOSTIC_SCENARIO: ${{ inputs.startup_scenario }}
 
+      - name: Проверить paired pre-read evidence
+        if: ${{ inputs.startup_scenario == 's2-pre-read' }}
+        shell: bash
+        env:
+          RAW: ${{ runner.temp }}/motion-performance/startup-diagnostic
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync, readdirSync } from 'node:fs';
+          const root = process.env.RAW;
+          const json = file => JSON.parse(readFileSync(root + '/' + file, 'utf8'));
+          const rows = readFileSync(root + '/samples.jsonl', 'utf8').trim().split('\n').map(JSON.parse);
+          assert.equal(rows.length, 36);
+          assert.equal(new Set(rows.map(r => r.round + ':' + r.id + ':' + r.condition)).size, 36);
+          assert.deepEqual([...new Set(rows.map(r => r.id))].sort(), ['anime', 'lab', 'motion']);
+          assert.deepEqual([...new Set(rows.map(r => r.condition))].sort(), ['control', 'pre-read']);
+          for (const row of rows) {
+            assert.equal(row.valid, true);
+            assert.equal(row.rows.length, 8);
+            assert.equal(row.rows.filter(b => b.warmup).length, 1);
+            assert.equal(row.offeredCalls, 40);
+            assert.equal(row.acquiredCalls, 40);
+            assert.equal(row.cancelReturnedCalls, 40);
+            assert.equal(row.removedTargets, 4000);
+            for (const batch of row.rows) {
+              assert.equal(batch.calls.length, 5);
+              assert.equal(batch.connectedDocumentEffects, 0);
+              assert.ok(Number.isFinite(batch.wholeElapsedMs) && batch.wholeElapsedMs >= batch.batchElapsedMs);
+              for (const [index, call] of batch.calls.entries()) {
+                assert.equal(call.call, index);
+                assert.ok(Number.isFinite(call.startElapsedMs) && call.startElapsedMs >= 0);
+                assert.ok(Number.isFinite(call.combinedElapsedMs) && call.combinedElapsedMs >= call.startElapsedMs);
+                if (row.condition === 'pre-read') {
+                  assert.equal(typeof call.transform, 'string');
+                  assert.ok(Number.isFinite(call.preReadElapsedMs) && call.preReadElapsedMs >= 0);
+                  assert.ok(call.combinedElapsedMs >= call.preReadElapsedMs);
+                } else {
+                  assert.equal(call.transform, null);
+                  assert.equal(call.preReadElapsedMs, null);
+                }
+              }
+            }
+          }
+          for (const id of ['lab', 'motion', 'anime']) assert.equal(json(id + '-original-semantic.json').valid, true);
+          assert.equal(json('pre-read-pose-control.json').valid, true);
+          assert.equal(readdirSync(root).filter(f => f.endsWith('.cpuprofile')).length, 0);
+          assert.equal(json('metadata.json').preReadProbe.profiler, false);
+          console.log('PRE_READ_RAW_PASS observations=36 publicCalls=1440 profiles=0');
+          JS
       - name: Сравнить spring и JS-исполнение с baseline
         if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}
         shell: bash
