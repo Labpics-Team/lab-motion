@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export const VERSION = '149.0.7827.55';
 export const CONFIG = Object.freeze({
-  categories: 'cc,benchmark,disabled-by-default-devtools.timeline.frame,disabled-by-default-devtools.timeline,blink.console',
+  categories: 'cc,benchmark,disabled-by-default-devtools.timeline.frame,disabled-by-default-devtools.timeline,blink.console,devtools.timeline',
   transferMode: 'ReportEvents',
 });
 const FLAGS = ['--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
@@ -124,18 +124,114 @@ export function mutationControls(events) {
     crossOwner: { status: 'unavailable', reason: 'no-proven-A-B-export-owner-discriminator' } };
 }
 
-// Shared by real runProbe finalization and the CLI; native ownership is not a success condition.
+// Native occurrence association only: no page owner, bitmap or presentation proof.
+export function nativeIntervals(events) {
+  const reporterName = 'PipelineReporter', feedbackName = 'SwapEndToPresentationCompositorFrame';
+  const category = 'cc,benchmark,disabled-by-default-devtools.timeline.frame';
+  const safeInteger = value => Number.isSafeInteger(value) && value >= 0;
+  const safeTime = value => Number.isFinite(value) && value >= 0 && value <= Number.MAX_SAFE_INTEGER;
+  const issues = [], tracks = new Map(), tuples = new Set(), occurrences = [], seen = new Set();
+  const fail = (code, index) => issues.push({ code, index });
+  const keyFor = event => JSON.stringify([event.cat, event.pid, event.id2?.local, event.scope ?? '']);
+  // Discover scopes from native names, then validate every event on those local tracks before projection.
+  const localTracks = new Set();
+  events.forEach((event, index) => {
+    if (![reporterName, feedbackName].includes(event.name)) return;
+    if (!safeInteger(event.pid) || typeof event.id2?.local !== 'string') fail('invalid-native-scope', index);
+    else localTracks.add(JSON.stringify([event.pid, event.id2.local]));
+  });
+  events.forEach((event, index) => {
+    if (!localTracks.has(JSON.stringify([event.pid, event.id2?.local]))) return;
+    if (event.cat !== category || typeof event.name !== 'string' || !['b', 'e'].includes(event.ph)
+      || !safeInteger(event.pid) || !safeInteger(event.tid) || !safeTime(event.ts)
+      || !/^0x[0-9a-f]+$/i.test(event.id2?.local) || Object.keys(event.id2).length !== 1
+      || event.id !== undefined || event.scope !== undefined && typeof event.scope !== 'string') {
+      fail('invalid-consumed-field', index); return;
+    }
+    const key = keyFor(event);
+    const track = tracks.get(key) ?? { entries: [], lastTimestamp: -1 };
+    if (event.ts < track.lastTimestamp) fail('reversed-track-time', index);
+    track.lastTimestamp = event.ts;
+    const signature = JSON.stringify([key, event.name, event.ph, event.ts]);
+    if (seen.has(signature)) fail('duplicate-track-event', index);
+    seen.add(signature);
+    track.entries.push({ event, index }); tracks.set(key, track);
+  });
+  for (const [key, track] of tracks) {
+    const stack = []; let reporter = null;
+    // Retained stream order is authoritative, including equal timestamp ends. Never force name order.
+    for (const entry of track.entries) {
+      const { event, index } = entry;
+      if (event.ph === 'b') {
+        if (event.name === reporterName) {
+          if (reporter || stack.length) fail('overlapping-reporter', index);
+          const fields = event.args?.frame_reporter;
+          const tuple = [event.pid, fields?.frame_source, fields?.frame_sequence, fields?.layer_tree_host_id];
+          if (!tuple.every(safeInteger) || typeof fields?.has_missing_content !== 'boolean'
+            || !['STATE_PRESENTED_ALL', 'STATE_PRESENTED_PARTIAL', 'STATE_NO_UPDATE_DESIRED', 'STATE_DROPPED'].includes(fields?.state))
+            fail('invalid-reporter-fields', index);
+          const tupleKey = JSON.stringify(tuple);
+          if (tuples.has(tupleKey)) fail('colliding-reporter-tuple', index);
+          tuples.add(tupleKey);
+          reporter = { track: key, beginIndex: index, beginTimestamp: event.ts, tuple,
+            state: fields?.state, hasMissingContent: fields?.has_missing_content, feedback: [] };
+        } else if (!reporter) fail('orphan-track-begin', index);
+        if (event.name === feedbackName) {
+          if (!reporter || stack.at(-1)?.event.name !== 'SubmitCompositorFrameToPresentationCompositorFrame')
+            fail('wrong-feedback-parent', index);
+          if (reporter?.feedback.length || stack.some(item => item.event.name === feedbackName))
+            fail('duplicate-feedback', index);
+        }
+        stack.push(entry);
+      } else {
+        const begin = stack.at(-1);
+        if (!begin || begin.event.name !== event.name) { fail('wrong-top-end', index); continue; }
+        stack.pop();
+        if (event.name === feedbackName && reporter) {
+          if (event.ts <= begin.event.ts) fail('nonpositive-feedback-duration', index);
+          reporter.feedback.push({ beginIndex: begin.index, endIndex: index,
+            beginTimestamp: begin.event.ts, endTimestamp: event.ts });
+        }
+        if (event.name === reporterName && reporter) {
+          if (stack.length) fail('wrong-reporter-parent', index);
+          const eligible = reporter.state === 'STATE_PRESENTED_ALL' && reporter.hasMissingContent === false;
+          if (eligible && reporter.feedback.length !== 1) fail('missing-eligible-feedback', index);
+          if (reporter.state === 'STATE_NO_UPDATE_DESIRED' && reporter.feedback.length) fail('unexpected-no-update-feedback', index);
+          occurrences.push({ ...reporter, endIndex: index, endTimestamp: event.ts, eligible }); reporter = null;
+        }
+      }
+    }
+    if (stack.length || reporter) fail('open-track', track.entries.at(-1).index);
+  }
+  return { status: issues.length ? 'rejected' : 'accepted', consumedIdentityAccepted: issues.length === 0,
+    issues, occurrences, associations: issues.length ? [] : occurrences.filter(item => item.eligible),
+    presentationProof: 'unresolved', ownership: 'unresolved', nativeUUID: 'unproved' };
+}
+
+// Shared by real runProbe finalization and CLI. Boundary completion is not presentation proof.
 export function finalizeBoundary(report) {
   const events = report.trace?.fragments.flatMap(fragment => fragment.value ?? []) ?? [];
   report.transportStatus = report.trace?.status ?? 'incomplete';
   report.markers = Object.fromEntries(['A:start', 'A:end', 'B:start', 'B:end'].map(label => [label,
     events.filter(event => event.name === 'TimeStamp' && event.args?.data?.message === `${report.metadata.markerToken}:${label}`)]));
+  report.nativeIntervals = nativeIntervals(events);
+  if (report.transportStatus !== 'complete' || report.trace.completion?.dataLossOccurred !== false || report.errors.length) {
+    report.nativeIntervals.status = 'rejected';
+    report.nativeIntervals.consumedIdentityAccepted = false;
+    report.nativeIntervals.associations = [];
+    report.nativeIntervals.issues.push({ code: 'incomplete-native-transport', index: null });
+  }
+  const markerIdentityAccepted = Object.values(report.markers).flat().every(event =>
+    Number.isSafeInteger(event.pid) && event.pid >= 0 && Number.isSafeInteger(event.tid) && event.tid >= 0
+    && Number.isFinite(event.ts) && event.ts >= 0 && event.ts <= Number.MAX_SAFE_INTEGER);
   report.controls = {
     markerPairsObserved: typeof report.metadata.markerToken === 'string'
       && Object.values(report.markers).every(values => values.length === 1),
     animationsFinished: report.pages.length === 2 && ['A', 'B'].every(label =>
       report.pages.filter(page => page.label === label && page.status === 'complete' && page.playState === 'finished').length === 1),
-    numericIdentityAccepted: inventory(events).numericIdentityAccepted,
+    numericIdentityAccepted: report.nativeIntervals.consumedIdentityAccepted && markerIdentityAccepted,
+    payloadNumericIdentityAccepted: inventory(events).numericIdentityAccepted,
+    payloadFidelity: 'unsupported-parsed-CDP-values',
     producer: report.properties.reporters && report.properties.feedback ? 'records-observed-timing-and-ownership-unresolved' : 'unresolved',
     unrelatedNativeOwner: 'unresolved-no-A-B-owner-discriminator-established',
     missingNativeRecordsProveTypedOmission: false, rawFragments: 'parsed-CDP-values-not-original-wire-bytes',
