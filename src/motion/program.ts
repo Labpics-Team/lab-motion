@@ -131,8 +131,8 @@ export function sample(program: Program, time: number, value: number[], velocity
       else end = middle;
     }
   }
-  const segment = _segments[at]!;
-  const _elapsed = Math.max(0, time - segment._at), duration = segment._end - segment._at;
+  const segment = _segments[at]!, start = segment._at;
+  const _elapsed = Math.max(0, time - start), duration = segment._end - start;
   if (time >= segment._end) {
     for (let i = 0; i < segment._to.length; i++) { value[i] = segment._to[i]!; velocity[i] = 0; }
     return;
@@ -152,7 +152,7 @@ export function sample(program: Program, time: number, value: number[], velocity
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
   for (let i = 0; i < segment._from.length; i++) {
     const a = segment._from[i]!, distance = segment._to[i]! - a;
-    if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
+    if (_elapsed === 0) { value[i] = a; velocity[i] = time < start ? 0 : segment._velocity[i] ?? 0; }
     else if (segment._timing._spring && !segment._artifact) {
       value[i] = a + distance * basis._value + (segment._velocity[i] ?? 0) * basis._valueV0;
       velocity[i] = distance * basis._velocity + (segment._velocity[i] ?? 0) * basis._velocityV0;

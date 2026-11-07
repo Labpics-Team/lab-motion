@@ -21,20 +21,22 @@ function read(program: Program, time: number) {
 describe('поиск сегмента при произвольном времени', () => {
   it('первый интервал читает постоянное число начал и сохраняет initial velocity', () => {
     const { program, segments } = trajectory(4096);
-    let reads = 0;
-    for (const segment of segments) {
+    // Сначала velocity fixture, затем getters: spread не стирает наблюдение _at.
+    segments[0] = { ...segments[0]!, _velocity: [7] };
+    const reads: number[] = [];
+    for (const [index, segment] of segments.entries()) {
       const at = segment._at;
-      Object.defineProperty(segment, '_at', { get() { reads++; return at; } });
+      Object.defineProperty(segment, '_at', { get() { reads.push(index); return at; } });
     }
-    const first: Program = { ...program, _segments: [
-      { ...segments[0]!, _velocity: [7] }, ...segments.slice(1),
-    ] };
-    reads = 0;
-    expect(read(first, 0)).toEqual({ value: 0, velocity: 7 });
-    expect(reads).toBeLessThanOrEqual(2);
-    reads = 0;
-    expect(read(program, 5).value).toBe(0.5);
-    expect(reads).toBeLessThanOrEqual(2);
+    const guardReads = 1, selectedStartReads = 1;
+    for (const time of [0, 5, -1]) {
+      reads.length = 0;
+      const result = read(program, time);
+      expect(result.value).toBe(time === 5 ? 0.5 : 0);
+      if (time !== 5) expect(result.velocity).toBe(time < 0 ? 0 : 7);
+      expect(reads).toHaveLength(guardReads + selectedStartReads);
+      expect(reads).toEqual([1, 0]);
+    }
   });
 
   it('NaN не выбирает другой callback, а throwing easing сохраняет error и порядок', () => {
@@ -70,7 +72,8 @@ describe('поиск сегмента при произвольном време
     for (const index of [4094, 1, 2048, 0, 4095, 73]) {
       reads = 0;
       expect(read(program, index * 10 + 5).value).toBe(index + 0.5);
-      expect(reads).toBeLessThanOrEqual(Math.ceil(Math.log2(segments.length)) + 2);
+      const guardReads = 1, selectedStartReads = 1;
+      expect(reads).toBeLessThanOrEqual(Math.ceil(Math.log2(segments.length)) + guardReads + selectedStartReads);
     }
   });
 
