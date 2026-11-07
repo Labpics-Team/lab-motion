@@ -25,6 +25,7 @@ public readonly record struct MotionObservation(
 /// <summary>Экспериментальный канал координаты. Скорость — в единицах координаты в секунду.</summary>
 public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
 {
+    private const float ProgressEndpointAccuracy = .001f;
     private sealed record Operation(long Id, int Request, TaskCompletionSource<MotionResult> Completion);
     private sealed record Request(int Id, MotionOrigin Origin, long Operation = 0);
     private readonly DispatcherQueue dispatcher;
@@ -112,21 +113,27 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     /// <summary>Безразмерный канал 0…1; скорость задаётся в единицах progress в секунду.</summary>
     public static ScalarMotion CreateProgress(Compositor compositor, float initial = 0)
         // Размах 1000 квалифицирован для точности progress; интегратор остаётся системным.
-        => new(compositor, ScalarAxis.X, 0, 1, initial, 1000);
+        => new(compositor, ScalarAxis.X, 0, 1, initial, 1000, ProgressEndpointAccuracy);
 
-    public ScalarMotion(Compositor compositor, float minimum, float maximum, float initial = 0)
-        : this(compositor, ScalarAxis.X, minimum, maximum, initial, 1) { }
+    public ScalarMotion(Compositor compositor, float minimum, float maximum, float initial, float endpointAccuracy)
+        : this(compositor, ScalarAxis.X, minimum, maximum, initial, 1, endpointAccuracy) { }
 
-    public ScalarMotion(Compositor compositor, ScalarAxis axis, float minimum, float maximum, float initial = 0)
-        : this(compositor, axis, minimum, maximum, initial, 1) { }
+    public ScalarMotion(Compositor compositor, ScalarAxis axis, float minimum, float maximum, float initial, float endpointAccuracy)
+        : this(compositor, axis, minimum, maximum, initial, 1, endpointAccuracy) { }
 
-    private ScalarMotion(Compositor compositor, ScalarAxis axis, float minimum, float maximum, float initial, float coordinateScale)
+    private ScalarMotion(Compositor compositor, ScalarAxis axis, float minimum, float maximum, float initial,
+        float coordinateScale, float endpointAccuracy)
     {
         dispatcher = DispatcherQueue.GetForCurrentThread()
             ?? throw new InvalidOperationException("Нужен поток с DispatcherQueue.");
         if (!float.IsFinite(minimum) || !float.IsFinite(maximum) || minimum >= maximum)
             throw new ArgumentOutOfRangeException(nameof(minimum));
         if (axis is not (ScalarAxis.X or ScalarAxis.Y)) throw new ArgumentOutOfRangeException(nameof(axis));
+        var nativeAccuracy = endpointAccuracy * coordinateScale;
+        var nativeAccuracySquared = nativeAccuracy * nativeAccuracy;
+        if (!float.IsFinite(endpointAccuracy) || endpointAccuracy <= 0 ||
+            !float.IsFinite(nativeAccuracySquared) || nativeAccuracySquared <= 0)
+            throw new ArgumentOutOfRangeException(nameof(endpointAccuracy), "Точность должна быть конечной и положительной в координатах исполнителя.");
         this.axis = axis;
         this.minimum = minimum;
         this.maximum = maximum;
@@ -139,9 +146,17 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         settings.InsertScalar("Target", initial * coordinateScale);
         settings.InsertScalar("Stiffness", 1);
         settings.InsertScalar("Damping", 1);
-        // Diagnostic: leave a repeated outside-bounds Inertia to native boundary correction.
+        settings.InsertScalar("BoundaryAccuracySquared", nativeAccuracySquared);
+        // E = (x-target)^2 + v^2/k bounds squared remaining damped spring displacement.
+        // A boundary residual within the coordinate's admitted accuracy belongs to native
+        // bounded correction; reselecting the force there can prevent native Idle forever.
+        var displacement = $"(this.Target.Position.{axis} - settings.Target)";
+        var velocity = $"this.Target.PositionVelocityInPixelsPerSecond.{axis}";
         condition = compositor.CreateExpressionAnimation(
-            $"this.Target.Position.{axis} >= this.Target.MinPosition.{axis} && this.Target.Position.{axis} <= this.Target.MaxPosition.{axis}");
+            $"!(((this.Target.Position.{axis} < this.Target.MinPosition.{axis} && settings.Target == this.Target.MinPosition.{axis}) || " +
+            $"(this.Target.Position.{axis} > this.Target.MaxPosition.{axis} && settings.Target == this.Target.MaxPosition.{axis})) && " +
+            $"({displacement} * {displacement} + {velocity} * {velocity} / settings.Stiffness <= settings.BoundaryAccuracySquared))");
+        condition.SetReferenceParameter("settings", settings);
         force = compositor.CreateExpressionAnimation(
             $"-settings.Stiffness * (this.Target.Position.{axis} - settings.Target) - settings.Damping * this.Target.PositionVelocityInPixelsPerSecond.{axis}");
         force.SetReferenceParameter("settings", settings);

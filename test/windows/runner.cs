@@ -8,7 +8,7 @@ var results = new List<object>();
 var passed = true;
 foreach (var reaction in new[] { "observe", "retarget", "stop", "snap", "dispose", "throw" })
 {
-    using var motion = new ScalarMotion(new Compositor(), -1000, 1000);
+    using var motion = new ScalarMotion(new Compositor(), -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
     var tracker = InteractionTracker.LastCreated;
     var first = motion.AnimateTo(200, new Spring(350, 0));
     var request = tracker.LastRequest;

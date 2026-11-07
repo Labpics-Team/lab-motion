@@ -33,6 +33,7 @@ public sealed class InteractionViewport : Grid
 public sealed partial class InteractionProbe : Page
 {
     private const float ResponseMilliseconds = 350;
+    private const float EndpointAccuracyProgress = .001f;
     private readonly InteractionTrace trace = new();
     private readonly List<CompositionObject> resources = [];
     private readonly List<(RoutedEvent Event, PointerEventHandler Handler)> inputHandlers = [];
@@ -104,7 +105,8 @@ public sealed partial class InteractionProbe : Page
     {
         var viewport = ElementCompositionPreview.GetElementVisual(TouchStage);
         var compositor = viewport.Compositor;
-        motion = new ScalarMotion(compositor, ScalarAxis.Y, -2 * height, height, -height / 2);
+        motion = new ScalarMotion(compositor, ScalarAxis.Y, -2 * height, height, -height / 2,
+            endpointAccuracy: EndpointAccuracyProgress * height);
         motion.Observed += Observe;
         motion.SetTarget(-height / 2, new Spring(ResponseMilliseconds, 0));
 
@@ -123,6 +125,7 @@ public sealed partial class InteractionProbe : Page
         {
             axis = "y", coordinates = "native", direction, width, height, scale, unitsPerProgress = -height,
             minimum = -2 * height, maximum = height, initial = -height / 2, target,
+            endpointAccuracyProgress = EndpointAccuracyProgress,
             responseMilliseconds = ResponseMilliseconds, bounce = 0,
             consumer = "ScalarMotion", initialReleaseTarget = -height / 2,
             startedAtUtc = trace.StartedAtUtc, stopwatchFrequency = Stopwatch.Frequency,

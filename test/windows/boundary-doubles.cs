@@ -1,5 +1,11 @@
 using System.Numerics;
 
+internal static class BoundaryTestSettings
+{
+    // Accuracy in the fixture's coordinate units; these lifecycle doubles do not integrate motion.
+    internal const float EndpointAccuracy = .5f;
+}
+
 namespace Microsoft.UI.Input
 {
     public sealed class PointerPoint { }

@@ -18,7 +18,7 @@ internal static class PanTests
             Test($"raw-axis-{axis}", () =>
             {
                 var compositor = new Compositor();
-                using var motion = new ScalarMotion(compositor, axis, -640, 320, -160);
+                using var motion = new ScalarMotion(compositor, axis, -640, 320, initial: -160, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
                 var tracker = InteractionTracker.LastCreated;
                 Require(tracker.MinPosition == Coordinate(axis, -640)
                     && tracker.MaxPosition == Coordinate(axis, 320)
@@ -62,7 +62,7 @@ internal static class PanTests
 
         Test("initial-value-is-observed-not-invented", () =>
         {
-            using var motion = new ScalarMotion(new Compositor(), ScalarAxis.Y, -640, 320, -160);
+            using var motion = new ScalarMotion(new Compositor(), ScalarAxis.Y, -640, 320, initial: -160, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             var request = tracker.LastRequest;
             var observations = new List<MotionObservation>();
@@ -78,7 +78,7 @@ internal static class PanTests
         Test("input-continues-after-animation-interruption", () =>
         {
             var compositor = new Compositor();
-            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320);
+            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             motion.SetTarget(0, Smooth);
             using var pan = motion.AttachPan(new Visual(compositor));
@@ -106,7 +106,7 @@ internal static class PanTests
         Test("input-callback-does-not-complete-program-task", () =>
         {
             var compositor = new Compositor();
-            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320);
+            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             motion.SetTarget(0, Smooth);
             using var pan = motion.AttachPan(new Visual(compositor));
@@ -126,7 +126,7 @@ internal static class PanTests
         Test("target-intent-does-not-submit-playback", () =>
         {
             var compositor = new Compositor();
-            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320);
+            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             var first = motion.AnimateTo(-320, Smooth);
             var request = tracker.LastRequest;
@@ -143,7 +143,7 @@ internal static class PanTests
         Test("target-intent-during-input-keeps-native-release", () =>
         {
             var compositor = new Compositor();
-            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320);
+            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             motion.SetTarget(0, Smooth);
             using var pan = motion.AttachPan(new Visual(compositor));
@@ -166,7 +166,7 @@ internal static class PanTests
         Test("invalid-target-intent-preserves-current-operation", () =>
         {
             var compositor = new Compositor();
-            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320);
+            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             var current = motion.AnimateTo(-320, Smooth);
             var request = tracker.LastRequest;
@@ -186,7 +186,7 @@ internal static class PanTests
         Test("ignored-playback-retains-intent-and-input", () =>
         {
             var compositor = new Compositor();
-            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320);
+            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             motion.SetTarget(0, Smooth);
             using var pan = motion.AttachPan(new Visual(compositor));
@@ -215,7 +215,7 @@ internal static class PanTests
             {
                 Test($"{origin}-submission-{(ignored ? "ignored" : "observed")}", () =>
                 {
-                    using var motion = new ScalarMotion(new Compositor(), ScalarAxis.Y, -640, 320);
+                    using var motion = new ScalarMotion(new Compositor(), ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
                     var tracker = InteractionTracker.LastCreated;
                     var animation = motion.AnimateTo(-320, Smooth);
                     motion.InertiaStateEntered(tracker, new() { RequestId = tracker.LastRequest });
@@ -243,7 +243,7 @@ internal static class PanTests
 
         Test("stale-command-callbacks-preserve-successor", () =>
         {
-            using var motion = new ScalarMotion(new Compositor(), ScalarAxis.Y, -640, 320);
+            using var motion = new ScalarMotion(new Compositor(), ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             var previous = motion.AnimateTo(-320, Smooth);
             var stale = tracker.LastRequest;
@@ -272,7 +272,7 @@ internal static class PanTests
             Throws<InvalidOperationException>(() => progress.AttachPan(new Visual(compositor)));
             Require(progressTracker.InteractionSources.Count == 0,
                 "Progress принял raw ввод с несовместимыми единицами.");
-            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320);
+            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             Throws<InvalidOperationException>(() => motion.AttachPan(new Visual(compositor)));
             Require(tracker.InteractionSources.Count == 0, "Источник создан до явной настройки release intent.");
@@ -287,7 +287,7 @@ internal static class PanTests
         Test("pan-detach-preserves-state-and-program-control", () =>
         {
             var compositor = new Compositor();
-            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320);
+            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             motion.SetTarget(0, Smooth);
             var pan = motion.AttachPan(new Visual(compositor));
@@ -319,7 +319,7 @@ internal static class PanTests
         Test("pan-wrong-thread-has-no-effect", () =>
         {
             var compositor = new Compositor();
-            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320);
+            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             motion.SetTarget(0, Smooth);
             using var pan = motion.AttachPan(new Visual(compositor));
@@ -338,7 +338,7 @@ internal static class PanTests
         Test("channel-dispose-closes-pan-and-observations", () =>
         {
             var compositor = new Compositor();
-            var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320);
+            var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             motion.SetTarget(0, Smooth);
             var pan = motion.AttachPan(new Visual(compositor));

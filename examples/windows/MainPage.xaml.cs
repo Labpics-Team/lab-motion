@@ -15,6 +15,7 @@ public sealed partial class MainPage : Page
     // Два тестовых режима: критическое затухание и пружина с отскоком.
     private static readonly Spring Smooth = new(350, 0);
     private static readonly Spring Expressive = new(500, .3f);
+    private const double EndpointAccuracyPhysicalPixels = .5;
 
     public MainPage()
     {
@@ -61,7 +62,8 @@ public sealed partial class MainPage : Page
         sprite.Size = new System.Numerics.Vector2(32, 32);
         sprite.Brush = compositor.CreateColorBrush(((SolidColorBrush)Status.Foreground).Color);
         ElementCompositionPreview.SetElementChildVisual(Stage, sprite);
-        var motion = new ScalarMotion(compositor, -1000, 1000);
+        var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0,
+            endpointAccuracy: (float)(EndpointAccuracyPhysicalPixels / XamlRoot.RasterizationScale));
         motion.Observed += trace.Add;
         motion.BindOffsetX(sprite);
         return motion;
@@ -124,7 +126,7 @@ public sealed partial class MainPage : Page
         Require(reset ? entry.NativeVelocity == 0 : entry.NativeVelocity * direction > 0, "Не сохранена семантика native velocity.");
         Require(reset ? (after.Position - entry.Position) * direction <= 0 : (after.Position - entry.Position) * direction > 0,
             "Траектория не отличает сохранение скорости от сброса.");
-        Require(Math.Abs(motion.Position + 100 * direction) * XamlRoot.RasterizationScale <= .5,
+        Require(Math.Abs(motion.Position + 100 * direction) * XamlRoot.RasterizationScale <= EndpointAccuracyPhysicalPixels,
             "Native settling дальше половины физического пикселя от цели.");
     }
 
@@ -137,7 +139,7 @@ public sealed partial class MainPage : Page
         runs.Add(new { kind = "smooth-settle", spring, outcome, trace });
         Require(outcome.End == MotionEnd.Finished, "Пружина из покоя не завершилась.");
         Require(trace.Where(x => x.Phase == "value").All(x => x.Position <= 200), "Критическая пружина перескочила цель.");
-        Require(Math.Abs(motion.Position - 200) * XamlRoot.RasterizationScale <= .5,
+        Require(Math.Abs(motion.Position - 200) * XamlRoot.RasterizationScale <= EndpointAccuracyPhysicalPixels,
             "Native settling дальше половины физического пикселя от цели.");
     }
 

@@ -20,7 +20,7 @@ internal static class BindingTests
             Test($"projection-{property}", () =>
             {
                 var compositor = new Compositor();
-                using var motion = new ScalarMotion(compositor, -1000, 1000);
+                using var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
                 var tracker = InteractionTracker.LastCreated;
                 var visual = new Visual(compositor);
                 using var binding = motion.Bind(visual, property, -2, .75f);
@@ -40,8 +40,8 @@ internal static class BindingTests
         {
             var compositor = new Compositor();
             var visual = new Visual(compositor);
-            using var first = new ScalarMotion(compositor, -1000, 1000);
-            using var second = new ScalarMotion(compositor, -1000, 1000);
+            using var first = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
+            using var second = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             first.BindOffsetX(visual);
             var prior = visual.Animations["Offset.X"];
             second.BindOffsetX(visual);
@@ -58,8 +58,8 @@ internal static class BindingTests
         {
             var compositor = new Compositor();
             var visual = new Visual(compositor);
-            using var first = new ScalarMotion(compositor, -1000, 1000);
-            using var second = new ScalarMotion(compositor, -1000, 1000);
+            using var first = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
+            using var second = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var old = first.Bind(visual, ScalarProperty.Opacity);
             second.Bind(visual, ScalarProperty.Opacity, .5f);
             var successor = visual.Animations["Opacity"];
@@ -73,7 +73,7 @@ internal static class BindingTests
         {
             var compositor = new Compositor();
             var visual = new Visual(compositor);
-            using var motion = new ScalarMotion(compositor, -1000, 1000);
+            using var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var old = motion.Bind(visual, ScalarProperty.OffsetY);
             var oldExpression = visual.Animations["Offset.Y"].Source;
             var current = motion.Bind(visual, ScalarProperty.OffsetY, -1, 40);
@@ -91,8 +91,8 @@ internal static class BindingTests
             var compositor = new Compositor();
             var visual = new Visual(compositor);
             var otherVisual = new Visual(compositor);
-            using var first = new ScalarMotion(compositor, -1000, 1000);
-            using var second = new ScalarMotion(compositor, -1000, 1000);
+            using var first = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
+            using var second = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var x = first.BindOffsetX(visual);
             first.BindOffsetX(otherVisual);
             second.Bind(visual, ScalarProperty.OffsetY);
@@ -112,7 +112,7 @@ internal static class BindingTests
         {
             var compositor = new Compositor();
             var visual = new Visual(compositor);
-            using var motion = new ScalarMotion(compositor, -1000, 1000);
+            using var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             motion.Bind(visual, ScalarProperty.Opacity);
             var before = visual.Animations["Opacity"];
             var expressions = compositor.Expressions.Count;
@@ -133,8 +133,8 @@ internal static class BindingTests
             var compositor = new Compositor();
             var foreign = new Compositor();
             var visual = new Visual(compositor);
-            using var owner = new ScalarMotion(compositor, -1000, 1000);
-            using var contender = new ScalarMotion(foreign, -1000, 1000);
+            using var owner = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
+            using var contender = new ScalarMotion(foreign, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             owner.BindOffsetX(visual);
             var before = visual.Animations["Offset.X"];
             var expressions = foreign.Expressions.Count;
@@ -148,8 +148,8 @@ internal static class BindingTests
         {
             var compositor = new Compositor();
             var visual = new Visual(compositor);
-            using var first = new ScalarMotion(compositor, -1000, 1000);
-            using var second = new ScalarMotion(compositor, -1000, 1000);
+            using var first = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
+            using var second = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             first.BindOffsetX(visual);
             var before = visual.Animations["Offset.X"];
             visual.FailNextStart = true;
@@ -168,14 +168,14 @@ internal static class BindingTests
         {
             var compositor = new Compositor();
             var visual = new Visual(compositor);
-            using var motion = new ScalarMotion(compositor, -1000, 1000);
+            using var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var binding = motion.BindOffsetX(visual);
             var before = visual.Animations["Offset.X"];
             Task.Run(() =>
             {
                 Throws<InvalidOperationException>(() => binding.Dispose());
                 Throws<InvalidOperationException>(() => motion.Bind(visual, ScalarProperty.Opacity));
-                using var otherThread = new ScalarMotion(compositor, -1000, 1000);
+                using var otherThread = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
                 Throws<InvalidOperationException>(() => otherThread.BindOffsetX(visual));
             }).GetAwaiter().GetResult();
             Require(ReferenceEquals(visual.Animations["Offset.X"], before) && visual.StartAttempts == 1
@@ -189,7 +189,7 @@ internal static class BindingTests
         {
             var compositor = new Compositor();
             var visual = new Visual(compositor);
-            using var motion = new ScalarMotion(compositor, -1000, 1000);
+            using var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             motion.Dispose();
             var expressions = compositor.Expressions.Count;
             Throws<ObjectDisposedException>(() => motion.BindOffsetX(visual));
@@ -247,6 +247,19 @@ internal static class BindingTests
                 && tracker.Position.X == 500 && compositor.PropertySets.Count == 1
                 && compositor.PropertySets[0].Scalars["Target"] == target,
                 "Недопустимый progress изменил native tracker или его настройки.");
+        });
+
+        Test("coordinate-accuracy-invalid-input-no-native-effect", () =>
+        {
+            var compositor = new Compositor();
+            var previousTracker = InteractionTracker.LastCreated;
+            foreach (var accuracy in new[] { 0, -1, float.NaN, float.PositiveInfinity, float.Epsilon, float.MaxValue })
+            {
+                Throws<ArgumentOutOfRangeException>(() => new ScalarMotion(compositor, -1000, 1000, 0, accuracy));
+                Throws<ArgumentOutOfRangeException>(() => new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, 0, accuracy));
+            }
+            Require(ReferenceEquals(InteractionTracker.LastCreated, previousTracker) && compositor.PropertySets.Count == 0,
+                "Недопустимая точность создала native tracker или его настройки.");
         });
 
         return results;
