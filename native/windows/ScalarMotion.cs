@@ -168,13 +168,25 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         request = new(tracker.TryUpdatePosition(Coordinates(initial * coordinateScale)), MotionOrigin.Initial);
     }
 
-    /// <summary>Меняет намерение для текущей Inertia и следующего release, не посылая запрос запуска.</summary>
+    /// <summary>Меняет текущую Inertia и следующий release; не начинает движение из Idle или Interacting.</summary>
     public void SetTarget(float target, Spring parameters)
     {
         CheckAccess();
         var coefficients = ValidateTarget(target, parameters);
+        var continuation = phase == "inertia" &&
+            (request?.Origin is MotionOrigin.Animation or MotionOrigin.Input || request is null && interacting)
+                ? request ?? new Request(0, MotionOrigin.Input) : null;
         Finish(MotionEnd.Stopped, "target-changed");
         Configure(target, parameters, coefficients);
+        if (continuation is not null)
+        {
+            // Modifier conditions are sampled on Inertia entry. A new target must also
+            // replace a selected bounded correction, preserving native position/velocity.
+            var nativeRequest = tracker.TryUpdatePositionWithAdditionalVelocity(Vector3.Zero);
+            request = continuation with { Id = nativeRequest };
+            interacting = false;
+            Emit("requested", request);
+        }
     }
 
     /// <summary>Новая цель сохраняет текущую native-скорость; initialVelocity допустима из покоя.</summary>

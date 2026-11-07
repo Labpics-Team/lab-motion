@@ -123,7 +123,7 @@ internal static class PanTests
                 "После постороннего callback собственное завершение больше не принимается.");
         });
 
-        Test("target-intent-does-not-submit-playback", () =>
+        Test("target-intent-before-native-inertia-does-not-submit-playback", () =>
         {
             var compositor = new Compositor();
             using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
@@ -162,6 +162,73 @@ internal static class PanTests
                 && item.NativeVelocity == -240) && observations.All(item => item.Phase != "requested"),
                 "Намерение подменило естественное отпускание программным запуском.");
         });
+
+        Test("target-intent-during-inertia-keeps-logical-operation", () =>
+        {
+            var compositor = new Compositor();
+            using var motion = new ScalarMotion(compositor, -640, 320, 0, BoundaryTestSettings.EndpointAccuracy);
+            var tracker = InteractionTracker.LastCreated;
+            var first = motion.AnimateTo(0, Smooth, -240);
+            var previous = tracker.LastRequest;
+            motion.InertiaStateEntered(tracker, new() { RequestId = previous, PositionVelocityInPixelsPerSecond = new(-240, 0, 0) });
+            var observations = new List<MotionObservation>();
+            motion.Observed += observations.Add;
+            motion.SetTarget(160, Smooth);
+            var continuation = tracker.LastRequest;
+            Require(continuation != previous && tracker.LastAdditionalVelocity == Vector3.Zero,
+                "Изменение текущей Inertia не переоценило modifier либо добавило скорость.");
+            Require(first.IsCompletedSuccessfully && first.Result is { End: MotionEnd.Stopped, Reason: "target-changed" },
+                "Смена намерения сохранила обещание прежней Task.");
+            var count = observations.Count;
+            motion.IdleStateEntered(tracker, new() { RequestId = previous });
+            Require(observations.Count == count, "Старый native Idle завершил продолженное намерение.");
+            motion.InertiaStateEntered(tracker, new() { RequestId = continuation, PositionVelocityInPixelsPerSecond = new(-240, 0, 0) });
+            motion.IdleStateEntered(tracker, new() { RequestId = continuation });
+            Require(observations.All(item => item.Operation == first.Result.Operation && item.Origin == MotionOrigin.Animation)
+                && observations.Last().Phase == "idle" && observations.Last().NativeRequestId == continuation,
+                "Native continuation изменила логическое владение движения.");
+            Require(first.Result.End == MotionEnd.Stopped, "Idle продолжения превратил прежний результат в Finished.");
+        });
+
+        Test("target-intent-during-input-inertia-keeps-input-origin", () =>
+        {
+            var compositor = new Compositor();
+            using var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, 0, BoundaryTestSettings.EndpointAccuracy);
+            var tracker = InteractionTracker.LastCreated;
+            motion.SetTarget(0, Smooth);
+            using var pan = motion.AttachPan(new Visual(compositor));
+            motion.InteractingStateEntered(tracker, new());
+            motion.InertiaStateEntered(tracker, new() { RequestId = 0, PositionVelocityInPixelsPerSecond = new(0, -240, 0) });
+            var observations = new List<MotionObservation>();
+            motion.Observed += observations.Add;
+            motion.SetTarget(-320, Smooth);
+            var continuation = tracker.LastRequest;
+            var count = observations.Count;
+            motion.IdleStateEntered(tracker, new() { RequestId = 0 });
+            motion.ValuesChanged(tracker, new() { RequestId = 0, Position = Vector3.Zero });
+            Require(observations.Count == count, "Старые input callbacks перезаписали продолжение.");
+            motion.InertiaStateEntered(tracker, new() { RequestId = continuation, PositionVelocityInPixelsPerSecond = new(0, -240, 0) });
+            motion.IdleStateEntered(tracker, new() { RequestId = continuation });
+            Require(tracker.LastAdditionalVelocity == Vector3.Zero && observations.All(item => item.Origin == MotionOrigin.Input
+                    && item.Operation == 0 && item.NativeRequestId == continuation) && observations.Last().Phase == "idle",
+                "Продолжение release потеряло input origin, скорость или native Idle.");
+        });
+
+        foreach (var ending in new[] { "stop", "snap" })
+        {
+            Test($"target-intent-does-not-restart-pending-{ending}", () =>
+            {
+                var compositor = new Compositor();
+                using var motion = new ScalarMotion(compositor, -640, 320, 0, BoundaryTestSettings.EndpointAccuracy);
+                var tracker = InteractionTracker.LastCreated;
+                _ = motion.AnimateTo(160, Smooth);
+                motion.InertiaStateEntered(tracker, new() { RequestId = tracker.LastRequest });
+                if (ending == "stop") motion.Stop(); else motion.SnapTo(0);
+                var request = tracker.LastRequest;
+                motion.SetTarget(-160, Smooth);
+                Require(tracker.LastRequest == request, "SetTarget возобновил уже остановленное движение до его callback.");
+            });
+        }
 
         Test("invalid-target-intent-preserves-current-operation", () =>
         {

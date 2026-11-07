@@ -38,11 +38,11 @@ $unitResult = Get-Content -LiteralPath (Join-Path $output 'unit.json') -Raw | Co
 if (!$unitResult.passed -or $unitResult.results.Count -ne 6 -or @($unitResult.results | Where-Object { !$_.passed }).Count -ne 0) {
     throw 'Lifecycle-пробы не подтвердили все шесть сценариев.'
 }
-if ($unitResult.bindings.Count -ne 14 -or @($unitResult.bindings | Where-Object { !$_.Passed }).Count -ne 0) {
-    throw 'Проверки привязок и единиц прогресса не подтвердили все четырнадцать сценариев.'
+if ($unitResult.bindings.Count -ne 15 -or @($unitResult.bindings | Where-Object { !$_.Passed }).Count -ne 0) {
+    throw 'Проверки привязок и единиц прогресса не подтвердили все пятнадцать сценариев.'
 }
-if ($unitResult.pans.Count -ne 18 -or @($unitResult.pans | Where-Object { !$_.Passed }).Count -ne 0) {
-    throw 'Проверки канала ввода не подтвердили все восемнадцать сценариев.'
+if ($unitResult.pans.Count -ne 22 -or @($unitResult.pans | Where-Object { !$_.Passed }).Count -ne 0) {
+    throw 'Проверки канала ввода не подтвердили все двадцать два сценария.'
 }
 
 Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--artifacts-path', $buildOutput, '--output', $appOutput)
@@ -97,5 +97,5 @@ foreach ($run in $trace.runs) {
         throw "Сценарий $($run.kind) не наблюдал нативное движение."
     }
 }
-[ordered]@{ passed = $true; lifecycleScenarios = 6; bindingScenarios = 14; nativeScenarios = 11; scale = $trace.scale } |
+[ordered]@{ passed = $true; lifecycleScenarios = 6; bindingScenarios = 15; panScenarios = 22; nativeScenarios = 11; scale = $trace.scale } |
     ConvertTo-Json | Tee-Object -FilePath (Join-Path $output 'result.json')
