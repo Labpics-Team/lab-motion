@@ -647,7 +647,7 @@ export async function runSemanticStartCheck(page, scenario, calls) {
 
 // ─── сценарий S5: freeze-continuity (визуальный) ─────────────────────────────
 
-function colorLeftEdge(pngBuf, channel) {
+export function colorLeftEdge(pngBuf, channel) {
   // Полный скан: кадры скринкаста — целый вьюпорт (возможен и letterbox),
   // привязываться к конкретной строке нельзя. Ищем левейший пиксель канала.
   const img = requireBenchmark('pngjs').PNG.sync.read(pngBuf);
