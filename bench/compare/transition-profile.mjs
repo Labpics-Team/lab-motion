@@ -141,12 +141,12 @@ try {
       const profileFile = `${round}-${id}.cpuprofile`;
       let context, cdp, stage = 'context-acquire';
       let profiling = false, coverage, accepted = 0, completed = 0;
-      const errors = [];
+      const errors = [], failures = [];
       const recordFailure = (error, failureStage) => {
         errors.push(error);
-        appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify({
+        failures.push({
           round, count, id, stage: failureStage, ...(diagnostic ? { condition, offered: count, accepted, completed, coverage } : {}), error: String(error?.stack ?? error),
-        }) + '\n');
+        });
       };
       const stopProfile = async () => {
         const { profile } = await cdp.send('Profiler.stop');
@@ -248,6 +248,11 @@ try {
           catch (closeError) { recordFailure(closeError, 'context-close'); }
         }
       }
+      // Журнал не должен прерывать восстановление профайлера и закрытие контекста.
+      for (const failure of failures) {
+        try { appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify(failure) + '\n'); }
+        catch (writeError) { errors.push(writeError); }
+      }
       if (errors.length === 1) throw errors[0];
       if (errors.length > 1) throw new AggregateError(errors, 'Отказ наблюдения и очистки', { cause: errors[0] });
     }
@@ -274,13 +279,18 @@ try {
 } catch (error) {
   runError = error;
 } finally {
-  const errors = runError ? [runError] : [];
+  const errors = runError ? [runError] : [], failures = [];
   for (const [stage, close] of [['browser-close', () => browser.close()], ['origin-close', () => origin.close()]]) {
     try { await close(); }
     catch (error) {
       errors.push(error);
-      appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify({ stage, error: String(error?.stack ?? error) }) + '\n');
+      failures.push({ stage, error: String(error?.stack ?? error) });
     }
+  }
+  // Сначала пробуем всю очистку, затем сохраняем журнал и ошибки его записи.
+  for (const failure of failures) {
+    try { appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify(failure) + '\n'); }
+    catch (writeError) { errors.push(writeError); }
   }
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1) throw new AggregateError(errors, 'Отказ запуска и очистки', { cause: errors[0] });

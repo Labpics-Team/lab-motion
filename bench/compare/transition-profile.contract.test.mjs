@@ -49,13 +49,18 @@ export function start(elements) { const run = animate(elements); return { finish
 async function execute(directory, args, preload, runner = join(repository, 'bench/compare/transition-profile.mjs')) {
   const child = spawn(process.execPath, [...(preload ? ['--import', pathToFileURL(preload).href] : []),
     runner, ...args], { cwd: directory, stdio: ['ignore', 'pipe', 'pipe'] });
-  let stdout = '', stderr = '';
+  let stdout = '', stderr = '', timedOut = false;
   child.stdout.on('data', data => { stdout += data; });
   child.stderr.on('data', data => { stderr += data; });
   return await new Promise((accept, reject) => {
-    const timer = setTimeout(() => { child.kill(); reject(new Error(`Transition CLI timeout\n${stderr}`)); }, 180_000);
+    // Оставляем внешнему тесту запас для завершения CLI и получения всего stderr.
+    const timer = setTimeout(() => { timedOut = true; child.kill(); }, 170_000);
     child.once('error', error => { clearTimeout(timer); reject(error); });
-    child.once('close', code => { clearTimeout(timer); accept({ code, stdout, stderr }); });
+    child.once('close', code => {
+      clearTimeout(timer);
+      if (timedOut) reject(new Error(`Transition CLI timeout\n${stderr}`));
+      else accept({ code, stdout, stderr });
+    });
   });
 }
 
@@ -90,7 +95,7 @@ describe('transition-profile: реальный Chromium и изменяемые 
       }
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
-  for (const fault of ['ordering', 'label-missing', 'label-renamed', 'label-wrong-last', 'page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'adapter-start-response', 'partial-adapter-throw', 'completion-response', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
+  for (const fault of ['ordering', 'label-missing', 'label-renamed', 'label-wrong-last', 'page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'adapter-start-response', 'partial-adapter-throw', 'completion-response', 'journal-start-response', 'journal-start-and-stop', 'journal-browser-close', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-startup-boundary-'));
     try {
       const candidate = inputPackage(directory, 'candidate', 'success');
@@ -111,17 +116,35 @@ describe('transition-profile: реальный Chromium и изменяемые 
       // Обёртки вызывают настоящие границы браузера; отказывает только выбранный ответ.
       writeFileSync(preload, `import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
-import { appendFileSync, readFileSync } from 'node:fs';
+import fs, { appendFileSync, readFileSync } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
+import { Server } from 'node:http';
 const require = createRequire(${JSON.stringify(join(repository, 'bench/compare/package.json'))});
 const { chromium } = require('playwright');
 const fault = ${JSON.stringify(fault)}, receipt = ${JSON.stringify(receipt)};
-const record = event => appendFileSync(receipt, JSON.stringify({ event }) + '\\n');
+const append = appendFileSync;
+const record = event => append(receipt, JSON.stringify({ event }) + '\\n');
+if (fault.startsWith('journal-')) {
+  fs.appendFileSync = (file, ...args) => {
+    if (String(file).endsWith('failures.jsonl')) { record('journal-failed'); throw new Error('FAULT_JOURNAL_WRITE'); }
+    return append(file, ...args);
+  };
+  syncBuiltinESMExports();
+  const closeOrigin = Server.prototype.close;
+  Server.prototype.close = function(callback) {
+    return closeOrigin.call(this, error => { record('origin-closed'); callback(error); });
+  };
+}
 const witness = ['ordering', 'coverage'].includes(fault);
 const labelControl = witness || fault.startsWith('label-');
 const launch = chromium.launch.bind(chromium);
 let armed = true, observation = 0;
 chromium.launch = async (...args) => {
-  const browser = await launch(...args), newContext = browser.newContext.bind(browser);
+  const browser = await launch(...args), newContext = browser.newContext.bind(browser), closeBrowser = browser.close.bind(browser);
+  browser.close = async (...args) => {
+    await closeBrowser(...args); record('browser-closed');
+    if (['journal-browser-close', 'journal-start-and-stop'].includes(fault)) throw new Error('FAULT_BROWSER_CLOSE');
+  };
   browser.newContext = async (...args) => {
     const index = observation++;
     const conditions = JSON.parse(readFileSync(${JSON.stringify(join(output, 'metadata.json'))}, 'utf8')).orders.flat();
@@ -138,6 +161,7 @@ chromium.launch = async (...args) => {
         appendFileSync(receipt, JSON.stringify({ partial }) + '\\n');
       }
       await close(...args); record('context-closed');
+      if (!armed && fault === 'journal-start-and-stop') throw new Error('FAULT_CONTEXT_CLOSE');
       if (armed && ['context-close', 'setup-and-close'].includes(fault)) { armed = false; throw new Error('FAULT_CONTEXT_CLOSE'); }
     };
     context.newPage = async (...args) => {
@@ -208,11 +232,11 @@ chromium.launch = async (...args) => {
         if (method === 'Profiler.start') {
           if (witness) await observedPage.evaluate(() => window.__startupWitness.push('profiler-start-ack'));
           record('profiler-started');
-          if (armed && ['start-response', 'start-and-stop'].includes(fault)) { armed = false; throw new Error('FAULT_START_RESPONSE'); }
+          if (armed && ['start-response', 'start-and-stop', 'journal-start-response', 'journal-start-and-stop'].includes(fault)) { armed = false; throw new Error('FAULT_START_RESPONSE'); }
         }
         if (method === 'Profiler.stop') {
           record('profiler-stopped');
-          if (fault === 'start-and-stop') throw new Error('FAULT_STOP_RESPONSE');
+          if (['start-and-stop', 'journal-start-and-stop'].includes(fault)) throw new Error('FAULT_STOP_RESPONSE');
           if (fault === 'coverage') {
             // Данные профиля детерминированы; настоящие запуск, остановка и жизненный цикл выполняются.
             const metadata = JSON.parse(readFileSync(${JSON.stringify(join(output, 'metadata.json'))}, 'utf8'));
@@ -268,6 +292,27 @@ chromium.launch = async (...args) => {
           assert.equal(negative.samples, 4);
           assert.equal(negative.startupSamples, 0);
           assert.equal(negative.status, 'inconclusive-no-startup-samples');
+        }
+      } else if (fault.startsWith('journal-')) {
+        assert.notEqual(result.code, 0);
+        assert.ok(result.stderr.includes('FAULT_JOURNAL_WRITE'));
+        assert.ok(result.stderr.includes(fault.startsWith('journal-start-') ? 'FAULT_START_RESPONSE' : 'FAULT_BROWSER_CLOSE'));
+        assert.ok(events.includes('journal-failed'));
+        assert.ok(events.includes('browser-closed'));
+        assert.ok(events.includes('origin-closed'));
+        assert.ok(events.indexOf('browser-closed') < events.indexOf('origin-closed'));
+        if (fault.startsWith('journal-start-')) {
+          if (fault === 'journal-start-and-stop') {
+            for (const failure of ['FAULT_STOP_RESPONSE', 'FAULT_CONTEXT_CLOSE', 'FAULT_BROWSER_CLOSE']) assert.ok(result.stderr.includes(failure));
+          }
+          assert.ok(events.includes('profiler-started'));
+          assert.ok(events.includes('profiler-stopped'));
+          assert.ok(events.indexOf('profiler-stopped') < events.indexOf('context-closed', events.indexOf('profiler-started')));
+          assert.equal(existsSync(join(output, 'diagnostic.json')), false);
+        } else {
+          const rows = readFileSync(join(output, 'samples.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+          assert.equal(rows.length, 16);
+          assert.ok(rows.every(row => row.valid && row.accepted === 1000 && row.completed === 1000));
         }
       } else if (fault !== 'ordering') {
         assert.notEqual(result.code, 0);
