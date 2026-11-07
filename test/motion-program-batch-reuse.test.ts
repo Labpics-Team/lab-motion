@@ -73,7 +73,6 @@ it('keeps signed-zero origin snapshots distinct', () => {
 });
 
 it('executes spring, authored, string literal and general CSS channels on each target', () => {
-  const a = harness(), b = harness();
   for (const [props, clock, expected] of [
     [properties({ x: 100 }), timing(undefined), '100'],
     [properties({ x: [0, 100] }), timing(options), '100'],
@@ -81,6 +80,7 @@ it('executes spring, authored, string literal and general CSS channels on each t
     [properties({ width: '100px' }), timing(options), '100px'],
     [properties({ width: 100 }), timing(options), '100px'],
   ] as const) {
+    const a = harness(), b = harness();
     const drafts = a.runtime._draft([a.element, b.element], props, clock);
     const run = a.runtime._execute(drafts);
     try {
@@ -91,6 +91,7 @@ it('executes spring, authored, string literal and general CSS channels on each t
       }
     } finally { run.stop(); }
   }
+  const a = harness(), b = harness();
   expect(() => a.runtime._draft([a.element, b.element], properties({ x: '100' }), timing(options))).toThrow();
 });
 
@@ -179,4 +180,5 @@ for (const reduced of [false, true]) it(`authored Programs publish synchronous c
   expect(await run.finished).toEqual({ status: 'finished' });
   expect(a.effects.length + b.effects.length).toBe(0);
   expect(a.updates.size + a.renders.size).toBe(0);
+  expect(b.updates.size + b.renders.size).toBe(0);
 });
