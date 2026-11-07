@@ -783,7 +783,7 @@ export function validateServerArtifact(artifact) {
     invariant(Object.entries(OBSERVER_ABLATION).every(([key, value]) => isDeepStrictEqual(diagnostic[key], value)) &&
       isDeepStrictEqual(artifact.diagnostic, diagnostic), 'observer ablation plan изменён');
     invariant(diagnostic.sourceIds?.H0 === artifact.registration.harness['bench/profile/server-profile-runner.mjs']?.sha256 &&
-      diagnostic.sourceIds?.H1 === artifact.registration.harness['bench/profile/server-observer-ablation.mjs']?.sha256 &&
+      diagnostic.sourceIds?.H1 === artifact.registration.harness['bench/profile/server-profile-runner.mjs']?.sha256 &&
       diagnostic.adapterSha256 === artifact.registration.harness['adapter:baseline']?.sha256 &&
       diagnostic.baselineTarballSha256 === artifact.registration.packages.baseline.tarballSha256, 'observer arms не связаны с baseline/source');
     invariant(artifact.verdict === 'UNPROVEN' && artifact.failures.length > 0 &&

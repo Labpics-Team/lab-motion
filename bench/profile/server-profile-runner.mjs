@@ -34,6 +34,30 @@ const HARNESS_FILES = ['bench/profile/server-profile-registration.mjs', 'bench/p
 const ENTRIES = ['lab', ...SERVER_PROFILE.comparators];
 const PACKAGES = { motion: 'motion', gsap: 'gsap', anime: 'animejs', 'motion-mini': 'motion', 'anime-waapi': 'animejs' };
 
+// Три прохода сохраняют порядок DOM-чтений; leading читает только первую цель каждой группы.
+export function serverBrowserSnapshot(els, leading = false) {
+  let connectedTargets = 0, activeWaapi = 0;
+  if (!leading) {
+    els.forEach(element => { if (element.isConnected) connectedTargets++; });
+    activeWaapi = els.reduce((sum, element) => sum + element.getAnimations().length, 0);
+  }
+  let count = 0, first, previous, runs;
+  els.forEach(entry => {
+    const element = leading ? entry[0] : entry;
+    const value = new DOMMatrixReadOnly(getComputedStyle(element).transform).e;
+    if (count === 0) first = value;
+    else if (!runs && !Object.is(value, first)) runs = [[count, first]];
+    if (runs) {
+      if (Object.is(value, previous)) runs.at(-1)[0]++;
+      else runs.push([1, value]);
+    }
+    previous = value;
+    count++;
+  });
+  const transforms = runs ? { encoding: 'rle', count, runs } : { encoding: 'repeat', count, value: first };
+  return leading ? transforms : { connectedTargets, activeWaapi, transforms };
+}
+
 function preserveRawNumbers(value) {
   if (typeof value === 'number' && !Number.isFinite(value)) return { nonfinite: String(value) };
   if (Array.isArray(value)) return value.map(preserveRawNumbers);
@@ -499,7 +523,8 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
       };
       const expand = (values) => Array.isArray(values) ? values : values.encoding === 'repeat' ? Array(values.count).fill(values.value)
         : values.runs.flatMap(([length, value]) => Array(length).fill(value));
-      const snapshot = config.diagnosticObserver?.snapshotSource ? (0, eval)(`(${config.diagnosticObserver.snapshotSource})`) : (els) => ({ connectedTargets: els.filter((element) => element.isConnected).length,
+      const streamingSnapshot = (0, eval)(`(${config.snapshotSource})`);
+      const snapshot = config.diagnosticObserver?.arm !== 'H0' ? streamingSnapshot : (els) => ({ connectedTargets: els.filter((element) => element.isConnected).length,
         activeWaapi: els.reduce((sum, element) => sum + element.getAnimations().length, 0),
         transforms: compact(els.map((element) => new DOMMatrixReadOnly(getComputedStyle(element).transform).e)) });
       const cancellationWitness = async (els, cancelBegin) => {
@@ -565,7 +590,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
           const activeWaapi = targets.reduce((sum, element) => sum + element.getAnimations().length, 0);
           if (observationClocks) observationClocks.getAnimations = { beginMs: animationsBeginMs, endMs: performance.now() };
           const stylesBeginMs = observationClocks ? performance.now() : null;
-          const leadingPositions = compact(groups.map((elements) => new DOMMatrixReadOnly(getComputedStyle(elements[0]).transform).e));
+          const leadingPositions = streamingSnapshot(groups, true);
           if (observationClocks) observationClocks.leadingStylesCompact = { beginMs: stylesBeginMs, endMs: performance.now() };
           const startWitness = { connectedTargets, activeWaapi, leadingPositions,
             readClock: { beginMs: readBeginMs, endMs: performance.now() },
@@ -614,6 +639,7 @@ export async function measureServerBrowser(browser, origin, adapter, scene, work
         heapObservation: performance.memory ? { usedJSHeapSize: performance.memory.usedJSHeapSize, totalJSHeapSize: performance.memory.totalJSHeapSize } : null };
     }, { scene, workMultiplier, repetitions: SERVER_PROFILE.repetitions, durationMs: SERVER_PROFILE.durationMs, toPx: SERVER_PROFILE.toPx,
       batchCalls: SERVER_PROFILE.browserBatchCalls, cancellation: SERVER_PROFILE.browserCancellationWitness,
+      snapshotSource: serverBrowserSnapshot.toString(),
       ...(diagnosticObserver ? { diagnosticObserver } : {}) }), 'образец API браузера');
     if (observationTiming && result.diagnosticBindingFailure) {
       const envelope = result.diagnosticBindingFailure;
@@ -779,7 +805,7 @@ export async function runServerProfile({ baseline, candidate, browser: browserNa
       machine, engineClock: engineClock.metadata, provenance: prepared, packages, transitivePackages: Object.fromEntries(closure), harness,
       allocationScope: 'Наблюдаемые куча и GC; удержания проверяются отдельным процессом после измерения времени',
       ...(dependencies.observerAblation === true ? { diagnostic: { ...artifact.diagnostic,
-        sourceIds: { H0: harness['bench/profile/server-profile-runner.mjs'].sha256, H1: harness['bench/profile/server-observer-ablation.mjs'].sha256 },
+        sourceIds: { H0: harness['bench/profile/server-profile-runner.mjs'].sha256, H1: harness['bench/profile/server-profile-runner.mjs'].sha256 },
         adapterSha256: adapters.baseline.sha256, baselineTarballSha256: packages.baseline.tarballSha256 } } : {}) };
     verifyServerClockRegistration(registrationAttempt);
     verify(registrationAttempt);

@@ -3,9 +3,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { createContext, runInContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
-import { OBSERVER_ABLATION, observerSnapshotH1 } from '../bench/profile/server-observer-ablation.mjs';
+import { OBSERVER_ABLATION } from '../bench/profile/server-observer-ablation.mjs';
 import { observerAblationMeasure } from '../bench/profile/server-profile-diagnostic.mjs';
-import { createServerJournal, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
+import { createServerJournal, runServerProfileCalibration, serverBrowserSnapshot as observerSnapshotH1 } from '../bench/profile/server-profile-runner.mjs';
 import { SERVER_PROFILE, serverProfileDigest, serverProfileStringify } from '../bench/profile/server-profile-registration.mjs';
 import { parseServerJsonBytes, parseServerJournalBytes, serverArtifactDigest, validateServerJournal, serverStagePlan } from '../bench/profile/server-profile-contract.mjs';
 
@@ -89,7 +89,7 @@ describe('diagnostic-only three-pass observer', () => {
       expect(call[2]).toBe(context.adapters.baseline);
       expect(call[4]).toBe(1);
       expect(call[6].arm).toBe(call[5].participant === 'left' ? 'H0' : 'H1');
-      expect(call[6].snapshotSource).toBe(call[5].participant === 'right' ? observerSnapshotH1.toString() : undefined);
+      expect(call[6]).toEqual({ arm: call[5].participant === 'left' ? 'H0' : 'H1' });
     }
     expect(artifact.stages).toEqual(['observer-ablation']);
     for (const name of ['pilot', 'samplePlan', 'aa', 'positive', 'ab']) expect(artifact[name]).toBeUndefined();
@@ -130,6 +130,54 @@ describe('diagnostic-only three-pass observer', () => {
     expect(h0Begin).toBeGreaterThan(0); expect(h0End).toBeGreaterThan(h0Begin);
     const original = observe(h0, values), reduced = observe(observerSnapshotH1.toString(), values);
     expectPositiveEquivalence(original, reduced, values);
+  });
+
+  it.each([Array(32).fill(-0), Array(32).fill(NaN), Array.from({ length: 32 }, (_, index) => [0, -0, NaN, Infinity][index % 4])].map(values => [values] as const))(
+    'leading collector preserves all32 positions and exact read order for %j', values => {
+      const reads: string[] = [], failure = new Error('leading matrix failure');
+      const groups = values.map((value, index) => [{ index, value }, { index: -1, value: 999 }]);
+      const collect = (fault = -1) => runInContext(`(${observerSnapshotH1.toString()})(groups, true)`, createContext({ groups,
+        getComputedStyle(element: { index: number; value: number }) { reads.push(`style:${element.index}`); return { transform: element }; },
+        DOMMatrixReadOnly: class { e: number; constructor(element: { index: number; value: number }) {
+          reads.push(`matrix:${element.index}`); if (element.index === fault) throw failure; this.e = element.value;
+        } },
+      }));
+      const encoded = collect();
+      const expected = observe(h0, values).value.transforms;
+      expect(encoded).toEqual(expected);
+      expect(encoded.count).toBe(32);
+      expect(reads).toEqual(values.flatMap((_, index) => [`style:${index}`, `matrix:${index}`]));
+      reads.length = 0;
+      expect(() => collect(7)).toThrow(failure);
+      expect(reads).toEqual(values.slice(0, 8).flatMap((_, index) => [`style:${index}`, `matrix:${index}`]));
+    });
+
+  it('normal runner and both ablation arms acquire leading positions from the same owner', () => {
+    const snapshotBegin = runner.indexOf('      const streamingSnapshot ='), snapshotEnd = runner.indexOf('      const cancellationWitness', snapshotBegin);
+    const leadingBegin = runner.indexOf('          const leadingPositions ='), leadingEnd = runner.indexOf('\n', leadingBegin);
+    expect(snapshotBegin).toBeGreaterThan(0); expect(snapshotEnd).toBeGreaterThan(snapshotBegin);
+    expect(leadingBegin).toBeGreaterThan(0);
+    const values = Array.from({ length: 32 }, (_, index) => index % 3);
+    for (const arm of [undefined, 'H0', 'H1']) {
+      const reads: string[] = [], groups = values.map((value, index) => [{ value, index,
+        get isConnected() { reads.push(`connected:${index}`); return true; },
+        getAnimations() { reads.push(`animations:${index}`); return []; },
+      }]);
+      const context = createContext({ groups, config: { snapshotSource: observerSnapshotH1.toString(), ...(arm ? { diagnosticObserver: { arm } } : {}) },
+        getComputedStyle(element: { value: number; index: number }) { reads.push(`style:${element.index}`); return { transform: element }; },
+        DOMMatrixReadOnly: class { e: number; constructor(element: { value: number; index: number }) { reads.push(`matrix:${element.index}`); this.e = element.value; } },
+      });
+      const observed = runInContext(`(() => { ${runner.slice(compactBegin, compactEnd)} ${runner.slice(snapshotBegin, snapshotEnd)}
+        return snapshot(groups.flat()); })()`, context);
+      expect(observed).toEqual({ connectedTargets: 32, activeWaapi: 0, transforms: observe(h0, values).value.transforms });
+      expect(reads).toEqual([...values.map((_, index) => `connected:${index}`), ...values.map((_, index) => `animations:${index}`),
+        ...values.flatMap((_, index) => [`style:${index}`, `matrix:${index}`])]);
+      reads.length = 0;
+      const positions = runInContext(`(() => { ${runner.slice(compactBegin, compactEnd)} ${runner.slice(snapshotBegin, snapshotEnd)}
+        ${runner.slice(leadingBegin, leadingEnd)} return leadingPositions; })()`, context);
+      expect(positions).toEqual(observe(h0, values).value.transforms);
+      expect(reads).toEqual(values.flatMap((_, index) => [`style:${index}`, `matrix:${index}`]));
+    }
   });
 
   it('rejects unexpected observer failures through the positive equivalence oracle', () => {

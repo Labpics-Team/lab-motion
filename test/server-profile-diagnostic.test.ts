@@ -221,8 +221,7 @@ describe('настоящий диагностический CLI', () => {
           { stage: 'observer-ablation', run: 0, participant: 'right' },
         ]);
         expect(acquisition.calls[0].observer).toEqual({ arm: 'H0' });
-        expect(acquisition.calls[1].observer.arm).toBe('H1');
-        expect(acquisition.calls[1].observer.snapshotSource).toBe(acquisition.expectedSnapshotSource);
+        expect(acquisition.calls[1].observer).toEqual({ arm: 'H1' });
       } else {
         expect(index.plan).toBeUndefined();
         expect(index.tracesDisabled).toBeUndefined();

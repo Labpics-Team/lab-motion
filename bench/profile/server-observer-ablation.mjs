@@ -15,22 +15,3 @@ export const OBSERVER_ABLATION = Object.freeze({
   estimand: 'Парное среднее cancelMs в свежем контексте исполнения по всем 8 повторам после 1 прогрева; наблюдатель после отмены может влиять только на последующую кучу/состояние',
   retry: false, tracing: false,
 });
-export function observerSnapshotH1(els) {
-  let connectedTargets = 0;
-  els.forEach(element => { if (element.isConnected) connectedTargets++; });
-  const activeWaapi = els.reduce((sum, element) => sum + element.getAnimations().length, 0);
-  let count = 0, first, previous, runs;
-  els.forEach(element => {
-    const value = new DOMMatrixReadOnly(getComputedStyle(element).transform).e;
-    if (count === 0) first = value;
-    else if (!runs && !Object.is(value, first)) runs = [[count, first]];
-    if (runs) {
-      if (Object.is(value, previous)) runs.at(-1)[0]++;
-      else runs.push([1, value]);
-    }
-    previous = value;
-    count++;
-  });
-  return { connectedTargets, activeWaapi,
-    transforms: runs ? { encoding: 'rle', count, runs } : { encoding: 'repeat', count, value: first } };
-}

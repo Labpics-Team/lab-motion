@@ -17,7 +17,7 @@ import { serverCalibrationVerdict, serverCellPairs, serverFamilyIntervals, serve
   serverResourceBinding, validateServerResourceIdentity, verifyServerClockBuildEvidence, verifyServerClockRegistration } from '../bench/profile/server-profile-contract.mjs';
 import { writeServerArtifact } from '../bench/profile/server-profile-artifact.mjs';
 import { compactStockMotionValueOutcomes, deriveRealmTimerStep, evaluateStartSemanticEvidence, validateStockMotionValueBatch } from '../bench/compare/methodology.mjs';
-import { measureServerBrowser, measureServerEngine, runServerProfile, runServerProfileCalibration } from '../bench/profile/server-profile-runner.mjs';
+import { measureServerBrowser, measureServerEngine, runServerProfile, runServerProfileCalibration, serverBrowserSnapshot } from '../bench/profile/server-profile-runner.mjs';
 import * as threadCpuClock from '../bench/profile/server-thread-cpu-clock.mjs';
 
 const hash = 'a'.repeat(64);
@@ -574,6 +574,15 @@ describe('deterministic checkpoint ACK integration', () => {
         expect(outcome.sample.raw).toHaveLength(SERVER_PROFILE.repetitions);
         expect(outcome.sample.warmup).toHaveLength(1);
         expect(outcome.sample.raw[0].cancelWitness.transformsBefore).toMatchObject({ encoding: 'repeat', count, value: 0 });
+        for (const row of [...outcome.sample.warmup, ...outcome.sample.raw]) {
+          expect(row.startWitness.leadingPositions).toMatchObject({ encoding: 'repeat', count: SERVER_PROFILE.browserBatchCalls, value: 0 });
+          expect(row.cancelWitness.connectedTargets).toBe(count);
+          expect(row.cancelWitness.frames).toHaveLength(SERVER_PROFILE.browserCancellationWitness.frames);
+          for (const frame of row.cancelWitness.frames) {
+            expect(frame.connectedTargets).toBe(count);
+            expect(frame.transforms).toEqual(row.cancelWitness.transformsBefore);
+          }
+        }
       } else {
         if (outcome.status !== 'rejected' || !(outcome.error instanceof AggregateError)) throw new Error('missing actual guard rejection');
         expect(outcome.error.errors).toHaveLength(1);
@@ -645,6 +654,9 @@ describe('deterministic checkpoint ACK integration', () => {
     try {
       const acquired = await checkpointSignal(fake.checkpoint.entered);
       const snapshot = structuredClone(acquired), before = fake.read();
+      expect(acquired.startWitness.connectedTargets).toBe(scene.targetsPerCall * SERVER_PROFILE.browserBatchCalls);
+      expect(acquired.startWitness.leadingPositions).toMatchObject({ encoding: 'repeat', count: SERVER_PROFILE.browserBatchCalls, value: 0 });
+      expect(before.starts - before.cancels).toBe(SERVER_PROFILE.browserBatchCalls);
       acquired.acquiredBatchStartMs = -1; // Хост должен хранить преобразованный снимок, сделанный до изменения.
       // Действие: передача квитанции отказывает после сохранения, до первой отмены.
       fake.checkpoint.reject(ackError);
@@ -732,6 +744,11 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
     expect(compactBegin).toBeGreaterThan(evaluationBegin);
     expect(compactEnd).toBeGreaterThan(compactBegin);
     const compactSource = source.slice(compactBegin, compactEnd);
+    const snapshotBegin = source.indexOf('      const streamingSnapshot =', compactEnd);
+    const snapshotEnd = source.indexOf('      const snapshot =', snapshotBegin);
+    expect(snapshotBegin).toBeGreaterThan(compactEnd);
+    expect(snapshotEnd).toBeGreaterThan(snapshotBegin);
+    const snapshotInitialization = source.slice(snapshotBegin, snapshotEnd);
     const run = (block: string, diagnostic = false) => {
       const events: string[] = [], identities: object[] = [];
       let index = 0;
@@ -743,11 +760,12 @@ describe('серверный PROFILE: clock/progress falsifiers', () => {
       }));
       const before = groups.flat();
       let clock = 0;
-      const realm = createContext({ groups, config: { diagnosticObserver: diagnostic ? { observationTiming: true } : undefined },
+      const realm = createContext({ groups, config: { snapshotSource: serverBrowserSnapshot.toString(),
+        diagnosticObserver: diagnostic ? { observationTiming: true } : undefined },
         performance: { now() { events.push('clock:' + clock); return ++clock; } },
         getComputedStyle(element: { id: number; groupIndex: number }) { events.push('transform:' + element.id); return { transform: transforms[element.groupIndex] }; },
         DOMMatrixReadOnly: class { e: number; constructor(transform: number) { this.e = transform; } } });
-      const result = runInContext('(() => {\n' + compactSource + block + '\nreturn { startWitness, targets }; })()', realm);
+      const result = runInContext('(() => {\n' + compactSource + snapshotInitialization + block + '\nreturn { startWitness, targets }; })()', realm);
       expect(result.targets).toHaveLength(identities.length);
       result.targets.forEach((element: object, i: number) => expect(element).toBe(identities[i]));
       groups.flat().forEach((element, i) => expect(element).toBe(before[i]));

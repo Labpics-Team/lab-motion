@@ -4,12 +4,10 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { measureServerBrowser, parseServerProfileArgs, runServerProfile, withServerProfileSignals } from './server-profile-runner.mjs';
-import { observerSnapshotH1 } from './server-observer-ablation.mjs';
 
 export function observerAblationMeasure(measure = measureServerBrowser) {
   return (browser, origin, adapter, scene, multiplier, observation) => measure(browser, origin, adapter, scene, multiplier, observation,
-    { arm: observation.participant === 'right' ? 'H1' : 'H0',
-      ...(observation.participant === 'right' ? { snapshotSource: observerSnapshotH1.toString() } : {}) });
+    { arm: observation.participant === 'right' ? 'H1' : 'H0' });
 }
 
 export async function boundedDiagnostic(promise, timeoutMs = 30_000) {

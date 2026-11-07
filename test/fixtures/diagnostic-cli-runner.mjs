@@ -2,7 +2,7 @@
 import { EventEmitter } from 'node:events';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { OBSERVER_ABLATION, observerSnapshotH1 } from './server-observer-ablation.mjs';
+import { OBSERVER_ABLATION } from './server-observer-ablation.mjs';
 export { parseServerProfileArgs, withServerProfileSignals } from '__REAL_RUNNER_URL__';
 
 const calls = [];
@@ -23,8 +23,7 @@ export async function runServerProfile(options, dependencies) {
   writeFileSync(path.join(options.out, 'server-profile.json'), raw);
   const receipt = { options, signal: dependencies.signal instanceof AbortSignal,
     observerAblation: dependencies.observerAblation === true,
-    baselineOnlyDiagnostic: dependencies.baselineOnlyDiagnostic === true,
-    expectedSnapshotSource: observerSnapshotH1.toString(), calls };
+    baselineOnlyDiagnostic: dependencies.baselineOnlyDiagnostic === true, calls };
   const publishReceipt = () => writeFileSync(path.join(options.out, 'acquisition.json'), JSON.stringify(receipt));
   if (fault === 'acquisition-error') {
     publishReceipt();
