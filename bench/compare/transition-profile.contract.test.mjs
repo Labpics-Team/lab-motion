@@ -46,9 +46,9 @@ export function start(elements) { const run = animate(elements); return { finish
   return root;
 }
 
-async function execute(directory, args, preload) {
+async function execute(directory, args, preload, runner = join(repository, 'bench/compare/transition-profile.mjs')) {
   const child = spawn(process.execPath, [...(preload ? ['--import', pathToFileURL(preload).href] : []),
-    join(repository, 'bench/compare/transition-profile.mjs'), ...args], { cwd: directory, stdio: ['ignore', 'pipe', 'pipe'] });
+    runner, ...args], { cwd: directory, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = '', stderr = '';
   child.stdout.on('data', data => { stdout += data; });
   child.stderr.on('data', data => { stderr += data; });
@@ -90,31 +90,46 @@ describe('transition-profile: реальный Chromium и изменяемые 
       }
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
-  for (const fault of ['ordering', 'page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
+  for (const fault of ['ordering', 'label-missing', 'label-renamed', 'label-wrong-last', 'page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-startup-boundary-'));
     try {
       const candidate = inputPackage(directory, 'candidate', 'success');
       const output = join(directory, 'output');
       const receipt = join(directory, 'boundary.jsonl');
       const preload = join(directory, 'boundary.mjs');
+      if (fault.startsWith('label-')) {
+        // Контрпримеры меняют исполняемую копию CLI, а не ожидаемый результат свидетеля.
+        const runner = join(candidate, 'bench/compare/transition-profile.mjs');
+        const source = readFileSync(runner, 'utf8');
+        const directive = '//# sourceURL=motion-startup-${id}.js';
+        assert.equal(source.split(directive).length, 2);
+        const replacement = fault === 'label-missing' ? '' : fault === 'label-renamed'
+          ? '//# sourceURL=renamed-${id}.js'
+          : directive + '\\n//# sourceURL=wrong-last.js';
+        writeFileSync(runner, source.replace(directive, replacement));
+      }
       // Обёртки вызывают настоящие границы браузера; отказывает только выбранный ответ.
       writeFileSync(preload, `import { createRequire } from 'node:module';
+import assert from 'node:assert/strict';
 import { appendFileSync, readFileSync } from 'node:fs';
 const require = createRequire(${JSON.stringify(join(repository, 'bench/compare/package.json'))});
 const { chromium } = require('playwright');
 const fault = ${JSON.stringify(fault)}, receipt = ${JSON.stringify(receipt)};
 const record = event => appendFileSync(receipt, JSON.stringify({ event }) + '\\n');
 const witness = ['ordering', 'coverage'].includes(fault);
+const labelControl = witness || fault.startsWith('label-');
 const launch = chromium.launch.bind(chromium);
 let armed = true, observation = 0;
 chromium.launch = async (...args) => {
   const browser = await launch(...args), newContext = browser.newContext.bind(browser);
   browser.newContext = async (...args) => {
     const index = observation++;
+    const conditions = JSON.parse(readFileSync(${JSON.stringify(join(output, 'metadata.json'))}, 'utf8')).orders.flat();
     const context = await newContext(...args), close = context.close.bind(context), newPage = context.newPage.bind(context), session = context.newCDPSession.bind(context);
-    let observedPage;
+    let observedPage, injections = 0;
     context.close = async (...args) => {
       if (witness) {
+        assert.equal(injections, 1);
         const events = await observedPage.evaluate(() => window.__startupWitness);
         appendFileSync(receipt, JSON.stringify({ index, events }) + '\\n');
       }
@@ -124,8 +139,14 @@ chromium.launch = async (...args) => {
     context.newPage = async (...args) => {
       const page = await newPage(...args), goto = page.goto.bind(page), addScriptTag = page.addScriptTag.bind(page);
       observedPage = page;
-      if (witness) page.addScriptTag = async (...args) => {
+      if (labelControl) page.addScriptTag = async (...args) => {
+        assert.equal(++injections, 1);
+        const id = conditions[index].split(':')[0];
+        // Проверяем последний эффективный URL в настоящем аргументе загрузки.
+        const directives = [...args[0].content.matchAll(/^[ \\t]*\\/\\/[#@][ \\t]*sourceURL[ \\t]*=[ \\t]*(\\S+)[ \\t]*$/gm)];
+        assert.equal(directives.at(-1)?.[1], 'motion-startup-' + id + '.js', 'SOURCE_URL_BOUNDARY');
         const result = await addScriptTag(...args);
+        if (!witness) return result;
         // Синхронный свидетель в том же realm: обёртка вызывает настоящий адаптер.
         await page.evaluate(() => {
           window.__startupWitness = [];
@@ -189,7 +210,8 @@ chromium.launch = async (...args) => {
   };
   return browser;
 };`);
-      const result = await execute(directory, [candidate, output, 'startup-diagnostic'], preload);
+      const result = await execute(directory, [candidate, output, 'startup-diagnostic'], preload,
+        fault.startsWith('label-') ? join(candidate, 'bench/compare/transition-profile.mjs') : undefined);
       const receipts = readFileSync(receipt, 'utf8').trim().split('\n').map(line => JSON.parse(line));
       const events = receipts.map(row => row.event);
       assert.ok(events.includes('context-closed'));
@@ -224,10 +246,11 @@ chromium.launch = async (...args) => {
         assert.notEqual(result.code, 0);
         assert.equal(existsSync(join(output, 'diagnostic.json')), false);
         const failures = readFileSync(join(output, 'failures.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
-        const expected = fault === 'setup-and-close' ? ['page-setup', 'context-close'] : fault === 'start-and-stop' ? ['profiler-start', 'profiler-stop-after-failure'] : [fault === 'start-response' ? 'profiler-start' : fault];
+        const expected = fault === 'setup-and-close' ? ['page-setup', 'context-close'] : fault === 'start-and-stop' ? ['profiler-start', 'profiler-stop-after-failure'] : [fault.startsWith('label-') ? 'page-setup' : fault === 'start-response' ? 'profiler-start' : fault];
         assert.deepEqual(failures.map(row => row.stage), expected);
         assert.ok(failures.every(row => row.round === 0 && row.count === 1000 && row.condition && row.offered === 1000));
         for (const row of failures) assert.ok(result.stderr.includes(row.error.split('\n')[0]));
+        if (fault.startsWith('label-')) assert.ok(result.stderr.includes('SOURCE_URL_BOUNDARY'));
         if (fault === 'context-close') {
           const rows = readFileSync(join(output, 'samples.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
           assert.ok(rows.at(-1).valid);
