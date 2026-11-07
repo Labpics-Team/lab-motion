@@ -647,7 +647,7 @@ export async function runSemanticStartCheck(page, scenario, calls) {
 
 // ─── сценарий S5: freeze-continuity (визуальный) ─────────────────────────────
 
-function colorLeftEdge(pngBuf, channel) {
+export function colorLeftEdge(pngBuf, channel) {
   // Полный скан: кадры скринкаста — целый вьюпорт (возможен и letterbox),
   // привязываться к конкретной строке нельзя. Ищем левейший пиксель канала.
   const img = requireBenchmark('pngjs').PNG.sync.read(pngBuf);
@@ -799,19 +799,183 @@ const FREEZE_DURATION_MS = S5_MOTION_CONTRACT.durationMs;
 const BLOCK_AT_MS = 300;
 const BLOCK_MS = 900;
 
-export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) {
+// Самодостаточная функция: исполняется в page realm и проверяется без браузера.
+export function installNativeCaptureDiagnostics(realm = globalThis) {
+  const prototype = realm.Element.prototype;
+  const original = prototype.animate;
+  const records = [];
+  const replay = realm.__s5ReplayObservation === true;
+  let visibilityChanges = 0;
+  const onVisibility = () => { visibilityChanges++; };
+  if (replay) realm.document.addEventListener('visibilitychange', onVisibility);
+  const now = () => realm.performance.now();
+  const snapshot = (animation) => {
+    const startTime = animation.startTime;
+    const defaultTimeline = animation.timeline !== null && animation.timeline === realm.document.timeline;
+    const complete = defaultTimeline && Number.isFinite(startTime);
+    return {
+      observedNowMs: now(), pending: animation.pending,
+      startTime, currentTime: animation.currentTime,
+      timeline: defaultTimeline ? 'default-document' : 'unsupported',
+      status: complete ? 'complete' : 'incomplete',
+      reason: complete ? null : defaultTimeline ? 'unresolved-start-time' : 'unsupported-timeline',
+      startEpochMs: complete ? realm.performance.timeOrigin + startTime : null,
+    };
+  };
+  prototype.animate = function (...args) {
+    if (this.id !== 'probe' && this.id !== 'capture-witness') {
+      return Reflect.apply(original, this, args);
+    }
+    const apiBeforeNowMs = now();
+    const animation = Reflect.apply(original, this, args);
+    const apiAfterNowMs = now();
+    records.push({ element: this.id, animation, apiBeforeNowMs, apiAfterNowMs, ready: null });
+    return animation;
+  };
+  let observed = false;
+  realm.__s5NativeCapture = {
+    observe() {
+      if (observed) return;
+      observed = true;
+      for (const record of records) {
+        record.afterStartup = snapshot(record.animation);
+        record.animation.ready.then(() => {
+          record.ready = { ...snapshot(record.animation), outcome: 'resolved' };
+          if (replay) {
+            // Observation costs CPU/host synchronization; not part of qualification.
+            const beforeNowMs = now();
+            try {
+              record.effect = { beforeNowMs,
+                keyframes: record.animation.effect.getKeyframes(),
+                timing: record.animation.effect.getTiming(), afterNowMs: now(),
+              };
+            } catch (error) {
+              record.effect = { beforeNowMs, afterNowMs: now(), error: String(error) };
+            }
+          }
+        }, (error) => {
+          record.ready = { ...snapshot(record.animation), outcome: 'rejected', error: String(error) };
+        });
+      }
+    },
+    readPose() {
+      // Post-event read, NOT a pose at the bitmap's presentation timestamp.
+      const beforeNowMs = now();
+      const beforeVisibilityChanges = visibilityChanges;
+      const visibilityBefore = realm.document.visibilityState;
+      const timingBefore = { ...realm.__benchTiming };
+      const before = records.map(({ element, animation }) => ({ element, ...snapshot(animation) }));
+      const poses = records.map(({ element }) => ({ element,
+        transform: realm.getComputedStyle(realm.document.getElementById(element)).transform,
+      }));
+      const after = records.map(({ element, animation }) => ({ element, ...snapshot(animation) }));
+      return { timeOriginMs: realm.performance.timeOrigin, beforeNowMs, afterNowMs: now(),
+        timelineCurrentTime: realm.document.timeline.currentTime,
+        beforeVisibilityChanges, afterVisibilityChanges: visibilityChanges,
+        visibilityBefore, visibilityAfter: realm.document.visibilityState,
+        timingBefore, timingAfter: { ...realm.__benchTiming }, before, after, poses,
+      };
+    },
+    finish() {
+      prototype.animate = original;
+      if (replay) realm.document.removeEventListener('visibilitychange', onVisibility);
+      return {
+        timeOriginMs: realm.performance.timeOrigin,
+        status: records.some((record) => record.element === 'probe')
+          && records.some((record) => record.element === 'capture-witness') ? 'recorded' : 'incomplete',
+        records: records.map(({ animation, ...record }) => ({
+          ...record, terminal: snapshot(animation),
+        })),
+      };
+    },
+  };
+}
+
+export function captureDiagnosticError(error) {
+  return {
+    name: error?.name ?? 'Error', message: String(error),
+    ...(error instanceof AggregateError ? { errors: Array.from(error.errors, captureDiagnosticError) } : {}),
+  };
+}
+
+export function assessReplayPose(frame, pose, startClock) {
+  const reasons = [];
+  const markerMs = startClock.cdpRuntimeTimestampMs;
+  const fromMs = pose.timeOriginMs + pose.beforeNowMs;
+  const toMs = pose.timeOriginMs + pose.afterNowMs;
+  if (!Number.isFinite(frame.ts) || !Number.isFinite(fromMs) || !Number.isFinite(toMs)
+    || fromMs > toMs || fromMs < frame.ts * 1000 || frame.ts * 1000 < markerMs) reasons.push('clock-boundary');
+  if (pose.visibilityBefore !== 'visible' || pose.visibilityAfter !== 'visible'
+    || pose.beforeVisibilityChanges !== 0 || pose.afterVisibilityChanges !== 0) reasons.push('visibility-boundary');
+  if (pose.before.length !== 2 || pose.after.length !== 2 || pose.poses.length !== 2
+    || !['probe', 'capture-witness'].every(element => pose.poses.some(p => p.element === element))) reasons.push('missing-paired-pose');
+  for (const before of pose.before) {
+    const after = pose.after.find(record => record.element === before.element);
+    if (!after || before.pending || after.pending || !Number.isFinite(before.startEpochMs)
+      || before.startEpochMs !== after.startEpochMs || before.startEpochMs > frame.ts * 1000
+      || before.currentTime !== after.currentTime || !Number.isFinite(before.currentTime)) reasons.push('native-start-or-frame-boundary');
+  }
+  const a = pose.timingBefore, b = pose.timingAfter;
+  if (a.startedAt !== b.startedAt || a.blockStartedAt !== b.blockStartedAt
+    || a.blockEndedAt !== b.blockEndedAt) reasons.push('block-or-start-boundary');
+  if (b.blockStartedAt !== null && b.blockStartedAt * 1000 <= toMs
+    && (b.blockEndedAt === null || b.blockEndedAt * 1000 >= frame.ts * 1000)) reasons.push('blocked-interval');
+  return { status: reasons.length ? 'unknown' : 'bounded-post-event-read', reasons: [...new Set(reasons)],
+    bitmapPoseEquality: 'unproven', presentationToReadMs: fromMs - frame.ts * 1000,
+    readDurationMs: toMs - fromMs, qualification: false };
+}
+
+export async function captureTrajectory(browser, adapterPath, blocked, pageUrl, diagnostic = undefined) {
   const { context, page } = await newPage(browser, adapterPath, pageUrl);
   const cdp = await context.newCDPSession(page);
   await cdp.send('Runtime.enable');
   const timerBefore = await measurePageTimerProbe(page, 'before');
   const frames = [];
+  const failures = [];
+  let nativeDiagnostic;
+  const replay = diagnostic?.replay === true;
+  const replayTimers = [];
+  const replayAcks = [];
+  let firstFrameResolve, selectedFrameResolve, finishedResolve, replayFailureReject;
+  const replayFailure = replay ? new Promise((_, reject) => { replayFailureReject = reject; }) : undefined;
+  if (replay) replayFailure.catch(() => {});
+  const failReplayEvent = (phase, error) => {
+    failures.push({ phase, error });
+    replayFailureReject(error);
+  };
+  const signal = (assign, label, timeoutMs) => {
+    const promise = new Promise((resolve, reject) => {
+      assign(resolve);
+      const timer = setTimeout(() => reject(new Error(`S5 replay ${label} timeout`)), timeoutMs);
+      replayTimers.push(timer);
+    });
+    // Every rejection is handled before triggering page/CDP actions.
+    promise.catch(() => {});
+    return promise;
+  };
+  const firstFrame = replay ? signal(resolve => { firstFrameResolve = resolve; }, 'baseline-frame', 2000) : undefined;
+  const selectedFrame = replay ? signal(resolve => { selectedFrameResolve = resolve; }, 'selected-frame', 6000) : undefined;
+  const replayFinished = replay ? signal(resolve => { finishedResolve = resolve; }, 'witness-finished', 6000) : undefined;
+  let replayMarkerMs, replayFrame, replayPose, replayAssessment, replayFrameCount = 0;
+  let replayFinishedRejected = false;
+  const replayConsole = event => {
+    if (event.args?.[0]?.value === 'lab-motion-s5-replay-finished') finishedResolve();
+    if (event.args?.[0]?.value === 'lab-motion-s5-replay-rejected') { replayFinishedRejected = true; finishedResolve(); }
+    if (event.args?.[0]?.value?.startsWith('lab-motion-start-')) replayMarkerMs = event.timestamp;
+  };
   let screencastActive = false;
   const stopScreencast = async () => {
     if (!screencastActive) return;
     screencastActive = false;
-    await cdp.send('Page.stopScreencast').catch(() => {});
+    if (diagnostic === undefined) await cdp.send('Page.stopScreencast').catch(() => {});
+    else await cdp.send('Page.stopScreencast');
   };
   try {
+    if (replay) {
+      cdp.on('Runtime.consoleAPICalled', replayConsole);
+      await page.evaluate(() => { window.__s5ReplayObservation = true; });
+    }
+    if (diagnostic !== undefined) await page.evaluate(installNativeCaptureDiagnostics);
     await page.evaluate(({ adapter, blocked }) => {
       const p = document.createElement('div');
       p.id = 'probe';
@@ -832,8 +996,30 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
     // и возвращает кадр уже ПОСЛЕ разблокировки — это давало бы wall-clock-прыжку
     // RAF-библиотек фальшивые 100% (проверено первым прогоном этого файла).
     cdp.on('Page.screencastFrame', (ev) => {
-      frames.push({ ts: ev.metadata.timestamp, data: ev.data });
-      cdp.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => {});
+      frames.push({ ts: ev.metadata.timestamp, data: ev.data,
+        ...(diagnostic === undefined ? {} : {
+          metadata: ev.metadata, sessionId: ev.sessionId, receivedHrtimeNs: process.hrtime.bigint().toString(),
+        }),
+      });
+      if (replay) {
+        const frame = { ...frames[frames.length - 1], frameIndex: replayFrameCount++ };
+        try {
+          if (Number.isFinite(frame.ts) && redLeftEdge(Buffer.from(frame.data, 'base64')) !== null) firstFrameResolve(frame);
+          // First exact event at/after 120ms; not a retry to reproduce historical round 3.
+          if (!replayFrame && Number.isFinite(replayMarkerMs) && frame.ts * 1000 >= replayMarkerMs + 120) {
+            replayFrame = frame;
+            selectedFrameResolve(frame);
+          }
+        } catch (error) {
+          // Bytes are already retained; deliver failure to the awaited capture boundary.
+          failReplayEvent('frame-decode', error);
+        } finally {
+          try {
+            replayAcks.push(cdp.send('Page.screencastFrameAck', { sessionId: ev.sessionId })
+              .catch(error => failReplayEvent('frame-ack', error)));
+          } catch (error) { failReplayEvent('frame-ack', error); }
+        }
+      } else cdp.send('Page.screencastFrameAck', { sessionId: ev.sessionId }).catch(() => {});
     });
     await cdp.send('Page.startScreencast', {
       format: 'png', everyNthFrame: 1, maxWidth: 800, maxHeight: 200,
@@ -841,12 +1027,13 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
     screencastActive = true;
     // CDP может не прислать новый кадр во время блокировки без visual damage.
     // Предстартовый пиксель даёт честную точку удержания, не синтезируя движение.
-    await waitForBaselineFrame(frames);
+    if (replay) await Promise.race([firstFrame, replayFailure]);
+    else await waitForBaselineFrame(frames);
 
     // Runtime marker и кадры имеют один CDP clock domain; page realm ограничивает
     // задержку marker→API. RTT Node↔page не входит в начало траектории.
     const startClock = await readCdpStartClock(page, cdp, ({ clockToken, config }) => {
-      const { px, duration, shouldBlock, blockAt, blockMs } = config;
+      const { px, duration, shouldBlock, blockAt, blockMs, diagnosticEnabled, replayEnabled } = config;
       const el = document.getElementById('probe');
       const epoch = () => (performance.timeOrigin + performance.now()) / 1000;
       const pageTimeOriginMs = performance.timeOrigin;
@@ -869,8 +1056,16 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
         while (performance.now() < end) { /* реальная блокировка main-thread */ }
         window.__benchTiming.blockEndedAt = epoch();
       }, blockAt);
+      // Только после обоих синхронных start и исходного планирования блока.
+      if (diagnosticEnabled) window.__s5NativeCapture.observe();
+      if (replayEnabled) window.__witness.finished.then(
+        () => console.debug('lab-motion-s5-replay-finished'),
+        () => console.debug('lab-motion-s5-replay-rejected'),
+      );
       return { pageTimeOriginMs, pageBeforeNowMs, pageApiNowMs };
     }, {
+      diagnosticEnabled: diagnostic !== undefined,
+      replayEnabled: replay,
       px: FREEZE_PX,
       duration: FREEZE_DURATION_MS,
       shouldBlock: blocked,
@@ -881,7 +1076,22 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
 
     // Ждём: анимация + блок + запас на lagSmoothing-подобное продление (GSAP
     // после лага доигрывает сдвинутый таймлайн; endpoint не заменяет S5-контракт).
-    await new Promise((r) => setTimeout(
+    if (replay) {
+      replayFrame = await Promise.race([selectedFrame, replayFailure]);
+      // This main-thread read may synchronize style and describes a LATER pose.
+      replayPose = await Promise.race([
+        page.evaluate(() => window.__s5NativeCapture.readPose()),
+        signal(() => {}, 'pose-read', 2000), replayFailure,
+      ]);
+      replayAssessment = assessReplayPose(replayFrame, replayPose, startClock);
+      replayPose.lastReceivedFrameIndex = replayFrameCount - 1;
+      if (replayPose.lastReceivedFrameIndex !== replayFrame.frameIndex) {
+        replayAssessment = { ...replayAssessment, status: 'unknown',
+          reasons: [...replayAssessment.reasons, 'screencast-frame-boundary'] };
+      }
+      await Promise.race([replayFinished, replayFailure]);
+      if (replayFinishedRejected) throw new Error('S5 replay witness finished rejected');
+    } else await new Promise((r) => setTimeout(
       r,
       FREEZE_DURATION_MS + (blocked ? BLOCK_MS : 0) + 700,
     ));
@@ -893,6 +1103,9 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
         timing: window.__benchTiming,
       };
     });
+    if (diagnostic !== undefined) {
+      nativeDiagnostic = await page.evaluate(() => window.__s5NativeCapture.finish());
+    }
     const clock = {
       startClock,
       timerEvidence: {
@@ -901,6 +1114,11 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
       },
     };
 
+    if (replay && nativeDiagnostic.records.some(record => record.ready?.status !== 'complete'
+      || !record.effect?.keyframes || !record.effect?.timing || record.effect.error)) {
+      replayAssessment = { ...replayAssessment, status: 'unknown',
+        reasons: [...replayAssessment.reasons, 'ready-effect-incomplete'] };
+    }
     const decoded = frames
       .map((f) => ({ t: f.ts - startedAt, x: redLeftEdge(Buffer.from(f.data, 'base64')) }))
       .filter((f) => Number.isFinite(f.t) && f.x !== null)
@@ -912,14 +1130,62 @@ export async function captureTrajectory(browser, adapterPath, blocked, pageUrl) 
     return {
       decoded,
       witness,
+      measurement: { target: 'png-threshold-v1', witness: 'png-threshold-v1' },
       clock,
       finalX: terminal.finalX,
       timing: terminal.timing,
       rawFrames: frames.length,
+      ...(diagnostic === undefined ? {} : { nativeDiagnostic }),
+      ...(replay ? { replay: { selectedFrame: { ...replayFrame, data: undefined }, pose: replayPose,
+        assessment: replayAssessment, qualification: false, observerEffect: 'style-and-host-reads-perturb' } } : {}),
     };
+  } catch (error) {
+    if (diagnostic === undefined) throw error;
+    if (!replay || !failures.some(failure => failure.error === error)) failures.push({ phase: 'capture', error });
   } finally {
-    await stopScreencast();
-    await context.close();
+    for (const timer of replayTimers) clearTimeout(timer);
+    if (replay) cdp.off('Runtime.consoleAPICalled', replayConsole);
+    if (diagnostic === undefined) {
+      try { await stopScreencast(); } finally { await context.close(); }
+    } else {
+      try { await stopScreencast(); } catch (error) { failures.push({ phase: 'stop', error }); }
+      if (nativeDiagnostic === undefined) {
+        try {
+          nativeDiagnostic = await page.evaluate(() => window.__s5NativeCapture?.finish() ?? {
+            status: 'incomplete', reason: 'instrumentation-not-installed', records: [],
+          });
+        } catch (error) {
+          failures.push({ phase: 'snapshot', error });
+          nativeDiagnostic = { status: 'incomplete', reason: 'snapshot-failed', error: captureDiagnosticError(error), records: [] };
+        }
+      }
+      if (replay) {
+        try { await context.close(); } catch (error) { failures.push({ phase: 'cleanup', error }); }
+        await Promise.all(replayAcks);
+        if (failures.length > 0) {
+          replayAssessment = { ...replayAssessment,
+            ...(replayAssessment ? { partialReadAssessment: { ...replayAssessment } } : {}),
+            status: 'unknown',
+            reasons: [...new Set([...(replayAssessment?.reasons ?? []),
+              ...failures.map(({ phase }) => `failure:${phase}`)])],
+            bitmapPoseEquality: 'unproven', qualification: false };
+        }
+      }
+      try {
+        await diagnostic.retain({ frames, nativeDiagnostic,
+          ...(replay ? { replay: { selectedFrame: replayFrame && { ...replayFrame, data: undefined },
+            pose: replayPose, assessment: replayAssessment ?? { status: 'unknown', reasons: ['incomplete-observation'], bitmapPoseEquality: 'unproven', qualification: false },
+            qualification: false, observerEffect: 'style-and-host-reads-perturb' } } : {}),
+          errors: failures.map(({ phase, error }) => ({ phase, error: captureDiagnosticError(error) })),
+        });
+      } catch (error) { failures.push({ phase: 'retain', error }); }
+      if (!replay) {
+        try { await context.close(); } catch (error) { failures.push({ phase: 'cleanup', error }); }
+      }
+      if (failures.length > 0) {
+        throw new AggregateError(failures.map(({ error }) => error), 'S5 capture or diagnostic teardown failed');
+      }
+    }
   }
 }
 
@@ -936,7 +1202,10 @@ async function runFreezePair(browser, adapterPath, blockedFirst, pageUrl) {
   if (Number.isFinite(windowStart) && Number.isFinite(windowEnd)) {
     for (let t = windowStart; t <= windowEnd; t += 0.1) grid.push(t);
   }
-  const evidence = createFreezeEvidence(blocked.decoded, baseline.decoded, grid);
+  const evidence = createFreezeEvidence(blocked.decoded, baseline.decoded, grid, {
+    baseline: baseline.measurement,
+    blocked: blocked.measurement,
+  });
   evidence.baselineWitness = baseline.witness;
   evidence.blockedWitness = blocked.witness;
   evidence.baselineClock = baseline.clock;

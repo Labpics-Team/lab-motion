@@ -182,7 +182,7 @@ export class Run implements Playback {
     engine?._operation(true);
     try {
       attemptAll(groups, group => group._control(
-        [...group._tracks.values()].filter(track => track._owner === this), action, time, this,
+        [...group._tracks.values()], action, time, this,
       ), failures);
     } finally { engine?._operation(false); }
     try { engine?._flush(); } catch (error) { failures.push(error); }
@@ -208,7 +208,7 @@ class Surface {
   private _written: string | undefined;
   private _token: Promise<Animation> | undefined;
   constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string) {
-    this._transforms = _key === 'transform' ? initialTransforms(_engine._host.styles(_element)) : {};
+    this._transforms = {};
     this._stamp = number(_engine._host.now(), 'clock');
   }
   _lock(busy: boolean): void {
@@ -422,10 +422,15 @@ class Surface {
     if (this._native || this._tracks.size === 0) return;
     try {
       this._render();
-      for (const track of [...this._tracks.values()]) {
-        if (moving(track) && this._ended(track)) this._end(track, true);
+      const tracks = this._tracks;
+      for (const track of tracks.values()) if (moving(track) && this._ended(track)) {
+        // Снимок нужен только перед callbacks завершения, не на каждом кадре.
+        for (const ending of [...tracks.values()]) {
+          if (moving(ending) && this._ended(ending)) this._end(ending, true);
+        }
+        break;
       }
-      for (const track of this._tracks.values()) if (moving(track)) return;
+      for (const track of tracks.values()) if (moving(track)) return;
       this._engine._idle(this);
     } catch (error) { this._fail(error); }
   }

@@ -15,6 +15,14 @@ on:
         description: 'Commit для парного сравнения полной стоимости движения'
         type: string
         default: ''
+      s5_capture_diagnostic:
+        description: 'Диагностика S5 с полными raw/PNG; обязателен performance_baseline (полный SHA)'
+        type: boolean
+        default: false
+      performance_contract_only:
+        description: 'Только контракты CLI в Chromium без парных измерений; обязателен performance_baseline (полный SHA)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -31,15 +39,17 @@ env:
 
 jobs:
   performance:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.profile_baseline && (inputs.s5_capture_diagnostic || inputs.performance_contract_only)) && !(inputs.s5_capture_diagnostic && inputs.performance_contract_only) }}
     uses: ./.github/workflows/performance.yml
     with:
       baseline: ${{ inputs.performance_baseline }}
+      s5_capture_diagnostic: ${{ inputs.s5_capture_diagnostic }}
+      performance_contract_only: ${{ inputs.performance_contract_only }}
 
   # Только явный baseline-запрос: обычный кандидат может менять runtime и
   # не обязан совпадать с зарегистрированным старым источником PROFILE-01.
   profile-baseline:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline && !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}
     uses: ./.github/workflows/profile-01.yml
 
   verify:
@@ -383,12 +393,22 @@ jobs:
           DOCS_RESULT: ${{ needs.documentation.result }}
           SECURITY_RESULT: ${{ needs.security.result }}
           WINDOWS_RESULT: ${{ needs.native-windows.result }}
+          EVENT_NAME: ${{ github.event_name }}
+          S5_CAPTURE_DIAGNOSTIC: ${{ inputs.s5_capture_diagnostic }}
+          PERFORMANCE_CONTRACT_ONLY: ${{ inputs.performance_contract_only }}
+          PROFILE_BASELINE: ${{ inputs.profile_baseline }}
+          PERFORMANCE_BASELINE: ${{ inputs.performance_baseline }}
         run: |
           set -euo pipefail
-          [[ "$VERIFY_RESULT" == success ]]
-          [[ "$TESTS_RESULT" == success ]]
-          [[ "$MUTATION_RESULT" == success ]]
-          [[ "$BROWSER_RESULT" == success ]]
-          [[ "$DOCS_RESULT" == success ]]
-          [[ "$SECURITY_RESULT" == success ]]
-          [[ "$WINDOWS_RESULT" == success ]]
+          if [[ "$EVENT_NAME" == workflow_dispatch && ( "$S5_CAPTURE_DIAGNOSTIC" == true || "$PERFORMANCE_CONTRACT_ONLY" == true ) ]]; then
+            [[ "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ]] || exit 1
+            [[ "$PROFILE_BASELINE" != true ]] || exit 1
+            [[ "$S5_CAPTURE_DIAGNOSTIC" != true || "$PERFORMANCE_CONTRACT_ONLY" != true ]] || exit 1
+          fi
+          [[ "$VERIFY_RESULT" == success ]] || exit 1
+          [[ "$TESTS_RESULT" == success ]] || exit 1
+          [[ "$MUTATION_RESULT" == success ]] || exit 1
+          [[ "$BROWSER_RESULT" == success ]] || exit 1
+          [[ "$DOCS_RESULT" == success ]] || exit 1
+          [[ "$SECURITY_RESULT" == success ]] || exit 1
+          [[ "$WINDOWS_RESULT" == success ]] || exit 1

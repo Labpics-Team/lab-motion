@@ -23,9 +23,11 @@ type BrowserShard = { browser: string; shard: number; shards: number };
 type Job = {
   name?: string;
   'runs-on'?: string;
+  'timeout-minutes'?: number;
   if?: string | boolean;
   needs?: string[];
   uses?: string;
+  with?: Record<string, unknown>;
   permissions?: Record<string, string>;
   defaults?: unknown;
   container?: { image: string; options: string };
@@ -91,10 +93,15 @@ const nativeFailureDiagnostics = [
   "} finally { Write-Output \"::${stopMarker}::\" }",
 ].join('\n');
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
-const gateCommand = 'set -euo pipefail\n[[ "$VERIFY_RESULT" == success ]]\n'
-  + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
-  + '[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]\n'
-  + '[[ "$SECURITY_RESULT" == success ]]\n[[ "$WINDOWS_RESULT" == success ]]';
+const gateCommand = 'set -euo pipefail\n'
+  + 'if [[ "$EVENT_NAME" == workflow_dispatch && ( "$S5_CAPTURE_DIAGNOSTIC" == true || "$PERFORMANCE_CONTRACT_ONLY" == true ) ]]; then\n'
+  + '  [[ "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ]] || exit 1\n'
+  + '  [[ "$PROFILE_BASELINE" != true ]] || exit 1\n'
+  + '  [[ "$S5_CAPTURE_DIAGNOSTIC" != true || "$PERFORMANCE_CONTRACT_ONLY" != true ]] || exit 1\n'
+  + 'fi\n[[ "$VERIFY_RESULT" == success ]] || exit 1\n'
+  + '[[ "$TESTS_RESULT" == success ]] || exit 1\n[[ "$MUTATION_RESULT" == success ]] || exit 1\n'
+  + '[[ "$BROWSER_RESULT" == success ]] || exit 1\n[[ "$DOCS_RESULT" == success ]] || exit 1\n'
+  + '[[ "$SECURITY_RESULT" == success ]] || exit 1\n[[ "$WINDOWS_RESULT" == success ]] || exit 1';
 const actionlintCommand = [
   'archive="$RUNNER_TEMP/actionlint.tar.gz"',
   'install_dir="$RUNNER_TEMP/actionlint"',
@@ -379,13 +386,27 @@ function assertNativeGraph(files: Map<string, string>) {
   expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
     .map(([name]) => name).sort()).toEqual(['ci.yml']);
   expect(files.has('ci-gate.yml')).toBe(false);
-  // Только release передаёт проверенный пакет между jobs. Обычная проверка
-  // сохраняет native capture локально и не зависит от хранилища архивов.
+  // Обычная проверка кандидата не выгружает архивы. Экспорт разрешён только
+  // защищённому release и явно запрошенному измерению производительности.
   for (const [name, workflow] of workflows) {
     if (name === 'release.yml') continue;
-    for (const job of Object.values(workflow.jobs)) {
-      for (const item of job.steps ?? []) {
-        expect(item.uses ?? '').not.toMatch(/^actions\/(upload-artifact|upload-pages-artifact)@/);
+    for (const [id, job] of Object.entries(workflow.jobs)) {
+      for (const [index, item] of (job.steps ?? []).entries()) {
+        if (name === 'performance.yml' && id === 'compare' && index === job.steps!.length - 1) {
+          const { name: _name, ...contract } = item;
+          expect({ ...contract, uses: unpin(item.uses ?? '') }).toEqual({
+            if: '${{ always() }}',
+            uses: 'actions/upload-artifact@<sha>',
+            with: {
+              name: 'motion-performance-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+              path: 'candidate/bench/compare/results/\n${{ runner.temp }}/motion-performance/\n',
+              'retention-days': 5,
+              'if-no-files-found': 'error',
+            },
+          });
+        } else {
+          expect(item.uses ?? '').not.toMatch(/^actions\/(upload-artifact|upload-pages-artifact)@/);
+        }
       }
     }
   }
@@ -401,32 +422,97 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(download.with?.['artifact-ids']).toBe('$' + '{{ needs.verify.outputs.artifact_id }}');
   const ci = workflows.get('ci.yml')!;
   const browser = workflows.get('browser.yml')!;
-  expect(ci.on).toEqual({
+  const ciEvents = structuredClone(ci.on);
+  // Descriptions are prose, not the dispatch interface under test.
+  const dispatch = ciEvents.workflow_dispatch as { inputs: Record<string, { description?: string }> };
+  for (const input of Object.values(dispatch.inputs)) delete input.description;
+  expect(ciEvents).toEqual({
     push: { branches: ['main'] }, pull_request: null, merge_group: null,
     workflow_dispatch: { inputs: { profile_baseline: {
-      description: 'Снять зарегистрированный размерный baseline PROFILE-01',
       type: 'boolean', default: false,
     }, performance_baseline: {
-      description: 'Commit для парного сравнения полной стоимости движения',
       type: 'string', default: '',
+    }, s5_capture_diagnostic: {
+      type: 'boolean', default: false,
+    }, performance_contract_only: {
+      type: 'boolean', default: false,
     } } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
   expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'native-windows', 'performance', 'profile-baseline', 'security', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}",
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline && !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}",
     uses: './.github/workflows/profile-01.yml',
   });
   expect(ci.jobs.performance).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' }}",
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.profile_baseline && (inputs.s5_capture_diagnostic || inputs.performance_contract_only)) && !(inputs.s5_capture_diagnostic && inputs.performance_contract_only) }}",
     uses: './.github/workflows/performance.yml',
-    with: { baseline: '${{ inputs.performance_baseline }}' },
+    with: { baseline: '${{ inputs.performance_baseline }}', s5_capture_diagnostic: '${{ inputs.s5_capture_diagnostic }}', performance_contract_only: '${{ inputs.performance_contract_only }}' },
   });
   const performance = workflows.get('performance.yml')!;
-  expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true } } } });
+  expect(performance.on).toEqual({ workflow_call: { inputs: {
+    baseline: { type: 'string', required: true }, s5_capture_diagnostic: { type: 'boolean', default: false },
+    performance_contract_only: { type: 'boolean', default: false },
+  } } });
   expect(performance.permissions).toEqual({ contents: 'read' });
-  expect(performance.jobs.compare!['runs-on']).toBe('ubuntu-latest');
-  expect(performance.jobs.compare!['continue-on-error']).toBeUndefined();
+  expect(performance.defaults).toBeUndefined();
+  expect(Object.keys(performance.jobs)).toEqual(['compare']);
+  const compare = performance.jobs.compare!;
+  expect(compare['runs-on']).toBe('ubuntu-latest');
+  expect(compare['timeout-minutes']).toBe(90);
+  expect(compare.strategy).toBeUndefined();
+  expect(compare['continue-on-error']).toBeUndefined();
+  expect(compare.if).toBeUndefined();
+  expect(compare.defaults).toBeUndefined();
+  expect(compare.permissions).toBeUndefined();
+  const { name: _baselineName, ...baselineValidation } = compare.steps![0]!;
+  expect(baselineValidation).toEqual({
+    shell: 'bash', env: { BASELINE: '${{ inputs.baseline }}' },
+    run: 'set -euo pipefail\n[[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]\n[[ "${{ inputs.s5_capture_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]\n',
+  });
+  const checkouts = compare.steps!.filter(item => item.uses?.startsWith('actions/checkout@'));
+  expect(checkouts.map(({ name: _name, uses, ...contract }) => ({ ...contract, uses: unpin(uses!) })))
+    .toEqual([
+      { uses: 'actions/checkout@<sha>', with: { path: 'candidate', 'persist-credentials': false, 'fetch-depth': 0 } },
+      { uses: 'actions/checkout@<sha>', with: { path: 'baseline', ref: '${{ inputs.baseline }}', 'persist-credentials': false, 'fetch-depth': 0 } },
+    ]);
+  const setup = compare.steps!.filter(item => item.uses?.startsWith('actions/setup-node@'));
+  expect(setup.map(({ name: _name, uses, ...contract }) => ({ ...contract, uses: unpin(uses!) })))
+    .toEqual([{ uses: 'actions/setup-node@<sha>', with: { 'node-version': '24.19.0' } }]);
+  for (const item of compare.steps!) expect(item['continue-on-error']).toBeUndefined();
+  const performanceRuns = compare.steps!.filter(item => item.run).slice(1);
+  expect(performanceRuns.map(({ name: _name, ...contract }) => ({ ...contract, run: contract.run!.trim() })))
+    .toEqual([
+      { if: '${{ inputs.s5_capture_diagnostic }}', 'working-directory': 'candidate', shell: 'bash',
+        env: { BASELINE: '${{ inputs.baseline }}' },
+        run: 'set -euo pipefail\ngit diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries' },
+      { run: activatePnpm },
+      { id: 'build', run: 'pnpm --dir baseline install --frozen-lockfile\npnpm --dir candidate install --frozen-lockfile\npnpm --dir baseline build\npnpm --dir candidate build' },
+      { if: '${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}', run: 'mkdir -p "$RUNNER_TEMP/motion-performance"\nnode candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"' },
+      { if: '${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}', run: 'node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"' },
+      { run: 'pnpm --dir candidate/bench/compare install --frozen-lockfile' },
+      { run: 'pnpm --dir candidate/bench/compare exec playwright install --with-deps chromium' },
+      { if: '${{ inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nmkdir -p "$RUNNER_TEMP/motion-performance"\nprintf \'mode=performance-contract-only\\n\' > "$RUNNER_TEMP/motion-performance/contract-only.txt"' },
+      { if: '${{ !inputs.s5_capture_diagnostic }}', run: 'xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs' },
+      { if: '${{ inputs.s5_capture_diagnostic }}', 'working-directory': 'candidate',
+        run: 'pnpm exec vitest run test/benchmark-cli-contract.test.ts test/ci-workflow-contract.test.ts' },
+      { if: '${{ inputs.s5_capture_diagnostic }}', 'working-directory': 'candidate', shell: 'bash',
+        env: { S5_CAPTURE_DIAGNOSTIC: '1', S5_CAPTURE_DIAGNOSTIC_DIR: '${{ runner.temp }}/motion-performance/s5-capture' },
+        run: 'set -euo pipefail\n[[ "$S5_CAPTURE_DIAGNOSTIC_DIR" = /* ]]\nmkdir -p "$RUNNER_TEMP/motion-performance"\nxvfb-run -a node bench/compare/conformance-smoke.mjs' },
+      { if: '${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/spring" spring-pair baseline\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline' },
+      { if: '${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline' },
+      { if: '${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}', 'working-directory': 'candidate/bench/compare', run: 'xvfb-run -a node bench.mjs' },
+      { if: "${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only && !cancelled() && steps.build.outcome == 'success' }}", shell: 'bash', run: [
+        'set -euo pipefail', 'mkdir -p "$RUNNER_TEMP/motion-performance"', 'motion_size_status=0',
+        'node baseline/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/baseline-size.txt" || motion_size_status=1',
+        'node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt" || motion_size_status=1',
+        'exit "$motion_size_status"',
+      ].join('\n') },
+    ]);
+  const performanceCallers = [...workflows].flatMap(([file, workflow]) =>
+    Object.entries(workflow.jobs).filter(([, job]) => job.uses === './.github/workflows/performance.yml')
+      .map(([id]) => [file, id]));
+  expect(performanceCallers).toEqual([['ci.yml', 'performance']]);
   expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
   expect(Object.keys(browser.jobs)).toEqual(['conformance']);
   for (const document of [ci, browser]) {
@@ -532,6 +618,11 @@ function assertNativeGraph(files: Map<string, string>) {
       DOCS_RESULT: '${{ needs.documentation.result }}',
       SECURITY_RESULT: '${{ needs.security.result }}',
       WINDOWS_RESULT: '${{ needs.native-windows.result }}',
+      EVENT_NAME: '${{ github.event_name }}',
+      S5_CAPTURE_DIAGNOSTIC: '${{ inputs.s5_capture_diagnostic }}',
+      PERFORMANCE_CONTRACT_ONLY: '${{ inputs.performance_contract_only }}',
+      PROFILE_BASELINE: '${{ inputs.profile_baseline }}',
+      PERFORMANCE_BASELINE: '${{ inputs.performance_baseline }}',
     },
     run: `${gateCommand}\n`,
   }]);
@@ -592,6 +683,60 @@ describe('нативный граф CI', () => {
     ['архив обычного CI', 'ci.yml', (w: Workflow) => {
       w.jobs.verify!.steps!.push({ name: 'Keep package', uses: 'actions/upload-artifact@0123456789012345678901234567890123456789', with: { path: 'node-floor-artifact' } });
     }],
+    ...['verify', 'tests', 'mutation', 'security'].map((id) => [`performance export в обычном CI/${id}`, 'ci.yml', (w: Workflow) => {
+      const performance = parse(sources().get('performance.yml')!) as Workflow;
+      w.jobs[id]!.steps!.push(performance.jobs.compare!.steps!.at(-1)!);
+    }] as const),
+    ['performance без ручного события', 'ci.yml', (w: Workflow) => { w.jobs.performance!.if = "${{ inputs.performance_baseline != '' }}"; }],
+    ['performance без явного baseline', 'ci.yml', (w: Workflow) => { w.jobs.performance!.if = "${{ github.event_name == 'workflow_dispatch' }}"; }],
+    ['performance с подменой baseline', 'ci.yml', (w: Workflow) => { w.jobs.performance = { ...w.jobs.performance, with: { baseline: 'main' } };  }],
+    ['performance обход caller через docs', 'docs.yml', (w: Workflow) => { w.jobs.export = { uses: './.github/workflows/performance.yml' }; }],
+    ['performance push trigger', 'performance.yml', (w: Workflow) => { w.on.push = null; }],
+    ['performance прямой dispatch', 'performance.yml', (w: Workflow) => { w.on.workflow_dispatch = null; }],
+    ['performance без обязательного input', 'performance.yml', (w: Workflow) => { w.on.workflow_call = { inputs: { baseline: { type: 'string', required: false } } }; }],
+    ['S5 не передан caller', 'ci.yml', (w: Workflow) => { delete w.jobs.performance!.with!.s5_capture_diagnostic; }],
+    ['S5 запускает PROFILE', 'ci.yml', (w: Workflow) => { w.jobs['profile-baseline']!.if = "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}"; }],
+    ['S5 обход product guard', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run?.includes('git diff --exit-code'))!.if = false; }],
+    ['S5 обход entries guard', 'performance.yml', (w: Workflow) => { const item = w.jobs.compare!.steps!.find(item => item.run?.includes('git diff --exit-code'))!; item.run = item.run!.replace('src bench/compare/entries', 'src'); }],
+    ['S5 запускает A/B', 'performance.yml', (w: Workflow) => { delete w.jobs.compare!.steps!.find(item => item.run?.includes('spring-pair baseline'))!.if; }],
+    ['S5 пропускает focused CLI', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run?.includes('pnpm exec vitest run test/benchmark-cli-contract'))!.if = false; }],
+    ['S5 скрывает capture failure', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run?.includes('node bench/compare/conformance-smoke'))!['continue-on-error'] = true; }],
+    ['S5 относительный raw path', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.env?.S5_CAPTURE_DIAGNOSTIC === '1')!.env!.S5_CAPTURE_DIAGNOSTIC_DIR = 'results/s5'; }],
+    ['performance дополнительная job', 'performance.yml', (w: Workflow) => { w.jobs.extra = { 'runs-on': 'ubuntu-latest' }; }],
+    ['performance расширяет timeout', 'performance.yml', (w: Workflow) => { w.jobs.compare!['timeout-minutes'] = 360; }],
+    ['performance дублирует измерение matrix', 'performance.yml', (w: Workflow) => { w.jobs.compare!.strategy = { 'fail-fast': false, matrix: { node: ['24', '24'] } }; }],
+    ['performance пропускает сравнительные assertions', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run === 'xvfb-run -a node bench.mjs')!.if = false; }],
+    ['performance скрывает отказ сравнительных assertions', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run === 'xvfb-run -a node bench.mjs')!.run += ' || true'; }],
+    ['performance скрывает отказ размера', 'performance.yml', (w: Workflow) => { const item = w.jobs.compare!.steps!.find(item => item.run?.includes('exit "$motion_size_status"'))!; item.run = item.run!.replace('exit "$motion_size_status"', 'exit 0'); }],
+    ['performance игнорирует failure', 'performance.yml', (w: Workflow) => { w.jobs.compare!['continue-on-error'] = true; }],
+    ['performance пропускает baseline validation', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.if = false; }],
+    ['performance ослабляет identity baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.run = 'true\n'; }],
+    ['performance подменяет input baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.env!.BASELINE = 'main'; }],
+    ['performance подменяет checkout baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![2]!.with!.ref = 'main'; }],
+    ['performance скрывает исходный failure', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!['continue-on-error'] = true; }],
+    ['performance подменяет Node', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.uses?.startsWith('actions/setup-node@'))!.with!['node-version'] = '24'; }],
+    ['performance пропускает setup Node', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.uses?.startsWith('actions/setup-node@'))!.if = false; }],
+    ['performance пропускает checkout', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![1]!.if = false; }],
+    ['performance export не последний', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.push({ run: 'true' }); }],
+    ['performance второй export', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.unshift(w.jobs.compare!.steps!.at(-1)!); }],
+    ...['if', 'uses', 'with', 'continue-on-error'].map((field) => [`performance export mutation ${field}`, 'performance.yml', (w: Workflow) => {
+      const item = w.jobs.compare!.steps!.at(-1)!;
+      if (field === 'if') item.if = '${{ success() }}';
+      else if (field === 'uses') item.uses = item.uses!.replace('upload-artifact', 'upload-pages-artifact');
+      else if (field === 'with') delete item.with;
+      else item['continue-on-error'] = true;
+    }] as const),
+    ...([
+      ['name', 'motion-performance-${{ github.sha }}'],
+      ['name', 'motion-performance-${{ github.run_id }}-${{ github.run_attempt }}'],
+      ['path', 'candidate/bench/compare/results/\n'],
+      ['path', '${{ runner.temp }}/motion-performance/\n'],
+      ['path', '**/*\n'],
+      ['retention-days', 30],
+      ['if-no-files-found', 'ignore'],
+    ] as const).map(([field, value]) => [`performance export option ${field}=${value}`, 'performance.yml', (w: Workflow) => {
+      w.jobs.compare!.steps!.at(-1)!.with![field] = value;
+    }] as const),
     ['раннее истечение release-пакета при ожидании approval', 'release.yml', (w: Workflow) => {
       step(w.jobs.verify!, 'Upload sealed package').with!['retention-days'] = 1;
     }],
@@ -761,7 +906,8 @@ describe('нативный граф CI', () => {
     const env: NodeJS.ProcessEnv = {
       ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
       MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
-      SECURITY_RESULT: 'success', WINDOWS_RESULT: 'success',
+      SECURITY_RESULT: 'success', WINDOWS_RESULT: 'success', EVENT_NAME: 'pull_request', S5_CAPTURE_DIAGNOSTIC: '',
+      PROFILE_BASELINE: '', PERFORMANCE_BASELINE: '', PERFORMANCE_CONTRACT_ONLY: '',
     };
     delete env[key];
     if (result !== undefined) env[key] = result;
@@ -770,6 +916,72 @@ describe('нативный граф CI', () => {
     });
     expect(actual.error).toBeUndefined();
     expect(actual.status === 0, `${key}=${result}: ${actual.stderr}`).toBe(result === 'success');
+  });
+
+  it.each([
+    { event: 'workflow_dispatch', s5: 'false', contract: 'true', profile: 'false', baseline: '', passes: false },
+    { event: 'workflow_dispatch', s5: 'false', contract: 'true', profile: 'false', baseline: 'main', passes: false },
+    { event: 'workflow_dispatch', s5: 'false', contract: 'true', profile: 'true', baseline: 'a'.repeat(40), passes: false },
+    { event: 'workflow_dispatch', s5: 'true', contract: 'true', profile: 'false', baseline: 'a'.repeat(40), passes: false },
+    { event: 'workflow_dispatch', s5: 'false', contract: 'true', profile: 'false', baseline: 'a'.repeat(40), passes: true },
+    { event: 'workflow_dispatch', s5: 'true', profile: 'false', baseline: '', passes: false },
+    { event: 'workflow_dispatch', s5: 'true', profile: 'false', baseline: 'main', passes: false },
+    { event: 'workflow_dispatch', s5: 'true', profile: 'false', baseline: 'a'.repeat(39), passes: false },
+    { event: 'workflow_dispatch', s5: 'true', profile: 'false', baseline: 'g'.repeat(40), passes: false },
+    { event: 'workflow_dispatch', s5: 'true', profile: 'true', baseline: 'a'.repeat(40), passes: false },
+    { event: 'workflow_dispatch', s5: 'true', profile: 'false', baseline: 'a'.repeat(40), passes: true },
+    { event: 'workflow_dispatch', s5: 'false', profile: 'true', baseline: '', passes: true },
+    { event: 'pull_request', s5: '', profile: '', baseline: '', passes: true },
+  ])('diagnostic aggregate guard $event/$s5/$profile/$baseline', ({ event, s5, profile, baseline, passes, contract }) => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', ci.jobs.CI!.steps![0]!.run!], {
+      encoding: 'utf8', timeout: 5000,
+      env: { ...process.env, EVENT_NAME: event, S5_CAPTURE_DIAGNOSTIC: s5, PERFORMANCE_CONTRACT_ONLY: contract ?? 'false', PROFILE_BASELINE: profile,
+        PERFORMANCE_BASELINE: baseline, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
+        MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success', WINDOWS_RESULT: 'success' },
+    });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status === 0, actual.stderr).toBe(passes);
+  });
+
+  it.each([
+    { s5: false, contract: false, cli: true, measurements: true },
+    { s5: true, contract: false, cli: false, measurements: false },
+    { s5: false, contract: true, cli: true, measurements: false },
+  ])('actual route selection S5=$s5 contract=$contract', ({ s5, contract, cli, measurements }) => {
+    const workflow = parse(sources().get('performance.yml')!) as Workflow;
+    const selected = (item: Step) => {
+      if (item.if === undefined) return true;
+      const expression = String(item.if).replace(/^\$\{\{\s*|\s*\}\}$/g, '')
+        .replaceAll('inputs.s5_capture_diagnostic', String(s5))
+        .replaceAll('inputs.performance_contract_only', String(contract))
+        .replaceAll('!cancelled()', 'true').replaceAll("steps.build.outcome == 'success'", 'true');
+      if (!/^[truefals\s!&|()]+$/.test(expression)) throw new Error(`Unsupported route expression: ${expression}`);
+      return Function(`return (${expression})`)() as boolean;
+    };
+    const steps = workflow.jobs.compare!.steps!;
+    expect(selected(steps.find(item => item.run?.includes('node --test candidate/bench/compare/transition-profile'))!)).toBe(cli);
+    for (const item of steps.filter(item => item.run?.match(/consumer-size\.mjs|easing-pair\.mjs|spring-pair baseline|full baseline|node bench\.mjs|size-gate\.mjs/))) {
+      expect(selected(item)).toBe(measurements);
+    }
+    expect(selected(steps.find(item => item.run?.includes('git diff --exit-code'))!)).toBe(s5);
+    expect(selected(steps.find(item => item.run?.includes('node bench/compare/conformance-smoke'))!)).toBe(s5);
+    expect(selected(steps.find(item => item.run?.includes('pnpm exec vitest run test/benchmark-cli-contract'))!)).toBe(s5);
+    const receipt = steps.findIndex(item => item.run?.includes('mode=performance-contract-only'));
+    expect(selected(steps[receipt]!)).toBe(contract);
+    expect(receipt).toBeLessThan(steps.findIndex(item => item.run?.includes('node --test candidate/bench/compare/transition-profile')));
+  });
+
+  it.each([0, 1])('S5 product guard propagates git diff status %i before execution', status => {
+    const workflow = parse(sources().get('performance.yml')!) as Workflow;
+    const guard = workflow.jobs.compare!.steps!.find(item => item.run?.includes('git diff --exit-code'))!;
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c',
+      `git() { printf '%s\\n' "$@"; return ${status}; }\n${guard.run}`], {
+      encoding: 'utf8', timeout: 5000, env: { ...process.env, BASELINE: 'a'.repeat(40) },
+    });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status).toBe(status);
+    expect(actual.stdout.trim().split('\n')).toEqual(['diff', '--exit-code', 'a'.repeat(40), 'HEAD', '--', 'src', 'bench/compare/entries']);
   });
 
   it('shell Vitest сохраняет код отказа после tee для diagnostics', () => {

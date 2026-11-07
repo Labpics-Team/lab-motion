@@ -931,14 +931,23 @@ describe('benchmark methodology fail-closed contracts', () => {
     const blocked = [{ t: 0.3, x: 10 }, { t: 0.5, x: 30 }];
     const baseline = [{ t: 0.3, x: 10 }, { t: 0.5, x: 50 }];
     const grid = [0.3, 0.4, 0.5];
-    const evidence = createFreezeEvidence(blocked, baseline, grid);
+    const measurement = {
+      baseline: { target: 'png-threshold-v1', witness: 'png-threshold-v1' },
+      blocked: { target: 'png-threshold-v1', witness: 'png-threshold-v1' },
+    };
+    const evidence = createFreezeEvidence(blocked, baseline, grid, measurement);
     const expected = scoreAgainstBaseline(blocked, baseline, grid);
+    measurement.blocked.witness = 'unknown';
 
     blocked[0]!.x = 999;
     baseline[0]!.x = 999;
     grid[0] = 999;
     expect(scoreAgainstBaseline(evidence.blocked, evidence.baseline, evidence.grid)).toEqual(expected);
-    expect(JSON.parse(JSON.stringify(evidence))).toEqual(evidence);
+    const restored = JSON.parse(JSON.stringify(evidence));
+    expect(restored).toEqual(evidence);
+    expect(restored.measurement.blocked).toEqual({ target: 'png-threshold-v1', witness: 'png-threshold-v1' });
+    expect(Object.keys(restored.blocked[0]).sort()).toEqual(['t', 'x']);
+    expect(Object.keys(restored.baseline[0]).sort()).toEqual(['t', 'x']);
   });
 
   it('distinguishes duplicate screencast frames from visible advancement', () => {
