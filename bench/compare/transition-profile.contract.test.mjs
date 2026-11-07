@@ -46,9 +46,9 @@ export function start(elements) { const run = animate(elements); return { finish
   return root;
 }
 
-async function execute(directory, args, preload, runner = join(repository, 'bench/compare/transition-profile.mjs')) {
+async function execute(directory, args, preload, runner = join(repository, 'bench/compare/transition-profile.mjs'), environment = {}) {
   const child = spawn(process.execPath, [...(preload ? ['--import', pathToFileURL(preload).href] : []),
-    runner, ...args], { cwd: directory, stdio: ['ignore', 'pipe', 'pipe'] });
+    runner, ...args], { cwd: directory, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MOTION_STARTUP_DIAGNOSTIC_SCENARIO: '', ...environment } });
   let stdout = '', stderr = '';
   child.stdout.on('data', data => { stdout += data; });
   child.stderr.on('data', data => { stderr += data; });
@@ -60,6 +60,252 @@ async function execute(directory, args, preload, runner = join(repository, 'benc
 }
 
 describe('transition-profile: реальный Chromium и изменяемые внешние входы', () => {
+  for (const [group, selector] of [['startup-diagnostic', 'unknown'], ['full', 's2-warm']]) it(`rejects selector ${group}/${selector} before package loading`, async () => {
+    const result = await execute(repository, ['missing-root', 'missing-output', group], undefined, undefined,
+      { MOTION_STARTUP_DIAGNOSTIC_SCENARIO: selector });
+    assert.notEqual(result.code, 0);
+    assert.match(result.stderr, /MOTION_STARTUP_DIAGNOSTIC_SCENARIO/);
+  });
+  for (const fault of ['no-motion', 'wrong-duration']) it(`S2 rejects semantic neighbor ${fault} before CPU observations`, { timeout: 180_000 }, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'motion-s2-semantic-'));
+    try {
+      const candidate = inputPackage(directory, 'candidate', 'success');
+      put(candidate, 'dist/motion/index.js', `export function animate(elements, properties, options) {
+        const animations = elements.map(element => element.animate(
+          [{ transform: 'translateX(0px)' }, { transform: 'translateX(' + properties.x + 'px)' }],
+          { duration: options.duration, easing: 'linear', fill: 'forwards' }));
+        const finished = Promise.all(animations.map(animation => animation.finished));
+        return { finished, duration: options.duration, stop() { animations.forEach(animation => animation.cancel()); } };
+      }`);
+      put(candidate, 'bench/compare/entries/lab.entry.mjs', fault === 'no-motion'
+        ? `export function start() { return { finished: () => Promise.resolve(), cancel() {} }; } export const startStagger = start;`
+        : `import { animate } from '../../../dist/motion/index.js'; export function start(els, px, duration) { const run = animate(els, { x: px }, { duration: duration * 4, ease: 'linear' }); return { finished: () => run.finished, cancel: () => run.stop() }; } export const startStagger = start;`);
+      for (const id of ['motion', 'anime']) cpSync(join(repository, 'bench/compare/entries', id + '.entry.mjs'), join(candidate, 'bench/compare/entries', id + '.entry.mjs'));
+      const output = join(directory, 'output');
+      const result = await execute(directory, [candidate, output, 'startup-diagnostic'], undefined, undefined,
+        { MOTION_STARTUP_DIAGNOSTIC_SCENARIO: 's2-warm' });
+      assert.notEqual(result.code, 0);
+      assert.match(result.stderr, /S2 semantic probe failed/);
+      assert.equal(JSON.parse(readFileSync(join(output, 'lab-original-semantic.json'), 'utf8')).valid, false);
+      assert.equal(existsSync(join(output, 'samples.jsonl')), false);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+  it('S2 captures real rival entries and exact immediate-cancel batch order', { timeout: 180_000 }, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'motion-s2-cli-'));
+    try {
+      const candidate = inputPackage(directory, 'candidate', 'success');
+      // Use real rival entries and a timed Lab neighbor that also satisfies the S2 oracle.
+      for (const id of ['lab', 'motion', 'anime']) cpSync(join(repository, 'bench/compare/entries', id + '.entry.mjs'), join(candidate, 'bench/compare/entries', id + '.entry.mjs'));
+      put(candidate, 'dist/motion/index.js', `export function animate(elements, properties, options) {
+        const animations = elements.map(element => element.animate(
+          [{ transform: 'translateX(0px)' }, { transform: 'translateX(' + properties.x + 'px)' }],
+          { duration: options.duration, easing: 'linear', fill: 'forwards' }));
+        const finished = Promise.all(animations.map(animation => animation.finished));
+        return { finished, duration: options.duration, stop() { animations.forEach(animation => animation.cancel()); } };
+      }`);
+      const output = join(directory, 'output'), receipt = join(directory, 'order.jsonl'), preload = join(directory, 'order.mjs');
+      writeFileSync(preload, `import { createRequire } from 'node:module';
+import assert from 'node:assert/strict';
+import { appendFileSync } from 'node:fs';
+const require = createRequire(${JSON.stringify(join(repository, 'bench/compare/package.json'))});
+const { chromium } = require('playwright');
+const launch = chromium.launch.bind(chromium);
+chromium.launch = async (...args) => {
+  const browser = await launch(...args), newContext = browser.newContext.bind(browser);
+  browser.newContext = async (...args) => {
+    const context = await newContext(...args), newPage = context.newPage.bind(context), close = context.close.bind(context);
+    let observed;
+    context.newPage = async (...args) => {
+      const page = await newPage(...args), add = page.addScriptTag.bind(page); observed = page;
+      page.addScriptTag = async (...args) => {
+        const value = await add(...args);
+        await page.evaluate(() => {
+          const events = window.__s2Events = [], adapter = window.__adapterModule;
+          const remove = Element.prototype.remove, raf = window.requestAnimationFrame;
+          Element.prototype.remove = function() { if (this.classList.contains('box') && new Error().stack.includes('motion-s2-wrapper.js')) events.push('remove'); return remove.call(this); };
+          window.requestAnimationFrame = callback => raf(timestamp => { if (callback.name === 'startupDiagnosticDrain') events.push('drain'); callback(timestamp); });
+          window.__adapterModule = { ...adapter, start(...args) {
+            if (new Error().stack.includes('motion-s2-wrapper.js')) events.push('start'); const control = adapter.start(...args);
+            return { ...control, cancel() { if (new Error().stack.includes('motion-s2-wrapper.js')) events.push('cancel'); return control.cancel(); } };
+          } };
+        });
+        return value;
+      };
+      return page;
+    };
+    context.close = async (...args) => {
+      const events = await observed.evaluate(() => window.__s2Events);
+      const batch = [...Array(5).fill('start'), ...Array(5).fill('cancel'), ...Array(500).fill('remove'), 'drain'];
+      if (events.length) assert.deepEqual(events, Array.from({ length: 8 }, () => batch).flat());
+      if (events.length) appendFileSync(${JSON.stringify(receipt)}, JSON.stringify({ count: events.length }) + '\\n');
+      return close(...args);
+    };
+    return context;
+  };
+  return browser;
+};`);
+      const result = await execute(directory, [candidate, output, 'startup-diagnostic'], preload, undefined,
+        { MOTION_STARTUP_DIAGNOSTIC_SCENARIO: 's2-warm' });
+      assert.equal(result.code, 0, result.stderr);
+      const metadata = JSON.parse(readFileSync(join(output, 'metadata.json'), 'utf8'));
+      assert.deepEqual(Object.keys(metadata.adapters), ['lab', 'motion', 'anime']);
+      for (const id of ['lab', 'motion', 'anime']) assert.equal(JSON.parse(readFileSync(join(output, id + '-original-semantic.json'), 'utf8')).valid, true);
+      assert.deepEqual(metadata.scenario.counts, [100]);
+      assert.equal(metadata.scenario.durationMs, 1200);
+      const rows = readFileSync(join(output, 'samples.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+      assert.equal(rows.length, 36);
+      assert.ok(rows.every(row => row.valid && row.offeredCalls === 40 && row.startAttempts === 40 && row.acquiredCalls === 40 && row.cancelReturnedCalls === 40 && row.removedTargets === 4000 && row.warmupCalls === 5 && row.measuredCalls === 35));
+      assert.ok(rows.every(row => row.naturalCompletedCalls === null && row.rows.length === 8 && row.rows[0].warmup && row.rows.slice(1).every(batch => !batch.warmup)));
+      assert.ok(rows.every(row => Object.keys(row.raw).join(',') === 'before,after' && Object.values(row.phaseCpuMs).every(value => value === null)));
+      assert.equal(readFileSync(receipt, 'utf8').trim().split('\n').length, 36);
+      const diagnostic = JSON.parse(readFileSync(join(output, 'diagnostic.json'), 'utf8'));
+      assert.equal(diagnostic.offeredCalls, 1440);
+      assert.equal(diagnostic.offeredTargets, 144000);
+      assert.equal(diagnostic.warmupCalls, 180);
+      assert.equal(diagnostic.measuredCalls, 1260);
+      assert.equal(diagnostic.naturalCompletedCalls, null);
+      assert.equal(diagnostic.coverage.length, 18);
+      assert.ok(diagnostic.coverage.every(row => row.phaseCpuStatus === 'unsupported-exact-phase-cpu'));
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+  for (const fault of ['lost-batch-response', 'partial-start', 'profiler-stop', 'context-close']) it(`S2 retains truthful failure envelope ${fault}`, { timeout: 180_000 }, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'motion-s2-failure-'));
+    try {
+      const candidate = inputPackage(directory, 'candidate', 'success');
+      for (const id of ['lab', 'motion', 'anime']) cpSync(join(repository, 'bench/compare/entries', id + '.entry.mjs'), join(candidate, 'bench/compare/entries', id + '.entry.mjs'));
+      put(candidate, 'dist/motion/index.js', `export function animate(elements, properties, options) {
+        const animations = elements.map(element => element.animate(
+          [{ transform: 'translateX(0px)' }, { transform: 'translateX(' + properties.x + 'px)' }],
+          { duration: options.duration, easing: 'linear', fill: 'forwards' }));
+        const finished = Promise.all(animations.map(animation => animation.finished));
+        return { finished, duration: options.duration, stop() { animations.forEach(animation => animation.cancel()); } };
+      }`);
+      const output = join(directory, 'output'), preload = join(directory, 'fault.mjs');
+      writeFileSync(preload, `import { createRequire } from 'node:module';
+const require = createRequire(${JSON.stringify(join(repository, 'bench/compare/package.json'))}), { chromium } = require('playwright');
+const launch = chromium.launch.bind(chromium), fault = ${JSON.stringify(fault)};
+let armed = true;
+chromium.launch = async (...args) => {
+ const browser = await launch(...args), newContext = browser.newContext.bind(browser);
+ browser.newContext = async (...args) => {
+  const context = await newContext(...args), newPage = context.newPage.bind(context), session = context.newCDPSession.bind(context), close = context.close.bind(context);
+  let batchReturned = false;
+  context.newPage = async (...args) => {
+   const page = await newPage(...args), evaluate = page.evaluate.bind(page);
+   page.evaluate = async (callback, arg) => {
+    const batch = typeof callback === 'string' && callback.includes('sourceURL=motion-s2-wrapper.js');
+    if (batch && armed && fault === 'partial-start') await evaluate(() => {
+     const adapter = window.__adapterModule; let calls = 0;
+     window.__adapterModule = { ...adapter, start(...args) { if (++calls === 2) { adapter.start(args[0].slice(0, 1), ...args.slice(1)); throw new Error('S2_PARTIAL_START'); } return adapter.start(...args); } };
+    });
+    const result = await evaluate(callback, arg);
+    if (batch) batchReturned = true;
+    if (batch && armed && fault === 'lost-batch-response') { armed = false; throw new Error('S2_LOST_BATCH_RESPONSE'); }
+    return result;
+   };
+   return page;
+  };
+  context.newCDPSession = async (...args) => {
+   const cdp = await session(...args), send = cdp.send.bind(cdp);
+   cdp.send = async (...args) => {
+    const result = await send(...args);
+    if (armed && batchReturned && fault === 'profiler-stop' && args[0] === 'Profiler.stop') { armed = false; throw new Error('S2_PROFILER_STOP_RESPONSE'); }
+    return result;
+   };
+   return cdp;
+  };
+  context.close = async (...args) => { await close(...args); if (armed && batchReturned && fault === 'context-close') { armed = false; throw new Error('S2_CONTEXT_CLOSE'); } };
+  return context;
+ };
+ return browser;
+};`);
+      const result = await execute(directory, [candidate, output, 'startup-diagnostic'], preload, undefined,
+        { MOTION_STARTUP_DIAGNOSTIC_SCENARIO: 's2-warm' });
+      assert.notEqual(result.code, 0);
+      const failures = readFileSync(join(output, 'failures.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+      const row = failures[0];
+      assert.equal(row.offeredCalls, 40); assert.equal(row.offeredTargets, 4000); assert.equal(row.naturalCompletedCalls, null);
+      if (fault === 'lost-batch-response') {
+        assert.equal(row.stage, 's2-warm-batch');
+        assert.equal(row.startAttempts, null); assert.equal(row.acquiredCalls, null); assert.equal(row.cancelReturnedCalls, null); assert.equal(row.removedTargets, null);
+        assert.match(result.stderr, /S2_LOST_BATCH_RESPONSE/);
+      } else if (fault === 'partial-start') {
+        assert.equal(row.stage, 's2-lifecycle-validation');
+        const observation = readFileSync(join(output, 'samples.jsonl'), 'utf8').trim().split('\n').map(JSON.parse)[0];
+        assert.equal(observation.errors[0].phase, 'start');
+        assert.match(observation.errors[0].error, /S2_PARTIAL_START/);
+        assert.equal(row.startAttempts, 2); assert.equal(row.acquiredCalls, 1); assert.equal(row.cancelReturnedCalls, 1); assert.equal(row.removedTargets, 500);
+        assert.match(result.stderr, /S2_PARTIAL_START/);
+      } else {
+        assert.equal(row.stage, fault === 'profiler-stop' ? 'profiler-stop' : 'context-close');
+        assert.equal(row.startAttempts, 40); assert.equal(row.acquiredCalls, 40); assert.equal(row.cancelReturnedCalls, 40); assert.equal(row.removedTargets, 4000);
+      }
+      assert.equal(existsSync(join(output, 'diagnostic.json')), false);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+  it('S2 attribution rejects absent and same-name wrong-URL wrappers', { timeout: 180_000 }, async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'motion-s2-profile-'));
+    try {
+      const candidate = inputPackage(directory, 'candidate', 'success');
+      for (const id of ['lab', 'motion', 'anime']) cpSync(join(repository, 'bench/compare/entries', id + '.entry.mjs'), join(candidate, 'bench/compare/entries', id + '.entry.mjs'));
+      put(candidate, 'dist/motion/index.js', `export function animate(elements, properties, options) {
+        const animations = elements.map(element => element.animate(
+          [{ transform: 'translateX(0px)' }, { transform: 'translateX(' + properties.x + 'px)' }],
+          { duration: options.duration, easing: 'linear', fill: 'forwards' }));
+        const finished = Promise.all(animations.map(animation => animation.finished));
+        return { finished, duration: options.duration, stop() { animations.forEach(animation => animation.cancel()); } };
+      }`);
+      const output = join(directory, 'output'), preload = join(directory, 'profile.mjs');
+      writeFileSync(preload, `import { createRequire } from 'node:module';
+const require = createRequire(${JSON.stringify(join(repository, 'bench/compare/package.json'))}), { chromium } = require('playwright');
+const launch = chromium.launch.bind(chromium);
+chromium.launch = async (...args) => {
+ const browser = await launch(...args), newContext = browser.newContext.bind(browser);
+ browser.newContext = async (...args) => {
+  const context = await newContext(...args), newPage = context.newPage.bind(context), session = context.newCDPSession.bind(context); let id;
+  context.newPage = async (...args) => {
+   const page = await newPage(...args), add = page.addScriptTag.bind(page);
+   page.addScriptTag = async (...args) => { const match = args[0].content?.match(/sourceURL=motion-startup-([^\\n]+)\\.js/); if (match) id = match[1]; return add(...args); };
+   return page;
+  };
+  context.newCDPSession = async (...args) => {
+   const cdp = await session(...args), send = cdp.send.bind(cdp);
+   cdp.send = async (...args) => {
+    const result = await send(...args); if (args[0] !== 'Profiler.stop') return result;
+    const frame = (functionName, url) => ({ functionName, url, lineNumber: 0, columnNumber: 0, scriptId: '1' });
+    return { profile: { nodes: [
+     { id: 1, callFrame: frame('(root)', ''), children: [2, 5, 7, 9] },
+     { id: 2, callFrame: frame('startupDiagnosticStart', 'motion-s2-wrapper.js'), children: [3] },
+     { id: 3, callFrame: frame('adapter', 'motion-startup-' + id + '.js'), children: [4] },
+     { id: 4, callFrame: frame('animate', '') },
+     { id: 5, callFrame: frame('startupDiagnosticCancel', 'motion-s2-wrapper.js'), children: [6] },
+     { id: 6, callFrame: frame('helper', 'motion-s2-wrapper.js') },
+     { id: 7, callFrame: frame('startupDiagnosticCleanup', 'wrong.js'), children: [8] },
+     { id: 8, callFrame: frame('adapter', 'motion-startup-' + id + '.js') },
+     { id: 9, callFrame: frame('adapter', 'motion-startup-' + id + '.js') }
+    ], samples: [4, 6, 8, 9], timeDeltas: [1000, 1000, 1000, 1000], startTime: 0, endTime: 4000 } };
+   };
+   return cdp;
+  };
+  return context;
+ };
+ return browser;
+};`);
+      const result = await execute(directory, [candidate, output, 'startup-diagnostic'], preload, undefined,
+        { MOTION_STARTUP_DIAGNOSTIC_SCENARIO: 's2-warm' });
+      assert.equal(result.code, 0, result.stderr);
+      const coverage = JSON.parse(readFileSync(join(output, 'diagnostic.json'), 'utf8')).coverage;
+      assert.ok(coverage.length > 0);
+      for (const row of coverage) {
+        assert.deepEqual(row.phaseSamples.startupDiagnosticStart, { inclusiveSamples: 1, adapterSamples: 1, status: 'sampled-wrapper' });
+        assert.deepEqual(row.phaseSamples.startupDiagnosticCancel, { inclusiveSamples: 1, adapterSamples: 0, status: 'sampled-wrapper' });
+        assert.equal(row.phaseSamples.startupDiagnosticCleanup.status, 'unsupported-missing-wrapper-samples');
+        assert.equal(row.phaseSamples.startupDiagnosticCleanup.adapterSamples, 0);
+        assert.equal(row.phaseSamples.startupDiagnosticDrain.status, 'unsupported-missing-wrapper-samples');
+        assert.equal(row.phaseCpuStatus, 'unsupported-exact-phase-cpu');
+      }
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
   it('startup diagnostic сохраняет профили, баланс и настоящий lifecycle', { timeout: 180_000 }, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-startup-cli-'));
     try {
@@ -90,7 +336,7 @@ describe('transition-profile: реальный Chromium и изменяемые 
       }
     } finally { rmSync(directory, { recursive: true, force: true }); }
   });
-  for (const fault of ['ordering', 'label-missing', 'label-renamed', 'label-wrong-last', 'page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
+  for (const fault of ['ordering', 'label-missing', 'label-renamed', 'label-wrong-last', 'page-setup', 'cdp-session', 'context-close', 'setup-and-close', 'start-response', 'start-and-stop', 'adapter-start-response', 'partial-adapter-throw', 'completion-response', 'coverage']) it(`сохраняет diagnostic boundary ${fault}`, { timeout: 180_000 }, async () => {
     const directory = mkdtempSync(join(tmpdir(), 'motion-startup-boundary-'));
     try {
       const candidate = inputPackage(directory, 'candidate', 'success');
@@ -133,12 +379,39 @@ chromium.launch = async (...args) => {
         const events = await observedPage.evaluate(() => window.__startupWitness);
         appendFileSync(receipt, JSON.stringify({ index, events }) + '\\n');
       }
+      if (fault === 'partial-adapter-throw') {
+        const partial = await observedPage.evaluate(() => window.__partialWitness);
+        appendFileSync(receipt, JSON.stringify({ partial }) + '\\n');
+      }
       await close(...args); record('context-closed');
       if (armed && ['context-close', 'setup-and-close'].includes(fault)) { armed = false; throw new Error('FAULT_CONTEXT_CLOSE'); }
     };
     context.newPage = async (...args) => {
-      const page = await newPage(...args), goto = page.goto.bind(page), addScriptTag = page.addScriptTag.bind(page);
+      const page = await newPage(...args), goto = page.goto.bind(page), addScriptTag = page.addScriptTag.bind(page), evaluate = page.evaluate.bind(page);
       observedPage = page;
+      page.evaluate = async (callback, argument) => {
+        const result = await evaluate(callback, argument);
+        const lostStart = fault === 'adapter-start-response' && callback.name === 'startupDiagnosticStart';
+        const lostCompletion = fault === 'completion-response' && argument?.watchdogMs !== undefined;
+        if (armed && (lostStart || lostCompletion)) {
+          armed = false;
+          record(lostStart ? 'adapter-start-returned' : 'completion-returned');
+          throw new Error(lostStart ? 'FAULT_ADAPTER_START_RESPONSE' : 'FAULT_COMPLETION_RESPONSE');
+        }
+        return result;
+      };
+      if (fault === 'partial-adapter-throw') page.addScriptTag = async (...args) => {
+        const result = await addScriptTag(...args);
+        await evaluate(() => {
+          const adapter = window.__adapterModule;
+          window.__adapterModule = { ...adapter, start(elements, ...args) {
+            window.__partialControl = adapter.start(elements.slice(0, 1), ...args);
+            window.__partialWitness = { accepted: 1, effects: document.getAnimations().length };
+            throw new Error('FAULT_PARTIAL_ADAPTER_START');
+          } };
+        });
+        return result;
+      };
       if (labelControl) page.addScriptTag = async (...args) => {
         assert.equal(++injections, 1);
         const id = conditions[index].split(':')[0];
@@ -246,14 +519,26 @@ chromium.launch = async (...args) => {
         assert.notEqual(result.code, 0);
         assert.equal(existsSync(join(output, 'diagnostic.json')), false);
         const failures = readFileSync(join(output, 'failures.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
-        const expected = fault === 'setup-and-close' ? ['page-setup', 'context-close'] : fault === 'start-and-stop' ? ['profiler-start', 'profiler-stop-after-failure'] : [fault.startsWith('label-') ? 'page-setup' : fault === 'start-response' ? 'profiler-start' : fault];
+        const expected = fault === 'setup-and-close' ? ['page-setup', 'context-close'] : fault === 'start-and-stop' ? ['profiler-start', 'profiler-stop-after-failure'] : [fault.startsWith('label-') ? 'page-setup' : fault === 'start-response' ? 'profiler-start' : ['adapter-start-response', 'partial-adapter-throw'].includes(fault) ? 'start' : fault === 'completion-response' ? 'completion' : fault];
         assert.deepEqual(failures.map(row => row.stage), expected);
         assert.ok(failures.every(row => row.round === 0 && row.count === 1000 && row.condition && row.offered === 1000));
         for (const row of failures) assert.ok(result.stderr.includes(row.error.split('\n')[0]));
         if (fault.startsWith('label-')) assert.ok(result.stderr.includes('SOURCE_URL_BOUNDARY'));
+        if (['adapter-start-response', 'partial-adapter-throw', 'completion-response'].includes(fault)) {
+          assert.equal(failures[0].accepted, fault === 'completion-response' ? 1000 : null);
+          assert.equal(failures[0].completed, null);
+          assert.equal(existsSync(join(output, 'samples.jsonl')), false);
+          if (fault === 'partial-adapter-throw') {
+            assert.deepEqual(receipts.find(row => row.partial)?.partial, { accepted: 1, effects: 1 });
+            assert.ok(result.stderr.includes('FAULT_PARTIAL_ADAPTER_START'));
+          } else assert.ok(events.includes(fault === 'completion-response' ? 'completion-returned' : 'adapter-start-returned'));
+        } else if (fault !== 'context-close') {
+          assert.ok(failures.every(row => row.accepted === 0 && row.completed === 0));
+        }
         if (fault === 'context-close') {
           const rows = readFileSync(join(output, 'samples.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
           assert.ok(rows.at(-1).valid);
+          assert.equal(failures[0].accepted, 1000);
           assert.equal(failures[0].completed, 1000);
         }
         if (fault.startsWith('start-')) {

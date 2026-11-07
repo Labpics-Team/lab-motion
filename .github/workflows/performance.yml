@@ -12,6 +12,9 @@ on:
       startup_diagnostic:
         type: boolean
         default: false
+      startup_scenario:
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -29,10 +32,12 @@ jobs:
         shell: bash
         env:
           BASELINE: ${{ inputs.baseline }}
+          STARTUP_SCENARIO: ${{ inputs.startup_scenario }}
         run: |
           set -euo pipefail
           [[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]
           [[ "${{ inputs.startup_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]
+          [[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "${{ inputs.startup_diagnostic }}" == true && "${{ inputs.performance_contract_only }}" != true ) ]]
 
       - name: Получить проверяемый источник
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -104,6 +109,7 @@ jobs:
         working-directory: candidate
         env:
           BASELINE: ${{ inputs.baseline }}
+          MOTION_STARTUP_DIAGNOSTIC_SCENARIO: ${{ inputs.startup_scenario }}
 
       - name: Сравнить spring и JS-исполнение с baseline
         if: ${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}

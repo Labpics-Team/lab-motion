@@ -6,6 +6,11 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import os from 'node:os';
 
+const group = process.argv[4] ?? 'full';
+const startupScenario = process.env.MOTION_STARTUP_DIAGNOSTIC_SCENARIO ?? '';
+if (startupScenario && (group !== 'startup-diagnostic' || startupScenario !== 's2-warm'))
+  throw new Error('MOTION_STARTUP_DIAGNOSTIC_SCENARIO requires startup-diagnostic and s2-warm');
+const s2Warm = startupScenario === 's2-warm';
 const rootPath = realpathSync(process.argv[2] ?? process.cwd());
 const baselinePath = process.argv[5] ? realpathSync(process.argv[5]) : undefined;
 if (baselinePath === rootPath) throw new Error('Baseline and candidate must be distinct checkouts');
@@ -29,19 +34,19 @@ mkdirSync(output);
 mkdirSync(path.join(output, 'adapters'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const optionalFile = file => { try { return readFileSync(file, 'utf8').trim(); } catch { return null; } };
-const group = process.argv[4] ?? 'full';
 if (!['full', 'native', 'spring-pair', 'js-pair', 'startup-diagnostic'].includes(group)) throw new Error('Unknown capability group');
 const diagnostic = group === 'startup-diagnostic';
 if (diagnostic && baselinePath) throw new Error('Диагностика старта измеряет один неизменный продукт, а не сравнивает кандидатов');
 const paired = group.endsWith('-pair');
 if (paired && !baselinePath) throw new Error('Paired runtime profile requires an immutable baseline');
-const ids = diagnostic ? ['lab', 'waapi-ctl'] : paired ? ['lab'] : group === 'native'
+const ids = diagnostic ? s2Warm ? ['lab', 'motion', 'anime'] : ['lab', 'waapi-ctl'] : paired ? ['lab'] : group === 'native'
   ? ['lab', 'lab-native', 'motion-mini', 'waapi-ctl']
   : ['lab', 'motion', 'gsap', 'anime', 'waapi-ctl'];
 if (baselinePath) ids.push('baseline');
-const counts = diagnostic ? [1000] : [1, 100, 1000];
-const rounds = diagnostic ? 4 : Math.ceil(20 / ids.length) * ids.length, durationMs = 400, watchdogMs = 10_000;
-const observations = diagnostic ? ['lab:plain', 'lab:profiled', 'waapi-ctl:plain', 'waapi-ctl:profiled'] : ids;
+const counts = diagnostic ? [s2Warm ? START_SCENARIO_MANIFEST.s2.targetsPerCall : 1000] : [1, 100, 1000];
+const rounds = diagnostic ? s2Warm ? 6 : 4 : Math.ceil(20 / ids.length) * ids.length;
+const durationMs = s2Warm ? START_SCENARIO_MANIFEST.s2.durationMs : 400, watchdogMs = 10_000;
+const observations = diagnostic ? s2Warm ? ids.flatMap(id => [`${id}:plain`, `${id}:profiled`]) : ['lab:plain', 'lab:profiled', 'waapi-ctl:plain', 'waapi-ctl:profiled'] : ids;
 const entries = { 'lab-native': 'lab-native', lab: 'lab', motion: 'motion', gsap: 'gsap', anime: 'anime', 'waapi-ctl': 'waapi-control', 'motion-mini': 'motion-mini', 'anime-waapi': 'anime-waapi' };
 if (baselinePath) entries.baseline = 'lab';
 const adapters = Object.fromEntries(Object.entries(entries).filter(([id]) => !diagnostic || ids.includes(id)).map(([id, entry]) => {
@@ -73,9 +78,12 @@ const metadata = {
   profileSha256: hash(readFileSync(new URL(import.meta.url))),
   versions: { lab: root.version, ...installed, chromium: browser.version(), node: process.version },
   environment: { cpu: os.cpus()[0].model, cpuMax: optionalFile('/sys/fs/cgroup/cpu.max'), memoryMax: optionalFile('/sys/fs/cgroup/memory.max') },
-  scenario: { group, counts, rounds, durationMs: group === 'spring-pair' ? null : durationMs, watchdogMs, targetPx: 300, easing: group === 'spring-pair' ? 'default spring' : group === 'js-pair' ? 'p*p*(3-2*p), custom JS callback' : 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
+  scenario: { group, counts, rounds, durationMs: group === 'spring-pair' ? null : durationMs, watchdogMs, targetPx: 300, easing: group === 'spring-pair' ? 'default spring' : group === 'js-pair' ? 'p*p*(3-2*p), custom JS callback' : 'linear', viewport: { width: 1200, height: 600 }, page: 'fresh realm; modules loaded before measurement', timeDomain: 'threadTicks', intervals: s2Warm ? 'before/after total: profiler-start inspector overhead, DOM construction, one warmup and seven five-call starts, immediate cancel/remove/microtask/one-rAF drain; excludes profiler-stop and context-close; no natural completion' : 'actual completion plus two frames and cancel/remove/two-frame cleanup; DOM construction and geometry validation excluded' },
   adapters, orders, sourceIdentity,
-  ...(diagnostic ? { diagnostic: { interpretation: 'Только атрибуция; время под профайлером не доказывает ускорение', profiler: 'CDP Profiler, стандартный интервал выборки', observations, offeredStarts: rounds * observations.length, profileWindow: 'От начала вычисления запуска до его ответа; может включать расходы инспектора и микрозадачи', coverage: 'Образец кадра адаптера ниже startupDiagnosticStart; отсутствие образцов не даёт вывода' } } : {}),
+  ...(s2Warm ? { startupScenario, warmBatch: { ...START_SCENARIO_MANIFEST.s2, warmupBatches: 1, samples: 7, calls: 5 },
+    cpuWindow: 'total thread CPU across DOM setup, one warmup and seven five-call batches, immediate cancel/remove/microtask/one-rAF drain; includes inspector overhead; no natural completion',
+    phaseCpuMs: { start: null, cancel: null, cleanup: null }, phaseCpuStatus: 'unsupported: sampled stacks are attribution, not exact phase CPU' } : {}),
+  ...(diagnostic ? { diagnostic: { interpretation: 'Только атрибуция; время под профайлером не доказывает ускорение', profiler: 'CDP Profiler, стандартный интервал выборки', observations, ...(s2Warm ? { offeredCalls: rounds * observations.length * 40, offeredTargets: rounds * observations.length * 4000, warmupCalls: rounds * observations.length * 5, measuredCalls: rounds * observations.length * 35 } : { offeredStarts: rounds * observations.length }), profileWindow: s2Warm ? 'S2 immediate-cancel batch lifecycle; includes setup, warmup and drain; attribution only' : 'От начала вычисления запуска до его ответа; может включать расходы инспектора и микрозадачи', coverage: 'Образец кадра адаптера ниже startupDiagnosticStart; отсутствие образцов не даёт вывода' } } : {}),
 };
 writeFileSync(path.join(output, 'metadata.json'), JSON.stringify(metadata, null, 2));
 const samples = [];
@@ -122,7 +130,7 @@ try {
     if (!exact) throw new Error('Baseline and candidate public trajectories differ');
   }
   // Сохраняется исходная проверка траектории вместе с её отказами.
-  for (const id of diagnostic ? [] : ids) {
+  for (const id of diagnostic && !s2Warm ? [] : ids) {
     const { context, page } = await pageFor(id);
     try {
       if (!await page.evaluate(() => typeof window.__adapterModule.startStagger === 'function')) {
@@ -132,6 +140,7 @@ try {
       const evidence = await runSemanticStartCheck(page, START_SCENARIO_MANIFEST.s2, 5);
       writeFileSync(path.join(output, `${id}-original-semantic.json`), JSON.stringify(evidence));
       console.log(`ORIGINAL_ORACLE ${id} ${evidence.valid}`);
+      if (s2Warm && !evidence.valid) throw new Error(`S2 semantic probe failed: ${id}`);
     } finally { await context.close(); }
   }
   for (let round = 0; round < rounds; round++) {
@@ -141,11 +150,15 @@ try {
       const profileFile = `${round}-${id}.cpuprofile`;
       let context, cdp, stage = 'context-acquire';
       let profiling = false, coverage, accepted = 0, completed = 0;
+      let batchEvidence = { startAttempts: 0, acquiredCalls: 0, cancelReturnedCalls: 0, removedTargets: 0 };
       const errors = [];
       const recordFailure = (error, failureStage) => {
         errors.push(error);
         appendFileSync(path.join(output, 'failures.jsonl'), JSON.stringify({
-          round, count, id, stage: failureStage, ...(diagnostic ? { condition, offered: count, accepted, completed, coverage } : {}), error: String(error?.stack ?? error),
+          round, count, id, stage: failureStage, ...(diagnostic ? s2Warm ? { condition, offeredCalls: 40, offeredTargets: 4000, naturalCompletedCalls: null,
+            startAttempts: batchEvidence.startAttempts, acquiredCalls: batchEvidence.acquiredCalls,
+            cancelReturnedCalls: batchEvidence.cancelReturnedCalls, removedTargets: batchEvidence.removedTargets, coverage }
+            : { condition, offered: count, accepted, completed, coverage } : {}), error: String(error?.stack ?? error),
         }) + '\n');
       };
       const stopProfile = async () => {
@@ -162,14 +175,29 @@ try {
           }
           return false;
         });
-        return { profileFile, samples: profile.samples?.length ?? 0, startupSamples: startupSamples.length, status: startupSamples.length ? 'sampled-startup' : 'inconclusive-no-startup-samples' };
+        const phaseSamples = s2Warm ? Object.fromEntries(['startupDiagnosticStart', 'startupDiagnosticCancel', 'startupDiagnosticCleanup', 'startupDiagnosticDrain'].map(phase => {
+          const attributed = adapterRequired => (profile.samples ?? []).filter(nodeId => {
+            let adapter = false;
+            for (let node = nodes.get(nodeId); node; node = nodes.get(parents.get(node.id))) {
+              if (node.callFrame.functionName === phase && node.callFrame.url === 'motion-s2-wrapper.js') return !adapterRequired || adapter;
+              adapter ||= node.callFrame.url === `motion-startup-${id}.js`;
+            }
+            return false;
+          }).length;
+          const wrapperPresent = profile.nodes.some(node => node.callFrame.functionName === phase && node.callFrame.url === 'motion-s2-wrapper.js');
+          return [phase, { inclusiveSamples: attributed(false), adapterSamples: attributed(true),
+            status: wrapperPresent && attributed(false) > 0 ? 'sampled-wrapper' : 'unsupported-missing-wrapper-samples' }];
+        })) : undefined;
+        return { profileFile, samples: profile.samples?.length ?? 0, startupSamples: startupSamples.length,
+          ...(s2Warm ? { phaseSamples, phaseCpuStatus: 'unsupported-exact-phase-cpu', attributionStatus: Object.values(phaseSamples).every(row => row.status === 'sampled-wrapper') ? 'sampled-all-phases' : 'inconclusive-missing-phase-samples' } : {}),
+          status: startupSamples.length ? 'sampled-startup' : 'inconclusive-no-startup-samples' };
       };
       try {
         const { page } = await pageFor(id, acquired => { context = acquired; stage = 'page-setup'; });
         stage = 'cdp-session';
         cdp = await context.newCDPSession(page);
         stage = 'measurement';
-        await page.evaluate(count => {
+        if (!s2Warm) await page.evaluate(count => {
           window.__targets = Array.from({ length: count }, (_, i) => {
             const el = document.createElement('div'); el.className = 'box';
             el.style.left = `${i % 50 * 12}px`; el.style.top = `${Math.floor(i / 50) * 12}px`;
@@ -187,6 +215,77 @@ try {
           profiling = true; // Запуск мог состояться, даже если получение ответа завершилось отказом.
           await cdp.send('Profiler.start');
         }
+        if (s2Warm) {
+          stage = 's2-warm-batch';
+          batchEvidence = { startAttempts: null, acquiredCalls: null, cancelReturnedCalls: null, removedTargets: null };
+          const batchCall = async function s2WarmDiagnosticBatch(config) {
+            const rows = [], errors = [];
+            let documentEffects = 0;
+            let acquiredCalls = 0, cancelReturnedCalls = 0, removedTargets = 0, startAttempts = 0;
+            function startupDiagnosticStart(groups, controls) {
+              const began = performance.now();
+              for (const elements of groups) {
+                startAttempts++;
+                controls.push(window.__adapterModule.start(elements, config.toPx, config.durationMs));
+                acquiredCalls++;
+              }
+              return performance.now() - began;
+            }
+            function startupDiagnosticCancel(controls) {
+              for (const control of controls) {
+                try { control.cancel(); cancelReturnedCalls++; }
+                catch (error) { errors.push({ phase: 'cancel', error: String(error?.stack ?? error) }); }
+              }
+            }
+            function startupDiagnosticCleanup(groups) {
+              for (const elements of groups) for (const element of elements) { element.remove(); removedTargets++; }
+            }
+            for (let index = -1; index < config.warmSamples; index++) {
+              const groups = Array.from({ length: config.warmCalls }, () => Array.from({ length: config.targetsPerCall }, () => {
+                const element = document.createElement('div'); element.className = 'box'; document.body.appendChild(element); return element;
+              }));
+              const controls = [];
+              let batchElapsedMs;
+              try { batchElapsedMs = startupDiagnosticStart(groups, controls); }
+              catch (error) { errors.push({ phase: 'start', error: String(error?.stack ?? error) }); }
+              finally { startupDiagnosticCancel(controls); startupDiagnosticCleanup(groups); }
+              await Promise.resolve();
+              await new Promise(resolve => requestAnimationFrame(function startupDiagnosticDrain() { resolve(); }));
+              documentEffects = document.getAnimations().length;
+              rows.push({ warmup: index === -1, batchElapsedMs, connectedDocumentEffects: documentEffects });
+              if (errors.length) break;
+            }
+            return { rows, startAttempts, acquiredCalls, cancelReturnedCalls, removedTargets, connectedDocumentEffects: documentEffects, errors };
+          };
+          const batch = await page.evaluate(`(${batchCall.toString()})(${JSON.stringify(START_SCENARIO_MANIFEST.s2)})\n//# sourceURL=motion-s2-wrapper.js`);
+          batchEvidence = { startAttempts: batch.startAttempts, acquiredCalls: batch.acquiredCalls,
+            cancelReturnedCalls: batch.cancelReturnedCalls, removedTargets: batch.removedTargets };
+          stage = 's2-after-metrics';
+          const after = await metrics(cdp);
+          if (profiled) { stage = 'profiler-stop'; coverage = await stopProfile(); }
+          const effects = batch.connectedDocumentEffects;
+          const batches = START_SCENARIO_MANIFEST.s2.warmSamples + 1;
+          const offeredCalls = batches * START_SCENARIO_MANIFEST.s2.warmCalls;
+          const delta = key => 1000 * (after[key] - before[key]);
+          const row = { round, count, id, condition, coverage, scenario: startupScenario, ...batch,
+            offeredCalls, offeredTargets: offeredCalls * count, warmupCalls: START_SCENARIO_MANIFEST.s2.warmCalls,
+            measuredCalls: START_SCENARIO_MANIFEST.s2.warmSamples * START_SCENARIO_MANIFEST.s2.warmCalls,
+            naturalCompletedCalls: null, completionStatus: 'not-observed-immediate-cancel', effects,
+            cancelEvidence: 'adapter cancel returned; adapters may swallow underlying errors; not confirmed cancellation',
+            cleanupEvidence: 'connected-document effects after remove only; retained detached effects and memory unverified',
+            taskCpuMs: delta('TaskDuration'), threadCpuMs: delta('ThreadTime'), scriptCpuMs: delta('ScriptDuration'),
+            styleCpuMs: delta('RecalcStyleDuration'), layoutCpuMs: delta('LayoutDuration'), raw: { before, after },
+            phaseCpuMs: { start: null, cancel: null, cleanup: null } };
+          row.valid = !batch.errors.length && batch.rows.length === batches && batch.startAttempts === offeredCalls && batch.acquiredCalls === offeredCalls &&
+            batch.cancelReturnedCalls === offeredCalls && batch.removedTargets === offeredCalls * count && effects === 0 &&
+            batch.rows.every(sample => sample.connectedDocumentEffects === 0 && Number.isFinite(sample.batchElapsedMs) && sample.batchElapsedMs >= 0) &&
+            ['taskCpuMs', 'threadCpuMs', 'scriptCpuMs', 'styleCpuMs', 'layoutCpuMs'].every(key => Number.isFinite(row[key]) && row[key] >= 0);
+          samples.push(row); appendFileSync(path.join(output, 'samples.jsonl'), JSON.stringify(row) + '\n');
+          if (!row.valid) {
+            stage = 's2-lifecycle-validation';
+            throw new Error(`Invalid S2 lifecycle: ${JSON.stringify(row)}`);
+          }
+        } else {
         stage = 'start';
         const startCall = diagnostic ? function startupDiagnosticStart(duration) {
           const start = performance.now();
@@ -197,6 +296,8 @@ try {
           window.__control = window.__adapterModule.start(window.__targets, 300, duration);
           return { apiMs: performance.now() - start, start };
         };
+        // Approved b7bda counter delta: dispatch without a response is unknown, not zero work.
+        if (diagnostic) { accepted = null; completed = null; }
         const started = await page.evaluate(startCall, durationMs);
         accepted = count;
         if (profiled) { stage = 'profiler-stop'; coverage = await stopProfile(); }
@@ -231,6 +332,7 @@ try {
         sample.valid = endpoint.count === count && endpoint.finite && endpoint.maxError <= 0.05 && effects === 0 && ['apiMs', 'completionMs', 'taskCpuMs', 'threadCpuMs', 'scriptCpuMs', 'styleCpuMs', 'layoutCpuMs'].every(k => Number.isFinite(sample[k]) && sample[k] >= 0);
         samples.push(sample); appendFileSync(path.join(output, 'samples.jsonl'), JSON.stringify(sample) + '\n');
         if (!sample.valid) throw new Error(`Invalid sample ${round}/${count}/${id}: ${JSON.stringify({ endpoint, effects })}`);
+        }
       } catch (error) {
         recordFailure(error, stage);
         if (profiling) {
@@ -257,7 +359,14 @@ try {
       throw new Error(`Measured dist changed: ${id}`);
   }
   if (diagnostic) {
-    const result = { interpretation: metadata.diagnostic.interpretation, offeredStarts: metadata.diagnostic.offeredStarts, completedStarts: samples.filter(row => row.valid).length, offeredTargets: samples.reduce((sum, row) => sum + row.offered, 0), completedTargets: samples.reduce((sum, row) => sum + row.completed, 0), coverage: samples.filter(row => row.condition === 'profiled').map(({ round, id, coverage }) => ({ round, id, ...coverage })) };
+    const result = s2Warm ? { interpretation: metadata.diagnostic.interpretation, scenario: startupScenario,
+      observations: samples.length, offeredCalls: samples.reduce((sum, row) => sum + row.offeredCalls, 0),
+      acquiredCalls: samples.reduce((sum, row) => sum + row.acquiredCalls, 0), cancelReturnedCalls: samples.reduce((sum, row) => sum + row.cancelReturnedCalls, 0),
+      offeredTargets: samples.reduce((sum, row) => sum + row.offeredTargets, 0), removedTargets: samples.reduce((sum, row) => sum + row.removedTargets, 0),
+      warmupCalls: samples.reduce((sum, row) => sum + row.warmupCalls, 0), measuredCalls: samples.reduce((sum, row) => sum + row.measuredCalls, 0),
+      naturalCompletedCalls: null, phaseCpuMs: metadata.phaseCpuMs,
+      coverage: samples.filter(row => row.condition === 'profiled').map(({ round, id, coverage }) => ({ round, id, ...coverage })) }
+      : { interpretation: metadata.diagnostic.interpretation, offeredStarts: metadata.diagnostic.offeredStarts, completedStarts: samples.filter(row => row.valid).length, offeredTargets: samples.reduce((sum, row) => sum + row.offered, 0), completedTargets: samples.reduce((sum, row) => sum + row.completed, 0), coverage: samples.filter(row => row.condition === 'profiled').map(({ round, id, coverage }) => ({ round, id, ...coverage })) };
     writeFileSync(path.join(output, 'diagnostic.json'), JSON.stringify(result, null, 2));
     console.log(JSON.stringify(result));
   } else {

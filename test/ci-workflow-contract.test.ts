@@ -75,6 +75,7 @@ const gateCommand = 'set -euo pipefail\n'
   + '  [[ "$STARTUP_DIAGNOSTIC" != true && "$PROFILE_BASELINE" != true ]]\n'
   + 'fi\nif [[ "$EVENT_NAME" == workflow_dispatch ]]; then\n'
   + '  [[ "$STARTUP_DIAGNOSTIC" != true || "$PROFILE_BASELINE" != true ]]\n'
+  + '  [[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "$STARTUP_DIAGNOSTIC" == true && "$PROFILE_BASELINE" != true && "$PERFORMANCE_CONTRACT_ONLY" != true && "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ) ]]\n'
   + 'fi\n[[ "$VERIFY_RESULT" == success ]]\n'
   + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
   + '[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]\n'
@@ -412,21 +413,23 @@ function assertNativeGraph(files: Map<string, string>) {
       type: 'boolean', default: false,
     }, startup_diagnostic: {
       type: 'boolean', default: false,
+    }, startup_scenario: {
+      type: 'string', default: '',
     } } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
   expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'performance', 'profile-baseline', 'security', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline && !inputs.performance_contract_only && !inputs.startup_diagnostic }}",
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline && !inputs.performance_contract_only && !inputs.startup_diagnostic && inputs.startup_scenario == '' }}",
     uses: './.github/workflows/profile-01.yml',
   });
   expect(ci.jobs.performance).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.performance_contract_only && (inputs.startup_diagnostic || inputs.profile_baseline)) && !(inputs.startup_diagnostic && inputs.profile_baseline) }}",
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.performance_contract_only && (inputs.startup_diagnostic || inputs.profile_baseline)) && !(inputs.startup_diagnostic && inputs.profile_baseline) && (inputs.startup_scenario == '' || (inputs.startup_diagnostic && inputs.startup_scenario == 's2-warm')) }}",
     uses: './.github/workflows/performance.yml',
-    with: { baseline: '${{ inputs.performance_baseline }}', startup_diagnostic: '${{ inputs.startup_diagnostic }}', performance_contract_only: '${{ inputs.performance_contract_only }}' },
+    with: { baseline: '${{ inputs.performance_baseline }}', startup_diagnostic: '${{ inputs.startup_diagnostic }}', startup_scenario: '${{ inputs.startup_scenario }}', performance_contract_only: '${{ inputs.performance_contract_only }}' },
   });
   const performance = workflows.get('performance.yml')!;
-  expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true }, startup_diagnostic: { type: 'boolean', default: false }, performance_contract_only: { type: 'boolean', default: false } } } });
+  expect(performance.on).toEqual({ workflow_call: { inputs: { baseline: { type: 'string', required: true }, startup_diagnostic: { type: 'boolean', default: false }, startup_scenario: { type: 'string', default: '' }, performance_contract_only: { type: 'boolean', default: false } } } });
   expect(performance.permissions).toEqual({ contents: 'read' });
   expect(performance.defaults).toBeUndefined();
   expect(Object.keys(performance.jobs)).toEqual(['compare']);
@@ -440,8 +443,8 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(compare.permissions).toBeUndefined();
   const { name: _baselineName, ...baselineValidation } = compare.steps![0]!;
   expect(baselineValidation).toEqual({
-    shell: 'bash', env: { BASELINE: '${{ inputs.baseline }}' },
-    run: 'set -euo pipefail\n[[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]\n[[ "${{ inputs.startup_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]\n',
+    shell: 'bash', env: { BASELINE: '${{ inputs.baseline }}', STARTUP_SCENARIO: '${{ inputs.startup_scenario }}' },
+    run: 'set -euo pipefail\n[[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]\n[[ "${{ inputs.startup_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]\n[[ -z "$STARTUP_SCENARIO" || ( "$STARTUP_SCENARIO" == s2-warm && "${{ inputs.startup_diagnostic }}" == true && "${{ inputs.performance_contract_only }}" != true ) ]]\n',
   });
   const checkouts = compare.steps!.filter(item => item.uses?.startsWith('actions/checkout@'));
   expect(checkouts.map(({ name: _name, uses, ...contract }) => ({ ...contract, uses: unpin(uses!) })))
@@ -464,7 +467,7 @@ function assertNativeGraph(files: Map<string, string>) {
       { run: 'pnpm --dir candidate/bench/compare exec playwright install --with-deps chromium' },
       { if: '${{ inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nmkdir -p "$RUNNER_TEMP/motion-performance"\nprintf \'mode=performance-contract-only\\n\' > "$RUNNER_TEMP/motion-performance/contract-only.txt"' },
       { run: 'xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs' },
-      { if: '${{ inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', 'working-directory': 'candidate', env: { BASELINE: '${{ inputs.baseline }}' }, run: 'set -euo pipefail\ngit diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries\nxvfb-run -a node bench/compare/transition-profile.mjs . "$RUNNER_TEMP/motion-performance/startup-diagnostic" startup-diagnostic' },
+      { if: '${{ inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', 'working-directory': 'candidate', env: { BASELINE: '${{ inputs.baseline }}', MOTION_STARTUP_DIAGNOSTIC_SCENARIO: '${{ inputs.startup_scenario }}' }, run: 'set -euo pipefail\ngit diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries\nxvfb-run -a node bench/compare/transition-profile.mjs . "$RUNNER_TEMP/motion-performance/startup-diagnostic" startup-diagnostic' },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/spring" spring-pair baseline\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline' },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline' },
       { if: '${{ !inputs.startup_diagnostic && !inputs.performance_contract_only }}', 'working-directory': 'candidate/bench/compare', run: 'xvfb-run -a node bench.mjs' },
@@ -564,6 +567,7 @@ function assertNativeGraph(files: Map<string, string>) {
       PERFORMANCE_CONTRACT_ONLY: '${{ inputs.performance_contract_only }}',
       PROFILE_BASELINE: '${{ inputs.profile_baseline }}',
       PERFORMANCE_BASELINE: '${{ inputs.performance_baseline }}',
+      STARTUP_SCENARIO: '${{ inputs.startup_scenario }}',
     },
     run: `${gateCommand}\n`,
   }]);
@@ -777,7 +781,7 @@ describe('нативный граф CI', () => {
       ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
       MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
       SECURITY_RESULT: 'success', PERFORMANCE_CONTRACT_ONLY: '', PROFILE_BASELINE: '', EVENT_NAME: 'pull_request',
-      STARTUP_DIAGNOSTIC: '', PERFORMANCE_BASELINE: '',
+      STARTUP_DIAGNOSTIC: '', STARTUP_SCENARIO: '', PERFORMANCE_BASELINE: '',
     };
     delete env[key];
     if (result !== undefined) env[key] = result;
@@ -798,7 +802,7 @@ describe('нативный граф CI', () => {
       const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
         env: { ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
           MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success',
-          EVENT_NAME: event, STARTUP_DIAGNOSTIC: diagnostic, PERFORMANCE_BASELINE: baseline, PERFORMANCE_CONTRACT_ONLY: 'false', PROFILE_BASELINE: 'false' },
+          EVENT_NAME: event, STARTUP_DIAGNOSTIC: diagnostic, STARTUP_SCENARIO: '', PERFORMANCE_BASELINE: baseline, PERFORMANCE_CONTRACT_ONLY: 'false', PROFILE_BASELINE: 'false' },
         encoding: 'utf8', timeout: 5000,
       });
       expect(actual.error).toBeUndefined();
@@ -833,9 +837,53 @@ describe('нативный граф CI', () => {
     const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', ci.jobs.CI!.steps![0]!.run!], {
       encoding: 'utf8', timeout: 5000,
       env: { ...process.env, EVENT_NAME: 'workflow_dispatch', STARTUP_DIAGNOSTIC: startup,
-        PERFORMANCE_CONTRACT_ONLY: contract, PROFILE_BASELINE: profile, PERFORMANCE_BASELINE: baseline,
+        PERFORMANCE_CONTRACT_ONLY: contract, PROFILE_BASELINE: profile, PERFORMANCE_BASELINE: baseline, STARTUP_SCENARIO: '',
         VERIFY_RESULT: 'success', TESTS_RESULT: 'success', MUTATION_RESULT: 'success',
         BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success' },
+    });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status === 0, actual.stderr).toBe(passes);
+  });
+
+  it.each([
+    { scenario: '', startup: 'false', contract: 'false', profile: 'false', baseline: '', passes: true },
+    { scenario: '', startup: 'true', contract: 'false', profile: 'false', baseline: 'a'.repeat(40), passes: true },
+    { scenario: 's2-warm', startup: 'true', contract: 'false', profile: 'false', baseline: 'a'.repeat(40), passes: true },
+    { scenario: 's2-warm', startup: 'false', contract: 'false', profile: 'false', baseline: 'a'.repeat(40), passes: false },
+    { scenario: 's2-warm', startup: 'true', contract: 'false', profile: 'false', baseline: '', passes: false },
+    { scenario: 's2-warm', startup: 'true', contract: 'false', profile: 'false', baseline: 'main', passes: false },
+    { scenario: 's2-warm', startup: 'true', contract: 'true', profile: 'false', baseline: 'a'.repeat(40), passes: false },
+    { scenario: 's2-warm', startup: 'true', contract: 'false', profile: 'true', baseline: 'a'.repeat(40), passes: false },
+    { scenario: 'unknown', startup: 'true', contract: 'false', profile: 'false', baseline: 'a'.repeat(40), passes: false },
+    { scenario: 's2-warm', startup: 'false', contract: 'false', profile: 'false', baseline: '', passes: false },
+  ])('startup_scenario aggregate dispatch $scenario/$startup/$contract/$profile', ({ scenario, startup, contract, profile, baseline, passes }) => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', ci.jobs.CI!.steps![0]!.run!], {
+      encoding: 'utf8', timeout: 5000,
+      env: { ...process.env, EVENT_NAME: 'workflow_dispatch', STARTUP_SCENARIO: scenario,
+        STARTUP_DIAGNOSTIC: startup, PERFORMANCE_CONTRACT_ONLY: contract,
+        PROFILE_BASELINE: profile, PERFORMANCE_BASELINE: baseline,
+        VERIFY_RESULT: 'success', TESTS_RESULT: 'success', MUTATION_RESULT: 'success',
+        BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success' },
+    });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status === 0, actual.stderr).toBe(passes);
+  });
+
+  it.each([
+    { scenario: '', startup: false, contract: false, passes: true },
+    { scenario: 's2-warm', startup: true, contract: false, passes: true },
+    { scenario: 's2-warm', startup: false, contract: false, passes: false },
+    { scenario: 's2-warm', startup: true, contract: true, passes: false },
+    { scenario: 'unknown', startup: true, contract: false, passes: false },
+  ])('reusable startup_scenario first-step $scenario/$startup/$contract', ({ scenario, startup, contract, passes }) => {
+    const performance = parse(sources().get('performance.yml')!) as Workflow;
+    const first = performance.jobs.compare!.steps![0]!;
+    const program = first.run!.replaceAll('${{ inputs.startup_diagnostic }}', String(startup))
+      .replaceAll('${{ inputs.performance_contract_only }}', String(contract));
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
+      encoding: 'utf8', timeout: 5000,
+      env: { ...process.env, BASELINE: 'a'.repeat(40), STARTUP_SCENARIO: scenario },
     });
     expect(actual.error).toBeUndefined();
     expect(actual.status === 0, actual.stderr).toBe(passes);
