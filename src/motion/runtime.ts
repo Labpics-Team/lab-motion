@@ -541,7 +541,7 @@ export class Runtime {
     const result: Draft[] = [], synced = new Set<Surface>();
     try {
       for (let i = 0; i < elements.length; i++) {
-        const element = elements[i]!, start = offset + i * clock._stagger;
+        const element = elements[i]!;
         for (let j = 0; j < props.length; j++) {
           const property = props[j]!;
           const group = this._surface(element, property._key);
@@ -549,14 +549,7 @@ export class Runtime {
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
-          // До push индекс i * props.length + j; предыдущая цель владеет тем же свойством.
-          const previous = i > 0 && !property._authored && property._literal && values.length === 1 &&
-            typeof values[0] === 'number' && (isTransform(property._key) || property._key === 'opacity') && !clock._spring
-            ? result[result.length - props.length]!._program : undefined;
-          const first = previous?._segments[0];
-          const spec = previous && Object.is(start, offset + (i - 1) * clock._stagger) && Object.is(current._unit, previous._unit) &&
-            Object.is(current._coordinates[0], first!._from[0]) && Object.is(current._velocity[0], first!._velocity[0])
-            ? previous : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, start);
+          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
           result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });
         }
       }
