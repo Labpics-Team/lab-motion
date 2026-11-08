@@ -39,6 +39,7 @@ public sealed partial class MainPage : Page
             await Progress("down");
             await Progress("reverse");
             await Progress("velocity");
+            await Boundaries();
             Status.Text = "Траектории проверены";
             Save("captured", null);
         }
@@ -219,6 +220,34 @@ public sealed partial class MainPage : Page
             Require(Math.Abs(trace.First(x => x.Phase == "inertia").NativeVelocity!.Value - 2) <= .00001f,
                 "Скорость канала возвращается не в единицах прогресса в секунду.");
         ElementCompositionPreview.SetElementChildVisual(Stage, null);
+    }
+
+    private async Task Boundaries()
+    {
+        var compositor = ElementCompositionPreview.GetElementVisual(Stage).Compositor;
+        using var sprite = compositor.CreateSpriteVisual();
+        sprite.Size = new System.Numerics.Vector2(24, 24);
+        using var brush = compositor.CreateColorBrush(((SolidColorBrush)Status.Foreground).Color);
+        sprite.Brush = brush;
+        ElementCompositionPreview.SetElementChildVisual(Stage, sprite);
+        var passed = true;
+        try
+        {
+            foreach (var coordinates in new[] { "progress", "raw-x", "raw-y" })
+            {
+                foreach (var (name, initial, velocity) in new[] { ("lower", 0f, -1f), ("interior", .5f, -1f), ("upper", 1f, 1f) })
+                {
+                    foreach (var setter in coordinates == "progress" ? new[] { false, true } : new[] { false })
+                    {
+                        var capture = await BoundaryProbe.Capture(compositor, sprite, coordinates, name, initial, velocity, setter);
+                        runs.Add(capture.Evidence);
+                        passed &= capture.Passed;
+                    }
+                }
+            }
+        }
+        finally { ElementCompositionPreview.SetElementChildVisual(Stage, null); }
+        Require(passed, "Native boundary или SetTarget не подтвердили цель и единственный terminal.");
     }
 
     private static async Task Until(Func<bool> condition)

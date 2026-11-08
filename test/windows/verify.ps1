@@ -85,12 +85,17 @@ try {
 }
 
 $trace = Get-Content -LiteralPath $tracePath -Raw | ConvertFrom-Json
-if ($trace.status -ne 'captured' -or $trace.error -or $trace.runs.Count -ne 11) {
-    throw 'Не получены все одиннадцать нативных сценариев.'
+if ($trace.status -ne 'captured' -or $trace.error -or $trace.runs.Count -ne 23) {
+    throw 'Не получены все двадцать три нативных сценария.'
 }
 $expected = @('idle-reentrant-retarget', 'lifetime', 'retarget-preserve:-1', 'retarget-preserve:1',
     'retarget-reset-mutant:-1', 'retarget-reset-mutant:1', 'smooth-settle',
-    'progress-up', 'progress-down', 'progress-reverse', 'progress-velocity') | Sort-Object
+    'progress-up', 'progress-down', 'progress-reverse', 'progress-velocity',
+    'boundary-progress-lower-settle', 'boundary-progress-lower-setter',
+    'boundary-progress-interior-settle', 'boundary-progress-interior-setter',
+    'boundary-progress-upper-settle', 'boundary-progress-upper-setter',
+    'boundary-raw-x-lower-settle', 'boundary-raw-x-interior-settle', 'boundary-raw-x-upper-settle',
+    'boundary-raw-y-lower-settle', 'boundary-raw-y-interior-settle', 'boundary-raw-y-upper-settle') | Sort-Object
 $actual = @($trace.runs | ForEach-Object {
     if ($_.kind -like 'retarget-*') { "$($_.kind):$($_.direction)" } else { $_.kind }
 }) | Sort-Object
@@ -99,6 +104,9 @@ foreach ($run in $trace.runs) {
     if ($run.trace.Count -eq 0 -or @($run.trace | Where-Object { $_.Phase -eq 'inertia' }).Count -eq 0) {
         throw "Сценарий $($run.kind) не наблюдал нативное движение."
     }
+    if ($run.kind -like 'boundary-*' -and !$run.passed) {
+        throw "Сценарий $($run.kind) не подтвердил границы движения."
+    }
 }
-[ordered]@{ passed = $true; lifecycleScenarios = 6; bindingScenarios = 15; panScenarios = 22; continuationScenarios = 16; nativeScenarios = 11; scale = $trace.scale } |
+[ordered]@{ passed = $true; lifecycleScenarios = 6; bindingScenarios = 15; panScenarios = 22; continuationScenarios = 16; nativeScenarios = 23; scale = $trace.scale } |
     ConvertTo-Json | Tee-Object -FilePath (Join-Path $output 'result.json')
