@@ -567,26 +567,26 @@ describe('schema 10 motion conformance admission', () => {
     expect(() => validateBenchmarkReportForPublication(motionFixture())).toThrow(/motion conformance/);
   });
 
-  it.each(['baseline', 'blocked'] as const)('происхождение %s переживает JSON, но не доказывает геометрию', (mode) => {
-    for (const source of [undefined, 'legacy', 'unknown', 'png-threshold-v1', 'analytic-test-v1']) {
-      for (const channel of ['target', 'witness'] as const) {
-        const report = motionFixture();
-        const run = report.payload.results.lab.raw.freeze[0];
-        run.evidence.measurement = { [mode]: { target: 'png-threshold-v1', witness: 'png-threshold-v1', [channel]: source } };
-        Object.assign(run.evidence.measurement[mode], { qualifiedGeometry: true, oracle: 'trusted', trusted: true });
-        report.payload.results.lab.raw.freeze[0] = JSON.parse(JSON.stringify(run));
-        refreshMotionReport(report);
-        const result = report.payload.motionConformance.lab.runs[0];
-        expect(result.capture[mode]).toMatchObject({
-          verdict: 'inconclusive', reason: 'raster-to-css-unproven',
-          measurement: { [channel]: source ?? 'unknown' },
-        });
-        expect(result.diagnostic[mode].verdict).toBe('pass');
-        expect(result[mode].verdict).toBe('inconclusive');
-        expect(() => validateBenchmarkReportPair(report)).not.toThrow();
-        expect(() => validateBenchmarkReportForPublication(report)).toThrow(/motion conformance/);
-      }
-    }
+  it.each((['baseline', 'blocked'] as const).flatMap((mode) =>
+    [undefined, 'legacy', 'unknown', 'png-threshold-v1', 'analytic-test-v1'].flatMap((source) =>
+      (['target', 'witness'] as const).map((channel) => ({ mode, source, channel })),
+    ),
+  ))('происхождение $mode ($source, $channel) переживает JSON, но не доказывает геометрию', ({ mode, source, channel }) => {
+    const report = motionFixture();
+    const run = report.payload.results.lab.raw.freeze[0];
+    run.evidence.measurement = { [mode]: { target: 'png-threshold-v1', witness: 'png-threshold-v1', [channel]: source } };
+    Object.assign(run.evidence.measurement[mode], { qualifiedGeometry: true, oracle: 'trusted', trusted: true });
+    report.payload.results.lab.raw.freeze[0] = JSON.parse(JSON.stringify(run));
+    refreshMotionReport(report);
+    const result = report.payload.motionConformance.lab.runs[0];
+    expect(result.capture[mode]).toMatchObject({
+      verdict: 'inconclusive', reason: 'raster-to-css-unproven',
+      measurement: { [channel]: source ?? 'unknown' },
+    });
+    expect(result.diagnostic[mode].verdict).toBe('pass');
+    expect(result[mode].verdict).toBe('inconclusive');
+    expect(() => validateBenchmarkReportPair(report)).not.toThrow();
+    expect(() => validateBenchmarkReportForPublication(report)).toThrow(/motion conformance/);
   });
 
   it('конечные целочисленные и субпиксельные PNG-контроли не открывают CSS-допуск', () => {
