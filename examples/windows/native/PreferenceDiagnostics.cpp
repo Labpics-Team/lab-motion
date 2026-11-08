@@ -71,7 +71,7 @@ namespace PreferenceDiagnostics
     {
         Record* record;
     public:
-        explicit Receiver(Record* value) noexcept : record(value) { record->Retain(); }
+        explicit Receiver(Record* recordState) noexcept : record(recordState) { record->Retain(); }
         ~Receiver() { record->Release(); }
         HRESULT STDMETHODCALLTYPE Invoke(View::IUISettings*, View::IUISettingsAnimationsEnabledChangedEventArgs*) override
         {
