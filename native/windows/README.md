@@ -409,7 +409,7 @@ RawCount, ActionCount, LastRawQpc, LastActionQpc, QpcFrequency, ForwardCount,
 AddHResult, RemoveHResult, Attached, Active, Faulted, Destroyed. Synthetic control,
 raw messages и сообщения нужного action учитываются раздельно; поздний null сбрасывает
 предыдущую выборку. Сохраняется общий предел 1800 ASCII-символов с отказом при превышении.
-`setter` содержит шестое nullable поле `ContextStillMatches`: readonly проверку
+`setter` содержит седьмое nullable поле `ContextStillMatches` (индекс 6): readonly проверку
 PID/TID/window station непосредственно перед прежним SET с flags 2. SameDesktop
 проверяется при attach, а не для каждого сообщения. Эти поля не идентифицируют
 конкретный SPI; положительный count не доказывает причину или своевременное прерывание,
