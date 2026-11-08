@@ -129,6 +129,9 @@ if ($unitResult.continuations.Count -ne 16 -or @($unitResult.continuations | Whe
 }
 $actualLifecycle = @($unitResult.results | ForEach-Object { $_.scenario }) | Sort-Object
 if (Compare-Object $expectedLifecycle $actualLifecycle) { throw 'Состав lifecycle-сценариев изменился.' }
+if ($unitResult.retargetMeter.Count -ne 14 -or @($unitResult.retargetMeter | Where-Object { !$_.Passed }).Count -ne 0) {
+    throw 'Измеритель retarget не различил все четырнадцать контрольных историй.'
+}
 
 Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--artifacts-path', $buildOutput, '--output', $appOutput)
 Copy-Item -LiteralPath (Join-Path $output 'native-diagnostics/LabMotion.PreferenceDiagnostics.dll') -Destination $appOutput
@@ -238,5 +241,5 @@ foreach ($run in $trace.runs) {
         throw "Сценарий $($run.kind) не подтвердил границы движения."
     }
 }
-[ordered]@{ passed = $true; lifecycleScenarios = $expectedLifecycle.Count; bindingScenarios = 15; disposalScenarios = 11; panScenarios = 22; continuationScenarios = 16; nativeScenarios = 23; scale = $trace.scale } |
+[ordered]@{ passed = $true; lifecycleScenarios = $expectedLifecycle.Count; bindingScenarios = 15; disposalScenarios = 11; panScenarios = 22; continuationScenarios = 16; retargetMeterScenarios = 14; nativeScenarios = 23; scale = $trace.scale } |
     ConvertTo-Json | Tee-Object -FilePath (Join-Path $output 'result.json')
