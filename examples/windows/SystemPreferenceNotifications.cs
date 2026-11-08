@@ -25,6 +25,7 @@ internal sealed class SystemPreferenceNotifications : IDisposable
     private readonly Action<SystemPreferenceNotifications, Exception> reportFailure;
     private readonly bool captureDiagnostics;
     private readonly long registration;
+    private readonly ProjectionDiagnostics? projectionDiagnostics;
     private long rawEntries;
     private long admittedEntries;
     private EntryOutcome lastEntry;
@@ -46,8 +47,13 @@ internal sealed class SystemPreferenceNotifications : IDisposable
         this.captureDiagnostics = captureDiagnostics;
         registration = captureDiagnostics ? Interlocked.Increment(ref nextRegistration) : 0;
         CheckAccess();
-        settings.AnimationsEnabledChanged += AnimationsChanged;
-        lock (gate) subscribed = true;
+        projectionDiagnostics = captureDiagnostics ? ProjectionDiagnostics.Create(typeof(UISettings).Assembly) : null;
+        try
+        {
+            settings.AnimationsEnabledChanged += AnimationsChanged;
+            lock (gate) subscribed = true;
+        }
+        catch { projectionDiagnostics?.Dispose(); throw; }
     }
 
     // Отказ снятия не забывает транспорт; допуск к эффекту отзывается отдельно.
@@ -64,6 +70,8 @@ internal sealed class SystemPreferenceNotifications : IDisposable
                 subscribed, subscribed && !retired, failure is not null || reportingFailure is not null);
         }
     }
+
+    internal ProjectionDiagnostics.Snapshot? ReadProjectionDiagnostics() => projectionDiagnostics?.ReadSnapshot();
 
     private static long? SafeNumber(long value, bool positive = false)
         => value >= (positive ? 1 : 0) && value <= MaximumSafeInteger ? value : null;
@@ -98,17 +106,21 @@ internal sealed class SystemPreferenceNotifications : IDisposable
             remove = subscribed && !removalAttempted;
             if (remove) removalAttempted = true;
         }
-        if (remove)
+        try
         {
-            try
+            if (remove)
             {
-                // После отказа projection повторный -= может быть no-op, а не native receipt.
-                // Единственная попытка не держит gate: поздний callback увидит retired.
-                settings.AnimationsEnabledChanged -= AnimationsChanged;
-                lock (gate) subscribed = false;
+                try
+                {
+                    // После отказа projection повторный -= может быть no-op, а не native receipt.
+                    // Единственная попытка не держит gate: поздний callback увидит retired.
+                    settings.AnimationsEnabledChanged -= AnimationsChanged;
+                    lock (gate) subscribed = false;
+                }
+                catch (Exception error) { CaptureFailure(error); }
             }
-            catch (Exception error) { CaptureFailure(error); }
         }
+        finally { projectionDiagnostics?.Dispose(); }
         ThrowIfFaulted();
     }
 

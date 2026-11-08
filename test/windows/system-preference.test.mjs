@@ -4,6 +4,53 @@ import { readFileSync } from 'node:fs';
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
+function projectionViolations(observer, adapter) {
+  const callback = observer.slice(observer.indexOf('private void FirstChance('), observer.indexOf('private long BoundedNext'));
+  return [
+    ['trace-only-before-registration', !adapter.includes('captureDiagnostics ? ProjectionDiagnostics.Create(typeof(UISettings).Assembly) : null')
+      || adapter.indexOf('ProjectionDiagnostics.Create(') > adapter.indexOf('settings.AnimationsEnabledChanged +=')],
+    ['scoped-cleanup', !observer.includes('FirstChanceException += observer.FirstChance;')
+      || !observer.includes('FirstChanceException -= FirstChance;')
+      || !adapter.includes('catch { projectionDiagnostics?.Dispose(); throw; }')
+      || !adapter.includes('finally { projectionDiagnostics?.Dispose(); }')],
+    ['guard-and-closed-throwing-site', !observer.includes('[ThreadStatic]')
+      || !observer.includes('finally { insideObserver = false; }')
+      || !observer.includes('error.TargetSite?.Module.Assembly')
+      || /error\.(Message|StackTrace|Source)|GetBaseException\(|new UISettings/.test(observer)],
+    ['no-callback-effects', /File\.|HashData|lock\s*\(|Dispatcher|Console\.|\.Invoke\(/.test(callback)],
+    ['newest-bounded-and-incomplete', !callback.includes('entry.Order > before.Last.Order')
+      || !observer.includes('Math.Max(0, captured.Count - 1)')
+      || !observer.includes('Interlocked.Exchange(ref faulted, 1)')],
+  ].filter(([, bad]) => bad).map(([name]) => name);
+}
+
+test('trace-only projection diagnostics preserve scope, thrown-owner fidelity and newest bounded evidence under sabotage', () => {
+  const observer = read('../../examples/windows/ProjectionDiagnostics.cs');
+  const adapter = read('../../examples/windows/SystemPreferenceNotifications.cs');
+  assert.deepEqual(projectionViolations(observer, adapter), []);
+  for (const [part, from, to, wanted] of [
+    ['adapter', 'captureDiagnostics ? ProjectionDiagnostics.Create(typeof(UISettings).Assembly) : null', 'ProjectionDiagnostics.Create(typeof(UISettings).Assembly)', 'trace-only-before-registration'],
+    ['adapter', 'finally { projectionDiagnostics?.Dispose(); }', 'finally { }', 'scoped-cleanup'],
+    ['adapter', 'catch { projectionDiagnostics?.Dispose(); throw; }', 'catch { throw; }', 'scoped-cleanup'],
+    ['observer', 'FirstChanceException -= FirstChance;', 'FirstChanceException += FirstChance;', 'scoped-cleanup'],
+    ['observer', 'error.TargetSite?.Module.Assembly', 'error.Source', 'guard-and-closed-throwing-site'],
+    ['observer', 'finally { insideObserver = false; }', 'finally { }', 'guard-and-closed-throwing-site'],
+    ['observer', 'entry.Order > before.Last.Order', 'entry.Order < before.Last.Order', 'newest-bounded-and-incomplete'],
+    ['observer', 'var error = args.Exception;', 'File.OpenRead("private"); var error = args.Exception;', 'no-callback-effects'],
+  ]) {
+    const changed = { observer, adapter, [part]: (part === 'observer' ? observer : adapter).replace(from, to) };
+    assert(projectionViolations(changed.observer, changed.adapter).includes(wanted), wanted);
+  }
+  const reader = read('./verify-input.ps1');
+  assert(reader.includes('projection = $projectionSummary'));
+  assert(reader.includes('$sequence -gt $projectionSequence'));
+  assert(reader.includes("'hresult' { if (($value -is [int] -or $value -is [long])"));
+  assert(reader.includes("& pwsh -NoProfile -File (Join-Path $PSScriptRoot 'projection-diagnostics.test.ps1')"));
+  const controls = read('./projection-diagnostics-controls.cs');
+  for (const name of ['caught-throw-before-handler', 'newest-overflow-not-first-n', 'unknown-type-null',
+    'recursive-incomplete', 'unsubscribe', 'idempotent-unsubscribe', 'loaded-identity']) assert(controls.includes(name));
+});
+
 test('canonical animation property event replaces WM-only transport on supported Windows', () => {
   const adapter = read('../../examples/windows/SystemPreferenceNotifications.cs');
   const page = read('../../examples/windows/PressPage.xaml.cs');
@@ -190,7 +237,7 @@ test('native property adapter preserves retirement, actual revocation and backgr
     assert.deepEqual(adapterViolations(healthy), []);
     for (const [before, after, violation] of [
       ['settings.AnimationsEnabledChanged += AnimationsChanged;', '', 'single typed native event on owned UISettings'],
-      ['CheckAccess();\n        settings.AnimationsEnabledChanged', 'settings.AnimationsEnabledChanged', 'owner UI admission before native registration'],
+      ['CheckAccess();', '', 'owner UI admission before native registration'],
       ['lock (gate) return subscribed;', 'return !retired;', 'actual transport and active effect are separate synchronized states'],
       ['lock (gate) return subscribed && !retired;', 'lock (gate) return subscribed;', 'actual transport and active effect are separate synchronized states'],
       ['retired = true;\n            remove = subscribed', 'retired = false;\n            remove = subscribed', 'revoke before native removal and retain failed transport'],

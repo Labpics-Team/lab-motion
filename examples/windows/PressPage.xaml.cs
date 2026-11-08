@@ -269,6 +269,7 @@ public sealed partial class PressPage : Page
                     notification = ReadSystemNotificationForTrace(),
                     diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0,
                     subscriptionDiagnostics = ReadSubscriptionDiagnosticsForTrace(subscriptionForTrace),
+                    projectionDiagnostics = ReadProjectionDiagnosticsForTrace(subscriptionForTrace),
                     subscriptionIsCurrent = subscriptionForTrace is null ? (bool?)null : ReferenceEquals(notifications, subscriptionForTrace),
                 });
                 trace?.Flush();
@@ -298,6 +299,16 @@ public sealed partial class PressPage : Page
             return subscription.ReadDiagnostics();
         }
         catch { return null; } // Диагностика не превращает чтение в policy/cleanup.
+    }
+
+    private ProjectionDiagnostics.Snapshot? ReadProjectionDiagnosticsForTrace(SystemPreferenceNotifications? subscription)
+    {
+        try
+        {
+            if (!DispatcherQueue.HasThreadAccess || subscription is null) return null;
+            return subscription.ReadProjectionDiagnostics();
+        }
+        catch { return null; } // Ошибка наблюдения не подменяет motion/policy исход.
     }
 
     private bool? ReadSystemAnimationForTrace()
