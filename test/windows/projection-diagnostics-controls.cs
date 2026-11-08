@@ -21,24 +21,29 @@ public static class ProjectionDiagnosticControls
 
     public static string Run()
     {
-        using var observer = ProjectionDiagnostics.Create(typeof(ProjectionDiagnosticControls).Assembly);
-        Require(observer is not null, "attached");
-        var before = observer!.ReadSnapshot();
+        using var observer = ProjectionDiagnostics.Create(typeof(ProjectionDiagnosticControls).Assembly)
+            ?? throw new InvalidOperationException("projection-control: attached");
+        var before = observer.ReadSnapshot();
         Catch(ThrowProjection);
         var after = observer.ReadSnapshot();
-        Require(after.Count > before.Count && after.LastProjection?.Type == "COM"
-            && after.LastProjection.HResult == unchecked((int)0x80004002)
-            && after.LastProjection.ThrowingOwner == "UISettings", "caught-throw-before-handler");
-        Require(after.LastProjection.Qpc is > 0 && after.QpcFrequency is > 0, "qpc");
-        var first = after.LastProjection.Order;
+        var firstProjection = after.LastProjection
+            ?? throw new InvalidOperationException("projection-control: caught-throw-before-handler");
+        Require(after.Count > before.Count && firstProjection.Type == "COM"
+            && firstProjection.HResult == unchecked((int)0x80004002)
+            && firstProjection.ThrowingOwner == "UISettings", "caught-throw-before-handler");
+        Require(firstProjection.Qpc is > 0 && after.QpcFrequency is > 0, "qpc");
+        var first = firstProjection.Order;
         for (var i = 0; i < 32; i++) Catch(ThrowProjection);
         var newest = observer.ReadSnapshot();
-        Require(newest.LastProjection!.Order > first && newest.ProjectionCount >= 33 && newest.ProjectionOmitted >= 32,
+        var newestProjection = newest.LastProjection
+            ?? throw new InvalidOperationException("projection-control: newest-overflow-not-first-n");
+        Require(newestProjection.Order > first && newest.ProjectionCount >= 33 && newest.ProjectionOmitted >= 32,
             "newest-overflow-not-first-n");
         Catch(ThrowUnknown);
         Require(observer.ReadSnapshot().LastProjection?.Type is null, "unknown-type-null");
         // Thread-local guard контролируется перед реальным CLR throw, не вместо observer callback.
-        var guard = typeof(ProjectionDiagnostics).GetField("insideObserver", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var guard = typeof(ProjectionDiagnostics).GetField("insideObserver", BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("projection-control: recursion-guard");
         guard.SetValue(null, true);
         try { Catch(ThrowProjection); }
         finally { guard.SetValue(null, false); }
