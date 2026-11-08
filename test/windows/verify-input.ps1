@@ -134,7 +134,18 @@ function Wait-Rest([long]$After = 0) {
         }
         Start-Sleep -Milliseconds 50
     } while ([DateTime]::UtcNow -lt $deadline)
-    throw 'Кнопка не вернулась в отпущенное состояние за 8 секунд.'
+    try { throw 'Кнопка не вернулась в отпущенное состояние за 8 секунд.' }
+    catch {
+        $failure = $_
+        try {
+            $summary = Get-RestSummary -After $After -Events $events
+            $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`nwait-rest: " + $summary)
+        } catch {
+            try { $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`nwait-rest: unavailable") }
+            catch { }
+        }
+        throw $failure
+    }
 }
 
 function Read-InputPhaseField($Data, [string]$Field, [string]$Type) {
@@ -150,6 +161,8 @@ function Read-InputPhaseField($Data, [string]$Field, [string]$Type) {
         'end' { if ($value -is [string] -and $value -cin @('Finished', 'Stopped')) { return $value } }
         'outcome' { if ($value -is [string] -and $value -cin @('Missing', 'Stale', 'Detached', 'Deduplicated', 'Update')) { return $value } }
         'entryOutcome' { if ($value -is [string] -and $value -cin @('None', 'Admitted', 'Rejected')) { return $value } }
+        'trigger' { if ($value -is [string] -and $value -cin @('attach', 'pressed', 'enabled', 'localPreference', 'systemPreference')) { return $value } }
+        'restKind' { if ($value -is [string] -and $value -cin @('completed', 'snapReadback')) { return $value } }
         'identityState' { if ($value -is [string] -and $value -cin @('Hashed', 'NotLoaded', 'NoLocation', 'TooLarge', 'Unavailable', 'Ambiguous')) { return $value } }
         'throwType' { if ($value -is [string] -and $value -cin @('COM', 'InvalidCast', 'Argument', 'InvalidOperation', 'TypeLoad', 'MissingMethod', 'FileNotFound', 'NotSupported')) { return $value } }
         'throwOwner' { if ($value -is [string] -and $value -cin @('UISettings', 'WinRTRuntime', 'Application', 'CoreRuntime', 'Other')) { return $value } }
@@ -162,6 +175,48 @@ function Read-InputPhaseField($Data, [string]$Field, [string]$Type) {
         'sha256' { if ($value -is [string] -and $value -cmatch '^[0-9a-f]{64}$') { return $value } }
     }
     return $null
+}
+
+function Get-RestSummary([long]$After, [object[]]$Events) {
+    # Последний уже прочитанный snapshot; attach не отбрасывается как не-input trigger.
+    $intentData = $null
+    $intent = $null
+    $completion = $null
+    $invalid = 0
+    foreach ($event in $Events) {
+        if ($null -eq $event) { $invalid++; continue }
+        $sequence = Read-InputPhaseField $event 'sequence' 'number'
+        if ($null -eq $sequence) { $invalid++ }
+        $kind = $event.PSObject.Properties['kind']
+        if ($null -eq $kind -or $kind.Value -isnot [string]) { $invalid++; continue }
+        if ($kind.Value -cne 'intent') { continue }
+        $property = $event.PSObject.Properties['data']
+        $intentData = if ($null -ne $property) { $property.Value } else { $null }
+        if ($null -eq $intentData) { $invalid++ }
+        $intent = @($sequence, (Read-InputPhaseField $intentData 'operation' 'number'),
+            (Read-InputPhaseField $intentData 'pressed' 'bool'), (Read-InputPhaseField $intentData 'localAnimation' 'bool'),
+            (Read-InputPhaseField $intentData 'systemAnimation' 'bool'), (Read-InputPhaseField $intentData 'trigger' 'trigger'))
+    }
+    $operation = Read-InputPhaseField $intentData 'operation' 'number'
+    if ($null -ne $operation) {
+        foreach ($event in $Events) {
+            if ($null -eq $event) { continue }
+            $sequence = Read-InputPhaseField $event 'sequence' 'number'
+            $kind = Read-InputPhaseField $event 'kind' 'restKind'
+            if ($null -eq $kind) { continue }
+            $property = $event.PSObject.Properties['data']
+            $data = if ($null -ne $property) { $property.Value } else { $null }
+            $endOperation = Read-InputPhaseField $data 'operation' 'number'
+            # Unknown operation не совпадает с unknown и не заимствует прежний completion.
+            if ($null -eq $endOperation -or $endOperation -ne $operation) { continue }
+            $completion = @($sequence, $kind, (Read-InputPhaseField $data 'reason' 'reason'), (Read-InputPhaseField $data 'end' 'end'))
+        }
+    }
+    $count = if ($null -eq $Events) { 0 } else { $Events.Count }
+    $summary = [ordered]@{ schema = 1; after = (Read-InputPhaseField ([pscustomobject]@{ value = $After }) 'value' 'number');
+        count = $count; invalid = $invalid; intent = $intent; completion = $completion } | ConvertTo-Json -Depth 3 -Compress
+    if ($summary.Length -gt 1800) { throw 'Диагностика ожидания превысила свой фиксированный предел.' }
+    return $summary
 }
 
 function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $Setter = $null) {

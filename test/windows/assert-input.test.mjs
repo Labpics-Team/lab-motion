@@ -901,12 +901,13 @@ test('nullable completed getter использует прежнюю bool про�
 test('отказ snap называет сценарий и сохраняет порядок фаз без нового чтения trace', () => {
   const source = readSource(new URL('./verify-input.ps1', import.meta.url));
   assert.deepEqual(inputPhaseDiagnosticViolations(source), []);
+  const snapDiagnosticStart = source.indexOf('function Get-InputPhaseSummary(');
   for (const [before, after, namedError] of [
     ["'InputSnapNotObserved'", "'unnamed'", 'named snap failure'],
     ['-Events $events', '-Events @(Read-Trace)', 'bounded snapshot reused'],
     ['throw $failure', 'throw', 'diagnostic cannot replace primary'],
     ['$summary.Length -le 1800', '$true', 'fixed phase summary bound'],
-  ]) assert(inputPhaseDiagnosticViolations(source.replace(before, after)).includes(namedError), namedError);
+  ]) assert(inputPhaseDiagnosticViolations(source.slice(0, snapDiagnosticStart) + source.slice(snapDiagnosticStart).replace(before, after)).includes(namedError), namedError);
 });
 
 test('диагностика фаз проецирует enum/bool/number и сохраняет missing/malformed проверки настоящего helper', () => {

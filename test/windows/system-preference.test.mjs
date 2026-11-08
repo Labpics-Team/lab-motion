@@ -4,6 +4,32 @@ import { readFileSync } from 'node:fs';
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
+function restFailureViolations(source) {
+  const wait = source.slice(source.indexOf('function Wait-Rest('), source.indexOf('function Read-InputPhaseField('));
+  return [
+    ['existing snapshot only', !wait.includes('Get-RestSummary -After $After -Events $events') || (wait.match(/Read-Trace/g) ?? []).length !== 1],
+    ['original wait and oracle', !wait.includes('[DateTime]::UtcNow.AddSeconds(8)') || !wait.includes('Start-Sleep -Milliseconds 50')
+      || !wait.includes("if ($intents[-1].sequence -gt $After -and !$last.pressed -and $ends.Count) { return }")],
+    ['primary survives projection fault', !wait.includes("throw 'Кнопка не вернулась в отпущенное состояние за 8 секунд.'")
+      || !wait.includes('$failure = $_') || !wait.includes('wait-rest: unavailable') || !wait.includes('throw $failure')],
+  ].filter(([, bad]) => bad).map(([name]) => name);
+}
+
+test('terminal Wait-Rest preserves rejection and projects only its last snapshot, including initial attach', () => {
+  const source = read('./verify-input.ps1');
+  assert.deepEqual(restFailureViolations(source), []);
+  for (const [from, to, wanted] of [
+    ['-After $After -Events $events', '-After $After -Events @(Read-Trace)', 'existing snapshot only'],
+    ['AddSeconds(8)', 'AddSeconds(9)', 'original wait and oracle'],
+    ['throw $failure', 'return', 'primary survives projection fault'],
+    ['wait-rest: unavailable', 'private-error', 'primary survives projection fault'],
+  ]) assert(restFailureViolations(source.replace(from, to)).includes(wanted), wanted);
+  assert(source.includes("'trigger' { if ($value -is [string] -and $value -cin @('attach', 'pressed', 'enabled', 'localPreference', 'systemPreference'))"));
+  const controls = read('./cleanup.test.ps1');
+  for (const name of ['rest-initial-attach-control', 'rest-snapshot-null-control', 'rest-secondary-primary-control',
+    'rest-healthy-rejection-control']) assert(controls.includes(name));
+});
+
 test('lifecycle consumer compiles only its own fixtures and linked motion sources', () => {
   const project = read('./lifecycle.csproj');
   const expected = ['runner.cs', 'boundary-doubles.cs', 'binding-tests.cs', 'dispose-tests.cs',

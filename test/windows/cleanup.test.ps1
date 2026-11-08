@@ -32,9 +32,9 @@ $ast = [Management.Automation.Language.Parser]::ParseInput([IO.File]::ReadAllTex
 if ($errors.Count) { throw 'Invalid harness syntax' }
 $readers = @($ast.EndBlock.Statements | Where-Object {
     $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -in @('Read-ProcessHasExited', 'Read-ProcessExitCode', 'Save-CleanupFailure',
-        'Read-InputPhaseField', 'Get-InputPhaseSummary')
+        'Read-InputPhaseField', 'Get-InputPhaseSummary', 'Get-RestSummary')
 })
-if ($readers.Count -ne 5) { throw 'Missing actual completion readers/arbitration/phase projection' }
+if ($readers.Count -ne 6) { throw 'Missing actual completion readers/arbitration/phase projection' }
 $completionReaders = [scriptblock]::Create(($readers | ForEach-Object { $_.Extent.Text }) -join "`n")
 . $completionReaders
 $finishDefinition = @($ast.EndBlock.Statements | Where-Object {
@@ -979,6 +979,51 @@ try {
         $phaseCases++
     } finally { . $completionReaders }
     "phase diagnostics: $phaseCases synthetic controls PASS"
+    # Failure-only Wait-Rest branch из настоящего AST, без polling/часов/нового Read-Trace.
+    $waitAst = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -eq 'Wait-Rest' })[0]
+    $terminalAst = @($waitAst.Body.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.TryStatementAst] })
+    if ($terminalAst.Count -ne 1) { throw 'rest-terminal-AST-control' }
+    $restFailure = [scriptblock]::Create($terminalAst[0].Extent.Text)
+    $initialRestEvents = @(
+        [pscustomobject]@{ sequence = 1L; kind = 'intent'; data = [pscustomobject]@{ operation = 1L; trigger = 'attach'; pressed = $false; localAnimation = $true; systemAnimation = $true } },
+        [pscustomobject]@{ sequence = 2L; kind = 'completed'; data = [pscustomobject]@{ operation = 1L; reason = 'settled'; end = 'Finished' } })
+    $rest = Get-RestSummary -After 0 -Events $initialRestEvents | ConvertFrom-Json
+    if ($rest.after -ne 0 -or $rest.intent[0] -ne 1 -or $rest.intent[5] -cne 'attach' -or
+        $rest.completion[0] -ne 2 -or $rest.completion[2] -cne 'settled') { throw 'rest-initial-attach-control' }
+    $laterRestEvents = @($initialRestEvents) + @([pscustomobject]@{ sequence = 3L; kind = 'intent'; data = $null })
+    $rest = Get-RestSummary -After 2 -Events $laterRestEvents | ConvertFrom-Json
+    if ($rest.intent[0] -ne 3 -or $rest.intent[1] -ne $null -or $rest.completion -ne $null -or $rest.invalid -ne 1) {
+        throw 'rest-snapshot-null-control'
+    }
+    $malformedRest = @([pscustomobject]@{ sequence = 'private'; kind = 'intent'; data = 'private' },
+        [pscustomobject]@{ sequence = 4L; kind = 'intent'; data = [pscustomobject]@{
+            operation = 'private'; pressed = 'false'; localAnimation = 0; systemAnimation = 'true'; trigger = '::error::private' } },
+        [pscustomobject]@{ sequence = 5L; kind = 'completed'; data = [pscustomobject]@{ operation = 'private'; reason = 'private'; end = 'private' } })
+    $restText = Get-RestSummary -After 9007199254740991 -Events $malformedRest
+    if ($restText -match 'private|::error::' -or $restText.Length -gt 1800 -or
+        ($restText | ConvertFrom-Json).completion -ne $null) { throw 'rest-closed-bounded-control' }
+    $events = $initialRestEvents
+    $After = 0L
+    $baselineRestFailure = $null
+    try { throw 'Кнопка не вернулась в отпущенное состояние за 8 секунд.' } catch { $baselineRestFailure = $_ }
+    $observed = $null
+    try { & $restFailure } catch { $observed = $_ }
+    if ($null -eq $observed -or $observed.Exception.Message -cne $baselineRestFailure.Exception.Message -or
+        $observed.FullyQualifiedErrorId -cne $baselineRestFailure.FullyQualifiedErrorId -or
+        !$observed.ErrorDetails.Message.Contains('wait-rest:') -or !$observed.ErrorDetails.Message.Contains('attach')) {
+        throw 'rest-healthy-rejection-control'
+    }
+    try {
+        function Get-RestSummary { throw 'secondary-rest-diagnostic' }
+        $observed = $null
+        try { & $restFailure } catch { $observed = $_ }
+        if ($null -eq $observed -or $observed.Exception.Message -cne $baselineRestFailure.Exception.Message -or
+            $observed.FullyQualifiedErrorId -cne $baselineRestFailure.FullyQualifiedErrorId -or
+            !$observed.ErrorDetails.Message.Contains('wait-rest: unavailable') -or $observed.Exception.Message -match 'secondary-rest') {
+            throw 'rest-secondary-primary-control'
+        }
+    } finally { . $completionReaders }
+    'wait-rest diagnostics: initial/null/malformed/primary-preserved actual AST controls PASS'
     # Настоящий неассоциированный .NET getter: процесс не запускается и ничего не меняет.
     $unassociated = [Diagnostics.Process]::new()
     try {
