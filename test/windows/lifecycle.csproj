@@ -9,5 +9,6 @@
     <Compile Include="../../native/windows/ScalarMotion.cs" Link="ScalarMotion.cs" />
     <Compile Include="../../native/windows/ScalarBinding.cs" Link="ScalarBinding.cs" />
     <Compile Include="../../native/windows/ScalarPan.cs" Link="ScalarPan.cs" />
+    <Compile Include="../../examples/windows/RetargetProbe.cs" Link="RetargetProbe.cs" />
   </ItemGroup>
 </Project>

@@ -120,13 +120,9 @@ public sealed partial class MainPage : Page
         var outcome = await second.WaitAsync(TimeSpan.FromSeconds(8));
         var replaced = await first;
         runs.Add(new { kind = reset ? "retarget-reset-mutant" : "retarget-preserve", direction, spring, before, first = replaced, second = outcome, trace });
-        var entry = trace.Single(x => x.Operation == 2 && x.Phase == "inertia");
-        var after = trace.First(x => x.Operation == 2 && x.Phase == "value" && x.Seconds > entry.Seconds);
-        Require(replaced.End == MotionEnd.Stopped && outcome.End == MotionEnd.Finished, "Завершения поколений перепутаны.");
-        Require(entry.Position * direction >= before * direction, "Retarget вернул позицию назад.");
-        Require(reset ? entry.NativeVelocity == 0 : entry.NativeVelocity * direction > 0, "Не сохранена семантика native velocity.");
-        Require(reset ? (after.Position - entry.Position) * direction <= 0 : (after.Position - entry.Position) * direction > 0,
-            "Траектория не отличает сохранение скорости от сброса.");
+        Require(replaced.Operation == 1 && replaced.End == MotionEnd.Stopped
+            && outcome.Operation == 2 && outcome.End == MotionEnd.Finished, "Завершения поколений перепутаны.");
+        RetargetProbe.Verify(trace, outcome.Operation, before, direction, reset);
         Require(Math.Abs(motion.Position + 100 * direction) * XamlRoot.RasterizationScale <= EndpointAccuracyPhysicalPixels,
             "Native settling дальше половины физического пикселя от цели.");
     }
@@ -210,11 +206,9 @@ public sealed partial class MainPage : Page
         Require(intermediateValues >= 3, "Не наблюдалось промежуточное движение прогресса.");
         if (direction == "reverse")
         {
-            var entry = trace.Single(x => x.Operation == 2 && x.Phase == "inertia");
-            var after = trace.First(x => x.Operation == 2 && x.Phase == "value" && x.Seconds > entry.Seconds);
-            Require(replaced?.End == MotionEnd.Stopped && entry.Position >= before
-                && entry.NativeVelocity > 0 && after.Position > entry.Position,
-                "Нормализация потеряла непрерывность разворота.");
+            Require(replaced?.Operation == 1 && replaced?.End == MotionEnd.Stopped && outcome.Operation == 2,
+                "Нормализация потеряла поколения разворота.");
+            RetargetProbe.Verify(trace, outcome.Operation, before!.Value, 1, false);
         }
         if (direction == "velocity")
             Require(Math.Abs(trace.First(x => x.Phase == "inertia").NativeVelocity!.Value - 2) <= .00001f,

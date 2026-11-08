@@ -47,6 +47,9 @@ if ($unitResult.pans.Count -ne 22 -or @($unitResult.pans | Where-Object { !$_.Pa
 if ($unitResult.continuations.Count -ne 16 -or @($unitResult.continuations | Where-Object { !$_.Passed }).Count -ne 0) {
     throw 'Проверки продолжения движения не подтвердили все шестнадцать сценариев.'
 }
+if ($unitResult.retargetMeter.Count -ne 14 -or @($unitResult.retargetMeter | Where-Object { !$_.Passed }).Count -ne 0) {
+    throw 'Измеритель retarget не различил все четырнадцать контрольных историй.'
+}
 
 Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--artifacts-path', $buildOutput, '--output', $appOutput)
 $exe = Join-Path $appOutput 'NativeWindow.exe'
@@ -108,5 +111,5 @@ foreach ($run in $trace.runs) {
         throw "Сценарий $($run.kind) не подтвердил границы движения."
     }
 }
-[ordered]@{ passed = $true; lifecycleScenarios = 6; bindingScenarios = 15; panScenarios = 22; continuationScenarios = 16; nativeScenarios = 23; scale = $trace.scale } |
+[ordered]@{ passed = $true; lifecycleScenarios = 6; bindingScenarios = 15; panScenarios = 22; continuationScenarios = 16; retargetMeterScenarios = 14; nativeScenarios = 23; scale = $trace.scale } |
     ConvertTo-Json | Tee-Object -FilePath (Join-Path $output 'result.json')

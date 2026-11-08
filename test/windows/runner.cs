@@ -51,5 +51,7 @@ var pans = PanTests.Run();
 passed &= pans.All(result => result.Passed);
 var continuations = ContinuationTests.Run();
 passed &= continuations.All(result => result.Passed);
-Console.WriteLine(JsonSerializer.Serialize(new { passed, results, bindings, pans, continuations }, new JsonSerializerOptions { WriteIndented = true }));
+var retargetMeter = RetargetProbeTests.Run();
+passed &= retargetMeter.All(result => result.Passed);
+Console.WriteLine(JsonSerializer.Serialize(new { passed, results, bindings, pans, continuations, retargetMeter }, new JsonSerializerOptions { WriteIndented = true }));
 return passed ? 0 : 1;
