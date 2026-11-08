@@ -249,6 +249,17 @@ test('boot failure projects saved MainPage trace through a closed nullable summa
   assert(controls.includes('$actual.Length -gt 180'));
 });
 
+test('saved boot trace preserves root JSON array identity before object admission', () => {
+  const source = readSource(new URL('./verify.ps1', import.meta.url));
+  const rootPreserved = candidate => candidate.includes('$saved = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json -NoEnumerate')
+    && candidate.includes('if ($saved -isnot [pscustomobject]) { return $traceSummary }');
+  assert(rootPreserved(source));
+  assert(!rootPreserved(source.replace('ConvertFrom-Json -NoEnumerate', 'ConvertFrom-Json')));
+  assert(!rootPreserved(source.replace('if ($saved -isnot [pscustomobject])', 'if ($false)')));
+  const controls = readSource(new URL('./process-cleanup.test.ps1', import.meta.url));
+  for (const name of ['singleton-array-root', 'empty-array-root']) assert(controls.includes(`name = '${name}'`));
+});
+
 test('process witness retains getter faults, invalid identity and a non-effect .NET getter control', () => {
   const source = readSource(new URL('./process-cleanup.test.ps1', import.meta.url));
   for (const fault of ['handle', 'start-time', 'handle-null', 'handle-zero', 'start-time-null', 'start-time-invalid']) {

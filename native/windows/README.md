@@ -113,6 +113,8 @@ trace завершают проверку ошибкой. Журналы сбо�
 `knownFailureCode` по точной известной первой строке MainPage Require/Until и
 `lastRunKind` из конечного состава MainPage. Последний сохранённый run — не текущий
 failed run: timeout до `runs.Add` может оставить предыдущий run или null.
+`ConvertFrom-Json -NoEnumerate` сохраняет тип root JSON: массив, включая singleton,
+не допускается как MainPage object и выдаёт только nullable поля.
 Неизвестные, повреждённые и недоступные значения остаются null; raw error/stack,
 массивы runs, путь и identity процесса не выводятся. Эта диагностика не допускает
 неуспешный boot и не меняет timeout/cleanup. `process-cleanup.test.ps1` извлекает

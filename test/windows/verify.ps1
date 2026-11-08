@@ -37,7 +37,7 @@ function Get-BootTraceSummary([string]$Path) {
     $traceSummary = [ordered]@{ status = $null; knownFailureCode = $null; lastRunKind = $null }
     try {
         # Читается только уже сохранённый MainPage trace; наружу выходят конечные literals.
-        $saved = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+        $saved = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json -NoEnumerate
         if ($saved -isnot [pscustomobject]) { return $traceSummary }
         $status = $saved.PSObject.Properties['status']
         if ($status -and $status.Value -is [string] -and $status.Value -cin @('captured', 'error')) {

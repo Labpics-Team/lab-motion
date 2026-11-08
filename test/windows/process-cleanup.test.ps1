@@ -179,7 +179,9 @@ try {
         @{ name = 'captured-error'; json = '{"status":"captured","error":"System.InvalidOperationException: Начальная скорость потеряна.","runs":[]}'; expected = '{"status":"captured","knownFailureCode":null,"lastRunKind":null}' },
         @{ name = 'missing'; json = '{}'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
         @{ name = 'malformed'; json = 'private-not-json'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
-        @{ name = 'array-root'; json = '[{"status":"captured"},{"status":"error"}]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' }
+        @{ name = 'array-root'; json = '[{"status":"captured"},{"status":"error"}]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
+        @{ name = 'singleton-array-root'; json = '[{"status":"error","error":"System.InvalidOperationException: Начальная скорость потеряна.","runs":[]}]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
+        @{ name = 'empty-array-root'; json = '[]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' }
     )
     foreach ($control in $traceCases) {
         $script:traceFixture = $control.json
