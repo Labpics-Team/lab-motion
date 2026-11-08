@@ -14,6 +14,7 @@ internal sealed class SystemPreferenceNotifications : IDisposable
     private readonly Action<SystemPreferenceNotifications, Exception> reportFailure;
     private bool subscribed;
     private bool retired;
+    private bool removalAttempted;
     private ExceptionDispatchInfo? failure;
     private ExceptionDispatchInfo? reportingFailure;
 
@@ -48,12 +49,18 @@ internal sealed class SystemPreferenceNotifications : IDisposable
     {
         CheckAccess();
         bool remove;
-        lock (gate) { retired = true; remove = subscribed; }
+        lock (gate)
+        {
+            retired = true;
+            remove = subscribed && !removalAttempted;
+            if (remove) removalAttempted = true;
+        }
         if (remove)
         {
             try
             {
-                // Снятие не держит gate: поздний callback увидит retired.
+                // После отказа projection повторный -= может быть no-op, а не native receipt.
+                // Единственная попытка не держит gate: поздний callback увидит retired.
                 settings.AnimationsEnabledChanged -= AnimationsChanged;
                 lock (gate) subscribed = false;
             }

@@ -165,9 +165,12 @@ function adapterViolations(source) {
       || registration.indexOf('CheckAccess();') > registration.indexOf('settings.AnimationsEnabledChanged +=')],
     ['actual transport and active effect are separate synchronized states', !source.includes('lock (gate) return subscribed;')
       || !source.includes('lock (gate) return subscribed && !retired;')],
-    ['revoke before native removal and retain failed transport', !/CheckAccess\(\);\s*bool remove;\s*lock \(gate\) \{ retired = true; remove = subscribed; \}/.test(dispose)
+    ['revoke before native removal and retain failed transport', !/CheckAccess\(\);\s*bool remove;\s*lock \(gate\)\s*\{\s*retired = true;\s*remove = subscribed && !removalAttempted;/.test(dispose)
       || !/settings\.AnimationsEnabledChanged -= AnimationsChanged;\s*lock \(gate\) subscribed = false;/.test(dispose)
       || !dispose.includes('catch (Exception error) { CaptureFailure(error); }') || !dispose.includes('ThrowIfFaulted();')],
+    ['one revoke attempt cannot accept projected retry as physical detach', !source.includes('private bool removalAttempted;')
+      || !dispose.includes('remove = subscribed && !removalAttempted;')
+      || !dispose.includes('if (remove) removalAttempted = true;')],
     ['delivery shares retirement lock and carries exact identity without UI getter', !/lock \(gate\)\s*\{\s*if \(retired \|\| !subscribed\) return;/.test(callback)
       || !callback.includes('try { notify(this); }') || !callback.includes('if (SaveFailure(error)) deliveryFailure = error;')
       || /settings\.|AnimationsEnabled\b|Update\(|State\./.test(callback)],
@@ -190,7 +193,9 @@ test('native property adapter preserves retirement, actual revocation and backgr
       ['CheckAccess();\n        settings.AnimationsEnabledChanged', 'settings.AnimationsEnabledChanged', 'owner UI admission before native registration'],
       ['lock (gate) return subscribed;', 'return !retired;', 'actual transport and active effect are separate synchronized states'],
       ['lock (gate) return subscribed && !retired;', 'lock (gate) return subscribed;', 'actual transport and active effect are separate synchronized states'],
-      ['retired = true; remove = subscribed;', 'retired = false; remove = subscribed;', 'revoke before native removal and retain failed transport'],
+      ['retired = true;\n            remove = subscribed', 'retired = false;\n            remove = subscribed', 'revoke before native removal and retain failed transport'],
+      ['remove = subscribed && !removalAttempted;', 'remove = subscribed;', 'one revoke attempt cannot accept projected retry as physical detach'],
+      ['if (remove) removalAttempted = true;', '', 'one revoke attempt cannot accept projected retry as physical detach'],
       ['settings.AnimationsEnabledChanged -= AnimationsChanged;', 'IgnoreRemove();', 'single typed native event on owned UISettings'],
       ['if (retired || !subscribed) return;', 'if (false) return;', 'delivery shares retirement lock and carries exact identity without UI getter'],
       ['notify(this);', 'notify(null!);', 'delivery shares retirement lock and carries exact identity without UI getter'],
@@ -199,6 +204,24 @@ test('native property adapter preserves retirement, actual revocation and backgr
       ['lock (gate) reportingFailure ??= ExceptionDispatchInfo.Capture(error);', 'reportingFailure = null;', 'reporting uses owner UI queue and preserves secondary failure'],
     ]) assert(adapterViolations(healthy.replace(before, after)).includes(violation), violation);
   }
+});
+
+test('CsWinRT failed native revoke makes a later projected remove a no-op, not a detach receipt', () => {
+  // Source-контрпример EventSource<T>.Unsubscribe, pinned CsWinRT ff5227a4:
+  // targetDelegate удаляется до native RemoveHandler/ThrowExceptionForHR.
+  // Это модель порядка projection, не исполнение C#/WinRT.
+  let targetDelegate = true, nativeHandler = true, nativeCalls = 0;
+  const projectedRemove = () => {
+    if (!targetDelegate) return;
+    targetDelegate = false;
+    nativeCalls++;
+    throw new Error('native-remove-failed');
+  };
+  assert.throws(projectedRemove, /native-remove-failed/);
+  assert.doesNotThrow(projectedRemove);
+  assert.deepEqual([targetDelegate, nativeHandler, nativeCalls], [false, true, 1]);
+  assert(adapterViolations(read('../../examples/windows/SystemPreferenceNotifications.cs'))
+    .every(violation => violation !== 'one revoke attempt cannot accept projected retry as physical detach'));
 });
 
 test('managed lifecycle source rejects stale/reloaded/window-closed notification ownership and preserves cleanup error', () => {
@@ -215,9 +238,9 @@ test('managed lifecycle source rejects stale/reloaded/window-closed notification
   assert(!source.slice(source.indexOf('private void NotificationFailed'), source.indexOf('private void ObserveSystemNotification')).includes('error.Message'));
 });
 
-test('independent lifetime control covers queued stale identity, failed unsubscribe, retry and repeated disposal', () => {
+test('independent lifetime control retains unknown revoke after repeated disposal and permits healthy detach', () => {
   // Модель ожидаемого контракта; это не исполнение C#/WinRT adapter.
-  const current = { subscribed: true, retired: false, fault: null };
+  const current = { subscribed: true, retired: false, removalAttempted: false, fault: null };
   const queue = [];
   let active = current, changes = 0, removals = 0;
   const receive = subscription => {
@@ -230,7 +253,8 @@ test('independent lifetime control covers queued stale identity, failed unsubscr
   };
   const dispose = (subscription, succeeds) => {
     subscription.retired = true;
-    if (subscription.subscribed) {
+    if (subscription.subscribed && !subscription.removalAttempted) {
+      subscription.removalAttempted = true;
       removals++;
       if (succeeds) subscription.subscribed = false;
       else subscription.fault ??= 'unsubscribe-primary';
@@ -238,14 +262,16 @@ test('independent lifetime control covers queued stale identity, failed unsubscr
   };
   receive(current);
   dispose(current, false);
-  assert.deepEqual(current, { subscribed: true, retired: true, fault: 'unsubscribe-primary' });
+  assert.deepEqual(current, { subscribed: true, retired: true, removalAttempted: true, fault: 'unsubscribe-primary' });
   receive(current);
   queue.forEach(apply);
   assert.equal(changes, 0);
   dispose(current, true);
   dispose(current, true);
-  assert.deepEqual([current.subscribed, current.retired, current.fault, removals], [false, true, 'unsubscribe-primary', 2]);
-  active = { subscribed: true, retired: false, fault: null };
+  assert.deepEqual([current.subscribed, current.retired, current.fault, removals], [true, true, 'unsubscribe-primary', 1]);
+  assert(current.subscribed, 'unknown revoke блокирует забывание transport и новый Attach');
+  // Независимый healthy owner — не разрешение Attach поверх неизвестного current.
+  active = { subscribed: true, retired: false, removalAttempted: false, fault: null };
   queue.forEach(apply);
   assert.equal(changes, 0, 'старый queued callback не принимает новую subscription');
   receive(active);
@@ -255,4 +281,7 @@ test('independent lifetime control covers queued stale identity, failed unsubscr
   receive(unrelated);
   apply(queue.at(-1));
   assert.equal(changes, 1, 'чужая subscription не получает эффект current page');
+  dispose(active, true);
+  dispose(active, true);
+  assert.deepEqual([active.subscribed, active.retired, active.fault, removals], [false, true, null, 2]);
 });
