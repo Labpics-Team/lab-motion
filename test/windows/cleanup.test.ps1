@@ -1005,6 +1005,7 @@ try {
     $events = $initialRestEvents
     $After = 0L
     $baselineRestFailure = $null
+    $restTimeoutSeconds = 8
     try { throw 'Кнопка не вернулась в отпущенное состояние за 8 секунд.' } catch { $baselineRestFailure = $_ }
     $observed = $null
     try { & $restFailure } catch { $observed = $_ }

@@ -235,7 +235,8 @@ test('boot failure projects saved MainPage trace through a closed nullable summa
   assert(source.includes('$identity.traceExists -is [bool] -and $identity.traceExists'));
   assert(source.includes("Write-Host ('Нативный trace: ' + ((Get-BootTraceSummary $tracePath) | ConvertTo-Json -Compress))"));
   const main = readSource(new URL('../../examples/windows/MainPage.xaml.cs', import.meta.url));
-  const requireMessages = [...main.matchAll(/Require\([\s\S]*?"([^"\n]+)"\);/g)].map(match => match[1]);
+  const retarget = readSource(new URL('../../examples/windows/RetargetProbe.cs', import.meta.url));
+  const requireMessages = [...`${main}\n${retarget}`.matchAll(/Require\([\s\S]*?"([^"\n]+)"\);/g)].map(match => match[1]);
   for (const message of requireMessages) assert(source.includes(`'System.InvalidOperationException: ${message}'`), message);
   assert(source.includes("'System.TimeoutException: Событие native runtime не получено.'"));
   const helper = source.slice(source.indexOf('function Get-BootTraceSummary('), source.indexOf("Invoke-Dotnet 'dotnet.txt'"));
@@ -267,7 +268,7 @@ test('saved boot trace preserves root JSON array identity before object admissio
 });
 
 const wantedBootCalls = ['IdleRetarget()', 'Retarget(false, 1)', 'Retarget(true, 1)', 'Retarget(false, -1)', 'Retarget(true, -1)',
-  'Settle()', 'Lifetime()', 'Progress("up")', 'Progress("down")', 'Progress("reverse")', 'Progress("velocity")'];
+  'Settle()', 'Lifetime()', 'Progress("up")', 'Progress("down")', 'Progress("reverse")', 'Progress("velocity")', 'Boundaries()'];
 
 function typedBootMetadataViolations(main, reader) {
   const run = main.slice(main.indexOf('private async void Run('), main.indexOf('private static FailureType? Classify('));
@@ -277,11 +278,11 @@ function typedBootMetadataViolations(main, reader) {
   const expected = ['InvalidOperation', 'Timeout', 'ObjectDisposed', 'Argument', 'ArgumentOutOfRange', 'ArgumentNull', 'InvalidCast', 'NullReference', 'COM'];
   const metadata = reader.slice(reader.indexOf("if ($traceSummary.status -ceq 'error')"), reader.indexOf("$errorValue = $saved.PSObject.Properties['error']"));
   return [
-    ['typed closed metadata', !main.includes('private enum Probe { IdleRetarget, Retarget, Settle, Lifetime, Progress }')
+    ['typed closed metadata', !main.includes('private enum Probe { IdleRetarget, Retarget, Settle, Lifetime, Progress, Boundaries }')
       || !main.includes('private readonly record struct FailureMetadata(FailureType? ErrorType, Probe? ActiveProbe);')],
     ['same calls with immediate active probe assignment', JSON.stringify(calls.map(x => x[2])) !== JSON.stringify(wantedBootCalls)
-      || calls.some(x => x[1] !== x[2].split('(')[0]) || (run.match(/\bawait /g) ?? []).length !== 11],
-    ['clear probe before captured save; retain original catch', !/await Progress\("velocity"\);\s*activeProbe = null;\s*Status.Text = "Траектории проверены";\s*Save\("captured", null\);/.test(run)
+      || calls.some(x => x[1] !== x[2].split('(')[0]) || (run.match(/\bawait /g) ?? []).length !== wantedBootCalls.length],
+    ['clear probe before captured save; retain original catch', !/await Boundaries\(\);\s*activeProbe = null;\s*Status.Text = "Траектории проверены";\s*Save\("captured", null\);/.test(run)
       || !run.includes('Save("error", error.ToString(), new FailureMetadata(Classify(error), activeProbe));')
       || !run.includes('finally { Application.Current.Exit(); }')],
     ['actual exact types not display classification', !classifier.includes('var type = error.GetType();')
@@ -304,6 +305,7 @@ test('boot failure metadata comes from typed producer not exception display text
   assert.deepEqual(typedBootMetadataViolations(main, reader), []);
   for (const [before, after, expected] of [
     ['activeProbe = Probe.Progress;', 'activeProbe = Probe.Lifetime;', 'same calls with immediate active probe assignment'],
+    ['activeProbe = Probe.Boundaries;', 'activeProbe = Probe.Progress;', 'same calls with immediate active probe assignment'],
     ['activeProbe = null;\n            Status.Text', 'Status.Text', 'clear probe before captured save; retain original catch'],
     ['var type = error.GetType();', 'var type = error.Message;', 'actual exact types not display classification'],
     ['type == typeof(InvalidOperationException)', 'error is InvalidOperationException', 'actual exact types not display classification'],
@@ -331,13 +333,13 @@ test('independent producer model retains active probe and ignores complete displ
         if (i === failAt) throw exception;
       }
       activeProbe = null;
-      if (failAt === 11) throw exception; // captured status/save failure не последняя проба.
+      if (failAt === wantedBootCalls.length) throw exception; // captured status/save failure не последняя проба.
       return { errorType: null, activeProbe: null };
     } catch (error) { return { errorType: known.get(error.actualType) ?? null, activeProbe }; }
   };
   const spoof = { actualType: 'TimeoutException', message: 'System.InvalidOperationException: private\n   at NativeWindow.MainPage.Lifetime()' };
-  for (let i = 0; i < 11; i++) assert.deepEqual(run(i, spoof), { errorType: 'Timeout', activeProbe: wantedBootCalls[i].split('(')[0] });
-  assert.deepEqual(run(11, spoof), { errorType: 'Timeout', activeProbe: null });
+  for (let i = 0; i < wantedBootCalls.length; i++) assert.deepEqual(run(i, spoof), { errorType: 'Timeout', activeProbe: wantedBootCalls[i].split('(')[0] });
+  assert.deepEqual(run(wantedBootCalls.length, spoof), { errorType: 'Timeout', activeProbe: null });
   assert.deepEqual(run(-1, spoof), { errorType: null, activeProbe: null });
   assert.deepEqual(run(8, { actualType: 'DerivedTimeoutException', message: spoof.message }), { errorType: null, activeProbe: 'Progress' });
 });

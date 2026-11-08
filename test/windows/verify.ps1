@@ -81,6 +81,12 @@ function Get-BootTraceSummary([string]$Path) {
                 'System.InvalidOperationException: Idle потерял identity или завершил новую операцию observer.' { 'idle-next-identity' }
                 'System.InvalidOperationException: Новая операция observer не завершилась своим native Idle.' { 'idle-next-completion' }
                 'System.InvalidOperationException: Завершения поколений перепутаны.' { 'retarget-completion' }
+                'System.InvalidOperationException: Retarget потерял logical operation или origin.' { 'retarget-operation' }
+                'System.InvalidOperationException: Retarget потерял request identity или превысил один Idle handoff.' { 'retarget-request-budget' }
+                'System.InvalidOperationException: Retarget не подтвердил единственный terminal последнего native request.' { 'retarget-terminal' }
+                'System.InvalidOperationException: Retarget смешал callbacks разных запросов или неверное завершение.' { 'retarget-callback' }
+                'System.InvalidOperationException: Нет native admission исходного retarget.' { 'retarget-admission' }
+                'System.InvalidOperationException: Нет движения исходного retarget до handoff.' { 'retarget-first-motion' }
                 'System.InvalidOperationException: Retarget вернул позицию назад.' { 'retarget-position' }
                 'System.InvalidOperationException: Не сохранена семантика native velocity.' { 'retarget-velocity' }
                 'System.InvalidOperationException: Траектория не отличает сохранение скорости от сброса.' { 'retarget-trajectory' }
@@ -94,7 +100,7 @@ function Get-BootTraceSummary([string]$Path) {
                 'System.InvalidOperationException: Native boundary или SetTarget не подтвердили цель и единственный terminal.' { 'boundary-completion' }
                 'System.InvalidOperationException: Нормализованный канал завершился дальше 0.001 от цели.' { 'progress-completion' }
                 'System.InvalidOperationException: Не наблюдалось промежуточное движение прогресса.' { 'progress-intermediate' }
-                'System.InvalidOperationException: Нормализация потеряла непрерывность разворота.' { 'progress-reverse' }
+                'System.InvalidOperationException: Нормализация потеряла поколения разворота.' { 'progress-reverse' }
                 'System.InvalidOperationException: Скорость канала возвращается не в единицах прогресса в секунду.' { 'progress-velocity' }
                 'System.TimeoutException: Событие native runtime не получено.' { 'native-event-timeout' }
                 default { $null }

@@ -92,9 +92,10 @@ function restFailureViolations(source) {
   const wait = source.slice(source.indexOf('function Wait-Rest('), source.indexOf('function Read-InputPhaseField('));
   return [
     ['existing snapshot only', !wait.includes('Get-RestSummary -After $After -Events $events') || (wait.match(/Read-Trace/g) ?? []).length !== 1],
-    ['original wait and oracle', !wait.includes('[DateTime]::UtcNow.AddSeconds(8)') || !wait.includes('Start-Sleep -Milliseconds 50')
+    ['original wait and oracle', !/^\$restTimeoutSeconds = 8$/m.test(source)
+      || !wait.includes('[DateTime]::UtcNow.AddSeconds($restTimeoutSeconds)') || !wait.includes('Start-Sleep -Milliseconds 50')
       || !wait.includes("if ($intents[-1].sequence -gt $After -and !$last.pressed -and $ends.Count) { return }")],
-    ['primary survives projection fault', !wait.includes("throw 'Кнопка не вернулась в отпущенное состояние за 8 секунд.'")
+    ['primary survives projection fault', !wait.includes('throw "Кнопка не вернулась в отпущенное состояние за $restTimeoutSeconds секунд."')
       || !wait.includes('$failure = $_') || !wait.includes('wait-rest: unavailable') || !wait.includes('throw $failure')],
   ].filter(([, bad]) => bad).map(([name]) => name);
 }
@@ -104,7 +105,8 @@ test('terminal Wait-Rest preserves rejection and projects only its last snapshot
   assert.deepEqual(restFailureViolations(source), []);
   for (const [from, to, wanted] of [
     ['-After $After -Events $events', '-After $After -Events @(Read-Trace)', 'existing snapshot only'],
-    ['AddSeconds(8)', 'AddSeconds(9)', 'original wait and oracle'],
+    ['$restTimeoutSeconds = 8', '$restTimeoutSeconds = 9', 'original wait and oracle'],
+    ['AddSeconds($restTimeoutSeconds)', 'AddSeconds(9)', 'original wait and oracle'],
     ['throw $failure', 'return', 'primary survives projection fault'],
     ['wait-rest: unavailable', 'private-error', 'primary survives projection fault'],
   ]) assert(restFailureViolations(source.replace(from, to)).includes(wanted), wanted);
@@ -117,7 +119,8 @@ test('terminal Wait-Rest preserves rejection and projects only its last snapshot
 test('lifecycle consumer compiles only its own fixtures and linked motion sources', () => {
   const project = read('./lifecycle.csproj');
   const expected = ['runner.cs', 'boundary-doubles.cs', 'binding-tests.cs', 'dispose-tests.cs',
-    '../../native/windows/ScalarMotion.cs', '../../native/windows/ScalarBinding.cs'].sort();
+    'pan-tests.cs', 'continuation-tests.cs', 'retarget-probe-tests.cs', '../../examples/windows/RetargetProbe.cs',
+    '../../native/windows/ScalarMotion.cs', '../../native/windows/ScalarBinding.cs', '../../native/windows/ScalarPan.cs'].sort();
   const admitsOnlyOwnedSources = xml => {
     const explicit = /<EnableDefaultCompileItems>\s*false\s*<\/EnableDefaultCompileItems>/.test(xml);
     const included = [...xml.matchAll(/<Compile\b[^>]*\bInclude="([^"]+)"/g)]

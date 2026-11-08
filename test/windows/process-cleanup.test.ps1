@@ -189,19 +189,21 @@ try {
         @{ name = 'typed-captured'; json = '{"status":"captured","errorType":"Timeout","activeProbe":"Progress"}'; expected = '{"status":"captured","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
         @{ name = 'metadata-types'; json = '{"status":"error","errorType":1,"activeProbe":true}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
         @{ name = 'metadata-case'; json = '{"status":"error","errorType":"timeout","activeProbe":"progress"}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
-        @{ name = 'metadata-structure'; json = '{"status":"error","errorType":["Timeout"],"activeProbe":{"value":"Progress"}}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' }
+        @{ name = 'metadata-structure'; json = '{"status":"error","errorType":["Timeout"],"activeProbe":{"value":"Progress"}}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'boundary-probe'; json = '{"status":"error","error":"System.InvalidOperationException: Native boundary или SetTarget не подтвердили цель и единственный terminal.","runs":[{"kind":"boundary-progress-interior-setter"}],"errorType":"InvalidOperation","activeProbe":"Boundaries"}'; expected = '{"status":"error","knownFailureCode":"boundary-completion","lastRunKind":"boundary-progress-interior-setter","errorType":"InvalidOperation","activeProbe":"Boundaries"}' },
+        @{ name = 'retarget-probe'; json = '{"status":"error","error":"System.InvalidOperationException: Retarget не подтвердил единственный terminal последнего native request.","runs":[{"kind":"retarget-preserve"}],"errorType":"InvalidOperation","activeProbe":"Retarget"}'; expected = '{"status":"error","knownFailureCode":"retarget-terminal","lastRunKind":"retarget-preserve","errorType":"InvalidOperation","activeProbe":"Retarget"}' }
     )
     foreach ($type in @('InvalidOperation', 'Timeout', 'ObjectDisposed', 'Argument', 'ArgumentOutOfRange', 'ArgumentNull', 'InvalidCast', 'NullReference', 'COM')) {
         $fixture = @{ status = 'error'; errorType = $type } | ConvertTo-Json -Compress
         $expected = [ordered]@{ status = 'error'; knownFailureCode = $null; lastRunKind = $null; errorType = $type; activeProbe = $null } | ConvertTo-Json -Compress
         $traceCases += @{ name = 'type-' + $type; json = $fixture; expected = $expected }
     }
-    foreach ($probe in @('IdleRetarget', 'Retarget', 'Settle', 'Lifetime', 'Progress')) {
+    foreach ($probe in @('IdleRetarget', 'Retarget', 'Settle', 'Lifetime', 'Progress', 'Boundaries')) {
         $fixture = @{ status = 'error'; activeProbe = $probe } | ConvertTo-Json -Compress
         $expected = [ordered]@{ status = 'error'; knownFailureCode = $null; lastRunKind = $null; errorType = $null; activeProbe = $probe } | ConvertTo-Json -Compress
         $traceCases += @{ name = 'probe-' + $probe; json = $fixture; expected = $expected }
     }
-    $maximum = [ordered]@{ status = 'captured'; knownFailureCode = 'lifetime-initial-velocity'; lastRunKind = 'idle-reentrant-retarget'; errorType = 'ArgumentOutOfRange'; activeProbe = 'IdleRetarget' } | ConvertTo-Json -Compress
+    $maximum = [ordered]@{ status = 'captured'; knownFailureCode = 'lifetime-initial-velocity'; lastRunKind = 'boundary-progress-interior-setter'; errorType = 'ArgumentOutOfRange'; activeProbe = 'IdleRetarget' } | ConvertTo-Json -Compress
     if ($maximum.Length -gt 180) { throw 'Typed metadata превысили прежний trace cap.' }
     foreach ($control in $traceCases) {
         $script:traceFixture = $control.json
