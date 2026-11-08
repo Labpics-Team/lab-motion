@@ -4,6 +4,22 @@ import { readFileSync } from 'node:fs';
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
+test('lifecycle consumer compiles only its own fixtures and linked motion sources', () => {
+  const project = read('./lifecycle.csproj');
+  const expected = ['runner.cs', 'boundary-doubles.cs', 'binding-tests.cs', 'dispose-tests.cs',
+    '../../native/windows/ScalarMotion.cs', '../../native/windows/ScalarBinding.cs'].sort();
+  const admitsOnlyOwnedSources = xml => {
+    const explicit = /<EnableDefaultCompileItems>\s*false\s*<\/EnableDefaultCompileItems>/.test(xml);
+    const included = [...xml.matchAll(/<Compile\b[^>]*\bInclude="([^"]+)"/g)]
+      .flatMap(match => match[1].split(';')).sort();
+    return explicit && JSON.stringify(included) === JSON.stringify(expected);
+  };
+  assert(admitsOnlyOwnedSources(project), 'unrelated Add-Type controls must not enter lifecycle compilation');
+  assert(!admitsOnlyOwnedSources(project.replace('<EnableDefaultCompileItems>false</EnableDefaultCompileItems>', '')));
+  assert(!admitsOnlyOwnedSources(project.replace('</ItemGroup>', '<Compile Include="projection-diagnostics-controls.cs" /></ItemGroup>')));
+  // Это SOURCE admission, не запуск MSBuild; реальный compiler проверяет existing Windows CI.
+});
+
 function projectionViolations(observer, adapter) {
   const callback = observer.slice(observer.indexOf('private void FirstChance('), observer.indexOf('private long BoundedNext'));
   return [

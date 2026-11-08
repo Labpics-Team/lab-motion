@@ -4,8 +4,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
   </PropertyGroup>
   <ItemGroup>
+    <!-- Вспомогательные файлы Add-Type соседних сценариев не входят в этот consumer. -->
+    <Compile Include="runner.cs;boundary-doubles.cs;binding-tests.cs;dispose-tests.cs" />
     <Compile Include="../../native/windows/ScalarMotion.cs" Link="ScalarMotion.cs" />
     <Compile Include="../../native/windows/ScalarBinding.cs" Link="ScalarBinding.cs" />
   </ItemGroup>
