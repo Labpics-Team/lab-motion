@@ -133,7 +133,7 @@ using (var motion = new ScalarMotion(new Compositor(), -1000, 1000, initial: 0, 
 var bindings = BindingTests.Run();
 passed &= bindings.All(result => result.Passed);
 var disposals = DisposeTests.Run();
-passed &= disposals.Count == 11 && disposals.All(result => result.Passed);
+passed &= disposals.Count == 14 && disposals.All(result => result.Passed);
 var pans = PanTests.Run();
 passed &= pans.All(result => result.Passed);
 var continuations = ContinuationTests.Run();

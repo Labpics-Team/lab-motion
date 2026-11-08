@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using LabMotion.WinUI;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Composition.Interactions;
@@ -151,6 +152,112 @@ internal static class DisposeTests
             Require(releases == 3 && lastExpression.DisposeCount == 1, "released failure допустил повторный effect.");
         });
 
+        Test("pan-dispose-failure-order", () =>
+        {
+            // Все комбинации вызывают настоящий ScalarPan; подменены только native effects.
+            for (var faults = 0; faults < 8; faults++)
+            {
+                var compositor = new Compositor();
+                using var motion = new ScalarMotion(compositor, -640, 320, 0, BoundaryTestSettings.EndpointAccuracy);
+                var tracker = InteractionTracker.LastCreated;
+                var releases = 0;
+                var removeFailure = new IOException("Первичный отказ Remove.");
+                var closeFailure = new IOException("Отказ source.Dispose.");
+                var releaseFailure = new IOException("Отказ released.");
+                var pan = ScalarPan.Create(DispatcherQueue.GetForCurrentThread(), tracker,
+                    new Visual(compositor), ScalarAxis.Y, _ =>
+                    {
+                        releases++;
+                        if ((faults & 4) != 0) ThrowPanReleased(releaseFailure);
+                    });
+                var source = VisualInteractionSource.LastCreated;
+                if ((faults & 1) != 0) tracker.InteractionSources.RemoveFailure = removeFailure;
+                if ((faults & 2) != 0) source.DisposeFailure = closeFailure;
+                var expected = new List<Exception>();
+                if ((faults & 1) != 0) expected.Add(removeFailure);
+                if ((faults & 2) != 0) expected.Add(closeFailure);
+                if ((faults & 4) != 0) expected.Add(releaseFailure);
+                var error = Capture(pan.Dispose);
+                CheckPanFailures(error, expected);
+                Require(tracker.InteractionSources.AddCount == 1 && tracker.InteractionSources.RemoveCount == 1
+                    && source.DisposeCount == 1 && releases == 1,
+                    "Отказ pan пропустил попытку cleanup или released.");
+                Require(tracker.InteractionSources.Count == ((faults & 1) != 0 ? 1 : 0),
+                    "Отказ Remove подменён успешным отключением источника.");
+                pan.Dispose();
+                Require(tracker.InteractionSources.RemoveCount == 1 && source.DisposeCount == 1 && releases == 1,
+                    "Повторный pan.Dispose повторил внешние effects после отказа.");
+            }
+        });
+
+        Test("pan-create-failure-order", () =>
+        {
+            foreach (var configuration in new[] { false, true })
+            {
+                foreach (var close in new[] { false, true })
+                {
+                    var compositor = new Compositor();
+                    using var motion = new ScalarMotion(compositor, -640, 320, 0, BoundaryTestSettings.EndpointAccuracy);
+                    var tracker = InteractionTracker.LastCreated;
+                    var primary = new IOException(configuration ? "Первичный отказ настройки." : "Первичный отказ Add.");
+                    var secondary = new IOException("Вторичный отказ source.Dispose.");
+                    var releases = 0;
+                    var visual = new Visual(compositor)
+                    {
+                        OnInteractionSourceCreated = source =>
+                        {
+                            source.ConfigurationFailure = configuration ? primary : null;
+                            source.DisposeFailure = close ? secondary : null;
+                        },
+                    };
+                    if (!configuration) tracker.InteractionSources.AddFailure = primary;
+                    var error = Capture(() => ScalarPan.Create(DispatcherQueue.GetForCurrentThread(), tracker,
+                        visual, ScalarAxis.Y, _ => releases++));
+                    CheckPanFailures(error, close ? [primary, secondary] : [primary]);
+                    Require(VisualInteractionSource.LastCreated.DisposeCount == 1 && releases == 0
+                        && tracker.InteractionSources.Count == 0 && tracker.InteractionSources.RemoveCount == 0
+                        && tracker.InteractionSources.AddCount == (configuration ? 0 : 1),
+                        "Неуспешный Create оставил невозвращённый source или выдал released чужому владельцу.");
+                }
+            }
+        });
+
+        Test("pan-owner-dispose-failure-order", () =>
+        {
+            var compositor = new Compositor();
+            var motion = new ScalarMotion(compositor, ScalarAxis.Y, -640, 320, 0, BoundaryTestSettings.EndpointAccuracy);
+            var tracker = InteractionTracker.LastCreated;
+            motion.SetTarget(-320, new Spring(350, 0));
+            var pan = motion.AttachPan(new Visual(compositor));
+            var source = VisualInteractionSource.LastCreated;
+            var visual = new Visual(compositor);
+            motion.BindOffsetX(visual);
+            var pending = motion.AnimateTo(-320, new Spring(350, 0));
+            motion.Observed += _ => { };
+            var primary = new IOException("Первичный отказ owned pan Remove.");
+            var secondary = new IOException("Вторичный отказ owned source.Dispose.");
+            tracker.InteractionSources.RemoveFailure = primary;
+            source.DisposeFailure = secondary;
+            var error = Capture(motion.Dispose);
+            CheckPanFailures(error, [primary, secondary]);
+            Require(pending.IsCompletedSuccessfully && pending.Result == new MotionResult(1, MotionEnd.Stopped, "disposed")
+                && tracker.InteractionSources.RemoveCount == 1 && source.DisposeCount == 1 && visual.Stops == 1
+                && tracker.DisposeCount == 1 && compositor.Modifiers[0].DisposeCount == 1
+                && compositor.PropertySets[0].DisposeCount == 1
+                && compositor.Expressions.All(expression => expression.DisposeCount == 1)
+                && ObserverCount(motion) == 0,
+                "Отказ owned pan отменил terminal, sibling cleanup или observer retirement.");
+            var inputs = typeof(ScalarMotion).GetField("inputs", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?? throw new InvalidOperationException("Не найден owned input set.");
+            Require(inputs.GetValue(motion) is HashSet<ScalarPan> { Count: 0 },
+                "released не снял ownership после compound pan отказа.");
+            motion.Dispose();
+            pan.Dispose();
+            Require(tracker.InteractionSources.RemoveCount == 1 && source.DisposeCount == 1
+                && tracker.DisposeCount == 1 && visual.Stops == 1,
+                "Повторный Dispose владельца повторил эффекты отказавшего pan.");
+        });
+
         return results;
 
         void Test(string name, Action action)
@@ -161,6 +268,24 @@ internal static class DisposeTests
     }
 
     private static Exception Secondary() => new IOException("Вторичный отказ native Dispose.");
+    private static void CheckPanFailures(Exception? error, IReadOnlyList<Exception> expected)
+    {
+        Require(expected.Count == 0 ? error is null : ReferenceEquals(error, expected[0]),
+            "ScalarPan потерял identity первой ошибки.");
+        if (error is null) return;
+        Require(error.StackTrace?.Contains("InteractionSourceCollection.Remove", StringComparison.Ordinal) == true
+            || error.StackTrace?.Contains("InteractionSourceCollection.Add", StringComparison.Ordinal) == true
+            || error.StackTrace?.Contains("VisualInteractionSource.Dispose", StringComparison.Ordinal) == true
+            || error.StackTrace?.Contains("VisualInteractionSource.set_PositionXSourceMode", StringComparison.Ordinal) == true
+            || error.StackTrace?.Contains(nameof(ThrowPanReleased), StringComparison.Ordinal) == true,
+            "ScalarPan потерял исходный stack trace ошибки boundary/released.");
+        var secondary = error.Data["ScalarPan.CleanupFailures"] as Exception[] ?? [];
+        Require(secondary.Length == expected.Count - 1
+            && secondary.Select((failure, index) => ReferenceEquals(failure, expected[index + 1])).All(value => value),
+            "ScalarPan потерял secondary ошибки или порядок попыток cleanup.");
+    }
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void ThrowPanReleased(Exception error) => throw error;
     private static Exception? Capture(Action action)
     {
         try { action(); return null; }

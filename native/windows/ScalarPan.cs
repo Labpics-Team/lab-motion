@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Composition.Interactions;
 using Microsoft.UI.Dispatching;
@@ -8,6 +9,9 @@ namespace LabMotion.WinUI;
 /// <summary>Ввод от неподвижного viewport; освобождение отключает источник, но не останавливает уже начатую Inertia.</summary>
 public sealed class ScalarPan : IDisposable
 {
+    // Exception.Data["ScalarPan.CleanupFailures"] хранит Exception[] вторичных отказов
+    // в порядке попыток; первая ошибка и её исходный stack trace остаются исключением вызова.
+    private const string CleanupFailuresKey = "ScalarPan.CleanupFailures";
     private readonly DispatcherQueue dispatcher;
     private readonly InteractionTracker tracker;
     private readonly VisualInteractionSource source;
@@ -56,7 +60,14 @@ public sealed class ScalarPan : IDisposable
             tracker.InteractionSources.Add(source);
             return new(dispatcher, tracker, source, axis, released);
         }
-        catch { source.Dispose(); throw; }
+        catch (Exception error)
+        {
+            var primary = ExceptionDispatchInfo.Capture(error);
+            try { source.Dispose(); }
+            catch (Exception cleanup) { error.Data[CleanupFailuresKey] = new[] { cleanup }; }
+            primary.Throw();
+            throw;
+        }
     }
 
     /// <summary>Перенаправляет настоящий Touch из PointerPressed; native отказ передаётся вызывающему коду.</summary>
@@ -72,11 +83,23 @@ public sealed class ScalarPan : IDisposable
         if (disposed) return;
         CheckAccess();
         disposed = true;
-        try { tracker.InteractionSources.Remove(source); }
-        finally
+        ExceptionDispatchInfo? failure = null;
+        List<Exception>? secondary = null;
+        Attempt(() => tracker.InteractionSources.Remove(source));
+        Attempt(source.Dispose);
+        Attempt(() => released(this));
+        if (failure is not null && secondary is not null)
+            failure.SourceException.Data[CleanupFailuresKey] = secondary.ToArray();
+        failure?.Throw();
+
+        void Attempt(Action cleanup)
         {
-            try { source.Dispose(); }
-            finally { released(this); }
+            try { cleanup(); }
+            catch (Exception error)
+            {
+                if (failure is null) failure = ExceptionDispatchInfo.Capture(error);
+                else (secondary ??= []).Add(error);
+            }
         }
     }
 
