@@ -483,15 +483,21 @@ try {
     })
     if ($releaseDefinitions.Count -ne 2) { throw 'Missing actual release Scenario/Invoke-Ui' }
     $releaseFunctions = [scriptblock]::Create(($releaseDefinitions | ForEach-Object { $_.Extent.Text }) -join "`n")
-    # Извлечённый Scenario читает конфигурацию владельца, не отдельный fixture default.
-    $restConfiguration = @($ast.EndBlock.Statements | Where-Object {
-        $_ -is [Management.Automation.Language.AssignmentStatementAst] -and
-        $_.Left -is [Management.Automation.Language.VariableExpressionAst] -and
-        $_.Left.VariablePath.UserPath -ceq 'restTimeoutSeconds'
-    })
-    if ($restConfiguration.Count -ne 1) { throw 'release-config-missing-control' }
-    . ([scriptblock]::Create($restConfiguration[0].Extent.Text))
-    if ($restTimeoutSeconds -ne 8) { throw 'release-config-owner-budget-control' }
+    # Scenario и Finish-Tool читают присваивания владельца; числа ниже — ожидания, не значения по умолчанию.
+    $configurationExpectations = [ordered]@{ restTimeoutSeconds = 8; toolTimeoutMilliseconds = 30000 }
+    foreach ($configurationName in $configurationExpectations.Keys) {
+        $configuration = @($ast.EndBlock.Statements | Where-Object {
+            $_ -is [Management.Automation.Language.AssignmentStatementAst] -and
+            $_.Left -is [Management.Automation.Language.VariableExpressionAst] -and
+            $_.Left.VariablePath.UserPath -ceq $configurationName
+        })
+        if ($configuration.Count -ne 1) { throw 'release-config-missing-control' }
+        . ([scriptblock]::Create($configuration[0].Extent.Text))
+        $configuredValue = Get-Variable -Name $configurationName -Scope Local -ValueOnly
+        if ($configuredValue -isnot [int] -or $configuredValue -ne $configurationExpectations[$configurationName]) {
+            throw 'release-config-owner-budget-control'
+        }
+    }
     $releaseCases = 0
     foreach ($releaseFault in @('healthy', 'delayed-exit', 'settled', 'race', 'read', 'setter', 'readback',
         'read-finish', 'setter-finish', 'finish', 'start', 'budget', 'local',
@@ -1014,7 +1020,6 @@ try {
     $events = $initialRestEvents
     $After = 0L
     $baselineRestFailure = $null
-    $restTimeoutSeconds = 8
     try { throw 'Кнопка не вернулась в отпущенное состояние за 8 секунд.' } catch { $baselineRestFailure = $_ }
     $observed = $null
     try { & $restFailure } catch { $observed = $_ }

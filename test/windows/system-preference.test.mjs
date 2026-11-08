@@ -4,14 +4,22 @@ import { readFileSync } from 'node:fs';
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
-test('extracted Scenario controls bind the actual owner rest timeout before execution (SOURCE only)', () => {
+test('extracted Scenario/Finish-Tool controls bind both owner timeouts before execution (SOURCE only)', () => {
   const controls = read('./cleanup.test.ps1');
-  const initialized = source => source.includes("$_.Left.VariablePath.UserPath -ceq 'restTimeoutSeconds'")
-    && source.includes('. ([scriptblock]::Create($restConfiguration[0].Extent.Text))')
-    && source.indexOf('. ([scriptblock]::Create($restConfiguration[0].Extent.Text))') < source.indexOf('$releaseCases = 0');
+  const binding = '. ([scriptblock]::Create($configuration[0].Extent.Text))';
+  const initialized = source => source.includes('[ordered]@{ restTimeoutSeconds = 8; toolTimeoutMilliseconds = 30000 }')
+    && source.includes('$_.Left.VariablePath.UserPath -ceq $configurationName')
+    && source.includes('$configuration.Count -ne 1') && source.includes('$configuredValue -isnot [int]')
+    && source.includes('$configuredValue -ne $configurationExpectations[$configurationName]')
+    && source.includes(binding) && source.indexOf(binding) < source.indexOf('$releaseCases = 0');
   assert(initialized(controls), 'release-config-missing-control');
-  assert(!initialized(controls.replace('. ([scriptblock]::Create($restConfiguration[0].Extent.Text))', '')), 'missing configuration must be detected');
-  assert(/^\$restTimeoutSeconds = 8$/m.test(read('./verify-input.ps1')), 'owner budget stays 8s');
+  for (const missing of [binding, 'toolTimeoutMilliseconds = 30000', 'restTimeoutSeconds = 8',
+    '$configuration.Count -ne 1', '$configuredValue -isnot [int]']) {
+    assert(!initialized(controls.replace(missing, '')), `missing configuration guard: ${missing}`);
+  }
+  const owner = read('./verify-input.ps1');
+  assert(/^\$restTimeoutSeconds = 8$/m.test(owner) && /^\$toolTimeoutMilliseconds = 30000$/m.test(owner));
+  assert(owner.includes('function Finish-Tool($Tool, [int]$Timeout = $toolTimeoutMilliseconds)'));
 });
 
 function nativeReceiverViolations(source, wrapper, adapter) {
