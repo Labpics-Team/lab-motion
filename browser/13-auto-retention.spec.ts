@@ -41,20 +41,48 @@ test('retained controls после disconnect не удерживают parent',
       __autoControls: typeof controls;
       __autoParent: WeakRef<HTMLDivElement>;
       __autoChild: WeakRef<HTMLDivElement>;
+      __autoSentinel: WeakRef<HTMLDivElement>;
     };
     retained.__autoControls = controls;
     retained.__autoParent = weakParent;
     retained.__autoChild = weakChild;
+    // Независимый target не подключён к DOM/controls; сохраняется только WeakRef.
+    retained.__autoSentinel = new WeakRef(document.createElement('div'));
   });
 
-  await expectCollected(page, () => {
-    const retained = window as unknown as {
-      __autoParent: WeakRef<HTMLDivElement>;
-      __autoChild: WeakRef<HTMLDivElement>;
+  try {
+    await expectCollected(page, () => {
+      const retained = window as unknown as {
+        __autoParent: WeakRef<HTMLDivElement>;
+        __autoChild: WeakRef<HTMLDivElement>;
+      };
+      return retained.__autoParent.deref() !== undefined ||
+        retained.__autoChild.deref() !== undefined;
+    });
+  } catch (primary) {
+    let diagnostic: { parentRetained: boolean | null; childRetained: boolean | null; sentinelRetained: boolean | null } = {
+      parentRetained: null, childRetained: null, sentinelRetained: null,
     };
-    return retained.__autoParent.deref() !== undefined ||
-      retained.__autoChild.deref() !== undefined;
-  });
+    try {
+      // Только после исходного FAIL: без дополнительного GC/task и без DOM handles.
+      diagnostic = await page.evaluate(() => {
+        const retained = window as unknown as {
+          __autoParent: WeakRef<HTMLDivElement>;
+          __autoChild: WeakRef<HTMLDivElement>;
+          __autoSentinel: WeakRef<HTMLDivElement>;
+        };
+        return {
+          parentRetained: retained.__autoParent.deref() !== undefined,
+          childRetained: retained.__autoChild.deref() !== undefined,
+          sentinelRetained: retained.__autoSentinel.deref() !== undefined,
+        };
+      });
+    } catch { /* Недоступная диагностика не заменяет первичный assertion. */ }
+    try {
+      console.log('auto-retention: ' + JSON.stringify(diagnostic));
+    } catch { /* Ошибка публикации также не заменяет первичный assertion. */ }
+    throw primary;
+  }
 });
 
 test('reentrant disconnect в snapshot не публикует stale strong-cache', async ({ page }) => {
