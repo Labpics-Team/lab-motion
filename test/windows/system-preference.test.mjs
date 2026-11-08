@@ -24,6 +24,28 @@ function projectionViolations(observer, adapter) {
   ].filter(([, bad]) => bad).map(([name]) => name);
 }
 
+test('latest completed resets projection before nullable-data admission, not only inside its reader', () => {
+  const reader = read('./verify-input.ps1');
+  const admission = reader.indexOf("if ($phase -eq 'completed' -and $null -ne $data)");
+  const reset = reader.indexOf('$projectionSequence = $sequence');
+  assert(reset >= 0 && reset < admission, 'null completed must clear old positive evidence');
+  // Предметная модель expected selection; это не исполнение PowerShell helper.
+  const events = [{ sequence: 395, completed: true, data: { projection: 'old-positive' } },
+    { sequence: 400, completed: true, data: null }];
+  const select = onlyNonNull => {
+    let latest = -1, projection = null;
+    for (const event of events) {
+      if (!event.completed || event.sequence <= latest || (onlyNonNull && event.data === null)) continue;
+      latest = event.sequence;
+      projection = event.data?.projection ?? null;
+    }
+    return projection;
+  };
+  assert.equal(select(false), null);
+  assert.equal(select(true), 'old-positive');
+  assert(read('./projection-diagnostics.test.ps1').includes('projection-reader-latest-null-data'));
+});
+
 test('trace-only projection diagnostics preserve scope, thrown-owner fidelity and newest bounded evidence under sabotage', () => {
   const observer = read('../../examples/windows/ProjectionDiagnostics.cs');
   const adapter = read('../../examples/windows/SystemPreferenceNotifications.cs');

@@ -239,6 +239,12 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
         $operationField = if ($phase -eq 'requested') { 'pageOperation' } else { 'operation' }
         $subscriptionSummary = $null
         $subscription = $null
+        # Latest определяется completed identity, даже если data отсутствуют/повреждены.
+        $captureProjection = $phase -eq 'completed' -and $sequence -gt $projectionSequence
+        if ($captureProjection) {
+            $projectionSequence = $sequence
+            $projectionSummary = $null
+        }
         if ($phase -eq 'completed' -and $null -ne $data) {
             $subscriptionProperty = $data.PSObject.Properties['subscriptionDiagnostics']
             if ($null -ne $subscriptionProperty -and $null -ne $subscriptionProperty.Value) {
@@ -255,9 +261,7 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
                     (Read-InputPhaseField $data 'subscriptionIsCurrent' 'bool'))
             }
             # Последняя completed-выборка captured registration; не identity SPI/event.
-            if ($sequence -gt $projectionSequence) {
-                $projectionSequence = $sequence
-                $projectionSummary = $null
+            if ($captureProjection) {
                 $projectionProperty = $data.PSObject.Properties['projectionDiagnostics']
                 if ($null -ne $projectionProperty -and $null -ne $projectionProperty.Value) {
                     $projection = $projectionProperty.Value

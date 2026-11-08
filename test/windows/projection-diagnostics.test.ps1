@@ -30,6 +30,14 @@ if ($text.Length -gt 1800 -or $decoded.schema -ne 2 -or $decoded.rows[0].Count -
     $decoded.projection[0] -ne 395 -or $decoded.projection[1] -ne 1 -or $decoded.projection[12][1][3] -ne -2147467262) {
     throw 'projection-reader-healthy'
 }
+# Admitted completed с null/malformed data сохраняет chronology, но отзывает old positive.
+foreach ($missingData in @($null, 'malformed-data')) {
+    $latestNull = @($events) + @([pscustomobject]@{ sequence = 400L; kind = 'completed'; data = $missingData })
+    $latestText = Get-InputPhaseSummary -Name 'system-disable-animation' -After 327 -Events $latestNull
+    $latest = $latestText | ConvertFrom-Json
+    if ($latest.projection -ne $null -or $latest.rows[-1][0] -ne 400 -or $latest.rows[-1].Count -ne 14 -or
+        $latestText.Length -gt 1800) { throw 'projection-reader-latest-null-data' }
+}
 $unknown = [pscustomobject]@{ State = 'raw-private-name'; Version = 'private-path'; Mvid = 'secret'; Sha256 = '::error::' }
 $projection.UISettingsAssembly = $unknown
 $projection.Last = [pscustomobject]@{ Type = 'private-type'; HResult = '0'; ThrowingOwner = 'raw-method'; Order = -1; Qpc = '123' }
