@@ -27,7 +27,11 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
 {
     private const float ProgressEndpointAccuracy = .001f;
     private sealed record Operation(long Id, int Request, TaskCompletionSource<MotionResult> Completion);
-    private sealed record Request(int Id, MotionOrigin Origin, long Operation = 0);
+    private sealed record Request(int Id, MotionOrigin Origin, long Operation = 0)
+    {
+        public float? Target { get; init; }
+        public bool IdleHandoffUsed { get; init; }
+    }
     private readonly DispatcherQueue dispatcher;
     private readonly InteractionTracker tracker;
     private readonly CompositionPropertySet settings;
@@ -38,6 +42,7 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     private readonly float minimum;
     private readonly float maximum;
     private readonly float coordinateScale;
+    private readonly float endpointAccuracy;
     private readonly ScalarAxis axis;
     private Operation? active;
     private Request? request;
@@ -138,6 +143,7 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         this.minimum = minimum;
         this.maximum = maximum;
         this.coordinateScale = coordinateScale;
+        this.endpointAccuracy = endpointAccuracy;
         ValidatePosition(initial);
         tracker = InteractionTracker.CreateWithOwner(compositor, this);
         tracker.MinPosition = Coordinates(minimum * coordinateScale);
@@ -174,8 +180,9 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         CheckAccess();
         var coefficients = ValidateTarget(target, parameters);
         var continuation = phase == "inertia" &&
-            (request?.Origin is MotionOrigin.Animation or MotionOrigin.Input || request is null && interacting)
+            (request?.Target is not null || request is null && interacting)
                 ? request ?? new Request(0, MotionOrigin.Input) : null;
+        var pendingIntent = request?.Target is not null;
         Finish(MotionEnd.Stopped, "target-changed");
         Configure(target, parameters, coefficients);
         if (continuation is not null)
@@ -183,10 +190,12 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
             // Modifier conditions are sampled on Inertia entry. A new target must also
             // replace a selected bounded correction, preserving native position/velocity.
             var nativeRequest = tracker.TryUpdatePositionWithAdditionalVelocity(Vector3.Zero);
-            request = continuation with { Id = nativeRequest };
+            request = continuation with { Id = nativeRequest, Target = target, IdleHandoffUsed = false };
             interacting = false;
             Emit("requested", request);
         }
+        else if (pendingIntent)
+            request = request! with { Target = target, IdleHandoffUsed = false };
     }
 
     /// <summary>Новая цель сохраняет текущую native-скорость; initialVelocity допустима из покоя.</summary>
@@ -207,7 +216,7 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
         var nativeRequest = tracker.TryUpdatePositionWithAdditionalVelocity(Coordinates((initialVelocity ?? 0) * coordinateScale));
         var operation = new Operation(++generation, nativeRequest, new TaskCompletionSource<MotionResult>(TaskCreationOptions.RunContinuationsAsynchronously));
         active = operation;
-        request = new(nativeRequest, MotionOrigin.Animation, operation.Id);
+        request = new(nativeRequest, MotionOrigin.Animation, operation.Id) { Target = target };
         Emit("requested", request);
         return operation.Completion.Task;
     }
@@ -335,13 +344,57 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
             return;
         }
         if (args.RequestId != request?.Id) { RecordIncomingIdle(args.RequestId, "mismatch"); return; }
-        RecordIncomingIdle(args.RequestId, "accepted");
         phase = "idle";
         interacting = false;
         var source = request;
+        if (source.Target is { } target)
+        {
+            var position = Coordinate(tracker.Position) / coordinateScale;
+            if (!float.IsFinite(position) || Math.Abs(position - target) > endpointAccuracy)
+            {
+                if (!source.IdleHandoffUsed)
+                {
+                    // A request ID can be acknowledged by the end of the previous bounded
+                    // correction without admitting the new motion. Resume once from actual
+                    // native Idle, whose velocity is zero, preserving the logical intent.
+                    RecordIncomingIdle(args.RequestId, "handoff");
+                    var handoff = source with { IdleHandoffUsed = true };
+                    request = handoff;
+                    int nextRequest;
+                    try
+                    {
+                        nextRequest = tracker.TryUpdatePositionWithAdditionalVelocity(Vector3.Zero);
+                    }
+                    catch (Exception error) { FailContinuation(handoff, error); return; }
+                    if (!ReferenceEquals(request, handoff)) return;
+                    request = handoff with { Id = nextRequest };
+                    if (active?.Request == source.Id) active = active with { Request = nextRequest };
+                    Emit("requested", request);
+                    return;
+                }
+                RecordIncomingIdle(args.RequestId, "continuation-failed");
+                FailContinuation(source, new InvalidOperationException("Нативное движение завершилось вне заданной точности цели."));
+                return;
+            }
+        }
+        RecordIncomingIdle(args.RequestId, "accepted");
+        request = null;
         // Observer может начать новое движение; результат завершённого уже окончателен.
         if (args.RequestId == active?.Request) Finish(MotionEnd.Finished, "settled");
         Emit(phase, source, Vector3.Zero);
+    }
+
+    private void FailContinuation(Request source, Exception error)
+    {
+        if (!ReferenceEquals(request, source)) return;
+        request = null;
+        if (active?.Request == source.Id)
+        {
+            var operation = active;
+            active = null;
+            operation.Completion.TrySetException(error);
+        }
+        Emit("continuation-failed", source, Vector3.Zero);
     }
     public void InteractingStateEntered(InteractionTracker sender, InteractionTrackerInteractingStateEnteredArgs args)
     {

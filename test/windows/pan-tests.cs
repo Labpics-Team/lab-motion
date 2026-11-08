@@ -118,6 +118,7 @@ internal static class PanTests
             motion.IdleStateEntered(tracker, new() { RequestId = 0 });
             Require(!program.IsCompleted, "Idle пользовательского ввода завершил чужую программную Task.");
             motion.InertiaStateEntered(tracker, new() { RequestId = request });
+            tracker.Position = new(0, -320, 0);
             motion.IdleStateEntered(tracker, new() { RequestId = request });
             Require(program.IsCompletedSuccessfully && program.Result.End == MotionEnd.Finished,
                 "После постороннего callback собственное завершение больше не принимается.");
@@ -183,6 +184,7 @@ internal static class PanTests
             motion.IdleStateEntered(tracker, new() { RequestId = previous });
             Require(observations.Count == count, "Старый native Idle завершил продолженное намерение.");
             motion.InertiaStateEntered(tracker, new() { RequestId = continuation, PositionVelocityInPixelsPerSecond = new(-240, 0, 0) });
+            tracker.Position = new(160, 0, 0);
             motion.IdleStateEntered(tracker, new() { RequestId = continuation });
             Require(observations.All(item => item.Operation == first.Result.Operation && item.Origin == MotionOrigin.Animation)
                 && observations.Last().Phase == "idle" && observations.Last().NativeRequestId == continuation,
@@ -208,6 +210,7 @@ internal static class PanTests
             motion.ValuesChanged(tracker, new() { RequestId = 0, Position = Vector3.Zero });
             Require(observations.Count == count, "Старые input callbacks перезаписали продолжение.");
             motion.InertiaStateEntered(tracker, new() { RequestId = continuation, PositionVelocityInPixelsPerSecond = new(0, -240, 0) });
+            tracker.Position = new(0, -320, 0);
             motion.IdleStateEntered(tracker, new() { RequestId = continuation });
             Require(tracker.LastAdditionalVelocity == Vector3.Zero && observations.All(item => item.Origin == MotionOrigin.Input
                     && item.Operation == 0 && item.NativeRequestId == continuation) && observations.Last().Phase == "idle",
@@ -378,6 +381,7 @@ internal static class PanTests
             var animation = motion.AnimateTo(-320, Smooth, 100);
             var request = tracker.LastRequest;
             motion.InertiaStateEntered(tracker, new() { RequestId = request });
+            tracker.Position = new(0, -320, 0);
             motion.IdleStateEntered(tracker, new() { RequestId = request });
             Require(animation.IsCompletedSuccessfully && animation.Result.End == MotionEnd.Finished,
                 "Detach потерял фактический переход в Idle или закрыл программное управление.");

@@ -44,6 +44,9 @@ if ($unitResult.bindings.Count -ne 15 -or @($unitResult.bindings | Where-Object 
 if ($unitResult.pans.Count -ne 22 -or @($unitResult.pans | Where-Object { !$_.Passed }).Count -ne 0) {
     throw 'Проверки канала ввода не подтвердили все двадцать два сценария.'
 }
+if ($unitResult.continuations.Count -ne 16 -or @($unitResult.continuations | Where-Object { !$_.Passed }).Count -ne 0) {
+    throw 'Проверки продолжения движения не подтвердили все шестнадцать сценариев.'
+}
 
 Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--artifacts-path', $buildOutput, '--output', $appOutput)
 $exe = Join-Path $appOutput 'NativeWindow.exe'
@@ -97,5 +100,5 @@ foreach ($run in $trace.runs) {
         throw "Сценарий $($run.kind) не наблюдал нативное движение."
     }
 }
-[ordered]@{ passed = $true; lifecycleScenarios = 6; bindingScenarios = 15; panScenarios = 22; nativeScenarios = 11; scale = $trace.scale } |
+[ordered]@{ passed = $true; lifecycleScenarios = 6; bindingScenarios = 15; panScenarios = 22; continuationScenarios = 16; nativeScenarios = 11; scale = $trace.scale } |
     ConvertTo-Json | Tee-Object -FilePath (Join-Path $output 'result.json')
