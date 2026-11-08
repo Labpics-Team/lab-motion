@@ -166,6 +166,7 @@ function Read-InputPhaseField($Data, [string]$Field, [string]$Type) {
         'identityState' { if ($value -is [string] -and $value -cin @('Hashed', 'NotLoaded', 'NoLocation', 'TooLarge', 'Unavailable', 'Ambiguous')) { return $value } }
         'throwType' { if ($value -is [string] -and $value -cin @('COM', 'InvalidCast', 'Argument', 'InvalidOperation', 'TypeLoad', 'MissingMethod', 'FileNotFound', 'NotSupported')) { return $value } }
         'throwOwner' { if ($value -is [string] -and $value -cin @('UISettings', 'WinRTRuntime', 'Application', 'CoreRuntime', 'Other')) { return $value } }
+        'nativeState' { if ($value -is [string] -and $value -cin @('Ready', 'Faulted', 'Unavailable')) { return $value } }
         'hresult' { if (($value -is [int] -or $value -is [long]) -and $value -ge -2147483648 -and $value -le 2147483647) { return $value } }
         'version' {
             if ($value -is [string] -and $value -cmatch '^[0-9]{1,5}(\.[0-9]{1,5}){3}$' -and
@@ -233,6 +234,7 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
         (Read-InputPhaseField $Setter 'QpcFrequency' 'positive'))
     $invalid = 0
     $projectionSummary = $null
+    $nativeSummary = $null
     $projectionSequence = -1L
     foreach ($event in $Events) {
         $sequence = Read-InputPhaseField $event 'sequence' 'number'
@@ -299,6 +301,7 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
         if ($captureProjection) {
             $projectionSequence = $sequence
             $projectionSummary = $null
+            $nativeSummary = $null
         }
         if ($phase -eq 'completed' -and $null -ne $data) {
             $subscriptionProperty = $data.PSObject.Properties['subscriptionDiagnostics']
@@ -317,6 +320,20 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
             }
             # Последняя completed-выборка captured registration; не identity SPI/event.
             if ($captureProjection) {
+                $nativeProperty = $data.PSObject.Properties['nativeDiagnostics']
+                if ($null -ne $nativeProperty -and $null -ne $nativeProperty.Value) {
+                    $native = $nativeProperty.Value
+                    $nativeSummary = @($sequence, (Read-InputPhaseField $subscription 'Registration' 'positive'),
+                        (Read-InputPhaseField $native 'State' 'nativeState'),
+                        (Read-InputPhaseField $native 'SameSource' 'bool'), (Read-InputPhaseField $native 'ControlPassed' 'bool'),
+                        (Read-InputPhaseField $native 'SourceHResult' 'hresult'), (Read-InputPhaseField $native 'DelegateHResult' 'hresult'),
+                        (Read-InputPhaseField $native 'MarshalHResult' 'hresult'), (Read-InputPhaseField $native 'ControlHResult' 'hresult'),
+                        (Read-InputPhaseField $native 'ControlCount' 'number'), (Read-InputPhaseField $native 'ControlQpc' 'positive'),
+                        (Read-InputPhaseField $native 'QpcFrequency' 'positive'), (Read-InputPhaseField $native 'AddHResult' 'hresult'),
+                        (Read-InputPhaseField $native 'Count' 'number'), (Read-InputPhaseField $native 'LastEntryQpc' 'positive'),
+                        (Read-InputPhaseField $native 'Attached' 'bool'), (Read-InputPhaseField $native 'Active' 'bool'),
+                        (Read-InputPhaseField $native 'Faulted' 'bool'), (Read-InputPhaseField $native 'RemoveHResult' 'hresult'))
+                }
                 $projectionProperty = $data.PSObject.Properties['projectionDiagnostics']
                 if ($null -ne $projectionProperty -and $null -ne $projectionProperty.Value) {
                     $projection = $projectionProperty.Value
@@ -363,7 +380,7 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
         $summary = [ordered]@{ schema = 2; scenario = $scenario; after = $After; count = $count;
             omitted = $count - $rows.Count; invalid = $invalid; rows = @($rows.ToArray()); setter = $setterSummary;
             timingCount = $timingCount; timingOmitted = $timingCount - $timing.Count; timing = @($timing.ToArray());
-            projection = $projectionSummary } | ConvertTo-Json -Depth 5 -Compress
+            projection = $projectionSummary; native = $nativeSummary } | ConvertTo-Json -Depth 5 -Compress
         if ($summary.Length -le 1800) { return $summary }
         if ($rows.Count -gt 2) { $rows.RemoveAt([int][Math]::Floor($rows.Count / 2)) }
         elseif ($timing.Count -gt 2) { $timing.RemoveAt([int][Math]::Floor($timing.Count / 2)) }
@@ -475,6 +492,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Проверка восстановления после ошибки не прошла.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'projection-diagnostics.test.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Проверка ограниченной projection диагностики не прошла.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'native-preference.test.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Native diagnostic reader controls не прошли.' }
     & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs') (Join-Path $PSScriptRoot 'dispose.test.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Проверки различающей силы input oracle не прошли.' }
     $env:LAB_MOTION_PROBE_OUTPUT = $null

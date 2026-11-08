@@ -26,6 +26,7 @@ internal sealed class SystemPreferenceNotifications : IDisposable
     private readonly bool captureDiagnostics;
     private readonly long registration;
     private readonly ProjectionDiagnostics? projectionDiagnostics;
+    private readonly NativePreferenceDiagnostics? nativeDiagnostics;
     private long rawEntries;
     private long admittedEntries;
     private EntryOutcome lastEntry;
@@ -35,6 +36,7 @@ internal sealed class SystemPreferenceNotifications : IDisposable
     private bool removalAttempted;
     private ExceptionDispatchInfo? failure;
     private ExceptionDispatchInfo? reportingFailure;
+    private ExceptionDispatchInfo? nativeCleanupFailure;
 
     internal SystemPreferenceNotifications(UISettings settings, DispatcherQueue dispatcher,
         Action<SystemPreferenceNotifications> notify, Action<SystemPreferenceNotifications, Exception> reportFailure,
@@ -52,6 +54,8 @@ internal sealed class SystemPreferenceNotifications : IDisposable
         {
             settings.AnimationsEnabledChanged += AnimationsChanged;
             lock (gate) subscribed = true;
+            // Native diagnostic token после product add; при выключенном trace его нет.
+            nativeDiagnostics = captureDiagnostics ? NativePreferenceDiagnostics.Create(settings) : null;
         }
         catch { projectionDiagnostics?.Dispose(); throw; }
     }
@@ -72,6 +76,7 @@ internal sealed class SystemPreferenceNotifications : IDisposable
     }
 
     internal ProjectionDiagnostics.Snapshot? ReadProjectionDiagnostics() => projectionDiagnostics?.ReadSnapshot();
+    internal NativePreferenceDiagnostics.Snapshot? ReadNativeDiagnostics() => nativeDiagnostics?.ReadSnapshot();
 
     private static long? SafeNumber(long value, bool positive = false)
         => value >= (positive ? 1 : 0) && value <= MaximumSafeInteger ? value : null;
@@ -91,6 +96,18 @@ internal sealed class SystemPreferenceNotifications : IDisposable
         ExceptionDispatchInfo? primary;
         ExceptionDispatchInfo? secondary;
         lock (gate) { primary = failure; secondary = reportingFailure; }
+        ExceptionDispatchInfo? diagnostic;
+        lock (gate) diagnostic = nativeCleanupFailure;
+        if (diagnostic is not null)
+        {
+            // Cleanup diagnostic остаётся отдельным исходом; product primary идёт первым.
+            var errors = new List<Exception>();
+            if (primary is not null) errors.Add(primary.SourceException);
+            if (secondary is not null) errors.Add(secondary.SourceException);
+            if (errors.Count == 0) diagnostic.Throw();
+            errors.Add(diagnostic.SourceException);
+            throw new AggregateException(errors);
+        }
         if (primary is not null && secondary is not null)
             throw new AggregateException(primary.SourceException, secondary.SourceException);
         primary?.Throw();
@@ -120,7 +137,12 @@ internal sealed class SystemPreferenceNotifications : IDisposable
                 catch (Exception error) { CaptureFailure(error); }
             }
         }
-        finally { projectionDiagnostics?.Dispose(); }
+        finally
+        {
+            try { nativeDiagnostics?.Dispose(); }
+            catch (Exception error) { lock (gate) nativeCleanupFailure ??= ExceptionDispatchInfo.Capture(error); }
+            finally { projectionDiagnostics?.Dispose(); }
+        }
         ThrowIfFaulted();
     }
 

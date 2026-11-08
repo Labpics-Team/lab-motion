@@ -4,6 +4,90 @@ import { readFileSync } from 'node:fs';
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
+function nativeReceiverViolations(source, wrapper, adapter) {
+  const invoke = source.slice(source.indexOf('HRESULT STDMETHODCALLTYPE Invoke('), source.indexOf('// Один handle'));
+  const record = source.slice(source.indexOf('struct Record'), source.indexOf('class Receiver'));
+  return [
+    ['same source without activation', /ActivateInstance|RoInitialize|CoInitializeEx|GetSystemMetrics|SystemParametersInfo/.test(source)
+      || !source.includes('suppliedIdentity.Get() != sourceIdentity.Get()')
+      || !wrapper.includes('((WinRT.IWinRTObject)settings).NativeObject') || !wrapper.includes('GC.KeepAlive(settings);')],
+    ['native WRL typed FTM and callback-only record', !source.includes('RuntimeClassFlags<Microsoft::WRL::ClassicCom>, Delegate, Microsoft::WRL::FtmBase>')
+      || /ComPtr|Handle\*|UISettings|managed/.test(record.replace('// Callback удерживает только эту запись; source и managed owner сюда не входят.', ''))
+      || /QueryInterface|\.As\(|notify|Dispatcher|getter|std::cout|File|CreateCCW|new\s/.test(invoke.replace('// QPC до lock; только bounded запись, без getter/COM conversion/UI/I/O.', ''))],
+    ['control before reset before physical add', source.indexOf('handle->receiver->Invoke(sender.Get(), nullptr)') < 0
+      || source.indexOf('record->snapshot.count = 0;') < source.indexOf('handle->receiver->Invoke(sender.Get(), nullptr)')
+      || source.indexOf('record->snapshot.count = 0;') > source.indexOf('handle->source->add_AnimationsEnabledChanged(')],
+    ['failure is not detached or zero success', !source.includes('else state.flags |= Faulted;')
+      || source.includes('else state.flags = (state.flags | Faulted) & ~Attached;')
+      || !source.includes('if ((state.flags & Attached) && !(state.flags & RemoveAttempted))')
+      || /token\.value\s*[!=]=\s*0/.test(source)],
+    ['diagnostic only after typed product add', !adapter.includes('captureDiagnostics ? NativePreferenceDiagnostics.Create(settings) : null')
+      || adapter.indexOf('NativePreferenceDiagnostics.Create(settings)') < adapter.indexOf('settings.AnimationsEnabledChanged += AnimationsChanged;')],
+    ['cleanup visible and finalizer cannot throw or unload', !wrapper.includes('if (cleanupFailure is not null) throw cleanupFailure;')
+      || !wrapper.includes('catch (Exception error) { ReleaseFailure = error.HResult; return false; }')
+      || !adapter.includes('nativeCleanupFailure ??= ExceptionDispatchInfo.Capture(error)')
+      || !adapter.includes('errors.Add(primary.SourceException);') || !adapter.includes('throw new AggregateException(errors);')
+      || /NativeLibrary\.Free|FreeLibrary|GetIUnknownForObject|GCHandle|unsafe/.test(wrapper)],
+  ].filter(([, bad]) => bad).map(([name]) => name);
+}
+
+test('native diagnostic source/lifetime/control/cleanup boundaries detect source sabotage (not native execution)', () => {
+  const source = read('../../examples/windows/native/PreferenceDiagnostics.cpp');
+  const wrapper = read('../../examples/windows/NativePreferenceDiagnostics.cs');
+  const adapter = read('../../examples/windows/SystemPreferenceNotifications.cs');
+  assert.deepEqual(nativeReceiverViolations(source, wrapper, adapter), []);
+  for (const [part, from, to, wanted] of [
+    ['source', 'suppliedIdentity.Get() != sourceIdentity.Get()', 'false', 'same source without activation'],
+    ['source', 'Delegate, Microsoft::WRL::FtmBase>', 'Delegate>', 'native WRL typed FTM and callback-only record'],
+    ['source', 'record->snapshot.count = 0;', 'record->snapshot.count = record->snapshot.controlCount;', 'control before reset before physical add'],
+    ['source', 'else state.flags |= Faulted;', 'else state.flags = (state.flags | Faulted) & ~Attached;', 'failure is not detached or zero success'],
+    ['adapter', 'captureDiagnostics ? NativePreferenceDiagnostics.Create(settings) : null', 'NativePreferenceDiagnostics.Create(settings)', 'diagnostic only after typed product add'],
+    ['wrapper', 'if (cleanupFailure is not null) throw cleanupFailure;', '', 'cleanup visible and finalizer cannot throw or unload'],
+    ['wrapper', 'ReleaseFailure = error.HResult; return false;', 'throw;', 'cleanup visible and finalizer cannot throw or unload'],
+  ]) {
+    const changed = { source, wrapper, adapter, [part]: ({ source, wrapper, adapter })[part].replace(from, to) };
+    assert(nativeReceiverViolations(changed.source, changed.wrapper, changed.adapter).includes(wanted), wanted);
+  }
+});
+
+test('native fixture composes actual helper and executes ABI, retirement, late-ref and fault controls', () => {
+  const controls = read('./native-preference-controls.cpp');
+  assert(controls.includes('#include "../../examples/windows/native/PreferenceDiagnostics.cpp"'));
+  assert(controls.includes('CoInitializeEx(nullptr, COINIT_MULTITHREADED)'));
+  assert(controls.includes('if (initialized) CoUninitialize();'));
+  for (const name of ['control-separate-reset-before-add-zero-token', 'failed-remove-attached-faulted',
+    'inflight-record-survives-owner', 'failed-remove-no-source-cycle', 'synchronous-add-entry-after-reset',
+    'concurrent-counter-qpc-coherent', 'overflow-explicit-fault']) assert(controls.includes(name), name);
+  const build = read('./build-native-preference.ps1');
+  assert(build.includes('call "{0}" >nul && cl.exe'));
+  assert(build.includes('/W4 /WX /MT') && build.includes('ole32.lib runtimeobject.lib'));
+  assert(build.includes('Microsoft.VisualStudio.Component.VC.Tools.x86.x64'));
+  assert(build.includes("name = 'control-contamination'") && build.includes("name = 'false-detach'"));
+  assert(build.includes('$text.Trim() -cne $mutation.expected'), 'compile failure is not a mutation witness');
+  assert(!/choco|winget|Invoke-WebRequest|Download|\bset\s*>|Get-ChildItem\s+env:/.test(build));
+  const harness = read('./verify.ps1');
+  assert(harness.indexOf("'build-native-preference.ps1'") < harness.indexOf("Invoke-Dotnet 'consumer-build.log'"));
+  assert(harness.indexOf('Copy-Item -LiteralPath') < harness.indexOf("$exe = Join-Path $appOutput 'NativeWindow.exe'"));
+});
+
+test('native finite tuple uses captured completed identity and resets null before projection admission', () => {
+  const reader = read('./verify-input.ps1');
+  assert(reader.indexOf('$nativeSummary = $null', reader.indexOf('$captureProjection'))
+    < reader.indexOf("if ($phase -eq 'completed' -and $null -ne $data)"));
+  assert(reader.includes('projection = $projectionSummary; native = $nativeSummary'));
+  assert(reader.includes("Read-InputPhaseField $native 'RemoveHResult' 'hresult'"));
+  const controls = read('./native-preference.test.ps1');
+  for (const name of ['native-reader-control-not-actual', 'native-reader-latest-null-clears-positive',
+    'native-reader-failed-remove-not-detached', 'native-reader-closed-malformed', 'native-reader-composed-bounded']) assert(controls.includes(name));
+  const page = read('../../examples/windows/PressPage.xaml.cs');
+  assert(page.includes('nativeDiagnostics = ReadNativeDiagnosticsForTrace(subscriptionForTrace)'));
+  const helper = page.slice(page.indexOf('private NativePreferenceDiagnostics.Snapshot? ReadNative'), page.indexOf('private bool? ReadSystemAnimationForTrace'));
+  assert(!/Flush\(|Update\(|ReadTrace|settings\./.test(helper));
+  const entry = "    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'native-preference.test.ps1')\n    if ($LASTEXITCODE -ne 0) { throw 'Native diagnostic reader controls не прошли.' }";
+  assert(reader.includes(entry));
+  assert(reader.includes("'projection-diagnostics.test.ps1')\n    if ($LASTEXITCODE -ne 0)"));
+});
+
 function restFailureViolations(source) {
   const wait = source.slice(source.indexOf('function Wait-Rest('), source.indexOf('function Read-InputPhaseField('));
   return [

@@ -101,6 +101,8 @@ function Get-BootTraceSummary([string]$Path) {
 }
 
 Invoke-Dotnet 'dotnet.txt' @('--info')
+& pwsh -NoProfile -File (Join-Path $PSScriptRoot 'build-native-preference.ps1') -OutputDirectory (Join-Path $output 'native-diagnostics')
+if ($LASTEXITCODE -ne 0) { throw 'Native diagnostic helper build/controls не прошли.' }
 Invoke-Dotnet 'unit-build.log' @('build', $unit, '--configuration', 'Release', '--artifacts-path', $buildOutput, '--output', $unitOutput)
 Invoke-Dotnet 'unit.json' @((Join-Path $unitOutput 'lifecycle.dll'))
 $unitResult = Get-Content -LiteralPath (Join-Path $output 'unit.json') -Raw | ConvertFrom-Json
@@ -117,6 +119,7 @@ $actualLifecycle = @($unitResult.results | ForEach-Object { $_.scenario }) | Sor
 if (Compare-Object $expectedLifecycle $actualLifecycle) { throw 'Состав lifecycle-сценариев изменился.' }
 
 Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--artifacts-path', $buildOutput, '--output', $appOutput)
+Copy-Item -LiteralPath (Join-Path $output 'native-diagnostics/LabMotion.PreferenceDiagnostics.dll') -Destination $appOutput
 $exe = Join-Path $appOutput 'NativeWindow.exe'
 $tracePath = Join-Path $output 'trace.json'
 $previousOutput = $env:LAB_MOTION_PROBE_OUTPUT

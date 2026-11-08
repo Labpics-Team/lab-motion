@@ -282,6 +282,36 @@ null. JSON ограничен 1800 ASCII-символами, пропуски о
 порядка release/preference/request/completion/snap, без изменения oracle или
 сроков. Отказ проекции не заменяет первичную ошибку. Полные trace, CLI arguments,
 stdout и пользовательское содержимое в summary не попадают.
+Временный native diagnostic receiver включается только с тем же trace и после
+успешной исходной typed подписки. Он получает тот же retained `UISettings` через
+публичный CsWinRT interop и QI(IUISettings6), без новой активации. Native WRL receiver
+с FtmBase записывает лишь bounded count/QPC; policy, managed callback, очередь и
+oracle не используют его как источник. Helper DLL собирается установленным VC x64
+toolchain внутри прежнего `verify.ps1`, без установки ПО. Синтетический вызов того же
+typed ABI до add проверяет recorder отдельно; control count/QPC сохраняются отдельно,
+actual counters сбрасываются до checked add. Synthetic PASS не подтверждает OS delivery.
+
+`native` в failure summary — одна последняя completed-выборка захваченной подписки:
+sequence, registration, State, SameSource, ControlPassed, SourceHResult,
+DelegateHResult, MarshalHResult, ControlHResult, ControlCount, ControlQpc,
+QpcFrequency, AddHResult, Count, LastEntryQpc, Attached, Active, Faulted, RemoveHResult.
+Это добавочное поле schema 2; прежние row columns, общий предел 1800 ASCII и условия
+приёмки сохранены. Нулевой token не считается ошибкой; сам token и адреса не выводятся.
+Unavailable/Faulted не трактуется как здоровый source count0. Поздний null completed
+сбрасывает старую положительную выборку. Refcounted record удерживается callback,
+без ссылки на managed owner или source. Close отзывает active до одной попытки remove;
+failed remove сохраняет Attached/Faulted и отдельную cleanup-ошибку, не detached PASS.
+Исходный product primary остаётся первым при aggregate cleanup failures. DLL не
+выгружается, пока callbacks ещё возможны; safe release не вызывает remove из finalizer.
+
+Только actual entry QPC внутри прежнего SET→completion окна при одинаковой boot/frequency
+сужает область к доставке между подписками. Cumulative count не идентифицирует SPI;
+поздний entry не доказывает своевременное прерывание. Дополнительный native token/reference
+может влиять на fan-out/lifetime; даже исчезновение отказа не доказывает causal fix или
+готовность обычного пути без диагностики. После выбора repair этот временный
+различитель удаляется либо обычный путь отдельно проверяется без него в прежней приёмке.
+Ни control, ни native positive не заменяют original typed input witness.
+
 В режиме trace callback делает один Flush после enqueue: иначе отказ очереди не
 имел бы будущего Update, способного записать receipt и false. Этот дополнительный
 lock/IO может изменить расписание и не доказывает причину исчезнувшего отказа.
