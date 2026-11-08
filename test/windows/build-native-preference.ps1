@@ -34,7 +34,8 @@ function Compile([string]$Name, [string]$InputFile, [switch]$Library) {
 Compile 'LabMotion.PreferenceDiagnostics' $source -Library
 Compile 'native-preference-controls' $controls
 & (Join-Path $output 'native-preference-controls.exe') 2>&1 | Tee-Object -FilePath (Join-Path $output 'native-preference-controls.log')
-if ($LASTEXITCODE -ne 0) { throw 'Native diagnostic ABI/lifetime controls не прошли.' }
+$nativeExitCode = $LASTEXITCODE
+if ($nativeExitCode -ne 0) { throw "Native diagnostic ABI/lifetime controls не прошли. Native exitCode=$nativeExitCode." }
 
 # Мутации собирают те же executable assertions против изменённого production source.
 # Ошибка compiler/setup не считается RED: нужен точный отказ ожидаемого свойства.

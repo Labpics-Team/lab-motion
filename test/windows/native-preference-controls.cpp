@@ -67,6 +67,8 @@ static Handle* Open(Settings* source, Snapshot& snapshot)
 namespace WindowControls
 {
     namespace W = WindowPreferenceDiagnostics;
+    // Конечные числовые фазы fixture; без адресов, HWND, lParam или текста OS error.
+    void Phase(unsigned value) { std::cerr << "window-control-phase: " << value << '\n' << std::flush; }
     struct State { int settingForwards = 0; bool revokedBeforeDestroyForward = false; W::Record* record = nullptr; };
     constexpr LRESULT ForwardResult = 0x13579;
     LRESULT CALLBACK Base(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
@@ -93,6 +95,7 @@ namespace WindowControls
     };
     void Run()
     {
+        Phase(1);
         WNDCLASSW type{};
         type.lpfnWndProc = Base;
         type.hInstance = GetModuleHandleW(nullptr);
@@ -107,6 +110,7 @@ namespace WindowControls
         W::Record* record = nullptr;
         Require(FAILED(WindowPreferenceDiagnosticsCreate(nullptr, pid, tid, station, &record, &captured)) && !record &&
             !(captured.flags & W::Attached), "window-missing-owner-fault-not-zero");
+        Phase(2);
         {
             Window window;
             Require(FAILED(WindowPreferenceDiagnosticsCreate(window.value, pid, 0, station, &record, &captured)) && !record &&
@@ -114,6 +118,7 @@ namespace WindowControls
                 "window-unknown-context-not-match");
             Require(FAILED(WindowPreferenceDiagnosticsCreate(window.value, pid, tid, L"DifferentStation", &record, &captured)) && !record &&
                 (captured.flags & W::DesktopChecked) && !(captured.flags & W::SameDesktop), "window-different-station-not-default-match");
+            Phase(3);
             Require(SUCCEEDED(WindowPreferenceDiagnosticsCreate(window.value, pid, tid, station, &record, &captured)) && record,
                 "window-own-context-create");
             window.state.record = record;
@@ -124,9 +129,11 @@ namespace WindowControls
             W::Record* duplicate = nullptr;
             Require(FAILED(WindowPreferenceDiagnosticsCreate(window.value, pid, tid, station, &duplicate, &captured)) && !duplicate &&
                 W::recordsAlive == 1, "window-no-subclass-ref-overwrite");
+            Phase(4);
             // Только local synthetic messages: ни SPI, ни broadcast, ни профиль.
             for (const WPARAM action : { WPARAM(0), WPARAM(1), W::ClientAreaAnimation })
-                Require(SendMessageW(window.value, WM_SETTINGCHANGE, action, LPARAM(1)) == ForwardResult, "window-actual-forward-result");
+                Require(SendMessageW(window.value, WM_SETTINGCHANGE, action, LPARAM(0)) == ForwardResult, "window-actual-forward-result");
+            Phase(5);
             WindowPreferenceDiagnosticsRead(record, &captured);
             Require(captured.rawCount == 3 && captured.actionCount == 1 && captured.forwardCount == 3 &&
                 captured.lastRawQpc > 0 && captured.lastActionQpc > 0 && window.state.settingForwards == 3,
@@ -134,19 +141,23 @@ namespace WindowControls
             HRESULT wrong = S_OK;
             std::thread other([&]() { W::Snapshot value{}; wrong = WindowPreferenceDiagnosticsClose(record, &value); });
             other.join();
+            Phase(6);
             captured = W::Read(record);
             Require(wrong == E_ACCESSDENIED && (captured.flags & W::Attached) && !(captured.flags & (W::Active | W::RemoveAttempted)),
                 "window-wrong-thread-no-remove");
             Require(SUCCEEDED(WindowPreferenceDiagnosticsClose(record, &captured)) && !(captured.flags & (W::Attached | W::Active)) &&
                 captured.removeResult == S_OK, "window-owner-remove");
             Require(SUCCEEDED(WindowPreferenceDiagnosticsClose(record, &captured)), "window-owner-remove-once");
-            Require(SendMessageW(window.value, WM_SETTINGCHANGE, W::ClientAreaAnimation, LPARAM(1)) == ForwardResult &&
+            Phase(7);
+            Require(SendMessageW(window.value, WM_SETTINGCHANGE, W::ClientAreaAnimation, LPARAM(0)) == ForwardResult &&
                 W::Read(record).rawCount == 3, "window-success-remove-no-recorder");
             window.state.record = nullptr;
             WindowPreferenceDiagnosticsRelease(record);
             Require(W::recordsAlive == 0, "window-success-record-reclaimed");
+            Phase(8);
         }
         {
+            Phase(10);
             Window window;
             Require(SUCCEEDED(WindowPreferenceDiagnosticsCreate(window.value, pid, tid, station, &record, &captured)), "window-failed-remove-create");
             window.state.record = record;
@@ -155,26 +166,35 @@ namespace WindowControls
                 (captured.flags & W::Faulted) && !(captured.flags & W::Active), "window-failed-remove-retains-record");
             W::failRemove = false;
             Require(FAILED(WindowPreferenceDiagnosticsClose(record, &captured)), "window-failed-remove-not-retried");
+            Phase(11);
             WindowPreferenceDiagnosticsRelease(record);
-            Require(W::recordsAlive == 1 && SendMessageW(window.value, WM_SETTINGCHANGE, W::ClientAreaAnimation, LPARAM(1)) == ForwardResult &&
+            Phase(12);
+            Require(W::recordsAlive == 1 && SendMessageW(window.value, WM_SETTINGCHANGE, W::ClientAreaAnimation, LPARAM(0)) == ForwardResult &&
                 W::Read(record).actionCount == 1, "window-owner-release-late-callback-safe");
+            Phase(13);
             window.Destroy();
+            Phase(14);
             Require(window.state.revokedBeforeDestroyForward && W::recordsAlive == 0, "window-destroy-revoke-forward-reclaim");
         }
         {
+            Phase(20);
             Window window;
             Require(SUCCEEDED(WindowPreferenceDiagnosticsCreate(window.value, pid, tid, station, &record, &captured)), "window-overflow-create");
             window.state.record = record;
             record->snapshot.rawCount = W::MaximumSafeInteger;
-            SendMessageW(window.value, WM_SETTINGCHANGE, W::ClientAreaAnimation, LPARAM(1));
+            SendMessageW(window.value, WM_SETTINGCHANGE, W::ClientAreaAnimation, LPARAM(0));
             Require(W::Read(record).rawCount == W::MaximumSafeInteger && (W::Read(record).flags & W::Faulted), "window-overflow-explicit");
+            Phase(21);
             window.Destroy();
+            Phase(22);
             captured = W::Read(record);
             Require((captured.flags & W::Destroyed) && !(captured.flags & (W::Active | W::Attached)) &&
                 window.state.revokedBeforeDestroyForward, "window-destroy-owner-snapshot");
             WindowPreferenceDiagnosticsRelease(record);
+            Phase(23);
         }
         Require(W::recordsAlive == 0 && UnregisterClassW(type.lpszClassName, type.hInstance) != FALSE, "window-fixture-all-reclaimed");
+        Phase(24);
     }
 }
 

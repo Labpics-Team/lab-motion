@@ -73,3 +73,19 @@ test('prepared native and PowerShell controls exercise actual helper, not a prov
     'window-reader-composed-fixed-budget', 'window-reader-latest-null-clears-positive']) assert(reader.includes(name));
   assert(read('./build-native-preference.ps1').includes('comctl32.lib user32.lib'));
 });
+
+test('synthetic HWND setting messages retain admissible nullable lParam (SOURCE, not native RCA)', () => {
+  const controls = read('./native-preference-controls.cpp');
+  const invalid = value => [...value.matchAll(/SendMessageW\([^\n]*WM_SETTINGCHANGE[^\n]*LPARAM\(1\)/g)];
+  assert.equal(invalid(controls).length, 0, 'WM_SETTINGCHANGE lParam is a string pointer or NULL, never address1');
+  assert(controls.includes('WM_SETTINGCHANGE, action, LPARAM(0)'));
+  assert(controls.includes('WM_SETTINGCHANGE, W::ClientAreaAnimation, LPARAM(0)'));
+  assert(invalid(controls.replaceAll('LPARAM(0)', 'LPARAM(1)')).length > 0, 'invalid payload source mutant rejected');
+  assert(controls.includes('<< value <<'));
+  assert(controls.includes("'\\n' << std::flush"));
+  assert(controls.indexOf('WindowControls::Run();') > controls.indexOf('Require(recordsAlive == 0, "all-records-reclaimed")'));
+  const build = read('./build-native-preference.ps1');
+  assert(build.includes('$nativeExitCode = $LASTEXITCODE'));
+  assert(build.includes('if ($nativeExitCode -ne 0)'));
+  assert(build.includes('Native exitCode=$nativeExitCode'));
+});
