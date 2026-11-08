@@ -112,7 +112,25 @@ trace завершают проверку ошибкой. Журналы сбо�
 читается его JSON и выводится закрытая проекция: `status` (`captured`/`error`/null),
 `knownFailureCode` по точной известной первой строке MainPage Require/Until и
 `lastRunKind` из конечного состава MainPage. Последний сохранённый run — не текущий
-failed run: timeout до `runs.Add` может оставить предыдущий run или null.
+failed run: отказ до `runs.Add` может оставить предыдущий run или null.
+Новые `errorType` и `activeProbe` читатель берёт только из закрытых producer полей.
+MainPage catch классифицирует фактический `Exception.GetType()` точным сравнением
+с известными .NET типами: InvalidOperation/Timeout/ObjectDisposed/Argument/
+ArgumentOutOfRange/ArgumentNull/InvalidCast/NullReference/COM. Неизвестный тип,
+включая derived type, даёт null. Локальный enum `activeProbe` устанавливается
+непосредственно перед существующей awaited пробой IdleRetarget/Retarget/Settle/
+Lifetime/Progress; перед записью captured результата очищается. Это активная
+верхнеуровневая проба, не stack-site, точный variant, нарушенный assertion или RCA.
+Ошибка записи captured результата не приписывается последней успешной пробе.
+Save добавляет эти поля к прежним status/error/scale/runs; captured выводит null.
+Unknown errorType и known activeProbe независимы; старые trace без новых полей
+дают два null, даже если display error содержит полный допустимый stack-frame.
+`Exception.ToString()` предназначен людям и не имеет точного формата; multiline
+Message может выглядеть как stack. Поэтому новые поля из него никогда не выводятся.
+Исторический knownFailureCode остаётся точной текстовой категорией прежней карты,
+не удостоверяет actual exception type или active probe. Reader допускает только
+case-sensitive enums/string при status=error, не raw error/stack/path/HRESULT.
+Пять полей сохраняют прежний cap180символов без новых file reads или ожиданий.
 `ConvertFrom-Json -NoEnumerate` сохраняет тип root JSON: массив, включая singleton,
 не допускается как MainPage object и выдаёт только nullable поля.
 Неизвестные, повреждённые и недоступные значения остаются null; raw error/stack,

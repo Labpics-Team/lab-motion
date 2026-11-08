@@ -9,6 +9,9 @@ namespace NativeWindow;
 
 public sealed partial class MainPage : Page
 {
+    private enum Probe { IdleRetarget, Retarget, Settle, Lifetime, Progress }
+    private enum FailureType { InvalidOperation, Timeout, ObjectDisposed, Argument, ArgumentOutOfRange, ArgumentNull, InvalidCast, NullReference, COM }
+    private readonly record struct FailureMetadata(FailureType? ErrorType, Probe? ActiveProbe);
     private readonly List<object> runs = [];
     private readonly string output = Environment.GetEnvironmentVariable("LAB_MOTION_PROBE_OUTPUT")
         ?? throw new InvalidOperationException("Нужен путь результата опыта.");
@@ -25,19 +28,32 @@ public sealed partial class MainPage : Page
     private async void Run(object sender, RoutedEventArgs args)
     {
         Loaded -= Run;
+        Probe? activeProbe = null;
         try
         {
+            activeProbe = Probe.IdleRetarget;
             await IdleRetarget();
+            activeProbe = Probe.Retarget;
             await Retarget(false, 1);
+            activeProbe = Probe.Retarget;
             await Retarget(true, 1);
+            activeProbe = Probe.Retarget;
             await Retarget(false, -1);
+            activeProbe = Probe.Retarget;
             await Retarget(true, -1);
+            activeProbe = Probe.Settle;
             await Settle();
+            activeProbe = Probe.Lifetime;
             await Lifetime();
+            activeProbe = Probe.Progress;
             await Progress("up");
+            activeProbe = Probe.Progress;
             await Progress("down");
+            activeProbe = Probe.Progress;
             await Progress("reverse");
+            activeProbe = Probe.Progress;
             await Progress("velocity");
+            activeProbe = null;
             Status.Text = "Траектории проверены";
             Save("captured", null);
         }
@@ -45,13 +61,28 @@ public sealed partial class MainPage : Page
         {
             Status.Text = "Ошибка опыта";
             Environment.ExitCode = 1;
-            Save("error", error.ToString());
+            Save("error", error.ToString(), new FailureMetadata(Classify(error), activeProbe));
         }
         finally { Application.Current.Exit(); }
     }
 
-    private void Save(string status, string? error) => File.WriteAllText(output,
-        JsonSerializer.Serialize(new { status, error, scale = XamlRoot.RasterizationScale, runs },
+    private static FailureType? Classify(Exception error)
+    {
+        var type = error.GetType();
+        return type == typeof(InvalidOperationException) ? FailureType.InvalidOperation
+            : type == typeof(TimeoutException) ? FailureType.Timeout
+            : type == typeof(ObjectDisposedException) ? FailureType.ObjectDisposed
+            : type == typeof(ArgumentException) ? FailureType.Argument
+            : type == typeof(ArgumentOutOfRangeException) ? FailureType.ArgumentOutOfRange
+            : type == typeof(ArgumentNullException) ? FailureType.ArgumentNull
+            : type == typeof(InvalidCastException) ? FailureType.InvalidCast
+            : type == typeof(NullReferenceException) ? FailureType.NullReference
+            : type == typeof(System.Runtime.InteropServices.COMException) ? FailureType.COM : null;
+    }
+
+    private void Save(string status, string? error, FailureMetadata? failure = null) => File.WriteAllText(output,
+        JsonSerializer.Serialize(new { status, error, scale = XamlRoot.RasterizationScale, runs,
+            errorType = failure?.ErrorType?.ToString(), activeProbe = failure?.ActiveProbe?.ToString() },
             new JsonSerializerOptions { WriteIndented = true }));
 
     private ScalarMotion Motion(List<MotionObservation> trace)

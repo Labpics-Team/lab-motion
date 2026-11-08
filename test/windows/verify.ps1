@@ -34,7 +34,7 @@ function Invoke-Dotnet([string]$Log, [string[]]$Arguments) {
 }
 
 function Get-BootTraceSummary([string]$Path) {
-    $traceSummary = [ordered]@{ status = $null; knownFailureCode = $null; lastRunKind = $null }
+    $traceSummary = [ordered]@{ status = $null; knownFailureCode = $null; lastRunKind = $null; errorType = $null; activeProbe = $null }
     try {
         # Читается только уже сохранённый MainPage trace; наружу выходят конечные literals.
         $saved = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json -NoEnumerate
@@ -53,6 +53,18 @@ function Get-BootTraceSummary([string]$Path) {
                     'progress-up', 'progress-down', 'progress-reverse', 'progress-velocity')) {
                     $traceSummary.lastRunKind = $kind.Value
                 }
+            }
+        }
+        if ($traceSummary.status -ceq 'error') {
+            # Новые поля принадлежат typed producer; display error/stack не источник.
+            $errorType = $saved.PSObject.Properties['errorType']
+            if ($errorType -and $errorType.Value -is [string] -and $errorType.Value -cin @('InvalidOperation',
+                'Timeout', 'ObjectDisposed', 'Argument', 'ArgumentOutOfRange', 'ArgumentNull', 'InvalidCast', 'NullReference', 'COM')) {
+                $traceSummary.errorType = $errorType.Value
+            }
+            $activeProbe = $saved.PSObject.Properties['activeProbe']
+            if ($activeProbe -and $activeProbe.Value -is [string] -and $activeProbe.Value -cin @('IdleRetarget', 'Retarget', 'Settle', 'Lifetime', 'Progress')) {
+                $traceSummary.activeProbe = $activeProbe.Value
             }
         }
         $errorValue = $saved.PSObject.Properties['error']
