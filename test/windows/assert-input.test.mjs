@@ -8,7 +8,11 @@ import { spawnSync } from 'node:child_process';
 import { verifyTrace, verifyCaptureWindow } from './assert-input.mjs';
 
 function normalizeSourceText(source) { return source.replace(/\r\n/g, '\n'); }
-function readSource(url) { return normalizeSourceText(readFileSync(url, 'utf8')); }
+function readSource(url) {
+  const source = normalizeSourceText(readFileSync(url, 'utf8'));
+  return url.pathname.endsWith('/verify-input.ps1')
+    ? normalizeSourceText(readFileSync(new URL('./process-tools.ps1', import.meta.url), 'utf8')) + '\n' + source : source;
+}
 
 // Это синтетические свидетели oracle, не результаты нативного ввода или отрисовки.
 function fixture() {
@@ -500,12 +504,15 @@ function inputCleanupViolations(source) {
     ['completion bool validated before use', !/\$exited = \$Process\.HasExited\s+if \(\$exited -isnot \[bool\]\)/.test(source)],
     ['exit code int validated before use', !/\$exitCode = \$Process\.ExitCode\s+if \(\$exitCode -isnot \[int\]\)/.test(source)],
     ['only qualified completion getters', (source.match(/\.HasExited\b/g) ?? []).length !== 1 || (source.match(/\.ExitCode\b/g) ?? []).length !== 1],
-    ['post-refresh qualified evidence', !/\$process\.Refresh\(\)\s+\$exited = Read-ProcessHasExited \$process\s+if \(!\$exited\) \{ throw '[^']+' \}\s+\$exitCode = Read-ProcessExitCode \$process/.test(source)
-      || !source.includes('@{ exited = $exited; forced = $forced; exitCode = $exitCode }')],
-    ['first completion failure retained through stop failure', (source.match(/catch \{ \$completionReadFailed = \$true; Save-CleanupFailure \$_ \(\[ref\]\$cleanupFailure\) \}/g) ?? []).length !== 2
+    ['post-refresh qualified evidence', !/\$Process\.Refresh\(\)/.test(source)
+      || !/\$exited = Read-ProcessHasExited \$Process\s+if \(!\$exited\)/.test(source)
+      || !source.includes('Read-ProcessExitCode $Process') || !source.includes('@{ exited = $exited; forced = $forced; exitCode = $exitCode }')
+      || !source.includes('$receipt = Close-OwnedProcess $process -Timeout 5000 -Graceful')
+      || !source.includes('$null = Close-OwnedProcess $recording.process -Timeout $toolTimeoutMilliseconds')],
+    ['first completion failure retained through stop failure', (source.match(/catch \{ \$completionReadFailed = \$true; Save-CleanupFailure \$_ \(\[ref\]\$cleanupFailure\) \}/g) ?? []).length !== 1
       || (source.match(/catch \{ \$stopFailed = \$true; Save-CleanupFailure \$_ \(\[ref\]\$cleanupFailure\) \}/g) ?? []).length !== 2],
     ['primary captured before evidence', !/\$primaryFailure = \$_\s+try \{ \$primaryFailure \| Out-String \| Set-Content/.test(source)],
-    ['application disposal encloses process boundary', !/if \(\$process\) \{\s+try \{\s+\$forced = \$false/.test(source)],
+    ['application disposal encloses process boundary', !/if \(\$process\) \{\s+try \{\s+\$receipt = Close-OwnedProcess/.test(source)],
     ['cleanup retains primary', !/if \(\$null -eq \$primaryFailure\) \{ throw \$cleanupFailure \}/.test(source)],
     ['fixed observable warning', !source.includes("Write-Warning 'Очистка после ошибки не завершена.' -WarningAction Continue")],
   ].filter(([, failed]) => failed).map(([name]) => name);
@@ -516,11 +523,11 @@ function assertInputCleanupSource(source) {
   for (const [before, after, expected] of [
     ['$exited -isnot [bool]', '$false', 'completion bool validated before use'],
     ['$exitCode -isnot [int]', '$false', 'exit code int validated before use'],
-    ['$needsClose = !(Read-ProcessHasExited $process)', '$needsClose = !$process.HasExited', 'only qualified completion getters'],
-    ['$exited = Read-ProcessHasExited $process', '$exited = $true', 'post-refresh qualified evidence'],
+    ['$needsClose = !(Read-ProcessHasExited $Process)', '$needsClose = !$Process.HasExited', 'only qualified completion getters'],
+    ['$exited = Read-ProcessHasExited $Process', '$exited = $true', 'post-refresh qualified evidence'],
     ['$completionReadFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure)', 'throw', 'first completion failure retained through stop failure'],
     ['$primaryFailure = $_', '$primaryFailure = $null', 'primary captured before evidence'],
-    ['try {\n            $forced = $false', '$forced = $false', 'application disposal encloses process boundary'],
+    ['try {\n            $receipt = Close-OwnedProcess', '$receipt = Close-OwnedProcess', 'application disposal encloses process boundary'],
     ['if ($null -eq $primaryFailure) { throw $cleanupFailure }', 'throw $cleanupFailure', 'cleanup retains primary'],
     ["Write-Warning 'Очистка после ошибки не завершена.' -WarningAction Continue", '$null', 'fixed observable warning'],
   ]) assert(inputCleanupViolations(source.replaceAll(before, after)).includes(expected), expected);
@@ -553,7 +560,7 @@ test('input witness requires first completion error and observable secondary ter
   }
   assert(source.includes("$observed.Exception.Message -notmatch 'bool HasExited'"));
   assert(source.includes('[regex]::Escape($secondary)'));
-  assert(source.includes('$script:killWaitReached -ne'));
+  assert(source.includes('!$script:killWaitReached'));
 });
 
 function cleanupArbitrationViolations(source) {
@@ -608,10 +615,13 @@ test('LF and in-memory Windows CRLF retain healthy source and the same mutation 
 test('input application has one independent forced-stop attempt after graceful failure', () => {
   const source = readSource(new URL('./verify-input.ps1', import.meta.url));
   const application = source.slice(source.lastIndexOf('if ($process) {'), source.lastIndexOf('try { $commands'));
-  assert(application.includes('$forceStop = !$process.WaitForExit(5000)'));
-  assert(application.includes('$stopFailed = $true; $forceStop = $true; Save-CleanupFailure'));
-  assert.match(application, /if \(\$forceStop\) \{\s+\$forced = \$true\s+try \{ \$process.Kill\(\$true\); \$process.WaitForExit\(\) \}/);
-  assert.equal((application.match(/\$process.Kill\(\$true\)/g) ?? []).length, 1);
+  assert(application.includes('$receipt = Close-OwnedProcess $process -Timeout 5000 -Graceful'));
+  const close = source.slice(source.indexOf('function Close-OwnedProcess'), source.indexOf(". (Join-Path $PSScriptRoot 'process-tools.ps1')"));
+  assert(close.includes('$forceStop = !$waitResult'));
+  assert(close.includes('$stopFailed = $true; $forceStop = $true; Save-CleanupFailure'));
+  assert.match(close, /if \(\$forceStop\) \{\s+\$forced = \$true\s+try \{ \$Process.Kill\(\$true\) \}/);
+  assert.equal((close.match(/\$Process.Kill\(\$true\)/g) ?? []).length, 1);
+  assert(!/\.WaitForExit\(\)/.test(close));
 });
 
 test('unowned healthy cleanup resets the injected invalid environment map', () => {

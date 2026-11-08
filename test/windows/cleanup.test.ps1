@@ -30,14 +30,19 @@ $tokens = $null
 $errors = $null
 $ast = [Management.Automation.Language.Parser]::ParseInput([IO.File]::ReadAllText($Harness), [ref]$tokens, [ref]$errors)
 if ($errors.Count) { throw 'Invalid harness syntax' }
-$readers = @($ast.EndBlock.Statements | Where-Object {
+$helperAst = [Management.Automation.Language.Parser]::ParseInput([IO.File]::ReadAllText((Join-Path $PSScriptRoot 'process-tools.ps1')), [ref]$tokens, [ref]$errors)
+if ($errors.Count -or @($helperAst.EndBlock.Statements | Where-Object { $_ -isnot [Management.Automation.Language.FunctionDefinitionAst] }).Count) {
+    throw 'Invalid function-only process owner'
+}
+$ownerStatements = @($ast.EndBlock.Statements) + @($helperAst.EndBlock.Statements)
+$readers = @($ownerStatements | Where-Object {
     $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -in @('Read-ProcessHasExited', 'Read-ProcessExitCode', 'Save-CleanupFailure',
-        'Read-InputPhaseField', 'Get-InputPhaseSummary', 'Get-RestSummary')
+        'Read-InputPhaseField', 'Get-InputPhaseSummary', 'Get-RestSummary', 'Close-OwnedProcess')
 })
-if ($readers.Count -ne 6) { throw 'Missing actual completion readers/arbitration/phase projection' }
+if ($readers.Count -ne 7) { throw 'Missing actual completion readers/arbitration/phase projection' }
 $completionReaders = [scriptblock]::Create(($readers | ForEach-Object { $_.Extent.Text }) -join "`n")
 . $completionReaders
-$finishDefinition = @($ast.EndBlock.Statements | Where-Object {
+$finishDefinition = @($helperAst.EndBlock.Statements | Where-Object {
     $_ -is [Management.Automation.Language.FunctionDefinitionAst] -and $_.Name -eq 'Finish-Tool'
 })
 if ($finishDefinition.Count -ne 1) { throw 'Missing actual Finish-Tool' }
@@ -52,6 +57,21 @@ $originalOutput = $env:LAB_MOTION_PRESS_TRACE
 $evidence = Join-Path ([IO.Path]::GetTempPath()) ('lab-motion-input-cleanup-' + [guid]::NewGuid().ToString())
 $null = [IO.Directory]::CreateDirectory($evidence)
 $cases = 0
+# Извлечённые cleanup/Scenario/Finish-Tool получают реальные присваивания владельца.
+$configurationExpectations = [ordered]@{ restTimeoutSeconds = 8; toolTimeoutMilliseconds = 30000 }
+foreach ($configurationName in $configurationExpectations.Keys) {
+    $configuration = @($ast.EndBlock.Statements | Where-Object {
+        $_ -is [Management.Automation.Language.AssignmentStatementAst] -and
+        $_.Left -is [Management.Automation.Language.VariableExpressionAst] -and
+        $_.Left.VariablePath.UserPath -ceq $configurationName
+    })
+    if ($configuration.Count -ne 1) { throw 'release-config-missing-control' }
+    . ([scriptblock]::Create($configuration[0].Extent.Text))
+    $configuredValue = Get-Variable -Name $configurationName -Scope Local -ValueOnly
+    if ($configuredValue -isnot [int] -or $configuredValue -ne $configurationExpectations[$configurationName]) {
+        throw 'release-config-owner-budget-control'
+    }
+}
 try {
     foreach ($before in @($false, $true)) {
     foreach ($injectPrimary in @($false, $true)) {
@@ -63,7 +83,7 @@ try {
         'record-has-exited-late', 'record-has-null-late', 'record-has-invalid-late',
         'has-null-close-main', 'has-null-close-wait', 'has-null-kill', 'has-null-kill-wait', 'record-has-null-kill',
         'has-null-dispose', 'record-has-null-app-close', 'record-has-null-dispose', 'has-null-restore-read', 'has-null-restore-env',
-        'close-main-kill', 'close-main-kill-wait', 'close-wait-kill', 'close-wait-kill-wait', 'record-already-closed')) {
+        'close-main-kill', 'close-main-kill-wait', 'close-wait-kill', 'close-wait-kill-wait', 'record-already-closed', 'record-stderr-fault')) {
         $script:fault = $fault
         $compound = $fault -in @('has-null-dispose', 'record-has-null-app-close', 'record-has-null-dispose', 'has-null-restore-read', 'has-null-restore-env')
         [ClientAreaAnimation]::Current = !$before
@@ -120,7 +140,8 @@ try {
         }
         $process | Add-Member ScriptMethod WaitForExit {
             param([int]$Timeout = 0)
-            if ($Timeout -eq 5000) {
+            if ($Timeout -lt 0 -or $Timeout -gt 5000) { throw 'cleanup-unbounded-wait' }
+            if ($script:killCount -eq 0) {
                 $script:closeWaitReached = $true
                 if ($script:fault -in @('close-wait', 'has-null-close-wait', 'close-wait-kill', 'close-wait-kill-wait')) { throw [InvalidOperationException]::new('cleanup-close-wait') }
                 if ($script:fault -in @('kill', 'kill-wait', 'forced-close', 'has-null-kill', 'has-null-kill-wait')) { return $false }
@@ -168,12 +189,22 @@ try {
                 if ($script:fault -in @('record', 'record-has-null-kill')) { throw [IO.IOException]::new('cleanup-recorder') }
                 $this.IsExited = $true
             }
-            $recorder | Add-Member ScriptMethod WaitForExit { $script:recorderWaitReached = $true }
+            $recorder | Add-Member ScriptMethod WaitForExit {
+                param([int]$Timeout = -1)
+                if ($Timeout -lt 0 -or $Timeout -gt 30000) { throw 'cleanup-unbounded-recorder-wait' }
+                $script:recorderWaitReached = $true
+                return $true
+            }
             $recorder | Add-Member ScriptMethod Dispose {
                 $script:recorderDisposed = $true
                 if ($script:fault -eq 'record-has-null-dispose') { throw [IO.IOException]::new('cleanup-recorder-dispose') }
             }
             $recording = @{ ended = $false; process = $recorder; stderr = $null; prefix = '' }
+            if ($fault -eq 'record-stderr-fault') {
+                $stderrSource = [Threading.Tasks.TaskCompletionSource[string]]::new()
+                $stderrSource.SetException([IO.IOException]::new('cleanup-recorder-stderr'))
+                $recording.stderr = $stderrSource.Task
+            }
         }
         function Set-Content {
             param([Parameter(Position = 0)][string]$Path, [Parameter(ValueFromPipeline = $true)]$InputObject)
@@ -199,6 +230,11 @@ try {
             throw "Cleanup restoration/disposal failed: before=$before primary=$injectPrimary fault=$fault"
         }
         if ($recording -and !$script:recorderDisposed) { throw 'Recorder disposal was skipped' }
+        if ($fault -eq 'record-stderr-fault' -and
+            (!$script:recorderWaitReached -or !$script:closeReached -or
+                (!$injectPrimary -and (!$observed -or !$observed.Exception.ToString().Contains('cleanup-recorder-stderr'))))) {
+            throw 'Recorder stream failure lost primary or sibling cleanup'
+        }
         if ($fault -in @('has-exited', 'has-null', 'has-invalid')) {
             if (!$script:closeReached -or !$script:closeWaitReached -or $script:exitCodeReached) {
                 throw 'Invalid initial completion lost own-process termination or admitted exit code'
@@ -229,7 +265,7 @@ try {
                 throw 'Forced failure replaced first graceful error'
             }
             if (!@($script:warnings | Where-Object { $_ -match [regex]::Escape($secondary) }).Count -or
-                $script:killCountAtDispose -ne 1 -or $script:killWaitCountAtDispose -ne [int]($fault.EndsWith('-kill-wait')) -or
+                $script:killCountAtDispose -ne 1 -or $script:killWaitCountAtDispose -ne 1 -or
                 $script:exitCodeReached -or $null -ne $script:closeEvidence) { throw 'Forced stop failure retried or lost its warning' }
         }
         if ($fault -in @('kill', 'kill-wait', 'has-null-kill', 'has-null-kill-wait') -and $script:killCount -ne 1) {
@@ -275,14 +311,14 @@ try {
                 throw "Secondary termination error not observable: $fault"
             }
             if ($fault -eq 'record-has-null-kill') {
-                if (!$script:recorderKillReached -or $script:recorderWaitReached -or !$script:closeReached) {
+                if (!$script:recorderKillReached -or !$script:recorderWaitReached -or !$script:closeReached) {
                     throw 'Recorder double fault lost own termination or application cleanup'
                 }
             } else {
                 if (!$script:closeReached -or $script:exitCodeReached) { throw 'Application double fault lost close or admitted exit code' }
                 if ($script:closeWaitReached -ne ($fault -ne 'has-null-close-main') -or
                     !$script:killReached -or
-                    $script:killWaitReached -ne ($fault -ne 'has-null-kill')) { throw 'Double fault invocation path changed' }
+                    !$script:killWaitReached) { throw 'Double fault invocation path changed' }
             }
         }
         if ($injectPrimary) {
@@ -409,6 +445,11 @@ try {
         $toolStdout = [pscustomobject]@{ Stream = 'stdout' }
         $toolStderr = [pscustomobject]@{ Stream = 'stderr' }
         foreach ($stream in @($toolStdout, $toolStderr)) {
+            $stream | Add-Member ScriptMethod WaitAsync {
+                param([TimeSpan]$Timeout)
+                if ($Timeout.TotalMilliseconds -lt 0 -or $Timeout.TotalMilliseconds -gt 100) { throw 'tool-unbounded-stream-control' }
+                return $this
+            }
             $stream | Add-Member ScriptMethod GetAwaiter { return $this }
             $stream | Add-Member ScriptMethod GetResult {
                 if ($script:toolFault.StartsWith($this.Stream)) { throw [IO.IOException]::new('tool-primary-' + $this.Stream) }
@@ -483,21 +524,6 @@ try {
     })
     if ($releaseDefinitions.Count -ne 2) { throw 'Missing actual release Scenario/Invoke-Ui' }
     $releaseFunctions = [scriptblock]::Create(($releaseDefinitions | ForEach-Object { $_.Extent.Text }) -join "`n")
-    # Scenario и Finish-Tool читают присваивания владельца; числа ниже — ожидания, не значения по умолчанию.
-    $configurationExpectations = [ordered]@{ restTimeoutSeconds = 8; toolTimeoutMilliseconds = 30000 }
-    foreach ($configurationName in $configurationExpectations.Keys) {
-        $configuration = @($ast.EndBlock.Statements | Where-Object {
-            $_ -is [Management.Automation.Language.AssignmentStatementAst] -and
-            $_.Left -is [Management.Automation.Language.VariableExpressionAst] -and
-            $_.Left.VariablePath.UserPath -ceq $configurationName
-        })
-        if ($configuration.Count -ne 1) { throw 'release-config-missing-control' }
-        . ([scriptblock]::Create($configuration[0].Extent.Text))
-        $configuredValue = Get-Variable -Name $configurationName -Scope Local -ValueOnly
-        if ($configuredValue -isnot [int] -or $configuredValue -ne $configurationExpectations[$configurationName]) {
-            throw 'release-config-owner-budget-control'
-        }
-    }
     $releaseCases = 0
     foreach ($releaseFault in @('healthy', 'delayed-exit', 'settled', 'race', 'read', 'setter', 'readback',
         'read-finish', 'setter-finish', 'finish', 'start', 'budget', 'local',
@@ -599,6 +625,11 @@ try {
                 $stdout = [pscustomobject]@{ Stream = 'stdout' }
                 $stderr = [pscustomobject]@{ Stream = 'stderr' }
                 foreach ($stream in @($stdout, $stderr)) {
+                    $stream | Add-Member ScriptMethod WaitAsync {
+                        param([TimeSpan]$Timeout)
+                        if ($Timeout.TotalMilliseconds -lt 0 -or $Timeout.TotalMilliseconds -gt 30000) { throw 'release-unbounded-stream-control' }
+                        return $this
+                    }
                     $stream | Add-Member ScriptMethod GetAwaiter { return $this }
                     $stream | Add-Member ScriptMethod GetResult {
                         if ($this.Stream -eq 'stderr') { return '' }

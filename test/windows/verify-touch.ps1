@@ -6,6 +6,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'process-tools.ps1')
+$toolTimeoutMilliseconds = 30000
 # Ввод принадлежит одноразовому runner, а не рабочему столу разработчика.
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
     throw 'Touch-квалификация запускается только в hosted-сессии GitHub.'
@@ -32,20 +34,21 @@ function Invoke-Ui([string]$Name, [string[]]$Arguments) {
     $info.RedirectStandardError = $true
     foreach ($argument in (@('ui') + $Arguments + @('-w', $script:window, '--json'))) { $info.ArgumentList.Add($argument) }
     $child = [Diagnostics.Process]::Start($info)
-    $stdout = $child.StandardOutput.ReadToEndAsync()
-    $stderr = $child.StandardError.ReadToEndAsync()
+    $tool = @{ process = $child; stdout = $null; stderr = $null; prefix = ''; ended = $false; name = $Name; arguments = $Arguments }
+    $evidence = $script:case
+    $commands = [Collections.Generic.List[object]]::new()
     try {
-        if (!$child.WaitForExit(30000)) { throw "Таймаут winapp: $Name" }
-        $text = $stdout.GetAwaiter().GetResult()
-        [IO.File]::WriteAllText((Join-Path $script:case "$Name.json"), $text)
-        [IO.File]::WriteAllText((Join-Path $script:case "$Name.stderr.log"), $stderr.GetAwaiter().GetResult())
-        if ($child.ExitCode -ne 0) { throw "winapp $Name завершился с кодом $($child.ExitCode)." }
-        return $text | ConvertFrom-Json
-    } finally {
+        $tool.stdout = $child.StandardOutput.ReadToEndAsync()
+        $tool.stderr = $child.StandardError.ReadToEndAsync()
+    } catch {
+        $failure = $_
         try {
-            if (!$child.HasExited) { $child.Kill($true); $child.WaitForExit() }
-        } finally { $child.Dispose() }
+            $null = Close-OwnedProcess $child -Timeout $toolTimeoutMilliseconds
+        } catch { Save-CleanupFailure $_ ([ref]$failure) }
+        finally { try { $child.Dispose() } catch { Save-CleanupFailure $_ ([ref]$failure) } }
+        throw $failure
     }
+    return Finish-Tool $tool
 }
 
 function Read-Trace {
@@ -65,7 +68,7 @@ function Wait-Trace([string]$Phase) {
     $deadline = [DateTime]::UtcNow.AddSeconds(10)
     do {
         $script:process.Refresh()
-        if ($script:process.HasExited) { throw 'Приложение завершилось до native readback.' }
+        if (Read-ProcessHasExited $script:process) { throw 'Приложение завершилось до native readback.' }
         $events = @(Read-Trace)
         if (@($events | Where-Object { $_.kind -in @('error', 'truncated') }).Count) { throw 'Трасса содержит ошибку или обрезана.' }
         if ($Phase -eq 'ready') {
@@ -91,8 +94,11 @@ function Find-Stage($Elements) {
 }
 
 $failures = [Collections.Generic.List[string]]::new()
+$primaryFailure = $null
 try {
-    & node --test (Join-Path $PSScriptRoot 'assert-touch.test.mjs')
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'touch-cleanup.test.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Проверки touch cleanup не прошли.' }
+    & node --test (Join-Path $PSScriptRoot 'assert-touch.test.mjs') (Join-Path $PSScriptRoot 'touch-cleanup.test.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Проверки touch oracle не прошли.' }
     $env:LAB_MOTION_PROBE_OUTPUT = $null
     $env:LAB_MOTION_PRESS_TRACE = $null
@@ -104,6 +110,7 @@ try {
         $script:case = (New-Item -ItemType Directory -Path (Join-Path $output $name)).FullName
         $script:trace = Join-Path $case 'trace.jsonl'
         $script:process = $null
+        $caseFailure = $null
         try {
             $env:LAB_MOTION_INTERACTION_OUTPUT = $trace
             $env:LAB_MOTION_INTERACTION_DIRECTION = [string]$direction
@@ -146,26 +153,41 @@ try {
             Wait-Trace 'idle' | Out-Null
             Invoke-Ui 'after' @('screenshot', '--output', (Join-Path $case 'after.png')) | Out-Null
         } catch {
+            $caseFailure = $_
             $failures.Add($name)
-            $_ | Out-String | Set-Content (Join-Path $case 'failure.txt')
+            try { $caseFailure | Out-String | Set-Content (Join-Path $case 'failure.txt') }
+            catch { Save-CleanupFailure $_ ([ref]$caseFailure) }
         } finally {
             if ($process) {
                 try {
-                    $forced = $false
-                    if (!$process.HasExited) {
-                        $null = $process.CloseMainWindow()
-                        if (!$process.WaitForExit(5000)) { $forced = $true; $process.Kill($true); $process.WaitForExit() }
-                    }
-                    $process.Refresh()
-                    if ($forced -or $process.ExitCode -ne 0) { $failures.Add("$name-close") }
-                    @{ exited = $process.HasExited; forced = $forced; exitCode = $process.ExitCode } |
-                        ConvertTo-Json | Set-Content (Join-Path $case 'close.json')
-                } finally { $process.Dispose() }
+                    $receipt = Close-OwnedProcess $process -Timeout 5000 -Graceful
+                    $receipt | ConvertTo-Json | Set-Content (Join-Path $case 'close.json')
+                    if ($receipt.forced -or $receipt.exitCode -ne 0) { throw 'Приложение не подтвердило штатное завершение.' }
+                } catch { Save-CleanupFailure $_ ([ref]$caseFailure) }
+                finally { try { $process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$caseFailure) } }
+            }
+            if ($null -ne $caseFailure) {
+                # Оба направления выполняются, но caller получит первую ошибку даже без failure.txt.
+                Save-CleanupFailure $caseFailure ([ref]$primaryFailure)
+                $failures.Add("$name-cleanup")
+                try { $caseFailure | Out-String | Set-Content (Join-Path $case 'failure.txt') }
+                catch { Write-Warning 'Не удалось записать первичную ошибку touch.' -WarningAction Continue }
             }
         }
     }
     & node (Join-Path $PSScriptRoot 'assert-touch.mjs') $output
     if ($LASTEXITCODE -ne 0 -or $failures.Count) { throw "Touch-квалификация не прошла. Harness failures: $($failures -join ', ')" }
+} catch {
+    Save-CleanupFailure $_ ([ref]$primaryFailure)
+    throw $primaryFailure
 } finally {
-    foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+    $restoreFailure = $null
+    foreach ($name in $saved.Keys) {
+        try { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+        catch { Save-CleanupFailure $_ ([ref]$restoreFailure) }
+    }
+    if ($null -ne $restoreFailure) {
+        if ($null -eq $primaryFailure) { throw $restoreFailure }
+        Write-Warning 'Восстановление окружения после ошибки touch не завершено.' -WarningAction Continue
+    }
 }

@@ -29,24 +29,7 @@ $recordReadyTimeoutSeconds = 15
 $recordInputBudgetMilliseconds = ($recordReadyTimeoutSeconds + 2 * $restTimeoutSeconds) * 1000 + $toolTimeoutMilliseconds
 $recordDurationSeconds = [int]($recordInputBudgetMilliseconds / 1000) + 1
 
-function Read-ProcessHasExited($Process) {
-    # PowerShell может подавить исключение getter и вернуть null: не приводим его к bool.
-    $exited = $Process.HasExited
-    if ($exited -isnot [bool]) { throw 'Процесс не вернул bool HasExited.' }
-    return $exited
-}
-
-function Read-ProcessExitCode($Process) {
-    $exitCode = $Process.ExitCode
-    if ($exitCode -isnot [int]) { throw 'Процесс не вернул int ExitCode.' }
-    return $exitCode
-}
-
-function Save-CleanupFailure([Management.Automation.ErrorRecord]$Failure, [ref]$FirstFailure) {
-    # Исключение из следующего finally не должно заменять уже сохранённую ошибку.
-    if ($null -eq $FirstFailure.Value) { $FirstFailure.Value = $Failure }
-    else { Write-Warning ('Вторичная ошибка очистки: ' + $Failure.Exception.Message) -WarningAction Continue }
-}
+. (Join-Path $PSScriptRoot 'process-tools.ps1')
 
 function Start-Tool([string]$Name, [string[]]$Arguments) {
     $info = [Diagnostics.ProcessStartInfo]::new($script:cli)
@@ -59,50 +42,6 @@ function Start-Tool([string]$Name, [string[]]$Arguments) {
     $stdout = $child.StandardOutput.ReadToEndAsync()
     $stderr = if ($Name -eq 'record') { $null } else { $child.StandardError.ReadToEndAsync() }
     return @{ process = $child; stdout = $stdout; stderr = $stderr; prefix = ''; ended = $false; name = $Name; arguments = $Arguments }
-}
-
-function Finish-Tool($Tool, [int]$Timeout = $toolTimeoutMilliseconds) {
-    $toolClock = [Diagnostics.Stopwatch]::StartNew()
-    $waitCompleted = $false
-    $killAttempted = $false
-    $finishFailure = $null
-    $result = $null
-    try {
-        if ($Timeout -lt 0) { throw 'Finish-Tool требует конечный неотрицательный Timeout.' }
-        $remaining = [int][Math]::Max(0, $Timeout - $toolClock.ElapsedMilliseconds)
-        $waitResult = $Tool.process.WaitForExit($remaining)
-        if ($waitResult -isnot [bool]) { throw 'winapp не вернул bool после ожидания.' }
-        $waitCompleted = $waitResult
-        if (!$waitCompleted) { throw "Таймаут winapp: $($Tool.name)" }
-        $text = $Tool.stdout.GetAwaiter().GetResult()
-        $errors = $Tool.prefix + $Tool.stderr.GetAwaiter().GetResult()
-        [IO.File]::WriteAllText((Join-Path $evidence "$($Tool.name).stderr.log"), $errors)
-        [IO.File]::WriteAllText((Join-Path $evidence "$($Tool.name).json"), $text)
-        if (!(Read-ProcessHasExited $Tool.process)) { throw 'winapp не подтвердил завершение после ожидания.' }
-        $exitCode = Read-ProcessExitCode $Tool.process
-        $commands.Add(@{ name = $Tool.name; arguments = $Tool.arguments; exitCode = $exitCode })
-        if ($exitCode -ne 0) { throw "winapp $($Tool.name): exit $exitCode" }
-        $result = $text | ConvertFrom-Json
-    } catch { $finishFailure = $_ }
-    finally {
-        # Ошибка ожидания не отменяет единственную попытку остановить свой child.
-        if (!$waitCompleted -and !$killAttempted) {
-            $killAttempted = $true
-            try { $Tool.process.Kill($true) } catch { Save-CleanupFailure $_ ([ref]$finishFailure) }
-            try {
-                # Остановка расходует только остаток исходного Timeout, не новый срок.
-                $remaining = [int][Math]::Max(0, $Timeout - $toolClock.ElapsedMilliseconds)
-                $stopped = $Tool.process.WaitForExit($remaining)
-                if ($stopped -isnot [bool]) { throw 'winapp не вернул bool после остановки.' }
-                $stopConfirmed = Read-ProcessHasExited $Tool.process
-                if (!$stopped -or !$stopConfirmed) { throw 'Остановка winapp не подтвердила завершение.' }
-            } catch { Save-CleanupFailure $_ ([ref]$finishFailure) }
-        }
-        $Tool.ended = $true
-        try { $Tool.process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$finishFailure) }
-    }
-    if ($null -ne $finishFailure) { throw $finishFailure }
-    return $result
 }
 
 function Invoke-Ui([string]$Name, [string[]]$Arguments) {
@@ -615,21 +554,11 @@ try {
     $cleanupFailure = $null
     if ($recording -and !$recording.ended) {
         try {
-            $completionReadFailed = $false
-            $stopFailed = $false
-            $needsStop = $true
-            try { $needsStop = !(Read-ProcessHasExited $recording.process) }
-            catch { $completionReadFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
-            # Неизвестное завершение не отменяет попытку остановить свою запись.
-            if ($needsStop) {
-                try { $recording.process.Kill($true); $recording.process.WaitForExit() }
-                catch { $stopFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
-            }
-            if (!$completionReadFailed -and !$stopFailed) {
-                if (!(Read-ProcessHasExited $recording.process)) { throw 'Запись не подтвердила завершение после очистки.' }
-                $remaining = if ($recording.stderr) { $recording.stderr.GetAwaiter().GetResult() } else { '' }
-                [IO.File]::WriteAllText((Join-Path $evidence 'record.stderr.log'), $recording.prefix + $remaining)
-            }
+            $recordCleanupClock = [Diagnostics.Stopwatch]::StartNew()
+            $null = Close-OwnedProcess $recording.process -Timeout $toolTimeoutMilliseconds
+            $remaining = [int][Math]::Max(0, $toolTimeoutMilliseconds - $recordCleanupClock.ElapsedMilliseconds)
+            $stderr = if ($recording.stderr) { $recording.stderr.WaitAsync([TimeSpan]::FromMilliseconds($remaining)).GetAwaiter().GetResult() } else { '' }
+            [IO.File]::WriteAllText((Join-Path $evidence 'record.stderr.log'), $recording.prefix + $stderr)
         } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
         finally {
             try { $recording.process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
@@ -637,33 +566,9 @@ try {
     }
     if ($process) {
         try {
-            $forced = $false
-            $completionReadFailed = $false
-            $stopFailed = $false
-            $needsClose = $true
-            try { $needsClose = !(Read-ProcessHasExited $process) }
-            catch { $completionReadFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
-            if ($needsClose) {
-                $forceStop = $false
-                try {
-                    $null = $process.CloseMainWindow()
-                    $forceStop = !$process.WaitForExit(5000)
-                } catch { $stopFailed = $true; $forceStop = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
-                # Отказ graceful cleanup не отменяет одну отдельную попытку остановки.
-                if ($forceStop) {
-                    $forced = $true
-                    try { $process.Kill($true); $process.WaitForExit() }
-                    catch { $stopFailed = $true; Save-CleanupFailure $_ ([ref]$cleanupFailure) }
-                }
-            }
-            if (!$completionReadFailed -and !$stopFailed) {
-                $process.Refresh()
-                $exited = Read-ProcessHasExited $process
-                if (!$exited) { throw 'Приложение не подтвердило завершение после очистки.' }
-                $exitCode = Read-ProcessExitCode $process
-                $closed = !$forced -and $exited -and $exitCode -eq 0
-                @{ exited = $exited; forced = $forced; exitCode = $exitCode } | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
-            }
+            $receipt = Close-OwnedProcess $process -Timeout 5000 -Graceful
+            $closed = !$receipt.forced -and $receipt.exited -and $receipt.exitCode -eq 0
+            $receipt | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
         } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
         finally {
             try { $process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
