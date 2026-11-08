@@ -739,7 +739,7 @@ try {
         $getterSummary = $getterText | ConvertFrom-Json
         $actual = $getterSummary.rows[0][6]
         if ($getterSummary.schema -ne 2 -or $getterSummary.count -ne 1 -or $getterSummary.rows.Count -ne 1 -or
-            $getterSummary.rows[0].Count -ne 13 -or $getterSummary.omitted -ne 0 -or $getterSummary.invalid -ne 0 -or
+            $getterSummary.rows[0].Count -ne 14 -or $getterSummary.omitted -ne 0 -or $getterSummary.invalid -ne 0 -or
             $getterSummary.rows[0][0] -ne 10 -or $getterSummary.rows[0][1] -cne 'completed' -or
             $getterSummary.rows[0][2] -ne 17 -or $getterSummary.rows[0][3] -ne 14 -or
             $getterSummary.rows[0][7] -cne 'settled' -or $getterSummary.rows[0][8] -cne 'Finished' -or
@@ -776,7 +776,7 @@ try {
         $actualNotification = $notificationSummary.rows[0][10]
         $actualFailure = $notificationSummary.rows[0][12]
         if ($notificationSummary.schema -ne 2 -or $notificationSummary.count -ne 1 -or $notificationSummary.rows.Count -ne 1 -or
-            $notificationSummary.rows[0].Count -ne 13 -or $notificationSummary.omitted -ne 0 -or $notificationSummary.invalid -ne 0 -or
+            $notificationSummary.rows[0].Count -ne 14 -or $notificationSummary.omitted -ne 0 -or $notificationSummary.invalid -ne 0 -or
             $notificationSummary.rows[0][0] -ne 10 -or $notificationSummary.rows[0][1] -cne 'completed' -or
             $notificationSummary.rows[0][2] -ne 17 -or $notificationSummary.rows[0][3] -ne 14 -or
             $notificationSummary.rows[0][7] -cne 'settled' -or $notificationSummary.rows[0][8] -cne 'Finished' -or
@@ -799,6 +799,43 @@ try {
         $completedNotificationCases++
     }
     "completion notification projection: $completedNotificationCases synthetic controls PASS"
+    # Исходный AST Get-InputPhaseSummary, не копия producer: поле14 только closed tuple.
+    $subscriptionCases = @(
+        @{ name = 'no-entry'; snapshot = @{ Registration = 7; RawEntries = 0; AdmittedEntries = 0; LastEntry = 'None'; LastEntryQpc = $null; QpcFrequency = 10000000; Attached = $true; Active = $true; Faulted = $false }; current = $true; expected = '[7,0,0,"None",null,10000000,true,true,false,true]' },
+        @{ name = 'admitted'; snapshot = @{ Registration = 7; RawEntries = 2; AdmittedEntries = 2; LastEntry = 'Admitted'; LastEntryQpc = 200; QpcFrequency = 10000000; Attached = $true; Active = $true; Faulted = $false }; current = $true; expected = '[7,2,2,"Admitted",200,10000000,true,true,false,true]' },
+        @{ name = 'rejected-retired'; snapshot = @{ Registration = 7; RawEntries = 3; AdmittedEntries = 2; LastEntry = 'Rejected'; LastEntryQpc = 250; QpcFrequency = 10000000; Attached = $true; Active = $false; Faulted = $true }; current = $true; expected = '[7,3,2,"Rejected",250,10000000,true,false,true,true]' },
+        @{ name = 'old-subscription'; snapshot = @{ Registration = 7; RawEntries = 3; AdmittedEntries = 2; LastEntry = 'Rejected'; LastEntryQpc = 250; QpcFrequency = 10000000; Attached = $false; Active = $false; Faulted = $false }; current = $false; expected = '[7,3,2,"Rejected",250,10000000,false,false,false,false]' },
+        @{ name = 'malformed'; snapshot = @{ Registration = '::error::secret'; RawEntries = -1; AdmittedEntries = 9007199254740992L; LastEntry = 'private-outcome'; LastEntryQpc = 0; QpcFrequency = 'private-frequency'; Attached = 1; Active = 'true'; Faulted = 'false' }; current = 'private-current'; expected = '[null,null,null,null,null,null,null,null,null,null]' },
+        @{ name = 'missing-fields'; snapshot = @{}; current = $null; expected = '[null,null,null,null,null,null,null,null,null,null]' },
+        @{ name = 'missing-snapshot'; snapshot = $null; current = $true; expected = 'null' }
+    )
+    foreach ($control in $subscriptionCases) {
+        $data = [pscustomobject]@{ operation = 17; nativeOperation = 14; reason = 'settled'; end = 'Finished'; isCurrent = $true;
+            systemAnimation = $false; notification = 2; queued = $null; diagnosticFailed = $false;
+            subscriptionDiagnostics = if ($null -ne $control.snapshot) { [pscustomobject]$control.snapshot } else { $null };
+            subscriptionIsCurrent = $control.current }
+        $event = [pscustomobject]@{ sequence = 10; kind = 'completed'; data = $data }
+        $text = Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($event)
+        $summary = $text | ConvertFrom-Json
+        $first13 = ConvertTo-Json -InputObject @($summary.rows[0][0..12]) -Compress
+        $tuple = ConvertTo-Json -InputObject $summary.rows[0][13] -Compress
+        if ($summary.rows[0].Count -ne 14 -or $first13 -cne '[10,"completed",17,14,null,null,false,"settled","Finished",true,2,null,false]' -or
+            $tuple -cne $control.expected -or $summary.count -ne 1 -or $summary.omitted -ne 0 -or
+            $text.Length -gt 1800 -or $text -match 'secret|private|::error::') { throw "phase-subscription-control: $($control.name)" }
+    }
+    $manySubscriptions = @(1..100 | ForEach-Object {
+        [pscustomobject]@{ sequence = $_; kind = 'completed'; data = [pscustomobject]@{
+            operation = $_; subscriptionIsCurrent = $true; subscriptionDiagnostics = [pscustomobject]@{
+                Registration = 9007199254740991L; RawEntries = 9007199254740991L; AdmittedEntries = 9007199254740991L;
+                LastEntry = 'Admitted'; LastEntryQpc = 9007199254740991L; QpcFrequency = 10000000;
+                Attached = $true; Active = $true; Faulted = $false } } }
+    })
+    $text = Get-InputPhaseSummary -Name 'system-disable-animation' -After 0 -Events $manySubscriptions
+    $summary = $text | ConvertFrom-Json
+    if ($text.Length -gt 1800 -or $summary.count -ne 100 -or $summary.rows.Count -gt 12 -or
+        $summary.omitted -ne (100 - $summary.rows.Count) -or $summary.rows[0][0] -ne 1 -or $summary.rows[-1][0] -ne 100 -or
+        $summary.rows[-1][13][0] -ne 9007199254740991L) { throw 'phase-subscription-bounded-control' }
+    "subscription snapshot projection: $($subscriptionCases.Count) synthetic controls PASS; bounded PASS"
     $received = [pscustomobject]@{ sequence = 10; kind = 'systemNotification'; data = [pscustomobject]@{
         notification = 7; phase = 'Received'; queued = $null; diagnosticFailed = $false } }
     $queueResult = [pscustomobject]@{ sequence = 11; kind = 'systemNotification'; data = [pscustomobject]@{

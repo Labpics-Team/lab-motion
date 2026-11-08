@@ -11,7 +11,7 @@ test('canonical animation property event replaces WM-only transport on supported
   assert(adapter.includes('UISettingsAnimationsEnabledChangedEventArgs args'));
   assert(adapter.includes('notify(this);'));
   assert(!/DllImport|SetWindowSubclass|WindowMessage|GCHandle/.test(adapter));
-  assert(page.includes('new SystemPreferenceNotifications(settings, DispatcherQueue, SystemPreferenceChanged, NotificationFailed)'));
+  assert(page.includes('new SystemPreferenceNotifications(settings, DispatcherQueue, SystemPreferenceChanged, NotificationFailed, trace is not null)'));
   assert(page.includes('private void SystemPreferenceChanged(SystemPreferenceNotifications subscription)'));
   assert(page.includes('source = "UISettings.AnimationsEnabledChanged"'));
 });
@@ -93,7 +93,7 @@ function routeViolations(page, app) {
   const apply = page.slice(page.indexOf('private void ApplySystemPreference('), page.indexOf('private void NotificationFailed('));
   const reporting = page.slice(page.indexOf('private void NotificationFailed('), page.indexOf('private void ObserveSystemNotification('));
   return [
-    ['one owned-settings notification source', !page.includes('new SystemPreferenceNotifications(settings, DispatcherQueue, SystemPreferenceChanged, NotificationFailed)')
+    ['one owned-settings notification source', !page.includes('new SystemPreferenceNotifications(settings, DispatcherQueue, SystemPreferenceChanged, NotificationFailed, trace is not null)')
       || page.includes('settings.AnimationsEnabledChanged') || !app.includes('new PressPage(window)')],
     ['callback carries its exact subscription', !callback.includes('private void SystemPreferenceChanged(SystemPreferenceNotifications subscription)')
       || callback.includes('var subscription = notifications') || !callback.includes('ApplySystemPreference(subscription)')],
@@ -171,7 +171,7 @@ function adapterViolations(source) {
     ['one revoke attempt cannot accept projected retry as physical detach', !source.includes('private bool removalAttempted;')
       || !dispose.includes('remove = subscribed && !removalAttempted;')
       || !dispose.includes('if (remove) removalAttempted = true;')],
-    ['delivery shares retirement lock and carries exact identity without UI getter', !/lock \(gate\)\s*\{\s*if \(retired \|\| !subscribed\) return;/.test(callback)
+    ['delivery shares retirement lock and carries exact identity without UI getter', !/lock \(gate\)[^]*?if \(retired \|\| !subscribed\) return;/.test(callback)
       || !callback.includes('try { notify(this); }') || !callback.includes('if (SaveFailure(error)) deliveryFailure = error;')
       || /settings\.|AnimationsEnabled\b|Update\(|State\./.test(callback)],
     ['first fault retired and retained under shared lock', !/lock \(gate\)\s*\{\s*retired = true;\s*if \(failure is not null\) return false;\s*failure = ExceptionDispatchInfo.Capture\(error\);/.test(saving)
@@ -284,4 +284,80 @@ test('independent lifetime control retains unknown revoke after repeated disposa
   dispose(active, true);
   dispose(active, true);
   assert.deepEqual([active.subscribed, active.retired, active.fault, removals], [false, true, null, 2]);
+});
+
+function entrySnapshotViolations(source, page) {
+  const callback = source.slice(source.indexOf('private void AnimationsChanged'), source.indexOf('private bool SaveFailure'));
+  const guard = callback.indexOf('if (retired || !subscribed) return;');
+  const raw = callback.indexOf('rawEntries++');
+  const rejected = callback.indexOf('lastEntry = EntryOutcome.Rejected;');
+  const admitted = callback.indexOf('admittedEntries++');
+  const outcome = callback.indexOf('lastEntry = EntryOutcome.Admitted;');
+  const helper = page.match(/private SystemPreferenceNotifications\.DiagnosticSnapshot\? ReadSubscriptionDiagnosticsForTrace\(SystemPreferenceNotifications\? subscription\)\s*\{([^]*?)\n    \}/)?.[1] ?? '';
+  return [
+    ['closed immutable snapshot', !source.includes('internal readonly record struct DiagnosticSnapshot(')
+      || !source.includes('internal enum EntryOutcome { None, Admitted, Rejected }')],
+    ['raw before admission; rejected cannot count as admitted', !(raw >= 0 && raw < rejected && rejected < guard && guard < admitted && admitted < outcome && outcome < callback.indexOf('try { notify(this); }'))],
+    ['diagnostic-only bounded counters', !/if \(captureDiagnostics\)\s*\{\s*if \(rawEntries <= MaximumSafeInteger\) rawEntries\+\+;/.test(callback)
+      || !/if \(captureDiagnostics\)\s*\{\s*if \(admittedEntries <= MaximumSafeInteger\) admittedEntries\+\+;/.test(callback)
+      || !source.includes('bool captureDiagnostics = false') || !source.includes('private readonly long registration;')],
+    ['captured subscription before await', !page.includes('var subscriptionForTrace = trace is not null ? notifications : null;')
+      || page.indexOf('var subscriptionForTrace =') > page.indexOf('await pending')
+      || !page.includes('subscriptionDiagnostics = ReadSubscriptionDiagnosticsForTrace(subscriptionForTrace)')
+      || !page.includes('ReferenceEquals(notifications, subscriptionForTrace)')],
+    ['read-only owner snapshot of captured adapter', !/if \(!DispatcherQueue.HasThreadAccess \|\| subscription is null\) return null;\s*return subscription.ReadDiagnostics\(\);/.test(helper)
+      || !helper.includes('catch { return null; }') || /Update\(|Flush\(|ThrowIfFaulted\(/.test(helper)],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('adapter diagnostic snapshot distinguishes raw entry before admission and retains subscription identity', () => {
+  const source = read('../../examples/windows/SystemPreferenceNotifications.cs');
+  const page = read('../../examples/windows/PressPage.xaml.cs');
+  assert.deepEqual(entrySnapshotViolations(source, page), []);
+  for (const [before, after, expected] of [
+    ['rawEntries++', 'admittedEntries++', 'raw before admission; rejected cannot count as admitted'],
+    ['lastEntry = EntryOutcome.Rejected;', 'lastEntry = EntryOutcome.Admitted;', 'raw before admission; rejected cannot count as admitted'],
+    ['if (retired || !subscribed) return;', '', 'raw before admission; rejected cannot count as admitted'],
+    ['if (rawEntries <= MaximumSafeInteger)', 'if (true)', 'diagnostic-only bounded counters'],
+    ['readonly record struct DiagnosticSnapshot', 'record struct DiagnosticSnapshot', 'closed immutable snapshot'],
+  ]) assert(entrySnapshotViolations(source.replace(before, after), page).includes(expected), expected);
+  for (const [before, after, expected] of [
+    ['ReadSubscriptionDiagnosticsForTrace(subscriptionForTrace)', 'ReadSubscriptionDiagnosticsForTrace(notifications)', 'captured subscription before await'],
+    ['return subscription.ReadDiagnostics();', 'return notifications.ReadDiagnostics();', 'read-only owner snapshot of captured adapter'],
+    ['return subscription.ReadDiagnostics();', 'Update("systemPreference"); return subscription.ReadDiagnostics();', 'read-only owner snapshot of captured adapter'],
+  ]) assert(entrySnapshotViolations(source, page.replace(before, after)).includes(expected), expected);
+});
+
+test('prepared actual projection controls retain original columns and closed nullable entry tuple', () => {
+  const controls = read('./cleanup.test.ps1');
+  const section = controls.slice(controls.indexOf('$subscriptionCases ='), controls.indexOf('$received ='));
+  for (const name of ['no-entry', 'admitted', 'rejected-retired', 'old-subscription', 'malformed', 'missing-fields', 'missing-snapshot'])
+    assert(section.includes(`name = '${name}'`), name);
+  for (const expected of ['$summary.rows[0][0..12]', '$summary.rows[0][13]', '$summary.rows[0].Count -ne 14',
+    '$text.Length -gt 1800', '$summary.rows.Count -gt 12', '$summary.omitted -ne (100 - $summary.rows.Count)',
+    'phase-subscription-bounded-control', 'Get-InputPhaseSummary -Name']) assert(section.includes(expected), expected);
+});
+
+test('independent entry model separates retired raw callback from healthy admission without changing new registration', () => {
+  // Модель контракта, не исполнение C#/WinRT и не native receipt.
+  const create = registration => ({ registration, raw: 0, admitted: 0, last: 'None', attached: true, active: true });
+  const enter = subscription => {
+    subscription.raw++;
+    subscription.last = 'Rejected';
+    if (!subscription.attached || !subscription.active) return false;
+    subscription.admitted++;
+    subscription.last = 'Admitted';
+    return true;
+  };
+  const old = create(7);
+  const captured = old;
+  assert.equal(enter(old), true);
+  old.active = false;
+  old.attached = false;
+  const current = create(8);
+  assert.equal(enter(old), false);
+  assert.deepEqual([captured.registration, captured.raw, captured.admitted, captured.last, captured === current], [7, 2, 1, 'Rejected', false]);
+  assert.deepEqual([current.registration, current.raw, current.admitted, current.last], [8, 0, 0, 'None']);
+  assert.equal(enter(current), true);
+  assert.deepEqual([current.raw, current.admitted, current.last], [1, 1, 'Admitted']);
 });

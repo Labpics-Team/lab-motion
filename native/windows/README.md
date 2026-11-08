@@ -192,12 +192,34 @@ release Finish. Это подготовленные подменные controls,
 прочитанную выборку: до 12 строк фаз после начала сценария, без нового чтения trace.
 `input-phase` schema2 содержит `after`, `count`, `omitted`, `invalid` и `rows`;
 поля строки — sequence, phase, operation, nativeOperation, pressed, localAnimation,
-systemAnimation, reason, end, isCurrent, notification, queued, diagnosticFailed.
-Фазы `systemCallback`, `systemQueued`, `systemDelegate` отдельно показывают вход в
-настоящий `UISettings.AnimationsEnabledChanged` callback, возвращённый `TryEnqueue`
+systemAnimation, reason, end, isCurrent, notification, queued, diagnosticFailed;
+поле с индексом 13 — nullable снимок подписки из `completed`.
+Фазы `systemCallback`, `systemQueued`, `systemDelegate` отдельно показывают допущенный
+адаптером `UISettings.AnimationsEnabledChanged` callback, возвращённый `TryEnqueue`
 bool и начало managed делегата. В trace источник явно указан как
 `UISettings.AnimationsEnabledChanged`; это не receipt `WM_SETTINGCHANGE` или
-подтверждение применения настройки. Прежняя ограниченная проекция сохраняет 13 полей.
+подтверждение применения настройки. Первые 13 полей прежней проекции не изменены.
+Снимок подписки — массив Registration, RawEntries, AdmittedEntries, LastEntry,
+LastEntryQpc, QpcFrequency, Attached, Active, Faulted, subscriptionIsCurrent.
+`LastEntry` имеет только значения None/Admitted/Rejected. `RawEntries` считает входы
+до проверки допуска под существующим lock адаптера, `AdmittedEntries` — прошедшие
+её входы, не успешные enqueue или эффекты. Отклонённый поздний callback поэтому
+не требует записи Received. QPC берётся на входе callback; порядок получения lock
+при конкурентных вызовах может отличаться от порядка QPC.
+Счётчики накопительные за жизнь экземпляра, не за отдельную операцию.
+Registration идентифицирует экземпляр адаптера в процессе, не SPI-запрос.
+Экземпляр захватывается до await текущей операции; снимок читает именно его,
+даже если позднее подписка страницы заменена. `subscriptionIsCurrent` отдельно
+сравнивает его с текущей подпиской; это не operation `isCurrent` и не атомарная
+связь с getter или last-issued notification. Состояние и счётчики самого адаптера
+снимаются совместно под lock. Attached означает сохранённую подписку, Active —
+её допуск, Faulted — сохранённую ошибку, а не подтверждение native снятия.
+Счётчики включены только с trace; переполнение безопасного JSON integer даёт null,
+не wraparound. Нет снимка/не удалось чтение — null; отсутствие входа в этом
+экземпляре к моменту выборки не доказывает отсутствие событий глобально или позже.
+Снимок использует существующий completed/Flush, без новых событий, ожиданий,
+таймеров, getter, изменения policy или условий приёмки. Его lock/QPC также
+имеют observer effect; исчезновение отказа не доказывает причину.
 Для различения timing исхода добавлены отдельные `setter` и `timing`, не новые
 условия приёмки. `setter` — снимок именно запрещающего вызова: абсолютные QPC
 на входе native SET и после его возврата, `SetSucceeded`, QPC после уже существующего

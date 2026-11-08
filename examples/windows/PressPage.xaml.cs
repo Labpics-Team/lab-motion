@@ -44,7 +44,7 @@ public sealed partial class PressPage : Page
         notifications?.ThrowIfFaulted();
         if (motion is not null) return;
         if (notifications is not null) throw new InvalidOperationException("Прежняя системная подписка ещё не снята.");
-        notifications = new SystemPreferenceNotifications(settings, DispatcherQueue, SystemPreferenceChanged, NotificationFailed);
+        notifications = new SystemPreferenceNotifications(settings, DispatcherQueue, SystemPreferenceChanged, NotificationFailed, trace is not null);
         var visual = ElementCompositionPreview.GetElementVisual(Highlight);
         motion = ScalarMotion.CreateProgress(visual.Compositor);
         motion.Bind(visual, ScalarProperty.Opacity, .45f);
@@ -232,6 +232,7 @@ public sealed partial class PressPage : Page
         notifications?.ThrowIfFaulted();
         var current = motion;
         if (current is null) return;
+        var subscriptionForTrace = trace is not null ? notifications : null;
         var id = ++operation;
         var pressed = Press.IsEnabled && Press.IsPressed;
         var localAnimation = Animation.IsChecked == true;
@@ -267,6 +268,8 @@ public sealed partial class PressPage : Page
                     // Выборки независимы; last-issued id не подтверждает receipt для текущего SPI.
                     notification = ReadSystemNotificationForTrace(),
                     diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0,
+                    subscriptionDiagnostics = ReadSubscriptionDiagnosticsForTrace(subscriptionForTrace),
+                    subscriptionIsCurrent = subscriptionForTrace is null ? (bool?)null : ReferenceEquals(notifications, subscriptionForTrace),
                 });
                 trace?.Flush();
             }
@@ -284,6 +287,17 @@ public sealed partial class PressPage : Page
         var notification = Volatile.Read(ref systemNotification);
         return notification > 0 && notification <= 9007199254740991
             ? (long?)notification : null;
+    }
+
+    private SystemPreferenceNotifications.DiagnosticSnapshot? ReadSubscriptionDiagnosticsForTrace(SystemPreferenceNotifications? subscription)
+    {
+        try
+        {
+            // Snapshot принадлежит captured subscription, не позднему current и не SPI-вызову.
+            if (!DispatcherQueue.HasThreadAccess || subscription is null) return null;
+            return subscription.ReadDiagnostics();
+        }
+        catch { return null; } // Диагностика не превращает чтение в policy/cleanup.
     }
 
     private bool? ReadSystemAnimationForTrace()

@@ -786,7 +786,7 @@ test('completed notification использует прежние number/bool п�
   }
   assert(completed.includes('$notificationSummary.rows[0][10]'));
   assert(completed.includes('$notificationSummary.rows[0][12]'));
-  assert(completed.includes('$notificationSummary.rows[0].Count -ne 13'));
+  assert(completed.includes('$notificationSummary.rows[0].Count -ne 14'));
   assert(completed.includes('$actualNotification -isnot [long]'));
   assert(completed.includes('$actualFailure -isnot [bool]'));
   assert(completed.includes('phase-completed-notification-control'));
@@ -815,7 +815,7 @@ test('nullable completed getter использует прежнюю bool про�
   assert(completed.includes("Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($completedEvent)"));
   assert(completed.includes('kind = \'completed\''));
   assert(completed.includes('$getterSummary.rows[0][6]'));
-  assert(completed.includes('$getterSummary.rows[0].Count -ne 13'));
+  assert(completed.includes('$getterSummary.rows[0].Count -ne 14'));
   for (const name of ['false', 'true', 'unavailable', 'malformed', 'missing']) assert(completed.includes(`name = '${name}'`), name);
   assert(completed.includes('$actual -isnot [bool]'));
   assert(completed.includes('$null -ne $actual'));

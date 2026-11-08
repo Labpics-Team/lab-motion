@@ -149,6 +149,7 @@ function Read-InputPhaseField($Data, [string]$Field, [string]$Type) {
         'reason' { if ($value -is [string] -and $value -cin @('settled', 'snap', 'replaced', 'stopped', 'disposed', 'interaction')) { return $value } }
         'end' { if ($value -is [string] -and $value -cin @('Finished', 'Stopped')) { return $value } }
         'outcome' { if ($value -is [string] -and $value -cin @('Missing', 'Stale', 'Detached', 'Deduplicated', 'Update')) { return $value } }
+        'entryOutcome' { if ($value -is [string] -and $value -cin @('None', 'Admitted', 'Rejected')) { return $value } }
     }
     return $null
 }
@@ -224,13 +225,30 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
         }
         if ($null -eq $phase) { continue }
         $operationField = if ($phase -eq 'requested') { 'pageOperation' } else { 'operation' }
-        # Строка schema2: прежние десять полей, затем notification,queued,diagnosticFailed.
+        $subscriptionSummary = $null
+        if ($phase -eq 'completed' -and $null -ne $data) {
+            $subscriptionProperty = $data.PSObject.Properties['subscriptionDiagnostics']
+            if ($null -ne $subscriptionProperty -and $null -ne $subscriptionProperty.Value) {
+                $subscription = $subscriptionProperty.Value
+                $subscriptionSummary = @((Read-InputPhaseField $subscription 'Registration' 'positive'),
+                    (Read-InputPhaseField $subscription 'RawEntries' 'number'),
+                    (Read-InputPhaseField $subscription 'AdmittedEntries' 'number'),
+                    (Read-InputPhaseField $subscription 'LastEntry' 'entryOutcome'),
+                    (Read-InputPhaseField $subscription 'LastEntryQpc' 'positive'),
+                    (Read-InputPhaseField $subscription 'QpcFrequency' 'positive'),
+                    (Read-InputPhaseField $subscription 'Attached' 'bool'),
+                    (Read-InputPhaseField $subscription 'Active' 'bool'),
+                    (Read-InputPhaseField $subscription 'Faulted' 'bool'),
+                    (Read-InputPhaseField $data 'subscriptionIsCurrent' 'bool'))
+            }
+        }
+        # Schema2 сохраняет прежние13 полей; поле14 — nullable subscription tuple.
         $rows.Add(@($sequence, $phase, (Read-InputPhaseField $data $operationField 'number'),
             (Read-InputPhaseField $data 'nativeOperation' 'number'), (Read-InputPhaseField $data 'pressed' 'bool'),
             (Read-InputPhaseField $data 'localAnimation' 'bool'), (Read-InputPhaseField $data 'systemAnimation' 'bool'),
             (Read-InputPhaseField $data 'reason' 'reason'), (Read-InputPhaseField $data 'end' 'end'),
             (Read-InputPhaseField $data 'isCurrent' 'bool'), (Read-InputPhaseField $data 'notification' 'number'),
-            (Read-InputPhaseField $data 'queued' 'bool'), (Read-InputPhaseField $data 'diagnosticFailed' 'bool')))
+            (Read-InputPhaseField $data 'queued' 'bool'), (Read-InputPhaseField $data 'diagnosticFailed' 'bool'), $subscriptionSummary))
     }
     $count = $rows.Count
     $timingCount = $timing.Count
