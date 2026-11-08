@@ -34,7 +34,7 @@ function Invoke-Dotnet([string]$Log, [string[]]$Arguments) {
 }
 
 function Get-BootTraceSummary([string]$Path) {
-    $traceSummary = [ordered]@{ status = $null; knownFailureCode = $null; lastRunKind = $null }
+    $traceSummary = [ordered]@{ status = $null; knownFailureCode = $null; lastRunKind = $null; errorType = $null; activeProbe = $null }
     try {
         # Читается только уже сохранённый MainPage trace; наружу выходят конечные literals.
         $saved = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json -NoEnumerate
@@ -58,6 +58,18 @@ function Get-BootTraceSummary([string]$Path) {
                     'boundary-raw-y-lower-settle', 'boundary-raw-y-interior-settle', 'boundary-raw-y-upper-settle')) {
                     $traceSummary.lastRunKind = $kind.Value
                 }
+            }
+        }
+        if ($traceSummary.status -ceq 'error') {
+            # Новые поля принадлежат typed producer; display error/stack не источник.
+            $errorType = $saved.PSObject.Properties['errorType']
+            if ($errorType -and $errorType.Value -is [string] -and $errorType.Value -cin @('InvalidOperation',
+                'Timeout', 'ObjectDisposed', 'Argument', 'ArgumentOutOfRange', 'ArgumentNull', 'InvalidCast', 'NullReference', 'COM')) {
+                $traceSummary.errorType = $errorType.Value
+            }
+            $activeProbe = $saved.PSObject.Properties['activeProbe']
+            if ($activeProbe -and $activeProbe.Value -is [string] -and $activeProbe.Value -cin @('IdleRetarget', 'Retarget', 'Settle', 'Lifetime', 'Progress', 'Boundaries')) {
+                $traceSummary.activeProbe = $activeProbe.Value
             }
         }
         $errorValue = $saved.PSObject.Properties['error']
@@ -95,6 +107,8 @@ function Get-BootTraceSummary([string]$Path) {
 }
 
 Invoke-Dotnet 'dotnet.txt' @('--info')
+& pwsh -NoProfile -File (Join-Path $PSScriptRoot 'build-native-preference.ps1') -OutputDirectory (Join-Path $output 'native-diagnostics')
+if ($LASTEXITCODE -ne 0) { throw 'Native diagnostic helper build/controls не прошли.' }
 Invoke-Dotnet 'unit-build.log' @('build', $unit, '--configuration', 'Release', '--artifacts-path', $buildOutput, '--output', $unitOutput)
 Invoke-Dotnet 'unit.json' @((Join-Path $unitOutput 'lifecycle.dll'))
 $unitResult = Get-Content -LiteralPath (Join-Path $output 'unit.json') -Raw | ConvertFrom-Json
@@ -117,6 +131,7 @@ $actualLifecycle = @($unitResult.results | ForEach-Object { $_.scenario }) | Sor
 if (Compare-Object $expectedLifecycle $actualLifecycle) { throw 'Состав lifecycle-сценариев изменился.' }
 
 Invoke-Dotnet 'consumer-build.log' @('build', $consumer, '--configuration', 'Release', '--runtime', 'win-x64', '--artifacts-path', $buildOutput, '--output', $appOutput)
+Copy-Item -LiteralPath (Join-Path $output 'native-diagnostics/LabMotion.PreferenceDiagnostics.dll') -Destination $appOutput
 $exe = Join-Path $appOutput 'NativeWindow.exe'
 $tracePath = Join-Path $output 'trace.json'
 $previousOutput = $env:LAB_MOTION_PROBE_OUTPUT

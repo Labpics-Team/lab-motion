@@ -190,7 +190,25 @@ trace завершают проверку ошибкой. Журналы сбо�
 читается его JSON и выводится закрытая проекция: `status` (`captured`/`error`/null),
 `knownFailureCode` по точной известной первой строке MainPage Require/Until и
 `lastRunKind` из конечного состава MainPage. Последний сохранённый run — не текущий
-failed run: timeout до `runs.Add` может оставить предыдущий run или null.
+failed run: отказ до `runs.Add` может оставить предыдущий run или null.
+Новые `errorType` и `activeProbe` читатель берёт только из закрытых producer полей.
+MainPage catch классифицирует фактический `Exception.GetType()` точным сравнением
+с известными .NET типами: InvalidOperation/Timeout/ObjectDisposed/Argument/
+ArgumentOutOfRange/ArgumentNull/InvalidCast/NullReference/COM. Неизвестный тип,
+включая derived type, даёт null. Локальный enum `activeProbe` устанавливается
+непосредственно перед существующей awaited пробой IdleRetarget/Retarget/Settle/
+Lifetime/Progress; перед записью captured результата очищается. Это активная
+верхнеуровневая проба, не stack-site, точный variant, нарушенный assertion или RCA.
+Ошибка записи captured результата не приписывается последней успешной пробе.
+Save добавляет эти поля к прежним status/error/scale/runs; captured выводит null.
+Unknown errorType и known activeProbe независимы; старые trace без новых полей
+дают два null, даже если display error содержит полный допустимый stack-frame.
+`Exception.ToString()` предназначен людям и не имеет точного формата; multiline
+Message может выглядеть как stack. Поэтому новые поля из него никогда не выводятся.
+Исторический knownFailureCode остаётся точной текстовой категорией прежней карты,
+не удостоверяет actual exception type или active probe. Reader допускает только
+case-sensitive enums/string при status=error, не raw error/stack/path/HRESULT.
+Пять полей сохраняют прежний cap180символов без новых file reads или ожиданий.
 `ConvertFrom-Json -NoEnumerate` сохраняет тип root JSON: массив, включая singleton,
 не допускается как MainPage object и выдаёт только nullable поля.
 Неизвестные, повреждённые и недоступные значения остаются null; raw error/stack,
@@ -270,12 +288,34 @@ release Finish. Это подготовленные подменные controls,
 прочитанную выборку: до 12 строк фаз после начала сценария, без нового чтения trace.
 `input-phase` schema2 содержит `after`, `count`, `omitted`, `invalid` и `rows`;
 поля строки — sequence, phase, operation, nativeOperation, pressed, localAnimation,
-systemAnimation, reason, end, isCurrent, notification, queued, diagnosticFailed.
-Фазы `systemCallback`, `systemQueued`, `systemDelegate` отдельно показывают вход в
-настоящий `UISettings.AnimationsEnabledChanged` callback, возвращённый `TryEnqueue`
+systemAnimation, reason, end, isCurrent, notification, queued, diagnosticFailed;
+поле с индексом 13 — nullable снимок подписки из `completed`.
+Фазы `systemCallback`, `systemQueued`, `systemDelegate` отдельно показывают допущенный
+адаптером `UISettings.AnimationsEnabledChanged` callback, возвращённый `TryEnqueue`
 bool и начало managed делегата. В trace источник явно указан как
 `UISettings.AnimationsEnabledChanged`; это не receipt `WM_SETTINGCHANGE` или
-подтверждение применения настройки. Прежняя ограниченная проекция сохраняет 13 полей.
+подтверждение применения настройки. Первые 13 полей прежней проекции не изменены.
+Снимок подписки — массив Registration, RawEntries, AdmittedEntries, LastEntry,
+LastEntryQpc, QpcFrequency, Attached, Active, Faulted, subscriptionIsCurrent.
+`LastEntry` имеет только значения None/Admitted/Rejected. `RawEntries` считает входы
+до проверки допуска под существующим lock адаптера, `AdmittedEntries` — прошедшие
+её входы, не успешные enqueue или эффекты. Отклонённый поздний callback поэтому
+не требует записи Received. QPC берётся на входе callback; порядок получения lock
+при конкурентных вызовах может отличаться от порядка QPC.
+Счётчики накопительные за жизнь экземпляра, не за отдельную операцию.
+Registration идентифицирует экземпляр адаптера в процессе, не SPI-запрос.
+Экземпляр захватывается до await текущей операции; снимок читает именно его,
+даже если позднее подписка страницы заменена. `subscriptionIsCurrent` отдельно
+сравнивает его с текущей подпиской; это не operation `isCurrent` и не атомарная
+связь с getter или last-issued notification. Состояние и счётчики самого адаптера
+снимаются совместно под lock. Attached означает сохранённую подписку, Active —
+её допуск, Faulted — сохранённую ошибку, а не подтверждение native снятия.
+Счётчики включены только с trace; переполнение безопасного JSON integer даёт null,
+не wraparound. Нет снимка/не удалось чтение — null; отсутствие входа в этом
+экземпляре к моменту выборки не доказывает отсутствие событий глобально или позже.
+Снимок использует существующий completed/Flush, без новых событий, ожиданий,
+таймеров, getter, изменения policy или условий приёмки. Его lock/QPC также
+имеют observer effect; исчезновение отказа не доказывает причину.
 Для различения timing исхода добавлены отдельные `setter` и `timing`, не новые
 условия приёмки. `setter` — снимок именно запрещающего вызова: абсолютные QPC
 на входе native SET и после его возврата, `SetSucceeded`, QPC после уже существующего
@@ -320,6 +360,36 @@ null. JSON ограничен 1800 ASCII-символами, пропуски о
 порядка release/preference/request/completion/snap, без изменения oracle или
 сроков. Отказ проекции не заменяет первичную ошибку. Полные trace, CLI arguments,
 stdout и пользовательское содержимое в summary не попадают.
+Временный native diagnostic receiver включается только с тем же trace и после
+успешной исходной typed подписки. Он получает тот же retained `UISettings` через
+публичный CsWinRT interop и QI(IUISettings6), без новой активации. Native WRL receiver
+с FtmBase записывает лишь bounded count/QPC; policy, managed callback, очередь и
+oracle не используют его как источник. Helper DLL собирается установленным VC x64
+toolchain внутри прежнего `verify.ps1`, без установки ПО. Синтетический вызов того же
+typed ABI до add проверяет recorder отдельно; control count/QPC сохраняются отдельно,
+actual counters сбрасываются до checked add. Synthetic PASS не подтверждает OS delivery.
+
+`native` в failure summary — одна последняя completed-выборка захваченной подписки:
+sequence, registration, State, SameSource, ControlPassed, SourceHResult,
+DelegateHResult, MarshalHResult, ControlHResult, ControlCount, ControlQpc,
+QpcFrequency, AddHResult, Count, LastEntryQpc, Attached, Active, Faulted, RemoveHResult.
+Это добавочное поле schema 2; прежние row columns, общий предел 1800 ASCII и условия
+приёмки сохранены. Нулевой token не считается ошибкой; сам token и адреса не выводятся.
+Unavailable/Faulted не трактуется как здоровый source count0. Поздний null completed
+сбрасывает старую положительную выборку. Refcounted record удерживается callback,
+без ссылки на managed owner или source. Close отзывает active до одной попытки remove;
+failed remove сохраняет Attached/Faulted и отдельную cleanup-ошибку, не detached PASS.
+Исходный product primary остаётся первым при aggregate cleanup failures. DLL не
+выгружается, пока callbacks ещё возможны; safe release не вызывает remove из finalizer.
+
+Только actual entry QPC внутри прежнего SET→completion окна при одинаковой boot/frequency
+сужает область к доставке между подписками. Cumulative count не идентифицирует SPI;
+поздний entry не доказывает своевременное прерывание. Дополнительный native token/reference
+может влиять на fan-out/lifetime; даже исчезновение отказа не доказывает causal fix или
+готовность обычного пути без диагностики. После выбора repair этот временный
+различитель удаляется либо обычный путь отдельно проверяется без него в прежней приёмке.
+Ни control, ни native positive не заменяют original typed input witness.
+
 В режиме trace callback делает один Flush после enqueue: иначе отказ очереди не
 имел бы будущего Update, способного записать receipt и false. Этот дополнительный
 lock/IO может изменить расписание и не доказывает причину исчезнувшего отказа.

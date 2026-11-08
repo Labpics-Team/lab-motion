@@ -230,7 +230,7 @@ test('boot controls extract the actual AST branch and cover healthy silence, nul
 test('boot failure projects saved MainPage trace through a closed nullable summary', () => {
   const source = readSource(new URL('./verify.ps1', import.meta.url));
   assert(source.includes('function Get-BootTraceSummary([string]$Path)'));
-  assert(source.includes("$traceSummary = [ordered]@{ status = $null; knownFailureCode = $null; lastRunKind = $null }"));
+  assert(source.includes("$traceSummary = [ordered]@{ status = $null; knownFailureCode = $null; lastRunKind = $null; errorType = $null; activeProbe = $null }"));
   assert(source.includes('$saved = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json'));
   assert(source.includes('$identity.traceExists -is [bool] -and $identity.traceExists'));
   assert(source.includes("Write-Host ('Нативный trace: ' + ((Get-BootTraceSummary $tracePath) | ConvertTo-Json -Compress))"));
@@ -264,6 +264,82 @@ test('saved boot trace preserves root JSON array identity before object admissio
   assert(!rootPreserved(source.replace('if ($saved -isnot [pscustomobject])', 'if ($false)')));
   const controls = readSource(new URL('./process-cleanup.test.ps1', import.meta.url));
   for (const name of ['singleton-array-root', 'empty-array-root']) assert(controls.includes(`name = '${name}'`));
+});
+
+const wantedBootCalls = ['IdleRetarget()', 'Retarget(false, 1)', 'Retarget(true, 1)', 'Retarget(false, -1)', 'Retarget(true, -1)',
+  'Settle()', 'Lifetime()', 'Progress("up")', 'Progress("down")', 'Progress("reverse")', 'Progress("velocity")'];
+
+function typedBootMetadataViolations(main, reader) {
+  const run = main.slice(main.indexOf('private async void Run('), main.indexOf('private static FailureType? Classify('));
+  const classifier = main.slice(main.indexOf('private static FailureType? Classify('), main.indexOf('private void Save('));
+  const calls = [...run.matchAll(/activeProbe = Probe\.(\w+);\s*await ([^;]+);/g)];
+  const mapping = [...classifier.matchAll(/type == typeof\(([^)]+)\) \? FailureType\.(\w+)/g)];
+  const expected = ['InvalidOperation', 'Timeout', 'ObjectDisposed', 'Argument', 'ArgumentOutOfRange', 'ArgumentNull', 'InvalidCast', 'NullReference', 'COM'];
+  const metadata = reader.slice(reader.indexOf("if ($traceSummary.status -ceq 'error')"), reader.indexOf("$errorValue = $saved.PSObject.Properties['error']"));
+  return [
+    ['typed closed metadata', !main.includes('private enum Probe { IdleRetarget, Retarget, Settle, Lifetime, Progress }')
+      || !main.includes('private readonly record struct FailureMetadata(FailureType? ErrorType, Probe? ActiveProbe);')],
+    ['same calls with immediate active probe assignment', JSON.stringify(calls.map(x => x[2])) !== JSON.stringify(wantedBootCalls)
+      || calls.some(x => x[1] !== x[2].split('(')[0]) || (run.match(/\bawait /g) ?? []).length !== 11],
+    ['clear probe before captured save; retain original catch', !/await Progress\("velocity"\);\s*activeProbe = null;\s*Status.Text = "Траектории проверены";\s*Save\("captured", null\);/.test(run)
+      || !run.includes('Save("error", error.ToString(), new FailureMetadata(Classify(error), activeProbe));')
+      || !run.includes('finally { Application.Current.Exit(); }')],
+    ['actual exact types not display classification', !classifier.includes('var type = error.GetType();')
+      || JSON.stringify(mapping.map(x => x[2])) !== JSON.stringify(expected)
+      || mapping.some(x => x[1] !== (x[2] === 'COM' ? 'System.Runtime.InteropServices.COMException' : `${x[2]}Exception`))
+      || /\.Message|\.StackTrace|\.Name|ToString\(|HResult|GetMethod|throw /.test(classifier)],
+    ['existing save carries optional typed fields', !main.includes('FailureMetadata? failure = null')
+      || !main.includes('errorType = failure?.ErrorType?.ToString(), activeProbe = failure?.ActiveProbe?.ToString()')],
+    ['reader only closed producer metadata', !metadata.includes("$saved.PSObject.Properties['errorType']")
+      || !metadata.includes("$saved.PSObject.Properties['activeProbe']")
+      || !metadata.includes('$traceSummary.errorType = $errorType.Value') || !metadata.includes('$traceSummary.activeProbe = $activeProbe.Value')
+      || !metadata.includes('$errorType.Value -is [string]') || !metadata.includes('$activeProbe.Value -is [string]')
+      || !metadata.includes('-cin') || /firstLine|StackTrace|lastRunKind|errorValue|Matches/.test(metadata)],
+  ].filter(([, failed]) => failed).map(([name]) => name);
+}
+
+test('boot failure metadata comes from typed producer not exception display text', () => {
+  const main = readSource(new URL('../../examples/windows/MainPage.xaml.cs', import.meta.url));
+  const reader = readSource(new URL('./verify.ps1', import.meta.url));
+  assert.deepEqual(typedBootMetadataViolations(main, reader), []);
+  for (const [before, after, expected] of [
+    ['activeProbe = Probe.Progress;', 'activeProbe = Probe.Lifetime;', 'same calls with immediate active probe assignment'],
+    ['activeProbe = null;\n            Status.Text', 'Status.Text', 'clear probe before captured save; retain original catch'],
+    ['var type = error.GetType();', 'var type = error.Message;', 'actual exact types not display classification'],
+    ['type == typeof(InvalidOperationException)', 'error is InvalidOperationException', 'actual exact types not display classification'],
+    ['errorType = failure?.ErrorType?.ToString()', 'errorType = error', 'existing save carries optional typed fields'],
+  ]) assert(typedBootMetadataViolations(main.replace(before, after), reader).includes(expected), expected);
+  for (const [before, after] of [
+    ["$saved.PSObject.Properties['errorType']", "$saved.PSObject.Properties['error']"],
+    ['$traceSummary.activeProbe = $activeProbe.Value', '$traceSummary.activeProbe = $traceSummary.lastRunKind'],
+    ['$errorType.Value -is [string]', '$true'],
+  ]) assert(typedBootMetadataViolations(main, reader.replace(before, after)).includes('reader only closed producer metadata'));
+  const controls = readSource(new URL('./process-cleanup.test.ps1', import.meta.url));
+  for (const name of ['full-frame-message-only', 'typed-overrides-display', 'unknown-type-known-probe', 'unknown-probe-known-type',
+    'typed-captured', 'metadata-types', 'metadata-case', 'metadata-structure']) assert(controls.includes(`name = '${name}'`), name);
+  assert(controls.includes('$maximum.Length -gt 180'));
+});
+
+test('independent producer model retains active probe and ignores complete display-frame spoof', () => {
+  // Контрактная модель, не исполнение C#/PowerShell или native проб.
+  const known = new Map([['InvalidOperationException', 'InvalidOperation'], ['TimeoutException', 'Timeout']]);
+  const run = (failAt, exception) => {
+    let activeProbe = null;
+    try {
+      for (let i = 0; i < wantedBootCalls.length; i++) {
+        activeProbe = wantedBootCalls[i].split('(')[0];
+        if (i === failAt) throw exception;
+      }
+      activeProbe = null;
+      if (failAt === 11) throw exception; // captured status/save failure не последняя проба.
+      return { errorType: null, activeProbe: null };
+    } catch (error) { return { errorType: known.get(error.actualType) ?? null, activeProbe }; }
+  };
+  const spoof = { actualType: 'TimeoutException', message: 'System.InvalidOperationException: private\n   at NativeWindow.MainPage.Lifetime()' };
+  for (let i = 0; i < 11; i++) assert.deepEqual(run(i, spoof), { errorType: 'Timeout', activeProbe: wantedBootCalls[i].split('(')[0] });
+  assert.deepEqual(run(11, spoof), { errorType: 'Timeout', activeProbe: null });
+  assert.deepEqual(run(-1, spoof), { errorType: null, activeProbe: null });
+  assert.deepEqual(run(8, { actualType: 'DerivedTimeoutException', message: spoof.message }), { errorType: null, activeProbe: 'Progress' });
 });
 
 test('process witness retains getter faults, invalid identity and a non-effect .NET getter control', () => {
@@ -871,7 +947,7 @@ test('completed notification использует прежние number/bool п�
   }
   assert(completed.includes('$notificationSummary.rows[0][10]'));
   assert(completed.includes('$notificationSummary.rows[0][12]'));
-  assert(completed.includes('$notificationSummary.rows[0].Count -ne 13'));
+  assert(completed.includes('$notificationSummary.rows[0].Count -ne 14'));
   assert(completed.includes('$actualNotification -isnot [long]'));
   assert(completed.includes('$actualFailure -isnot [bool]'));
   assert(completed.includes('phase-completed-notification-control'));
@@ -900,7 +976,7 @@ test('nullable completed getter использует прежнюю bool про�
   assert(completed.includes("Get-InputPhaseSummary -Name 'system-disable-animation' -After 9 -Events @($completedEvent)"));
   assert(completed.includes('kind = \'completed\''));
   assert(completed.includes('$getterSummary.rows[0][6]'));
-  assert(completed.includes('$getterSummary.rows[0].Count -ne 13'));
+  assert(completed.includes('$getterSummary.rows[0].Count -ne 14'));
   for (const name of ['false', 'true', 'unavailable', 'malformed', 'missing']) assert(completed.includes(`name = '${name}'`), name);
   assert(completed.includes('$actual -isnot [bool]'));
   assert(completed.includes('$null -ne $actual'));
@@ -910,12 +986,13 @@ test('nullable completed getter использует прежнюю bool про�
 test('отказ snap называет сценарий и сохраняет порядок фаз без нового чтения trace', () => {
   const source = readSource(new URL('./verify-input.ps1', import.meta.url));
   assert.deepEqual(inputPhaseDiagnosticViolations(source), []);
+  const snapDiagnosticStart = source.indexOf('function Get-InputPhaseSummary(');
   for (const [before, after, namedError] of [
     ["'InputSnapNotObserved'", "'unnamed'", 'named snap failure'],
     ['-Events $events', '-Events @(Read-Trace)', 'bounded snapshot reused'],
     ['throw $failure', 'throw', 'diagnostic cannot replace primary'],
     ['$summary.Length -le 1800', '$true', 'fixed phase summary bound'],
-  ]) assert(inputPhaseDiagnosticViolations(source.replace(before, after)).includes(namedError), namedError);
+  ]) assert(inputPhaseDiagnosticViolations(source.slice(0, snapDiagnosticStart) + source.slice(snapDiagnosticStart).replace(before, after)).includes(namedError), namedError);
 });
 
 test('диагностика фаз проецирует enum/bool/number и сохраняет missing/malformed проверки настоящего helper', () => {

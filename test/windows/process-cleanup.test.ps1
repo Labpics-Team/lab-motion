@@ -162,27 +162,47 @@ try {
         $expected = 'Нативный процесс: ' + $control.expected
         $expectedCount = if ($control.traceExists -is [bool] -and $control.traceExists) { 2 } else { 1 }
         if ($script:bootMessages.Count -ne $expectedCount -or $script:bootMessages[0] -cne $expected -or $script:bootMessages[0].Length -gt 128) { throw 'Boot-диагностика нарушила закрытый bounded контракт.' }
-        if ($expectedCount -eq 2 -and $script:bootMessages[1] -cne 'Нативный trace: {"status":null,"knownFailureCode":null,"lastRunKind":null}') { throw 'Пустой trace выдал выдуманное значение.' }
+        if ($expectedCount -eq 2 -and $script:bootMessages[1] -cne 'Нативный trace: {"status":null,"knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}') { throw 'Пустой trace выдал выдуманное значение.' }
         if ($script:traceReads -ne ($expectedCount - 1)) { throw 'traceExists refusal всё равно прочитал файл.' }
     }
 
     # Исполняется AST исходной функции с настоящим JSON decoder; file boundary подменена.
     $traceCases = @(
-        @{ name = 'captured'; json = '{"status":"captured","error":null,"runs":[{"kind":"lifetime"}]}'; expected = '{"status":"captured","knownFailureCode":null,"lastRunKind":"lifetime"}' },
-        @{ name = 'require'; json = '{"status":"error","error":"System.InvalidOperationException: Idle потерял identity или завершил новую операцию observer.\r\nprivate-stack","runs":[{"kind":"idle-reentrant-retarget","trace":["private-run"]}]}'; expected = '{"status":"error","knownFailureCode":"idle-next-identity","lastRunKind":"idle-reentrant-retarget"}' },
-        @{ name = 'timeout'; json = '{"status":"error","error":"System.TimeoutException: Событие native runtime не получено.\nprivate-stack","runs":[]}'; expected = '{"status":"error","knownFailureCode":"native-event-timeout","lastRunKind":null}' },
-        @{ name = 'last-saved'; json = '{"status":"error","error":"System.InvalidOperationException: Начальная скорость потеряна.","runs":[{"kind":"smooth-settle"},{"kind":"lifetime"}]}'; expected = '{"status":"error","knownFailureCode":"lifetime-initial-velocity","lastRunKind":"lifetime"}' },
-        @{ name = 'unknown'; json = '{"status":"private-status","error":"private-error","runs":[{"kind":"private-kind"}],"path":"private-path","pid":"private-pid"}'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
-        @{ name = 'types'; json = '{"status":true,"error":5,"runs":{"kind":"lifetime"}}'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
-        @{ name = 'last-invalid'; json = '{"status":"error","error":"System.InvalidOperationException: Начальная скорость потеряна.private-tail","runs":[{"kind":"lifetime"},{"kind":5}]}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null}' },
-        @{ name = 'stack-only'; json = '{"status":"error","error":"private-error\nSystem.InvalidOperationException: Начальная скорость потеряна.","runs":[{"kind":"LIFETIME"}]}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null}' },
-        @{ name = 'captured-error'; json = '{"status":"captured","error":"System.InvalidOperationException: Начальная скорость потеряна.","runs":[]}'; expected = '{"status":"captured","knownFailureCode":null,"lastRunKind":null}' },
-        @{ name = 'missing'; json = '{}'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
-        @{ name = 'malformed'; json = 'private-not-json'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
-        @{ name = 'array-root'; json = '[{"status":"captured"},{"status":"error"}]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
-        @{ name = 'singleton-array-root'; json = '[{"status":"error","error":"System.InvalidOperationException: Начальная скорость потеряна.","runs":[]}]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
-        @{ name = 'empty-array-root'; json = '[]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' }
+        @{ name = 'captured'; json = '{"status":"captured","error":null,"runs":[{"kind":"lifetime"}]}'; expected = '{"status":"captured","knownFailureCode":null,"lastRunKind":"lifetime","errorType":null,"activeProbe":null}' },
+        @{ name = 'require'; json = '{"status":"error","error":"System.InvalidOperationException: Idle потерял identity или завершил новую операцию observer.\r\nprivate-stack","runs":[{"kind":"idle-reentrant-retarget","trace":["private-run"]}]}'; expected = '{"status":"error","knownFailureCode":"idle-next-identity","lastRunKind":"idle-reentrant-retarget","errorType":null,"activeProbe":null}' },
+        @{ name = 'timeout'; json = '{"status":"error","error":"System.TimeoutException: Событие native runtime не получено.\nprivate-stack","runs":[]}'; expected = '{"status":"error","knownFailureCode":"native-event-timeout","lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'last-saved'; json = '{"status":"error","error":"System.InvalidOperationException: Начальная скорость потеряна.","runs":[{"kind":"smooth-settle"},{"kind":"lifetime"}]}'; expected = '{"status":"error","knownFailureCode":"lifetime-initial-velocity","lastRunKind":"lifetime","errorType":null,"activeProbe":null}' },
+        @{ name = 'unknown'; json = '{"status":"private-status","error":"private-error","runs":[{"kind":"private-kind"}],"path":"private-path","pid":"private-pid"}'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'types'; json = '{"status":true,"error":5,"runs":{"kind":"lifetime"}}'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'last-invalid'; json = '{"status":"error","error":"System.InvalidOperationException: Начальная скорость потеряна.private-tail","runs":[{"kind":"lifetime"},{"kind":5}]}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'stack-only'; json = '{"status":"error","error":"private-error\nSystem.InvalidOperationException: Начальная скорость потеряна.","runs":[{"kind":"LIFETIME"}]}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'captured-error'; json = '{"status":"captured","error":"System.InvalidOperationException: Начальная скорость потеряна.","runs":[]}'; expected = '{"status":"captured","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'missing'; json = '{}'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'malformed'; json = 'private-not-json'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'array-root'; json = '[{"status":"captured"},{"status":"error"}]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'singleton-array-root'; json = '[{"status":"error","error":"System.InvalidOperationException: Начальная скорость потеряна.","runs":[]}]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'empty-array-root'; json = '[]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'full-frame-message-only'; json = '{"status":"error","error":"System.InvalidOperationException: private-message\n   at NativeWindow.MainPage.Progress(String direction) in private-path:line 215\n   at NativeWindow.MainPage.Run(Object sender, RoutedEventArgs args)","runs":[{"kind":"lifetime"}]}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":"lifetime","errorType":null,"activeProbe":null}' },
+        @{ name = 'typed-overrides-display'; json = '{"status":"error","error":"System.InvalidOperationException: Начальная скорость потеряна.\n   at NativeWindow.MainPage.Lifetime()","runs":[{"kind":"lifetime"}],"errorType":"Timeout","activeProbe":"Progress"}'; expected = '{"status":"error","knownFailureCode":"lifetime-initial-velocity","lastRunKind":"lifetime","errorType":"Timeout","activeProbe":"Progress"}' },
+        @{ name = 'unknown-type-known-probe'; json = '{"status":"error","errorType":"Private","activeProbe":"Progress"}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":"Progress"}' },
+        @{ name = 'unknown-probe-known-type'; json = '{"status":"error","errorType":"InvalidOperation","activeProbe":"Private"}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":"InvalidOperation","activeProbe":null}' },
+        @{ name = 'typed-captured'; json = '{"status":"captured","errorType":"Timeout","activeProbe":"Progress"}'; expected = '{"status":"captured","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'metadata-types'; json = '{"status":"error","errorType":1,"activeProbe":true}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'metadata-case'; json = '{"status":"error","errorType":"timeout","activeProbe":"progress"}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' },
+        @{ name = 'metadata-structure'; json = '{"status":"error","errorType":["Timeout"],"activeProbe":{"value":"Progress"}}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}' }
     )
+    foreach ($type in @('InvalidOperation', 'Timeout', 'ObjectDisposed', 'Argument', 'ArgumentOutOfRange', 'ArgumentNull', 'InvalidCast', 'NullReference', 'COM')) {
+        $fixture = @{ status = 'error'; errorType = $type } | ConvertTo-Json -Compress
+        $expected = [ordered]@{ status = 'error'; knownFailureCode = $null; lastRunKind = $null; errorType = $type; activeProbe = $null } | ConvertTo-Json -Compress
+        $traceCases += @{ name = 'type-' + $type; json = $fixture; expected = $expected }
+    }
+    foreach ($probe in @('IdleRetarget', 'Retarget', 'Settle', 'Lifetime', 'Progress')) {
+        $fixture = @{ status = 'error'; activeProbe = $probe } | ConvertTo-Json -Compress
+        $expected = [ordered]@{ status = 'error'; knownFailureCode = $null; lastRunKind = $null; errorType = $null; activeProbe = $probe } | ConvertTo-Json -Compress
+        $traceCases += @{ name = 'probe-' + $probe; json = $fixture; expected = $expected }
+    }
+    $maximum = [ordered]@{ status = 'captured'; knownFailureCode = 'lifetime-initial-velocity'; lastRunKind = 'idle-reentrant-retarget'; errorType = 'ArgumentOutOfRange'; activeProbe = 'IdleRetarget' } | ConvertTo-Json -Compress
+    if ($maximum.Length -gt 180) { throw 'Typed metadata превысили прежний trace cap.' }
     foreach ($control in $traceCases) {
         $script:traceFixture = $control.json
         $script:traceReads = 0
@@ -198,7 +218,7 @@ try {
     # Неизвестные status/error не дают текстовый fallback; unreadable сохраняет null.
     function Get-Content { param($LiteralPath, [switch]$Raw); throw [IO.IOException]::new('private-read-error') }
     $actual = Get-BootTraceSummary 'fixture' | ConvertTo-Json -Compress
-    if ($actual -cne '{"status":null,"knownFailureCode":null,"lastRunKind":null}') { throw 'Отказ чтения выдал ложный trace.' }
+    if ($actual -cne '{"status":null,"knownFailureCode":null,"lastRunKind":null,"errorType":null,"activeProbe":null}') { throw 'Отказ чтения выдал ложный trace.' }
     $script:bootMessages = @()
     $observed = $null
     try { & $bootFailure } catch { $observed = $_ }

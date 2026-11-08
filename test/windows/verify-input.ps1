@@ -140,7 +140,18 @@ function Wait-Rest([long]$After = 0) {
         }
         Start-Sleep -Milliseconds 50
     } while ([DateTime]::UtcNow -lt $deadline)
-    throw "Кнопка не вернулась в отпущенное состояние за $restTimeoutSeconds секунд."
+    try { throw "Кнопка не вернулась в отпущенное состояние за $restTimeoutSeconds секунд." }
+    catch {
+        $failure = $_
+        try {
+            $summary = Get-RestSummary -After $After -Events $events
+            $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`nwait-rest: " + $summary)
+        } catch {
+            try { $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`nwait-rest: unavailable") }
+            catch { }
+        }
+        throw $failure
+    }
 }
 
 function Read-InputPhaseField($Data, [string]$Field, [string]$Type) {
@@ -155,8 +166,64 @@ function Read-InputPhaseField($Data, [string]$Field, [string]$Type) {
         'reason' { if ($value -is [string] -and $value -cin @('settled', 'snap', 'replaced', 'stopped', 'disposed', 'interaction')) { return $value } }
         'end' { if ($value -is [string] -and $value -cin @('Finished', 'Stopped')) { return $value } }
         'outcome' { if ($value -is [string] -and $value -cin @('Missing', 'Stale', 'Detached', 'Deduplicated', 'Update')) { return $value } }
+        'entryOutcome' { if ($value -is [string] -and $value -cin @('None', 'Admitted', 'Rejected')) { return $value } }
+        'trigger' { if ($value -is [string] -and $value -cin @('attach', 'pressed', 'enabled', 'localPreference', 'systemPreference')) { return $value } }
+        'restKind' { if ($value -is [string] -and $value -cin @('completed', 'snapReadback')) { return $value } }
+        'identityState' { if ($value -is [string] -and $value -cin @('Hashed', 'NotLoaded', 'NoLocation', 'TooLarge', 'Unavailable', 'Ambiguous')) { return $value } }
+        'throwType' { if ($value -is [string] -and $value -cin @('COM', 'InvalidCast', 'Argument', 'InvalidOperation', 'TypeLoad', 'MissingMethod', 'FileNotFound', 'NotSupported')) { return $value } }
+        'throwOwner' { if ($value -is [string] -and $value -cin @('UISettings', 'WinRTRuntime', 'Application', 'CoreRuntime', 'Other')) { return $value } }
+        'nativeState' { if ($value -is [string] -and $value -cin @('Ready', 'Faulted', 'Unavailable')) { return $value } }
+        'hresult' { if (($value -is [int] -or $value -is [long]) -and $value -ge -2147483648 -and $value -le 2147483647) { return $value } }
+        'version' {
+            if ($value -is [string] -and $value -cmatch '^[0-9]{1,5}(\.[0-9]{1,5}){3}$' -and
+                @($value.Split('.') | Where-Object { [int]$_ -gt 65535 }).Count -eq 0) { return $value }
+        }
+        'mvid' { if ($value -is [string] -and $value -cmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') { return $value } }
+        'sha256' { if ($value -is [string] -and $value -cmatch '^[0-9a-f]{64}$') { return $value } }
     }
     return $null
+}
+
+function Get-RestSummary([long]$After, [object[]]$Events) {
+    # Последний уже прочитанный snapshot; attach не отбрасывается как не-input trigger.
+    $intentData = $null
+    $intent = $null
+    $completion = $null
+    $invalid = 0
+    foreach ($event in $Events) {
+        if ($null -eq $event) { $invalid++; continue }
+        $sequence = Read-InputPhaseField $event 'sequence' 'number'
+        if ($null -eq $sequence) { $invalid++ }
+        $kind = $event.PSObject.Properties['kind']
+        if ($null -eq $kind -or $kind.Value -isnot [string]) { $invalid++; continue }
+        if ($kind.Value -cne 'intent') { continue }
+        $property = $event.PSObject.Properties['data']
+        $intentData = if ($null -ne $property) { $property.Value } else { $null }
+        if ($null -eq $intentData) { $invalid++ }
+        $intent = @($sequence, (Read-InputPhaseField $intentData 'operation' 'number'),
+            (Read-InputPhaseField $intentData 'pressed' 'bool'), (Read-InputPhaseField $intentData 'localAnimation' 'bool'),
+            (Read-InputPhaseField $intentData 'systemAnimation' 'bool'), (Read-InputPhaseField $intentData 'trigger' 'trigger'))
+    }
+    $operation = Read-InputPhaseField $intentData 'operation' 'number'
+    if ($null -ne $operation) {
+        foreach ($event in $Events) {
+            if ($null -eq $event) { continue }
+            $sequence = Read-InputPhaseField $event 'sequence' 'number'
+            $kind = Read-InputPhaseField $event 'kind' 'restKind'
+            if ($null -eq $kind) { continue }
+            $property = $event.PSObject.Properties['data']
+            $data = if ($null -ne $property) { $property.Value } else { $null }
+            $endOperation = Read-InputPhaseField $data 'operation' 'number'
+            # Unknown operation не совпадает с unknown и не заимствует прежний completion.
+            if ($null -eq $endOperation -or $endOperation -ne $operation) { continue }
+            $completion = @($sequence, $kind, (Read-InputPhaseField $data 'reason' 'reason'), (Read-InputPhaseField $data 'end' 'end'))
+        }
+    }
+    $count = if ($null -eq $Events) { 0 } else { $Events.Count }
+    $summary = [ordered]@{ schema = 1; after = (Read-InputPhaseField ([pscustomobject]@{ value = $After }) 'value' 'number');
+        count = $count; invalid = $invalid; intent = $intent; completion = $completion } | ConvertTo-Json -Depth 3 -Compress
+    if ($summary.Length -gt 1800) { throw 'Диагностика ожидания превысила свой фиксированный предел.' }
+    return $summary
 }
 
 function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $Setter = $null) {
@@ -172,6 +239,9 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
         (Read-InputPhaseField $Setter 'ReadbackEnabled' 'bool'),
         (Read-InputPhaseField $Setter 'QpcFrequency' 'positive'))
     $invalid = 0
+    $projectionSummary = $null
+    $nativeSummary = $null
+    $projectionSequence = -1L
     foreach ($event in $Events) {
         $sequence = Read-InputPhaseField $event 'sequence' 'number'
         if ($null -eq $sequence) { $invalid++; continue }
@@ -230,13 +300,82 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
         }
         if ($null -eq $phase) { continue }
         $operationField = if ($phase -eq 'requested') { 'pageOperation' } else { 'operation' }
-        # Строка schema2: прежние десять полей, затем notification,queued,diagnosticFailed.
+        $subscriptionSummary = $null
+        $subscription = $null
+        # Latest определяется completed identity, даже если data отсутствуют/повреждены.
+        $captureProjection = $phase -eq 'completed' -and $sequence -gt $projectionSequence
+        if ($captureProjection) {
+            $projectionSequence = $sequence
+            $projectionSummary = $null
+            $nativeSummary = $null
+        }
+        if ($phase -eq 'completed' -and $null -ne $data) {
+            $subscriptionProperty = $data.PSObject.Properties['subscriptionDiagnostics']
+            if ($null -ne $subscriptionProperty -and $null -ne $subscriptionProperty.Value) {
+                $subscription = $subscriptionProperty.Value
+                $subscriptionSummary = @((Read-InputPhaseField $subscription 'Registration' 'positive'),
+                    (Read-InputPhaseField $subscription 'RawEntries' 'number'),
+                    (Read-InputPhaseField $subscription 'AdmittedEntries' 'number'),
+                    (Read-InputPhaseField $subscription 'LastEntry' 'entryOutcome'),
+                    (Read-InputPhaseField $subscription 'LastEntryQpc' 'positive'),
+                    (Read-InputPhaseField $subscription 'QpcFrequency' 'positive'),
+                    (Read-InputPhaseField $subscription 'Attached' 'bool'),
+                    (Read-InputPhaseField $subscription 'Active' 'bool'),
+                    (Read-InputPhaseField $subscription 'Faulted' 'bool'),
+                    (Read-InputPhaseField $data 'subscriptionIsCurrent' 'bool'))
+            }
+            # Последняя completed-выборка captured registration; не identity SPI/event.
+            if ($captureProjection) {
+                $nativeProperty = $data.PSObject.Properties['nativeDiagnostics']
+                if ($null -ne $nativeProperty -and $null -ne $nativeProperty.Value) {
+                    $native = $nativeProperty.Value
+                    $nativeSummary = @($sequence, (Read-InputPhaseField $subscription 'Registration' 'positive'),
+                        (Read-InputPhaseField $native 'State' 'nativeState'),
+                        (Read-InputPhaseField $native 'SameSource' 'bool'), (Read-InputPhaseField $native 'ControlPassed' 'bool'),
+                        (Read-InputPhaseField $native 'SourceHResult' 'hresult'), (Read-InputPhaseField $native 'DelegateHResult' 'hresult'),
+                        (Read-InputPhaseField $native 'MarshalHResult' 'hresult'), (Read-InputPhaseField $native 'ControlHResult' 'hresult'),
+                        (Read-InputPhaseField $native 'ControlCount' 'number'), (Read-InputPhaseField $native 'ControlQpc' 'positive'),
+                        (Read-InputPhaseField $native 'QpcFrequency' 'positive'), (Read-InputPhaseField $native 'AddHResult' 'hresult'),
+                        (Read-InputPhaseField $native 'Count' 'number'), (Read-InputPhaseField $native 'LastEntryQpc' 'positive'),
+                        (Read-InputPhaseField $native 'Attached' 'bool'), (Read-InputPhaseField $native 'Active' 'bool'),
+                        (Read-InputPhaseField $native 'Faulted' 'bool'), (Read-InputPhaseField $native 'RemoveHResult' 'hresult'))
+                }
+                $projectionProperty = $data.PSObject.Properties['projectionDiagnostics']
+                if ($null -ne $projectionProperty -and $null -ne $projectionProperty.Value) {
+                    $projection = $projectionProperty.Value
+                    $identities = [Collections.Generic.List[object]]::new()
+                    foreach ($role in @('UISettingsAssembly', 'WinRTRuntimeAssembly')) {
+                        $property = $projection.PSObject.Properties[$role]
+                        $identity = if ($null -ne $property) { $property.Value } else { $null }
+                        $identities.Add(@((Read-InputPhaseField $identity 'State' 'identityState'),
+                            (Read-InputPhaseField $identity 'Version' 'version'), (Read-InputPhaseField $identity 'Mvid' 'mvid'),
+                            (Read-InputPhaseField $identity 'Sha256' 'sha256')))
+                    }
+                    $throws = [Collections.Generic.List[object]]::new()
+                    foreach ($field in @('Last', 'LastProjection')) {
+                        $property = $projection.PSObject.Properties[$field]
+                        $entry = if ($null -ne $property) { $property.Value } else { $null }
+                        if ($null -eq $entry) { $throws.Add($null); continue }
+                        $throws.Add(@((Read-InputPhaseField $entry 'Order' 'positive'), (Read-InputPhaseField $entry 'Qpc' 'positive'),
+                            (Read-InputPhaseField $entry 'Type' 'throwType'), (Read-InputPhaseField $entry 'HResult' 'hresult'),
+                            (Read-InputPhaseField $entry 'ThrowingOwner' 'throwOwner')))
+                    }
+                    $projectionSummary = @($sequence, (Read-InputPhaseField $subscription 'Registration' 'positive'), @($identities.ToArray()),
+                        (Read-InputPhaseField $projection 'StartedQpc' 'positive'), (Read-InputPhaseField $projection 'QpcFrequency' 'positive'),
+                        (Read-InputPhaseField $projection 'Active' 'bool'), (Read-InputPhaseField $projection 'Faulted' 'bool'),
+                        (Read-InputPhaseField $projection 'ReentrantSkipped' 'number'), (Read-InputPhaseField $projection 'Count' 'number'),
+                        (Read-InputPhaseField $projection 'Omitted' 'number'), (Read-InputPhaseField $projection 'ProjectionCount' 'number'),
+                        (Read-InputPhaseField $projection 'ProjectionOmitted' 'number'), @($throws.ToArray()))
+                }
+            }
+        }
+        # Schema2 сохраняет прежние13 полей; поле14 — nullable subscription tuple.
         $rows.Add(@($sequence, $phase, (Read-InputPhaseField $data $operationField 'number'),
             (Read-InputPhaseField $data 'nativeOperation' 'number'), (Read-InputPhaseField $data 'pressed' 'bool'),
             (Read-InputPhaseField $data 'localAnimation' 'bool'), (Read-InputPhaseField $data 'systemAnimation' 'bool'),
             (Read-InputPhaseField $data 'reason' 'reason'), (Read-InputPhaseField $data 'end' 'end'),
             (Read-InputPhaseField $data 'isCurrent' 'bool'), (Read-InputPhaseField $data 'notification' 'number'),
-            (Read-InputPhaseField $data 'queued' 'bool'), (Read-InputPhaseField $data 'diagnosticFailed' 'bool')))
+            (Read-InputPhaseField $data 'queued' 'bool'), (Read-InputPhaseField $data 'diagnosticFailed' 'bool'), $subscriptionSummary))
     }
     $count = $rows.Count
     $timingCount = $timing.Count
@@ -246,7 +385,8 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
     do {
         $summary = [ordered]@{ schema = 2; scenario = $scenario; after = $After; count = $count;
             omitted = $count - $rows.Count; invalid = $invalid; rows = @($rows.ToArray()); setter = $setterSummary;
-            timingCount = $timingCount; timingOmitted = $timingCount - $timing.Count; timing = @($timing.ToArray()) } | ConvertTo-Json -Depth 4 -Compress
+            timingCount = $timingCount; timingOmitted = $timingCount - $timing.Count; timing = @($timing.ToArray());
+            projection = $projectionSummary; native = $nativeSummary } | ConvertTo-Json -Depth 5 -Compress
         if ($summary.Length -le 1800) { return $summary }
         if ($rows.Count -gt 2) { $rows.RemoveAt([int][Math]::Floor($rows.Count / 2)) }
         elseif ($timing.Count -gt 2) { $timing.RemoveAt([int][Math]::Floor($timing.Count / 2)) }
@@ -356,6 +496,10 @@ try {
     # Подменная ClientAreaAnimation теста живёт в отдельном процессе.
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'cleanup.test.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Проверка восстановления после ошибки не прошла.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'projection-diagnostics.test.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Проверка ограниченной projection диагностики не прошла.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'native-preference.test.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Native diagnostic reader controls не прошли.' }
     & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs') (Join-Path $PSScriptRoot 'dispose.test.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Проверки различающей силы input oracle не прошли.' }
     $env:LAB_MOTION_PROBE_OUTPUT = $null
