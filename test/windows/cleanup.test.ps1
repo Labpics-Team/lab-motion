@@ -483,6 +483,15 @@ try {
     })
     if ($releaseDefinitions.Count -ne 2) { throw 'Missing actual release Scenario/Invoke-Ui' }
     $releaseFunctions = [scriptblock]::Create(($releaseDefinitions | ForEach-Object { $_.Extent.Text }) -join "`n")
+    # Извлечённый Scenario читает конфигурацию владельца, не отдельный fixture default.
+    $restConfiguration = @($ast.EndBlock.Statements | Where-Object {
+        $_ -is [Management.Automation.Language.AssignmentStatementAst] -and
+        $_.Left -is [Management.Automation.Language.VariableExpressionAst] -and
+        $_.Left.VariablePath.UserPath -ceq 'restTimeoutSeconds'
+    })
+    if ($restConfiguration.Count -ne 1) { throw 'release-config-missing-control' }
+    . ([scriptblock]::Create($restConfiguration[0].Extent.Text))
+    if ($restTimeoutSeconds -ne 8) { throw 'release-config-owner-budget-control' }
     $releaseCases = 0
     foreach ($releaseFault in @('healthy', 'delayed-exit', 'settled', 'race', 'read', 'setter', 'readback',
         'read-finish', 'setter-finish', 'finish', 'start', 'budget', 'local',
