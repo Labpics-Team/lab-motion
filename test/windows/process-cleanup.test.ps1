@@ -14,6 +14,11 @@ $bootBranch = $owner.Find({
 }, $true)
 if (!$bootBranch) { throw 'Отсутствует исходная ветка отказа нативного процесса.' }
 $bootFailure = [scriptblock]::Create(($bootBranch.Clauses[0].Item2.Statements | ForEach-Object { $_.Extent.Text }) -join "`n")
+$traceFunction = $ast.Find({ param($node)
+    $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Get-BootTraceSummary'
+}, $true)
+if (!$traceFunction) { throw 'Отсутствует исходная закрытая проекция MainPage trace.' }
+. ([scriptblock]::Create($traceFunction.Extent.Text))
 
 # Исполняется настоящий try/catch/finally; подменены только process/file boundaries.
 $originalOutput = $env:LAB_MOTION_PROBE_OUTPUT
@@ -33,6 +38,7 @@ try {
         $script:pidStopped = $false
         $script:warned = $false
         $script:bootMessages = @()
+        $script:traceReads = 0
         $script:waitReached = $false
         $script:getterReached = $false
         $exe = 'owned.exe'
@@ -98,6 +104,7 @@ try {
         }
         function Stop-Process { param($Id, [switch]$Force); $script:pidStopped = $true; $script:owned.HasExited = $true }
         function Test-Path { param($LiteralPath); return $true }
+        function Get-Content { param($LiteralPath, [switch]$Raw); $script:traceReads++; return '{}' }
         function Set-Content {
             param([Parameter(Position = 0)]$Path, $Encoding, [Parameter(ValueFromPipeline = $true)]$InputObject)
             process { if ($script:fault -eq 'evidence') { throw [IO.IOException]::new('primary-evidence') } }
@@ -120,7 +127,8 @@ try {
             if ($observed) { throw $observed }
         } elseif (!$observed) { throw "Expected failure missing: $fault" }
         $expectsBootMessage = $fault -in @('own-timeout', 'foreign-pid')
-        if ($script:bootMessages.Count -ne [int]$expectsBootMessage) { throw "Диагностика вне boot-отказа: $fault" }
+        if ($script:bootMessages.Count -ne (2 * [int]$expectsBootMessage)) { throw "Диагностика вне boot-отказа: $fault" }
+        if ($script:traceReads -ne [int]$expectsBootMessage) { throw "Saved trace прочитан вне boot-отказа: $fault" }
         if ($fault -in @('handle', 'handle-null', 'handle-zero')) {
             if ($observed.Exception.Message -notmatch 'Не получен действительный handle') { throw "Handle validation error missing: $fault" }
         }
@@ -133,7 +141,7 @@ try {
         $cases++
     }
 
-    # Настоящая AST-ветка получает только identity: здесь нет Process или файловых reads.
+    # Настоящая AST-ветка получает identity и подменённую границу сохранённого файла, не Process.
     $bootCases = @(
         @{ completed = $false; exitCode = $null; traceExists = $true; expected = '{"completed":false,"exitCode":null,"traceExists":true}' },
         @{ completed = $true; exitCode = -1; traceExists = $true; expected = '{"completed":true,"exitCode":-1,"traceExists":true}' },
@@ -147,15 +155,56 @@ try {
     foreach ($control in $bootCases) {
         $identity = [ordered]@{ completed = $control.completed; exitCode = $control.exitCode; traceExists = $control.traceExists; pid = 'private-pid'; path = 'private-path' }
         $script:bootMessages = @()
+        $script:traceReads = 0
         $observed = $null
         try { & $bootFailure } catch { $observed = $_ }
         if (!$observed -or $observed.Exception.Message -ne 'Нативный процесс не подтвердил успешное завершение.') { throw 'Boot-диагностика заменила первичную ошибку.' }
         $expected = 'Нативный процесс: ' + $control.expected
-        if ($script:bootMessages.Count -ne 1 -or $script:bootMessages[0] -cne $expected -or $script:bootMessages[0].Length -gt 128) { throw 'Boot-диагностика нарушила закрытый bounded контракт.' }
+        $expectedCount = if ($control.traceExists -is [bool] -and $control.traceExists) { 2 } else { 1 }
+        if ($script:bootMessages.Count -ne $expectedCount -or $script:bootMessages[0] -cne $expected -or $script:bootMessages[0].Length -gt 128) { throw 'Boot-диагностика нарушила закрытый bounded контракт.' }
+        if ($expectedCount -eq 2 -and $script:bootMessages[1] -cne 'Нативный trace: {"status":null,"knownFailureCode":null,"lastRunKind":null}') { throw 'Пустой trace выдал выдуманное значение.' }
+        if ($script:traceReads -ne ($expectedCount - 1)) { throw 'traceExists refusal всё равно прочитал файл.' }
     }
+
+    # Исполняется AST исходной функции с настоящим JSON decoder; file boundary подменена.
+    $traceCases = @(
+        @{ name = 'captured'; json = '{"status":"captured","error":null,"runs":[{"kind":"lifetime"}]}'; expected = '{"status":"captured","knownFailureCode":null,"lastRunKind":"lifetime"}' },
+        @{ name = 'require'; json = '{"status":"error","error":"System.InvalidOperationException: Idle потерял identity или завершил новую операцию observer.\r\nprivate-stack","runs":[{"kind":"idle-reentrant-retarget","trace":["private-run"]}]}'; expected = '{"status":"error","knownFailureCode":"idle-next-identity","lastRunKind":"idle-reentrant-retarget"}' },
+        @{ name = 'timeout'; json = '{"status":"error","error":"System.TimeoutException: Событие native runtime не получено.\nprivate-stack","runs":[]}'; expected = '{"status":"error","knownFailureCode":"native-event-timeout","lastRunKind":null}' },
+        @{ name = 'last-saved'; json = '{"status":"error","error":"System.InvalidOperationException: Начальная скорость потеряна.","runs":[{"kind":"smooth-settle"},{"kind":"lifetime"}]}'; expected = '{"status":"error","knownFailureCode":"lifetime-initial-velocity","lastRunKind":"lifetime"}' },
+        @{ name = 'unknown'; json = '{"status":"private-status","error":"private-error","runs":[{"kind":"private-kind"}],"path":"private-path","pid":"private-pid"}'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
+        @{ name = 'types'; json = '{"status":true,"error":5,"runs":{"kind":"lifetime"}}'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
+        @{ name = 'last-invalid'; json = '{"status":"error","error":"System.InvalidOperationException: Начальная скорость потеряна.private-tail","runs":[{"kind":"lifetime"},{"kind":5}]}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null}' },
+        @{ name = 'stack-only'; json = '{"status":"error","error":"private-error\nSystem.InvalidOperationException: Начальная скорость потеряна.","runs":[{"kind":"LIFETIME"}]}'; expected = '{"status":"error","knownFailureCode":null,"lastRunKind":null}' },
+        @{ name = 'captured-error'; json = '{"status":"captured","error":"System.InvalidOperationException: Начальная скорость потеряна.","runs":[]}'; expected = '{"status":"captured","knownFailureCode":null,"lastRunKind":null}' },
+        @{ name = 'missing'; json = '{}'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
+        @{ name = 'malformed'; json = 'private-not-json'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' },
+        @{ name = 'array-root'; json = '[{"status":"captured"},{"status":"error"}]'; expected = '{"status":null,"knownFailureCode":null,"lastRunKind":null}' }
+    )
+    foreach ($control in $traceCases) {
+        $script:traceFixture = $control.json
+        $script:traceReads = 0
+        function Get-Content { param($LiteralPath, [switch]$Raw); $script:traceReads++; return $script:traceFixture }
+        $actual = Get-BootTraceSummary 'fixture' | ConvertTo-Json -Compress
+        if ($actual -cne $control.expected -or $actual.Length -gt 180 -or $script:traceReads -ne 1) { throw "Закрытая trace projection не подтверждена: $($control.name)" }
+        $identity = [ordered]@{ completed = $true; exitCode = 1; traceExists = $true }
+        $script:bootMessages = @()
+        $observed = $null
+        try { & $bootFailure } catch { $observed = $_ }
+        if (!$observed -or $observed.Exception.Message -ne 'Нативный процесс не подтвердил успешное завершение.' -or $script:bootMessages.Count -ne 2 -or $script:bootMessages[1] -cne ('Нативный trace: ' + $control.expected)) { throw 'Trace projection потеряла первичный throw или закрытый output.' }
+    }
+    # Неизвестные status/error не дают текстовый fallback; unreadable сохраняет null.
+    function Get-Content { param($LiteralPath, [switch]$Raw); throw [IO.IOException]::new('private-read-error') }
+    $actual = Get-BootTraceSummary 'fixture' | ConvertTo-Json -Compress
+    if ($actual -cne '{"status":null,"knownFailureCode":null,"lastRunKind":null}') { throw 'Отказ чтения выдал ложный trace.' }
+    $script:bootMessages = @()
+    $observed = $null
+    try { & $bootFailure } catch { $observed = $_ }
+    if (!$observed -or $observed.Exception.Message -ne 'Нативный процесс не подтвердил успешное завершение.' -or $script:bootMessages.Count -ne 2) { throw 'Отказ чтения заменил boot primary.' }
+
     function Write-Host { param($Object); throw [IO.IOException]::new('private-diagnostic-error') }
     $observed = $null
     try { & $bootFailure } catch { $observed = $_ }
     if (!$observed -or $observed.Exception.Message -ne 'Нативный процесс не подтвердил успешное завершение.') { throw 'Отказ вывода замаскировал boot-ошибку.' }
 } finally { $env:LAB_MOTION_PROBE_OUTPUT = $originalOutput }
-"process cleanup: $cases PASS; getter primitive: PASS; boot projection: $($bootCases.Count) PASS; output failure: PASS"
+"process cleanup: $cases PASS; getter primitive: PASS; boot projection: $($bootCases.Count) PASS; saved trace: $($traceCases.Count) PASS; output failure: PASS"

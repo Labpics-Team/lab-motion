@@ -33,6 +33,61 @@ function Invoke-Dotnet([string]$Log, [string[]]$Arguments) {
     if ($code -ne 0) { throw "dotnet завершился с кодом $code. Журнал: $Log" }
 }
 
+function Get-BootTraceSummary([string]$Path) {
+    $traceSummary = [ordered]@{ status = $null; knownFailureCode = $null; lastRunKind = $null }
+    try {
+        # Читается только уже сохранённый MainPage trace; наружу выходят конечные literals.
+        $saved = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+        if ($saved -isnot [pscustomobject]) { return $traceSummary }
+        $status = $saved.PSObject.Properties['status']
+        if ($status -and $status.Value -is [string] -and $status.Value -cin @('captured', 'error')) {
+            $traceSummary.status = $status.Value
+        }
+        $runs = $saved.PSObject.Properties['runs']
+        if ($runs -and $runs.Value -is [array] -and $runs.Value.Count -gt 0) {
+            $last = $runs.Value[-1]
+            if ($last -is [pscustomobject]) {
+                $kind = $last.PSObject.Properties['kind']
+                if ($kind -and $kind.Value -is [string] -and $kind.Value -cin @('idle-reentrant-retarget',
+                    'retarget-preserve', 'retarget-reset-mutant', 'smooth-settle', 'lifetime',
+                    'progress-up', 'progress-down', 'progress-reverse', 'progress-velocity')) {
+                    $traceSummary.lastRunKind = $kind.Value
+                }
+            }
+        }
+        $errorValue = $saved.PSObject.Properties['error']
+        if ($traceSummary.status -ceq 'error' -and $errorValue -and $errorValue.Value -is [string]) {
+            # ToString содержит stack; классифицируется только точная известная первая строка.
+            $firstLine = ($errorValue.Value -split '\r?\n', 2)[0]
+            $traceSummary.knownFailureCode = switch -CaseSensitive ($firstLine) {
+                'System.InvalidOperationException: Idle передал observer ещё незавершённую операцию.' { 'idle-first-completion' }
+                'System.InvalidOperationException: Idle потерял identity или завершил новую операцию observer.' { 'idle-next-identity' }
+                'System.InvalidOperationException: Новая операция observer не завершилась своим native Idle.' { 'idle-next-completion' }
+                'System.InvalidOperationException: Завершения поколений перепутаны.' { 'retarget-completion' }
+                'System.InvalidOperationException: Retarget вернул позицию назад.' { 'retarget-position' }
+                'System.InvalidOperationException: Не сохранена семантика native velocity.' { 'retarget-velocity' }
+                'System.InvalidOperationException: Траектория не отличает сохранение скорости от сброса.' { 'retarget-trajectory' }
+                'System.InvalidOperationException: Native settling дальше половины физического пикселя от цели.' { 'settling-distance' }
+                'System.InvalidOperationException: Пружина из покоя не завершилась.' { 'settle-completion' }
+                'System.InvalidOperationException: Критическая пружина перескочила цель.' { 'settle-overshoot' }
+                'System.InvalidOperationException: Начальная скорость потеряна.' { 'lifetime-initial-velocity' }
+                'System.InvalidOperationException: Stop выдал неверное завершение.' { 'lifetime-stop' }
+                'System.InvalidOperationException: Dispose выдал неверное завершение.' { 'lifetime-dispose' }
+                'System.InvalidOperationException: Канал доступен или сообщает события после Dispose.' { 'lifetime-retirement' }
+                'System.InvalidOperationException: Нормализованный канал завершился дальше 0.001 от цели.' { 'progress-completion' }
+                'System.InvalidOperationException: Не наблюдалось промежуточное движение прогресса.' { 'progress-intermediate' }
+                'System.InvalidOperationException: Нормализация потеряла непрерывность разворота.' { 'progress-reverse' }
+                'System.InvalidOperationException: Скорость канала возвращается не в единицах прогресса в секунду.' { 'progress-velocity' }
+                'System.TimeoutException: Событие native runtime не получено.' { 'native-event-timeout' }
+                default { $null }
+            }
+        }
+    } catch {
+        # Повреждённый/недоступный trace не становится успехом и не меняет boot throw.
+    }
+    return $traceSummary
+}
+
 Invoke-Dotnet 'dotnet.txt' @('--info')
 Invoke-Dotnet 'unit-build.log' @('build', $unit, '--configuration', 'Release', '--artifacts-path', $buildOutput, '--output', $unitOutput)
 Invoke-Dotnet 'unit.json' @((Join-Path $unitOutput 'lifecycle.dll'))
@@ -98,6 +153,13 @@ try {
             Write-Host ('Нативный процесс: ' + ($summary | ConvertTo-Json -Compress))
         } catch {
             # Диагностика не заменяет первичный отказ и не выводит сырую ошибку.
+        }
+        if ($identity.traceExists -is [bool] -and $identity.traceExists) {
+            try {
+                Write-Host ('Нативный trace: ' + ((Get-BootTraceSummary $tracePath) | ConvertTo-Json -Compress))
+            } catch {
+                # Отказ чтения/вывода не подменяет первичную ошибку процесса.
+            }
         }
         throw 'Нативный процесс не подтвердил успешное завершение.'
     }

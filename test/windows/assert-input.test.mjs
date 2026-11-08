@@ -186,8 +186,9 @@ function bootDiagnosticViolations(source) {
   const branch = source.match(/if \(!\$finished -or \$identity\.exitCode -ne 0 -or !\$identity\.traceExists\) \{([\s\S]*?)\n    \}/)?.[1] ?? '';
   return [
     ['closed typed identity projection', !/\$summary = \[ordered\]@\{\s+completed = if \(\$identity\.completed -is \[bool\]\) \{ \$identity\.completed \} else \{ \$null \}\s+exitCode = if \(\$identity\.exitCode -is \[int\]\) \{ \$identity\.exitCode \} else \{ \$null \}\s+traceExists = if \(\$identity\.traceExists -is \[bool\]\) \{ \$identity\.traceExists \} else \{ \$null \}\s+\}/.test(branch)],
-    ['failure-only bounded output before original throw', !/Write-Host \('Нативный процесс: ' \+ \(\$summary \| ConvertTo-Json -Compress\)\)\s+\} catch \{[^}]*\}\s+throw 'Нативный процесс не подтвердил успешное завершение\.'/.test(branch)],
-    ['no new process or file observation', /\$process\.|\$exe|\$tracePath|\$_|Get-|Test-|Set-Content/.test(branch)],
+    ['failure-only bounded output before original throw', !branch.includes("Write-Host ('Нативный процесс: ' + ($summary | ConvertTo-Json -Compress))")
+      || !/throw 'Нативный процесс не подтвердил успешное завершение\.'\s*$/.test(branch)],
+    ['no new process observation or unrelated file read', /\$process\.|\$exe|\$_|Get-|Test-|Set-Content/.test(branch.replace('Get-BootTraceSummary $tracePath', 'SavedTraceSummary'))],
     ['single diagnostic output', (source.match(/Write-Host \('Нативный процесс: '/g) ?? []).length !== 1],
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
@@ -201,7 +202,7 @@ test('boot failure logs only closed identity fields without changing the primary
     ['$identity.exitCode -is [int]', '$true', 'closed typed identity projection'],
     ['$identity.traceExists -is [bool]', '$true', 'closed typed identity projection'],
     ['$summary | ConvertTo-Json -Compress', '$identity | ConvertTo-Json -Compress', 'failure-only bounded output before original throw'],
-    ["Write-Host ('Нативный процесс: '", "Write-Host ($process.Id + 'Нативный процесс: '", 'no new process or file observation'],
+    ["Write-Host ('Нативный процесс: '", "Write-Host ($process.Id + 'Нативный процесс: '", 'no new process observation or unrelated file read'],
     ["throw 'Нативный процесс не подтвердил успешное завершение.'", "throw 'changed'", 'failure-only bounded output before original throw'],
   ]) assert(bootDiagnosticViolations(source.replace(before, after)).includes(expected), expected);
 });
@@ -211,13 +212,41 @@ test('boot controls extract the actual AST branch and cover healthy silence, nul
   assert(source.includes('$bootBranch = $owner.Find('));
   assert(source.includes('$bootBranch.Clauses[0].Item2.Statements'));
   assert(source.includes('try { & $bootFailure } catch { $observed = $_ }'));
-  assert(source.includes('$script:bootMessages.Count -ne [int]$expectsBootMessage'));
+  assert(source.includes('$script:bootMessages.Count -ne (2 * [int]$expectsBootMessage)'));
   for (const value of ['[int]::MinValue', '[int]::MaxValue', '[long]::MaxValue', "'private-completed'", "'private-exit'", "'private-trace'", "pid = 'private-pid'", "path = 'private-path'"]) {
     assert(source.includes(value), value);
   }
   assert(source.includes('$script:bootMessages[0] -cne $expected'));
   assert(source.includes('$script:bootMessages[0].Length -gt 128'));
   assert(source.includes("function Write-Host { param($Object); throw [IO.IOException]::new('private-diagnostic-error') }"));
+});
+
+test('boot failure projects saved MainPage trace through a closed nullable summary', () => {
+  const source = readSource(new URL('./verify.ps1', import.meta.url));
+  assert(source.includes('function Get-BootTraceSummary([string]$Path)'));
+  assert(source.includes("$traceSummary = [ordered]@{ status = $null; knownFailureCode = $null; lastRunKind = $null }"));
+  assert(source.includes('$saved = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json'));
+  assert(source.includes('$identity.traceExists -is [bool] -and $identity.traceExists'));
+  assert(source.includes("Write-Host ('Нативный trace: ' + ((Get-BootTraceSummary $tracePath) | ConvertTo-Json -Compress))"));
+  const main = readSource(new URL('../../examples/windows/MainPage.xaml.cs', import.meta.url));
+  const requireMessages = [...main.matchAll(/Require\([\s\S]*?"([^"\n]+)"\);/g)].map(match => match[1]);
+  for (const message of requireMessages) assert(source.includes(`'System.InvalidOperationException: ${message}'`), message);
+  assert(source.includes("'System.TimeoutException: Событие native runtime не получено.'"));
+  const helper = source.slice(source.indexOf('function Get-BootTraceSummary('), source.indexOf("Invoke-Dotnet 'dotnet.txt'"));
+  assert(helper.includes('switch -CaseSensitive ($firstLine)'));
+  assert(helper.includes("$firstLine = ($errorValue.Value -split '\\r?\\n', 2)[0]"));
+  assert(helper.includes('default { $null }'));
+  assert(!/Write-Host|Write-Output|Write-Warning|\$process\.|Set-Content/.test(helper));
+  const controls = readSource(new URL('./process-cleanup.test.ps1', import.meta.url));
+  assert(controls.includes('. ([scriptblock]::Create($traceFunction.Extent.Text))'));
+  assert(controls.includes("$actual = Get-BootTraceSummary 'fixture' | ConvertTo-Json -Compress"));
+  assert(controls.includes('$script:traceReads -ne [int]$expectsBootMessage'));
+  assert(controls.includes('$script:traceReads -ne ($expectedCount - 1)'));
+  for (const name of ['captured', 'require', 'timeout', 'last-saved', 'unknown', 'types', 'last-invalid', 'stack-only', 'captured-error', 'missing', 'malformed', 'array-root']) {
+    assert(controls.includes(`name = '${name}'`), name);
+  }
+  assert(controls.includes("throw [IO.IOException]::new('private-read-error')"));
+  assert(controls.includes('$actual.Length -gt 180'));
 });
 
 test('process witness retains getter faults, invalid identity and a non-effect .NET getter control', () => {
