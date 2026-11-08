@@ -54,40 +54,6 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     private readonly HashSet<ScalarBinding> bindings = [];
     private readonly HashSet<ScalarPan> inputs = [];
 
-    // Временный private witness входящего Idle. Удалить вместе с diagnostic pin после локализации.
-    private sealed record IncomingIdleReceipt(long Sequence, long TimestampTicks, int CallbackRequestId,
-        int? CurrentRequestId, long? Operation, bool Disposed, bool Interacting, string Disposition);
-    private readonly object incomingIdleGate = new();
-    private readonly IncomingIdleReceipt?[] incomingIdleReceipts = new IncomingIdleReceipt?[8];
-    private long incomingIdleCount;
-
-    private void RecordIncomingIdle(int callbackRequestId, string disposition)
-    {
-        lock (incomingIdleGate)
-        {
-            var sequence = ++incomingIdleCount;
-            incomingIdleReceipts[(int)((sequence - 1) % incomingIdleReceipts.Length)] = new(
-                sequence, Stopwatch.GetTimestamp(), callbackRequestId, request?.Id, request?.Operation,
-                disposed, interacting, disposition);
-        }
-    }
-
-    private object CaptureIncomingIdle()
-    {
-        // Только managed snapshot: существующий private probe читает его и после Dispose.
-        if (!dispatcher.HasThreadAccess) throw new InvalidOperationException("Idle witness читается на потоке владельца.");
-        lock (incomingIdleGate)
-        {
-            var retained = (int)Math.Min(incomingIdleCount, incomingIdleReceipts.Length);
-            var receipts = new IncomingIdleReceipt[retained];
-            for (var index = 0; index < retained; index++)
-                receipts[index] = incomingIdleReceipts[(int)((incomingIdleCount - retained + index) % incomingIdleReceipts.Length)]
-                    ?? throw new InvalidOperationException("Idle witness потерял сохранённую запись.");
-            return new { schemaVersion = 1, callbackCount = incomingIdleCount,
-                capturedTicks = Stopwatch.GetTimestamp(), clockFrequency = Stopwatch.Frequency, receipts };
-        }
-    }
-
     public event Action<MotionObservation>? Observed;
     public float Position { get { CheckAccess(); return Coordinate(tracker.Position) / coordinateScale; } }
 
@@ -334,16 +300,15 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
     }
     public void IdleStateEntered(InteractionTracker sender, InteractionTrackerIdleStateEnteredArgs args)
     {
-        if (disposed) { RecordIncomingIdle(args.RequestId, "disposed"); return; }
+        if (disposed) return;
         if (args.RequestId == 0 && interacting)
         {
-            RecordIncomingIdle(args.RequestId, "input");
             phase = "idle";
             interacting = false;
             Emit(phase, new(0, MotionOrigin.Input), Vector3.Zero);
             return;
         }
-        if (args.RequestId != request?.Id) { RecordIncomingIdle(args.RequestId, "mismatch"); return; }
+        if (args.RequestId != request?.Id) return;
         phase = "idle";
         interacting = false;
         var source = request;
@@ -357,7 +322,6 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
                     // A request ID can be acknowledged by the end of the previous bounded
                     // correction without admitting the new motion. Resume once from actual
                     // native Idle, whose velocity is zero, preserving the logical intent.
-                    RecordIncomingIdle(args.RequestId, "handoff");
                     var handoff = source with { IdleHandoffUsed = true };
                     request = handoff;
                     int nextRequest;
@@ -372,12 +336,10 @@ public sealed class ScalarMotion : IInteractionTrackerOwner, IDisposable
                     Emit("requested", request);
                     return;
                 }
-                RecordIncomingIdle(args.RequestId, "continuation-failed");
                 FailContinuation(source, new InvalidOperationException("Нативное движение завершилось вне заданной точности цели."));
                 return;
             }
         }
-        RecordIncomingIdle(args.RequestId, "accepted");
         request = null;
         // Observer может начать новое движение; результат завершённого уже окончателен.
         if (args.RequestId == active?.Request) Finish(MotionEnd.Finished, "settled");
