@@ -45,6 +45,7 @@ public sealed partial class PressPage : Page
         if (motion is not null) return;
         if (notifications is not null) throw new InvalidOperationException("Прежняя системная подписка ещё не снята.");
         notifications = new SystemPreferenceNotifications(settings, DispatcherQueue, SystemPreferenceChanged, NotificationFailed, trace is not null);
+        notifications.AttachWindowDiagnostics(window);
         var visual = ElementCompositionPreview.GetElementVisual(Highlight);
         motion = ScalarMotion.CreateProgress(visual.Compositor);
         motion.Bind(visual, ScalarProperty.Opacity, .45f);
@@ -272,6 +273,7 @@ public sealed partial class PressPage : Page
                     subscriptionDiagnostics = ReadSubscriptionDiagnosticsForTrace(subscriptionForTrace),
                     projectionDiagnostics = ReadProjectionDiagnosticsForTrace(subscriptionForTrace),
                     nativeDiagnostics = ReadNativeDiagnosticsForTrace(subscriptionForTrace),
+                    windowDiagnostics = ReadWindowDiagnosticsForTrace(subscriptionForTrace),
                     subscriptionIsCurrent = subscriptionForTrace is null ? (bool?)null : ReferenceEquals(notifications, subscriptionForTrace),
                 });
                 trace?.Flush();
@@ -321,6 +323,16 @@ public sealed partial class PressPage : Page
             return subscription.ReadNativeDiagnostics();
         }
         catch { return null; } // Это trace, не product fallback или источник policy.
+    }
+
+    private WindowPreferenceDiagnostics.Snapshot? ReadWindowDiagnosticsForTrace(SystemPreferenceNotifications? subscription)
+    {
+        try
+        {
+            if (!DispatcherQueue.HasThreadAccess || subscription is null) return null;
+            return subscription.ReadWindowDiagnostics();
+        }
+        catch { return null; } // Пассивное чтение не вызывает Apply или повтор уведомления.
     }
 
     private bool? ReadSystemAnimationForTrace()

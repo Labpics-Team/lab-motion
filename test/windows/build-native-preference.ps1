@@ -22,7 +22,7 @@ function Compile([string]$Name, [string]$InputFile, [switch]$Library) {
     $target = Join-Path $output ($Name + $(if ($Library) { '.dll' } else { '.exe' }))
     $mode = if ($Library) { '/LD' } else { '' }
     # vcvars и cl живут в одном subprocess; полный set/runner env не публикуется.
-    $command = 'call "{0}" >nul && cl.exe /nologo /std:c++17 /EHsc /O2 /W4 /WX /MT /DWIN32_LEAN_AND_MEAN /DNOMINMAX {1} /Fo"{2}" "{3}" /link /OUT:"{4}" ole32.lib runtimeobject.lib' -f $vcvars, $mode, $object, $InputFile, $target
+    $command = 'call "{0}" >nul && cl.exe /nologo /std:c++17 /EHsc /O2 /W4 /WX /MT /DWIN32_LEAN_AND_MEAN /DNOMINMAX {1} /Fo"{2}" "{3}" /link /OUT:"{4}" ole32.lib runtimeobject.lib comctl32.lib user32.lib' -f $vcvars, $mode, $object, $InputFile, $target
     Push-Location -LiteralPath $output
     try {
         & cmd.exe /d /s /c $command 2>&1 | Tee-Object -FilePath (Join-Path $output "$Name-build.log")

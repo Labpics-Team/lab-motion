@@ -12,6 +12,7 @@ class ClientAreaAnimation {
     static [long] $ReadbackQpc = 120
     static [object] $ReadbackEnabled = $null
     static [long] $QpcFrequency = 10000000
+    static [object] $ContextStillMatches = $null
     static [void] Write([bool]$value) {
         if ([ClientAreaAnimation]::FailNextWrite) {
             [ClientAreaAnimation]::FailNextWrite = $false

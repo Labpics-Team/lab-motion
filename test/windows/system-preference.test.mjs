@@ -286,18 +286,19 @@ test('SET/native-event/Apply/completed сохраняют различающую
 
 function inputSuiteWiringViolations(source) {
   const invocations = [...source.matchAll(/^    & node --test (.+)\n    if \(\$LASTEXITCODE -ne 0\) \{ throw 'Проверки различающей силы input oracle не прошли\.' \}/gm)];
-  const wanted = "(Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs') (Join-Path $PSScriptRoot 'dispose.test.mjs')";
+  const wanted = "(Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs') (Join-Path $PSScriptRoot 'dispose.test.mjs') (Join-Path $PSScriptRoot 'window-preference.test.mjs')";
   return invocations.length === 1 && invocations[0][1] === wanted
     && (source.match(/& node --test/g) ?? []).length === 1 ? [] : ['one mandatory invocation executes both suites and retains failure guard'];
 }
 
-test('mandatory input entry executes all three source suites exactly once in the existing Node guard', () => {
-  const healthy = "    & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs') (Join-Path $PSScriptRoot 'dispose.test.mjs')\n"
+test('mandatory input entry executes all four source suites exactly once in the existing Node guard', () => {
+  const healthy = "    & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs') (Join-Path $PSScriptRoot 'dispose.test.mjs') (Join-Path $PSScriptRoot 'window-preference.test.mjs')\n"
     + "    if ($LASTEXITCODE -ne 0) { throw 'Проверки различающей силы input oracle не прошли.' }";
   assert.deepEqual(inputSuiteWiringViolations(healthy), []);
   for (const mutant of [
     healthy.replace(" (Join-Path $PSScriptRoot 'system-preference.test.mjs')", ''),
     healthy.replace(" (Join-Path $PSScriptRoot 'dispose.test.mjs')", ''),
+    healthy.replace(" (Join-Path $PSScriptRoot 'window-preference.test.mjs')", ''),
     healthy.replace('$LASTEXITCODE -ne 0', '$false'),
     healthy + "\n    & node --test (Join-Path $PSScriptRoot 'system-preference.test.mjs')",
   ]) assert.equal(inputSuiteWiringViolations(mutant).length, 1);
