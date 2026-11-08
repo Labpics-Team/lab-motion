@@ -167,6 +167,8 @@ try {
                 finally { try { $process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$caseFailure) } }
             }
             if ($null -ne $caseFailure) {
+                # Оба направления выполняются, но caller получит первую ошибку даже без failure.txt.
+                Save-CleanupFailure $caseFailure ([ref]$primaryFailure)
                 $failures.Add("$name-cleanup")
                 try { $caseFailure | Out-String | Set-Content (Join-Path $case 'failure.txt') }
                 catch { Write-Warning 'Не удалось записать первичную ошибку touch.' -WarningAction Continue }
@@ -176,7 +178,7 @@ try {
     & node (Join-Path $PSScriptRoot 'assert-touch.mjs') $output
     if ($LASTEXITCODE -ne 0 -or $failures.Count) { throw "Touch-квалификация не прошла. Harness failures: $($failures -join ', ')" }
 } catch {
-    $primaryFailure = $_
+    Save-CleanupFailure $_ ([ref]$primaryFailure)
     throw $primaryFailure
 } finally {
     $restoreFailure = $null

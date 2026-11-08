@@ -106,6 +106,7 @@ try {
                 try { throw [IO.IOException]::new('primary-touch') } catch { $caseFailure = $_ }
             }
             $original = $caseFailure
+            $primaryFailure = $null
             $failures = [Collections.Generic.List[string]]::new()
             . $caseCleanup
             if ($process.Disposes -ne 1 -or $process.Kills -gt 1 -or $process.Waits.Count -gt 2) {
@@ -202,6 +203,52 @@ try {
         $cases++
     }
     $outer = @($ast.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.TryStatementAst] })[-1]
+    # Настоящий terminal + catch: первая case error видна caller даже при двух отказах записи.
+    $terminal = [scriptblock]::Create(($outer.Body.Statements | Select-Object -Last 2 | ForEach-Object { $_.Extent.Text }) -join "`n")
+    $catchBody = $outer.CatchClauses[0].Body.Extent.Text
+    $terminalCatch = [scriptblock]::Create($catchBody.Substring(1, $catchBody.Length - 2))
+    function node {
+        param($Oracle, $OutputDirectory)
+        $script:LASTEXITCODE = $script:oracleExit
+    }
+    foreach ($terminalFault in @('case-log-fail', 'case-log-oracle-fail', 'oracle-fail', 'healthy')) {
+        $script:fault = 'evidence'
+        $script:oracleExit = [int]($terminalFault -in @('case-log-oracle-fail', 'oracle-fail'))
+        $script:warnings.Clear()
+        $primaryFailure = $null
+        $firstError = $null
+        $failures = [Collections.Generic.List[string]]::new()
+        $directions = 0
+        foreach ($direction in @(1, -1)) {
+            $name = "direction-$direction"
+            $caseFailure = $null
+            if ($terminalFault.StartsWith('case-log')) {
+                try { throw [IO.IOException]::new("primary-direction-$direction") } catch { $caseFailure = $_ }
+                if ($null -eq $firstError) { $firstError = $caseFailure }
+                # То же первое diagnostic write, что в настоящем case catch.
+                try { $caseFailure | Out-String | Set-Content (Join-Path $case 'failure.txt') }
+                catch { Save-CleanupFailure $_ ([ref]$caseFailure) }
+            }
+            $process = $null
+            . $caseCleanup
+            $directions++
+        }
+        $observed = $null
+        $output = $evidence
+        try {
+            try { . $terminal } catch { . $terminalCatch }
+        } catch { $observed = $_ }
+        if ($directions -ne 2) { throw 'touch-terminal-both-directions-control' }
+        if ($null -ne $firstError) {
+            if ($null -eq $observed -or ![object]::ReferenceEquals($observed.Exception, $firstError.Exception) -or
+                !$observed.Exception.Message.Contains('primary-direction-1') -or
+                !$script:warnings.Contains('Не удалось записать первичную ошибку touch.') -or
+                !@($script:warnings | Where-Object { $_ -match 'Touch-квалификация не прошла' }).Count) {
+                throw 'touch-terminal-primary-fallback-control'
+            }
+        } elseif (($null -eq $observed) -ne ($terminalFault -eq 'healthy')) { throw 'touch-terminal-oracle-control' }
+        $cases++
+    }
     $restoreBody = $outer.Finally.Extent.Text
     $restore = [scriptblock]::Create($restoreBody.Substring(1, $restoreBody.Length - 2))
     $oldControlEnvironment = [Environment]::GetEnvironmentVariable('LAB_MOTION_TOUCH_CLEANUP_CONTROL')

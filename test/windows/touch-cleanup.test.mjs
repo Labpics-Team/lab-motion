@@ -23,6 +23,8 @@ function violations(source, owner) {
     ['caller disposal preserves first error', !source.includes('try { $process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$caseFailure) }') ||
       !source.includes('try { $child.Dispose() } catch { Save-CleanupFailure $_ ([ref]$failure) }')],
     ['primary before diagnostic write', !/\$caseFailure = \$_\s+\$failures.Add\(\$name\)\s+try \{ \$caseFailure \| Out-String/.test(source)],
+    ['terminal preserves first case failure', !source.includes('Save-CleanupFailure $caseFailure ([ref]$primaryFailure)') ||
+      !/\} catch \{\s+Save-CleanupFailure \$_ \(\[ref\]\$primaryFailure\)\s+throw \$primaryFailure/.test(source)],
     ['restoration continues and preserves primary', !source.includes('catch { Save-CleanupFailure $_ ([ref]$restoreFailure) }') ||
       !source.includes('if ($null -eq $primaryFailure) { throw $restoreFailure }')],
     ['actual shared finish and close entry', !source.includes('return Finish-Tool $tool') ||
@@ -56,6 +58,8 @@ test('input и touch используют один bounded process owner без 
     [importOwner, '', 'one function-only owner'],
     ['try { $process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$caseFailure) }', '$process.Dispose()', 'caller disposal preserves first error'],
     ['$caseFailure = $_', '$caseFailure = $null', 'primary before diagnostic write'],
+    ['Save-CleanupFailure $caseFailure ([ref]$primaryFailure)', '$null', 'terminal preserves first case failure'],
+    ['Save-CleanupFailure $_ ([ref]$primaryFailure)', '$primaryFailure = $_', 'terminal preserves first case failure'],
     ['if ($null -eq $primaryFailure) { throw $restoreFailure }', 'throw $restoreFailure', 'restoration continues and preserves primary'],
   ]) assert(violations(touch.replaceAll(from, to), helper).includes(wanted), wanted);
 });
@@ -81,6 +85,11 @@ test('реальный PS witness подключён до touch и провер�
   assert(witness.includes('touch-task-deadline-disposal-control'));
   assert(witness.includes('touch-task-timeout-control'));
   assert(witness.includes('touch-task-primary-control'));
+  assert(witness.includes('$outer.Body.Statements | Select-Object -Last 2'));
+  assert(witness.includes('$outer.CatchClauses[0].Body.Extent.Text'));
+  assert(witness.includes('touch-terminal-primary-fallback-control'));
+  assert(witness.includes('touch-terminal-both-directions-control'));
+  assert(witness.includes("'case-log-oracle-fail'"));
 });
 
 test('capture/rest budgets владельца не меняются при выносе process owner', () => {
