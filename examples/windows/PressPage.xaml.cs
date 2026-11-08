@@ -44,7 +44,7 @@ public sealed partial class PressPage : Page
         notifications?.ThrowIfFaulted();
         if (motion is not null) return;
         if (notifications is not null) throw new InvalidOperationException("Прежняя системная подписка ещё не снята.");
-        notifications = new SystemPreferenceNotifications(window, SystemPreferenceChanged, NotificationFailed);
+        notifications = new SystemPreferenceNotifications(settings, DispatcherQueue, SystemPreferenceChanged, NotificationFailed);
         var visual = ElementCompositionPreview.GetElementVisual(Highlight);
         motion = ScalarMotion.CreateProgress(visual.Compositor);
         motion.Bind(visual, ScalarProperty.Opacity, .45f);
@@ -64,9 +64,8 @@ public sealed partial class PressPage : Page
     private void Changed(DependencyObject sender, DependencyProperty property)
         => Update(property == ButtonBase.IsPressedProperty ? "pressed" : "enabled");
     private void PreferenceChanged(object sender, RoutedEventArgs args) => Update("localPreference");
-    private void SystemPreferenceChanged(bool clientAreaAnimation)
+    private void SystemPreferenceChanged(SystemPreferenceNotifications subscription)
     {
-        var subscription = notifications;
         if (trace is null)
         {
             if (!DispatcherQueue.TryEnqueue(() => ApplySystemPreference(subscription)))
@@ -74,14 +73,14 @@ public sealed partial class PressPage : Page
             return;
         }
         var notification = Interlocked.Increment(ref systemNotification);
-        ObserveSystemNotification(notification, SystemNotificationPhase.Received, clientAreaAnimation: clientAreaAnimation);
+        ObserveSystemNotification(notification, SystemNotificationPhase.Received);
         var queued = DispatcherQueue.TryEnqueue(() =>
         {
-            ObserveSystemNotification(notification, SystemNotificationPhase.Delegate, clientAreaAnimation: clientAreaAnimation);
+            ObserveSystemNotification(notification, SystemNotificationPhase.Delegate);
             ApplySystemPreference(subscription, notification);
         });
         // Отказ очереди не имеет будущего Update/Flush; фиксируем также его bool.
-        ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true, clientAreaAnimation: clientAreaAnimation);
+        ObserveSystemNotification(notification, SystemNotificationPhase.Queued, queued, flush: true);
         if (!queued) throw new InvalidOperationException("Очередь отказала системному уведомлению.");
     }
 
@@ -95,6 +94,11 @@ public sealed partial class PressPage : Page
             return;
         }
         subscription.ThrowIfFaulted();
+        if (!subscription.IsActive)
+        {
+            ObserveSystemApply(notification, SystemPreferenceOutcome.Detached, null, null);
+            return;
+        }
         var enabled = settings.AnimationsEnabled;
         var observed = observedSystemAnimation;
         if (observed == enabled)
@@ -106,8 +110,11 @@ public sealed partial class PressPage : Page
         ObserveSystemApply(notification, SystemPreferenceOutcome.Update, enabled, observed);
     }
 
-    private void NotificationFailed(Exception error)
+    private void NotificationFailed(SystemPreferenceNotifications subscription, Exception error)
     {
+        if (!DispatcherQueue.HasThreadAccess)
+            throw new InvalidOperationException("Сообщение об ошибке подписки требует UI-поток.");
+        if (!ReferenceEquals(notifications, subscription)) return;
         const string message = "Ошибка уведомления системной настройки.";
         try
         {
@@ -124,12 +131,12 @@ public sealed partial class PressPage : Page
         if (!validIdentity) Interlocked.Exchange(ref notificationDiagnosticFailed, 1);
         try
         {
-            // Настоящий WM callback: запись не утверждает изменение preference или исполнение queue.
+            // Native property event: запись не утверждает исполнение queued policy.
             trace.Add("systemNotification", new
             {
                 qpc = ReadQpcForTrace(), qpcFrequency = ReadQpcFrequencyForTrace(), clientAreaAnimation,
                 notification = validIdentity ? (long?)notification : null,
-                source = "WM_SETTINGCHANGE", phase = phase.ToString(), queued,
+                source = "UISettings.AnimationsEnabledChanged", phase = phase.ToString(), queued,
                 diagnosticFailed = Volatile.Read(ref notificationDiagnosticFailed) != 0,
             });
             if (flush) trace.Flush();

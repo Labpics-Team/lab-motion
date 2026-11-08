@@ -1,147 +1,118 @@
-using Microsoft.UI.Xaml;
+using Microsoft.UI.Dispatching;
 using System.Runtime.ExceptionServices;
-using System.Runtime.InteropServices;
+using Windows.UI.ViewManagement;
 
 namespace NativeWindow;
 
-// Единственный источник системных уведомлений собственного окна; политику preference не выбирает.
+// Один native property event; getter и policy остаются у потребителя на UI-потоке.
 internal sealed class SystemPreferenceNotifications : IDisposable
 {
-    private const uint SettingChange = 0x001A;
-    private const nuint ClientAreaAnimation = 0x1043;
-    private const uint NonClientDestroy = 0x0082;
-    private readonly uint ownerThread;
-    private readonly SubclassProcedure procedure;
-    private readonly Action<Exception> reportFailure;
-    private Action<bool>? notify;
-    private nint handle;
-    private GCHandle keepAlive;
+    private readonly object gate = new();
+    private readonly UISettings settings;
+    private readonly DispatcherQueue dispatcher;
+    private readonly Action<SystemPreferenceNotifications> notify;
+    private readonly Action<SystemPreferenceNotifications, Exception> reportFailure;
+    private bool subscribed;
     private bool retired;
     private ExceptionDispatchInfo? failure;
     private ExceptionDispatchInfo? reportingFailure;
 
-    internal SystemPreferenceNotifications(Window window, Action<bool> notify, Action<Exception> reportFailure)
+    internal SystemPreferenceNotifications(UISettings settings, DispatcherQueue dispatcher,
+        Action<SystemPreferenceNotifications> notify, Action<SystemPreferenceNotifications, Exception> reportFailure)
     {
-        if (!window.DispatcherQueue.HasThreadAccess)
-            throw new InvalidOperationException("Подписка требует поток собственного окна.");
-        ownerThread = GetCurrentThreadId();
-        handle = WinRT.Interop.WindowNative.GetWindowHandle(window);
-        if (handle == 0 || GetWindowThreadProcessId(handle, out var process) != ownerThread || process != (uint)Environment.ProcessId)
-            throw new InvalidOperationException("Не подтверждено собственное окно для системной подписки.");
+        this.settings = settings;
+        this.dispatcher = dispatcher;
         this.notify = notify;
         this.reportFailure = reportFailure;
-        procedure = WindowMessage;
-        // Native API не удерживает managed delegate: root живёт до подтверждённого снятия/destroy.
-        keepAlive = GCHandle.Alloc(this);
-        try
-        {
-            if (!SetWindowSubclass(handle, procedure, 1, 0))
-                throw new InvalidOperationException("Не установлена подписка системной настройки.");
-        }
-        catch
-        {
-            handle = 0;
-            keepAlive.Free();
-            throw;
-        }
+        CheckAccess();
+        settings.AnimationsEnabledChanged += AnimationsChanged;
+        lock (gate) subscribed = true;
     }
 
-    internal bool IsAttached => handle != 0;
+    // Отказ снятия не забывает транспорт; допуск к эффекту отзывается отдельно.
+    internal bool IsAttached { get { lock (gate) return subscribed; } }
+    internal bool IsActive { get { lock (gate) return subscribed && !retired; } }
 
     internal void ThrowIfFaulted()
     {
         CheckAccess();
-        if (failure is not null && reportingFailure is not null)
-            throw new AggregateException(failure.SourceException, reportingFailure.SourceException);
-        failure?.Throw();
+        ExceptionDispatchInfo? primary;
+        ExceptionDispatchInfo? secondary;
+        lock (gate) { primary = failure; secondary = reportingFailure; }
+        if (primary is not null && secondary is not null)
+            throw new AggregateException(primary.SourceException, secondary.SourceException);
+        primary?.Throw();
     }
 
     public void Dispose()
     {
         CheckAccess();
-        retired = true;
-        notify = null;
-        if (handle != 0)
+        bool remove;
+        lock (gate) { retired = true; remove = subscribed; }
+        if (remove)
         {
             try
             {
-                if (RemoveWindowSubclass(handle, procedure, 1))
-                {
-                    handle = 0;
-                    keepAlive.Free();
-                }
-                else CaptureFailure(new InvalidOperationException("Не снята подписка системной настройки."));
+                // Снятие не держит gate: поздний callback увидит retired.
+                settings.AnimationsEnabledChanged -= AnimationsChanged;
+                lock (gate) subscribed = false;
             }
             catch (Exception error) { CaptureFailure(error); }
         }
-        // Даже после успешного снятия прежняя ошибка не превращается в успех cleanup.
         ThrowIfFaulted();
     }
 
-    private nint WindowMessage(nint window, uint message, nuint wParam, nint lParam, nuint id, nuint reference)
+    private void AnimationsChanged(UISettings sender, UISettingsAnimationsEnabledChangedEventArgs args)
     {
-        var destroying = window == handle && message == NonClientDestroy;
-        try
+        Exception? deliveryFailure = null;
+        lock (gate)
         {
-            if (destroying)
+            if (retired || !subscribed) return;
+            // notify только ставит managed работу в очередь; передаётся именно этот subscription.
+            try { notify(this); }
+            catch (Exception error)
             {
-                retired = true;
-                notify = null;
-                // До forwarding отзываем адрес: поздний Dispose не тронет переиспользованный HWND.
-                handle = 0;
-                if (!RemoveWindowSubclass(window, procedure, 1))
-                    CaptureFailure(new InvalidOperationException("Не снята подписка при уничтожении окна."));
-            }
-            else if (window == handle && id == 1 && !retired && message == SettingChange)
-            {
-                // Только доставка; getter и реакция остаются в прежней managed очереди.
-                notify?.Invoke(wParam == ClientAreaAnimation);
+                if (SaveFailure(error)) deliveryFailure = error;
             }
         }
-        catch (Exception error) { CaptureFailure(error); }
+        if (deliveryFailure is not null) ReportFailure(deliveryFailure);
+    }
 
-        try { return DefSubclassProc(window, message, wParam, lParam); }
-        catch (Exception error)
+    private bool SaveFailure(Exception error)
+    {
+        lock (gate)
         {
-            CaptureFailure(error);
-            return 0;
-        }
-        finally
-        {
-            if (destroying && keepAlive.IsAllocated) keepAlive.Free();
-            GC.KeepAlive(this);
+            retired = true;
+            if (failure is not null) return false;
+            failure = ExceptionDispatchInfo.Capture(error);
+            return true;
         }
     }
 
     private void CaptureFailure(Exception error)
     {
-        retired = true;
-        notify = null;
-        if (failure is not null) return;
-        failure = ExceptionDispatchInfo.Capture(error);
-        try { reportFailure(error); }
-        catch (Exception secondary) { reportingFailure = ExceptionDispatchInfo.Capture(secondary); }
+        if (SaveFailure(error)) ReportFailure(error);
+    }
+
+    private void ReportFailure(Exception error)
+    {
+        try
+        {
+            if (dispatcher.HasThreadAccess) reportFailure(this, error);
+            else if (!dispatcher.TryEnqueue(() => ReportFailure(error)))
+                SaveReportingFailure(new InvalidOperationException("Очередь отказала сообщению об ошибке системной подписки."));
+        }
+        catch (Exception secondary) { SaveReportingFailure(secondary); }
+    }
+
+    private void SaveReportingFailure(Exception error)
+    {
+        lock (gate) reportingFailure ??= ExceptionDispatchInfo.Capture(error);
     }
 
     private void CheckAccess()
     {
-        if (GetCurrentThreadId() != ownerThread)
-            throw new InvalidOperationException("Подписка принадлежит другому потоку окна.");
+        if (!dispatcher.HasThreadAccess)
+            throw new InvalidOperationException("Подписка принадлежит UI-потоку владельца.");
     }
-
-    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
-    private delegate nint SubclassProcedure(nint window, uint message, nuint wParam, nint lParam, nuint id, nuint reference);
-
-    [DllImport("comctl32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool SetWindowSubclass(nint window, SubclassProcedure callback, nuint id, nuint reference);
-    [DllImport("comctl32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool RemoveWindowSubclass(nint window, SubclassProcedure callback, nuint id);
-    [DllImport("comctl32.dll")]
-    private static extern nint DefSubclassProc(nint window, uint message, nuint wParam, nint lParam);
-    [DllImport("kernel32.dll")]
-    private static extern uint GetCurrentThreadId();
-    [DllImport("user32.dll")]
-    private static extern uint GetWindowThreadProcessId(nint window, out uint process);
 }

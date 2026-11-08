@@ -180,9 +180,10 @@ release Finish. Это подготовленные подменные controls,
 поля строки — sequence, phase, operation, nativeOperation, pressed, localAnimation,
 systemAnimation, reason, end, isCurrent, notification, queued, diagnosticFailed.
 Фазы `systemCallback`, `systemQueued`, `systemDelegate` отдельно показывают вход в
-настоящий `WM_SETTINGCHANGE` callback собственного окна, возвращённый `TryEnqueue`
-bool и начало managed делегата. В trace источник явно указан как `WM_SETTINGCHANGE`;
-это не receipt события `UISettings`. Прежняя ограниченная проекция сохраняет 13 полей.
+настоящий `UISettings.AnimationsEnabledChanged` callback, возвращённый `TryEnqueue`
+bool и начало managed делегата. В trace источник явно указан как
+`UISettings.AnimationsEnabledChanged`; это не receipt `WM_SETTINGCHANGE` или
+подтверждение применения настройки. Прежняя ограниченная проекция сохраняет 13 полей.
 Для различения timing исхода добавлены отдельные `setter` и `timing`, не новые
 условия приёмки. `setter` — снимок именно запрещающего вызова: абсолютные QPC
 на входе native SET и после его возврата, `SetSucceeded`, QPC после уже существующего
@@ -190,9 +191,10 @@ bool и начало managed делегата. В trace источник явн�
 границы. Этот снимок снимается сразу после `Write(false)` в существующий
 `animation-system-disabled.json`; восстановление не заменяет его в failure summary.
 `timing` содержит строки sequence, phase, qpc, qpcFrequency, notification,
-clientAreaAnimation, outcome, enabled, observed. Для WM `clientAreaAnimation=true`
-означает `wParam==SPI_SETCLIENTAREAANIMATION`, а не подтверждённый GET или применение.
-Прочие WM сообщения по-прежнему доставляются: эта bool не фильтрует callback.
+clientAreaAnimation, outcome, enabled, observed. Поле `clientAreaAnimation` сохранено
+для совместимости проекции, но в текущем property-event транспорте всегда null:
+у события нет WM wParam, и такой классификатор к нему неприменим. Исторические
+WM-записи с этим полем не переименовываются и не превращаются в property receipts.
 `systemApply` сообщает Missing/Stale/Detached admission либо Deduplicated/Update
 с уже прочитанными bool текущего UISettings и прошлого наблюдения. Дополнительного
 getter нет; Update обозначает выбранный вызов, не успешное завершение эффекта.
@@ -236,22 +238,34 @@ lock/IO может изменить расписание и не доказыв�
 диагностики неизвестен. Эти события не дают input GREEN и не являются новым gate.
 Без trace callback также доставляет уведомление через managed очередь. Отказ
 enqueue наблюдаем как ошибка, а не заменяется прямым Update. Единственный источник
-системной смены — `WM_SETTINGCHANGE` собственного top-level HWND; подписки на
-`UISettings.AnimationsEnabledChanged` и второго fallback нет. На owner thread
-делегат перечитывает тот же `UISettings`; unrelated/repeated notifications при
+системной смены — штатное
+[`UISettings.AnimationsEnabledChanged`](https://learn.microsoft.com/en-us/uwp/api/windows.ui.viewmanagement.uisettings.animationsenabledchanged?view=winrt-26100)
+того же экземпляра `UISettings`; WM fallback, polling и второго источника нет.
+Контракт доступен с Windows 10 2004/19041 (UniversalApiContract v10), что покрывает
+минимальную версию примера. Документация не обещает UI-поток callback: его диагностика
+использует защищённый lock `PressTrace`, а getter, policy и сообщение в XAML `State`
+выполняются только на UI-потоке. В args не предполагается недокументированного bool payload.
+На UI-потоке делегат перечитывает тот же `UISettings`; повторные уведомления при
 неизменном значении не запускают новые команды движения. Начальное чтение и все
 предметные реакции обновляют последний принятый snapshot в одном владельце.
-Снятие подписки при Unloaded/Closed и destroy не отменяет уже queued delegates;
+Снятие подписки при Unloaded/Closed не отменяет уже queued delegates;
 они не применяют preference к странице и не выдают команды движения, хотя
 диагностическая запись начала Delegate может сохраниться.
-Reload не получает вторую route, пока прежний subclass не снят. Managed delegate
-удерживается до подтверждённого Remove или собственного WM_NCDESTROY, каждый
-native callback сохраняет DefSubclassProc forwarding. Ошибка регистрации видима;
-ошибка доставки/снятия сохраняется и читается на managed admission/cleanup, а не
-выходит исключением в Win32. Getter и реакция не выполняются из reverse-PInvoke.
+Каждый обработчик передаёт идентичность своей подписки, а не позднее значение текущей:
+старый обработчик после Detach/Attach не выдаёт эффект новой странице.
+Отзыв допуска и доставка синхронизированы; перед снятием подписки закрывается допуск к эффекту.
+`IsAttached` остаётся true при отказе снятия, чтобы владелец не забыл возможный
+сохраняющийся транспорт и не разрешил новый Attach. `IsActive` отдельно закрывает
+доставку и Apply; сохранённая ошибка читается до getter. Повторный Dispose повторяет
+снятие подписки при неподтверждённом исходе, но не стирает первый отказ даже после успешного
+снятия. Повторный Dispose после подтверждённого снятия не вызывает remove снова.
+Ошибки доставки/снятия и сообщения об ошибке сохраняются под общим lock;
+сообщение маршрутизируется в UI-очередь и проверяет идентичность подписки.
+Регистрация и снятие выполняются на UI-потоке; native HWND/subclass, ручного GC root
+и reverse-PInvoke в этом транспорте нет. Ошибка регистрации остаётся видимой вызывающему.
 Флаг `-ConfigureHostedAnimations` доступен только в одноразовой GitHub-hosted
 сессии: он включает и временно отключает client-area animation через `SystemParametersInfo`,
-проверяет системный readback и реакцию приложения через `WM_SETTINGCHANGE` с чтением
+проверяет системный readback и реакцию приложения через native property event с чтением
 того же `UISettings`, затем восстанавливает прежнее значение
 при завершении, в том числе после ошибки. Ошибка очистки не подменяет первичную ошибку
 ввода или настройки и выдаёт фиксированное предупреждение; `Dispose` приложения и

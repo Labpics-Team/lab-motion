@@ -4,6 +4,18 @@ import { readFileSync } from 'node:fs';
 
 const read = name => readFileSync(new URL(name, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
+test('canonical animation property event replaces WM-only transport on supported Windows', () => {
+  const adapter = read('../../examples/windows/SystemPreferenceNotifications.cs');
+  const page = read('../../examples/windows/PressPage.xaml.cs');
+  assert(adapter.includes('settings.AnimationsEnabledChanged += AnimationsChanged;'));
+  assert(adapter.includes('UISettingsAnimationsEnabledChangedEventArgs args'));
+  assert(adapter.includes('notify(this);'));
+  assert(!/DllImport|SetWindowSubclass|WindowMessage|GCHandle/.test(adapter));
+  assert(page.includes('new SystemPreferenceNotifications(settings, DispatcherQueue, SystemPreferenceChanged, NotificationFailed)'));
+  assert(page.includes('private void SystemPreferenceChanged(SystemPreferenceNotifications subscription)'));
+  assert(page.includes('source = "UISettings.AnimationsEnabledChanged"'));
+});
+
 function timingViolations({ setter, adapter, page, harness }) {
   return [
     ['native SET boundaries and existing GET receipt', !/SetEnteredQpc = ReadQpc\(\);\s*var success = Set\(0x1043, 0, new IntPtr\(enabled \? 1 : 0\), 2\);/.test(setter)
@@ -12,9 +24,9 @@ function timingViolations({ setter, adapter, page, harness }) {
       || !/var error = success \? 0 : Marshal.GetLastWin32Error\(\);\s*SetReturnedQpc = ReadQpc\(\);/.test(setter)],
     ['no-profile and unchanged getter count', (setter.match(/Get\(0x1042/g) ?? []).length !== 1
       || (setter.match(/\bRead\(\)/g) ?? []).length !== 2 || setter.includes('new IntPtr(enabled ? 1 : 0), 3')],
-    ['qualifying WM receipt does not filter delivery', !adapter.includes('private Action<bool>? notify;')
-      || !adapter.includes('notify?.Invoke(wParam == ClientAreaAnimation);')
-      || /message == SettingChange\s*&&/.test(adapter)],
+    ['canonical native receipt retains source identity', !adapter.includes('notify(this);')
+      || !adapter.includes('settings.AnimationsEnabledChanged += AnimationsChanged;')
+      || !page.includes('source = "UISettings.AnimationsEnabledChanged"')],
     ['actual sparse QPC and closed Apply outcomes', !page.includes('SystemPreferenceOutcome { Missing, Stale, Detached, Deduplicated, Update }')
       || !page.includes('Stopwatch.GetTimestamp()') || !page.includes('Stopwatch.IsHighResolution')
       || !page.includes('qpcFrequency = ReadQpcFrequencyForTrace()')
@@ -34,7 +46,7 @@ function timingViolations({ setter, adapter, page, harness }) {
   ].filter(([, bad]) => bad).map(([name]) => name);
 }
 
-test('существующие SET/WM/Apply/completed точки дают различающую QPC проекцию без нового поведения', () => {
+test('SET/native-event/Apply/completed сохраняют различающую QPC проекцию при замене транспорта', () => {
   const actual = { setter: read('./animation-settings.cs'), adapter: read('../../examples/windows/SystemPreferenceNotifications.cs'),
     page: read('../../examples/windows/PressPage.xaml.cs'), harness: read('./verify-input.ps1') };
   assert.deepEqual(timingViolations(actual), []);
@@ -42,7 +54,7 @@ test('существующие SET/WM/Apply/completed точки дают раз
     ['setter', 'SetEnteredQpc = ReadQpc();', 'SetEnteredQpc = null;', 'native SET boundaries and existing GET receipt'],
     ['setter', 'SetSucceeded = success;', 'SetSucceeded = true;', 'native SET boundaries and existing GET receipt'],
     ['setter', 'new IntPtr(enabled ? 1 : 0), 2', 'new IntPtr(enabled ? 1 : 0), 3', 'no-profile and unchanged getter count'],
-    ['adapter', 'notify?.Invoke(wParam == ClientAreaAnimation);', 'notify?.Invoke(true);', 'qualifying WM receipt does not filter delivery'],
+    ['adapter', 'notify(this);', 'notify(null!);', 'canonical native receipt retains source identity'],
     ['page', 'Stopwatch.GetTimestamp()', 'Stopwatch.StartNew().ElapsedTicks', 'actual sparse QPC and closed Apply outcomes'],
     ['page', 'SystemPreferenceOutcome.Deduplicated, enabled, observed', 'SystemPreferenceOutcome.Update, enabled, observed', 'actual sparse QPC and closed Apply outcomes'],
     ['page', 'qpc = ReadQpcForTrace()', 'qpc = null', 'completed uses absolute timestamp, not frame sampling'],
@@ -77,52 +89,48 @@ test('mandatory input entry executes all three source suites exactly once in the
 });
 
 function routeViolations(page, app) {
-  const callback = page.slice(page.indexOf('private void ApplySystemPreference('), page.indexOf('private void ObserveSystemNotification'));
-  const stripped = callback.replace(/ObserveSystemApply\([^;]*\);/g, '').replace(/\/\/[^\n]*/g, '');
+  const callback = page.slice(page.indexOf('private void SystemPreferenceChanged('), page.indexOf('private void ApplySystemPreference('));
+  const apply = page.slice(page.indexOf('private void ApplySystemPreference('), page.indexOf('private void NotificationFailed('));
+  const reporting = page.slice(page.indexOf('private void NotificationFailed('), page.indexOf('private void ObserveSystemNotification('));
   return [
-    ['one own-window notification source', !page.includes('new SystemPreferenceNotifications(window, SystemPreferenceChanged, NotificationFailed)')
+    ['one owned-settings notification source', !page.includes('new SystemPreferenceNotifications(settings, DispatcherQueue, SystemPreferenceChanged, NotificationFailed)')
       || page.includes('settings.AnimationsEnabledChanged') || !app.includes('new PressPage(window)')],
-    ['unchanged preference does not issue animation command', !/var enabled = settings\.AnimationsEnabled;\s*var observed = observedSystemAnimation;\s*if \(observed == enabled\)\s*\{\s*return;\s*\}\s*Update\("systemPreference"\);/.test(stripped)
+    ['callback carries its exact subscription', !callback.includes('private void SystemPreferenceChanged(SystemPreferenceNotifications subscription)')
+      || callback.includes('var subscription = notifications') || !callback.includes('ApplySystemPreference(subscription)')],
+    ['unchanged preference does not issue animation command', !/var enabled = settings\.AnimationsEnabled;\s*var observed = observedSystemAnimation;\s*if \(observed == enabled\)/.test(apply)
+      || !apply.includes('SystemPreferenceOutcome.Deduplicated') || !apply.includes('Update("systemPreference");')
       || !page.includes('observedSystemAnimation = systemAnimation;')],
-    ['honest WM origin and retained managed queue', !page.includes('source = "WM_SETTINGCHANGE"')
-      || !page.includes('DispatcherQueue.TryEnqueue') || !page.includes('ApplySystemPreference(subscription)')],
-    ['stale queued callback cannot enter reloaded page', !callback.includes('!ReferenceEquals(notifications, subscription)')
-      || !callback.includes('!subscription.IsAttached')],
+    ['honest property-event origin and retained managed queue', !page.includes('source = "UISettings.AnimationsEnabledChanged"')
+      || !callback.includes('DispatcherQueue.TryEnqueue') || /settings\.|Animation\.|State\.|motion\.|notifications/.test(callback)],
+    ['stale or retired queued callback cannot enter reloaded page', !apply.includes('!ReferenceEquals(notifications, subscription)')
+      || !apply.includes('!subscription.IsAttached') || !apply.includes('if (!subscription.IsActive)')
+      || apply.indexOf('subscription.ThrowIfFaulted();') > apply.indexOf('var enabled = settings.AnimationsEnabled;')],
+    ['failure UI guards both thread and subscription identity', !reporting.includes('if (!DispatcherQueue.HasThreadAccess)')
+      || !reporting.includes('if (!ReferenceEquals(notifications, subscription)) return;')],
     ['managed admission retains notification failure', !page.includes('notifications?.ThrowIfFaulted();')],
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
 
-test('WM route source oracle accepts healthy witness and rejects old/duplicate/bypass routes', () => {
-  const healthy = `notifications = new SystemPreferenceNotifications(window, SystemPreferenceChanged, NotificationFailed);
-    notifications?.ThrowIfFaulted();
-    observedSystemAnimation = systemAnimation;
-    source = "WM_SETTINGCHANGE";
-    DispatcherQueue.TryEnqueue(() => ApplySystemPreference(subscription));
-    private void ApplySystemPreference(SystemPreferenceNotifications? subscription)
-    {
-      if (subscription is null || !ReferenceEquals(notifications, subscription) || !subscription.IsAttached) return;
-      var enabled = settings.AnimationsEnabled;
-      var observed = observedSystemAnimation;
-      if (observed == enabled) { return; }
-      Update("systemPreference");
-    }
-    private void ObserveSystemNotification()`;
-  const app = 'new PressPage(window)';
-  assert.deepEqual(routeViolations(healthy, app), []);
+test('property-event source contract rejects duplicate, stale, inline and misattributed delivery', () => {
+  const page = read('../../examples/windows/PressPage.xaml.cs');
+  const app = read('../../examples/windows/App.xaml.cs');
+  assert.deepEqual(routeViolations(page, app), []);
   for (const [before, after, violation] of [
-    ['notifications =', 'settings.AnimationsEnabledChanged += SystemPreferenceChanged; notifications =', 'one own-window notification source'],
-    ['if (observed == enabled) { return; }', '', 'unchanged preference does not issue animation command'],
-    ['observedSystemAnimation = systemAnimation;', '', 'unchanged preference does not issue animation command'],
-    ['source = "WM_SETTINGCHANGE"', 'source = "UISettings"', 'honest WM origin and retained managed queue'],
-    ['DispatcherQueue.TryEnqueue', 'RunInline', 'honest WM origin and retained managed queue'],
-    ['!ReferenceEquals(notifications, subscription)', 'false', 'stale queued callback cannot enter reloaded page'],
-    ['!subscription.IsAttached', 'false', 'stale queued callback cannot enter reloaded page'],
+    ['new SystemPreferenceNotifications(settings, DispatcherQueue', 'new SystemPreferenceNotifications(new UISettings(), DispatcherQueue', 'one owned-settings notification source'],
+    ['SystemPreferenceChanged(SystemPreferenceNotifications subscription)', 'SystemPreferenceChanged(SystemPreferenceNotifications ignored)\n    { var subscription = notifications;', 'callback carries its exact subscription'],
+    ['if (observed == enabled)', 'if (false)', 'unchanged preference does not issue animation command'],
+    ['source = "UISettings.AnimationsEnabledChanged"', 'source = "WM_SETTINGCHANGE"', 'honest property-event origin and retained managed queue'],
+    ['DispatcherQueue.TryEnqueue', 'RunInline', 'honest property-event origin and retained managed queue'],
+    ['!ReferenceEquals(notifications, subscription)', 'false', 'stale or retired queued callback cannot enter reloaded page'],
+    ['!subscription.IsAttached', 'false', 'stale or retired queued callback cannot enter reloaded page'],
+    ['if (!subscription.IsActive)', 'if (false)', 'stale or retired queued callback cannot enter reloaded page'],
+    ['if (!DispatcherQueue.HasThreadAccess)', 'if (false)', 'failure UI guards both thread and subscription identity'],
     ['notifications?.ThrowIfFaulted();', '', 'managed admission retains notification failure'],
-  ]) assert(routeViolations(healthy.replace(before, after), app).includes(violation), violation);
-  assert(routeViolations(healthy, 'new PressPage()').includes('one own-window notification source'));
+  ]) assert(routeViolations(page.replaceAll(before, after), app).includes(violation), violation);
+  assert(routeViolations(page, 'new PressPage()').includes('one owned-settings notification source'));
 });
 
-test('actual PressPage uses only the owning-window route and preserves real preference transitions', () => {
+test('actual PressPage uses only the owned-settings event and preserves real preference transitions', () => {
   assert.deepEqual(routeViolations(read('../../examples/windows/PressPage.xaml.cs'), read('../../examples/windows/App.xaml.cs')), []);
 });
 
@@ -144,50 +152,51 @@ test('independent preference witness distinguishes unrelated/repeated notificati
 
 function adapterViolations(source) {
   const registration = source.slice(source.indexOf('internal SystemPreferenceNotifications('), source.indexOf('internal bool IsAttached'));
-  const dispose = source.slice(source.indexOf('public void Dispose()'), source.indexOf('private nint WindowMessage'));
-  const callback = source.slice(source.indexOf('private nint WindowMessage'), source.indexOf('private void CaptureFailure'));
+  const dispose = source.slice(source.indexOf('public void Dispose()'), source.indexOf('private void AnimationsChanged'));
+  const callback = source.slice(source.indexOf('private void AnimationsChanged'), source.indexOf('private bool SaveFailure'));
+  const saving = source.slice(source.indexOf('private bool SaveFailure'), source.indexOf('private void CaptureFailure'));
+  const reporting = source.slice(source.indexOf('private void ReportFailure'), source.indexOf('private void CheckAccess'));
   return [
-    ['own HWND and owning thread before registration', !source.includes('window.DispatcherQueue.HasThreadAccess')
-      || !source.includes('WinRT.Interop.WindowNative.GetWindowHandle(window)')
-      || !source.includes('GetWindowThreadProcessId(handle, out var process) != ownerThread || process != (uint)Environment.ProcessId')],
-    ['delegate retained until confirmed detach', !source.includes('procedure = WindowMessage;') || !source.includes('keepAlive = GCHandle.Alloc(this);')
-      || !/if \(RemoveWindowSubclass\(handle, procedure, 1\)\)\s*\{\s*handle = 0;\s*keepAlive.Free\(\);\s*\}/.test(dispose)],
-    ['registration failure is observable and releases unused root', !/if \(!SetWindowSubclass\(handle, procedure, 1, 0\)\)\s*throw new InvalidOperationException/.test(registration)
-      || !/catch\s*\{\s*handle = 0;\s*keepAlive.Free\(\);\s*throw;\s*\}/.test(registration)],
-    ['failed removal retires first and keeps fault readable', !/CheckAccess\(\);\s*retired = true;\s*notify = null;/.test(dispose)
-      || !dispose.includes('else CaptureFailure(new InvalidOperationException') || !dispose.includes('ThrowIfFaulted();')],
-    ['destroy revokes address before forwarding and releases afterwards', !/handle = 0;\s*if \(!RemoveWindowSubclass\(window, procedure, 1\)\)/.test(callback)
-      || !/finally\s*\{\s*if \(destroying && keepAlive.IsAllocated\) keepAlive.Free\(\);\s*GC.KeepAlive\(this\);\s*\}/.test(callback)],
-    ['all callbacks forward without getter or test-only filter', !callback.includes('return DefSubclassProc(window, message, wParam, lParam);')
-      || !callback.includes('window == handle && id == 1 && !retired && message == SettingChange')
-      || /AnimationsEnabled|Update\(|0x1043|PtrToString|ReadInt|lParam\s*==/.test(callback)],
-    ['managed delivery exceptions retained inside reverse PInvoke', !callback.includes('catch (Exception error) { CaptureFailure(error); }')
-      || !source.includes('if (failure is not null) return;') || !source.includes('failure = ExceptionDispatchInfo.Capture(error);')
-      || !source.includes('catch (Exception secondary) { reportingFailure = ExceptionDispatchInfo.Capture(secondary); }')
-      || !source.includes('failure?.Throw();')],
+    ['single typed native event on owned UISettings', !source.includes('UISettingsAnimationsEnabledChangedEventArgs args')
+      || (source.match(/settings\.AnimationsEnabledChanged \+= AnimationsChanged;/g) ?? []).length !== 1
+      || !source.includes('settings.AnimationsEnabledChanged -= AnimationsChanged;')
+      || /DllImport|SetWindowSubclass|GCHandle|WindowMessage|Timer|Task\.Delay|args\./.test(source)],
+    ['owner UI admission before native registration', registration.indexOf('CheckAccess();') < 0
+      || registration.indexOf('CheckAccess();') > registration.indexOf('settings.AnimationsEnabledChanged +=')],
+    ['actual transport and active effect are separate synchronized states', !source.includes('lock (gate) return subscribed;')
+      || !source.includes('lock (gate) return subscribed && !retired;')],
+    ['revoke before native removal and retain failed transport', !/CheckAccess\(\);\s*bool remove;\s*lock \(gate\) \{ retired = true; remove = subscribed; \}/.test(dispose)
+      || !/settings\.AnimationsEnabledChanged -= AnimationsChanged;\s*lock \(gate\) subscribed = false;/.test(dispose)
+      || !dispose.includes('catch (Exception error) { CaptureFailure(error); }') || !dispose.includes('ThrowIfFaulted();')],
+    ['delivery shares retirement lock and carries exact identity without UI getter', !/lock \(gate\)\s*\{\s*if \(retired \|\| !subscribed\) return;/.test(callback)
+      || !callback.includes('try { notify(this); }') || !callback.includes('if (SaveFailure(error)) deliveryFailure = error;')
+      || /settings\.|AnimationsEnabled\b|Update\(|State\./.test(callback)],
+    ['first fault retired and retained under shared lock', !/lock \(gate\)\s*\{\s*retired = true;\s*if \(failure is not null\) return false;\s*failure = ExceptionDispatchInfo.Capture\(error\);/.test(saving)
+      || !source.includes('lock (gate) { primary = failure; secondary = reportingFailure; }')
+      || !source.includes('primary?.Throw();')],
+    ['reporting uses owner UI queue and preserves secondary failure', !reporting.includes('if (dispatcher.HasThreadAccess) reportFailure(this, error);')
+      || !reporting.includes('else if (!dispatcher.TryEnqueue(() => ReportFailure(error)))')
+      || !reporting.includes('catch (Exception secondary) { SaveReportingFailure(secondary); }')
+      || !reporting.includes('lock (gate) reportingFailure ??= ExceptionDispatchInfo.Capture(error);')],
   ].filter(([, failed]) => failed).map(([name]) => name);
 }
 
-test('actual adapter source retains native callback ownership, forwarding and failure readback under sabotage', () => {
+test('native property adapter preserves retirement, actual revocation and background-fault reporting under sabotage', () => {
   const source = read('../../examples/windows/SystemPreferenceNotifications.cs');
   for (const healthy of [source, source.replaceAll('\n', '\r\n').replaceAll('\r\n', '\n')]) {
     assert.deepEqual(adapterViolations(healthy), []);
     for (const [before, after, violation] of [
-      ['window.DispatcherQueue.HasThreadAccess', 'true', 'own HWND and owning thread before registration'],
-      ['process != (uint)Environment.ProcessId', 'false', 'own HWND and owning thread before registration'],
-      ['keepAlive = GCHandle.Alloc(this);', '', 'delegate retained until confirmed detach'],
-      ['if (!SetWindowSubclass(handle, procedure, 1, 0))', 'if (false)', 'registration failure is observable and releases unused root'],
-      ['keepAlive.Free();\n            throw;', 'keepAlive.Free();\n            return;', 'registration failure is observable and releases unused root'],
-      ['if (RemoveWindowSubclass(handle, procedure, 1))', 'if (true)', 'delegate retained until confirmed detach'],
-      ['retired = true;', 'retired = false;', 'failed removal retires first and keeps fault readable'],
-      ['CheckAccess();\n        retired = true;', 'retired = true;', 'failed removal retires first and keeps fault readable'],
-      ['else CaptureFailure(new InvalidOperationException', 'else Ignore(new InvalidOperationException', 'failed removal retires first and keeps fault readable'],
-      ['handle = 0;\n                if (!RemoveWindowSubclass(window, procedure, 1))', 'if (!RemoveWindowSubclass(window, procedure, 1))', 'destroy revokes address before forwarding and releases afterwards'],
-      ['if (destroying && keepAlive.IsAllocated) keepAlive.Free();', '', 'destroy revokes address before forwarding and releases afterwards'],
-      ['return DefSubclassProc(window, message, wParam, lParam);', 'return 0;', 'all callbacks forward without getter or test-only filter'],
-      ['message == SettingChange', 'message == SettingChange && wParam == 0x1043', 'all callbacks forward without getter or test-only filter'],
-      ['notify?.Invoke(wParam == ClientAreaAnimation);', 'var value = settings.AnimationsEnabled; notify?.Invoke(wParam == ClientAreaAnimation);', 'all callbacks forward without getter or test-only filter'],
-      ['if (failure is not null) return;', '', 'managed delivery exceptions retained inside reverse PInvoke'],
+      ['settings.AnimationsEnabledChanged += AnimationsChanged;', '', 'single typed native event on owned UISettings'],
+      ['CheckAccess();\n        settings.AnimationsEnabledChanged', 'settings.AnimationsEnabledChanged', 'owner UI admission before native registration'],
+      ['lock (gate) return subscribed;', 'return !retired;', 'actual transport and active effect are separate synchronized states'],
+      ['lock (gate) return subscribed && !retired;', 'lock (gate) return subscribed;', 'actual transport and active effect are separate synchronized states'],
+      ['retired = true; remove = subscribed;', 'retired = false; remove = subscribed;', 'revoke before native removal and retain failed transport'],
+      ['settings.AnimationsEnabledChanged -= AnimationsChanged;', 'IgnoreRemove();', 'single typed native event on owned UISettings'],
+      ['if (retired || !subscribed) return;', 'if (false) return;', 'delivery shares retirement lock and carries exact identity without UI getter'],
+      ['notify(this);', 'notify(null!);', 'delivery shares retirement lock and carries exact identity without UI getter'],
+      ['if (failure is not null) return false;', '', 'first fault retired and retained under shared lock'],
+      ['if (dispatcher.HasThreadAccess) reportFailure(this, error);', 'reportFailure(this, error);', 'reporting uses owner UI queue and preserves secondary failure'],
+      ['lock (gate) reportingFailure ??= ExceptionDispatchInfo.Capture(error);', 'reportingFailure = null;', 'reporting uses owner UI queue and preserves secondary failure'],
     ]) assert(adapterViolations(healthy.replace(before, after)).includes(violation), violation);
   }
 });
@@ -206,32 +215,44 @@ test('managed lifecycle source rejects stale/reloaded/window-closed notification
   assert(!source.slice(source.indexOf('private void NotificationFailed'), source.indexOf('private void ObserveSystemNotification')).includes('error.Message'));
 });
 
-test('independent lifetime witness keeps failed removal rooted and never removes a destroyed or reused address', () => {
-  // Модель native outcomes: source checks выше связывают отдельные переходы с C#;
-  // этот witness не исполняет HWND, GC или reverse-PInvoke.
-  let handle = 12, rooted = true, retired = false;
-  let removes = 0;
-  const dispose = succeeds => {
-    retired = true;
-    if (handle !== 0) {
-      removes++;
-      if (succeeds) { handle = 0; rooted = false; }
+test('independent lifetime control covers queued stale identity, failed unsubscribe, retry and repeated disposal', () => {
+  // Модель ожидаемого контракта; это не исполнение C#/WinRT adapter.
+  const current = { subscribed: true, retired: false, fault: null };
+  const queue = [];
+  let active = current, changes = 0, removals = 0;
+  const receive = subscription => {
+    if (!subscription.subscribed || subscription.retired) return;
+    queue.push(subscription); // Sender identity не подменяется поздним active.
+  };
+  const apply = subscription => {
+    if (subscription !== active || !subscription.subscribed || subscription.retired) return;
+    changes++;
+  };
+  const dispose = (subscription, succeeds) => {
+    subscription.retired = true;
+    if (subscription.subscribed) {
+      removals++;
+      if (succeeds) subscription.subscribed = false;
+      else subscription.fault ??= 'unsubscribe-primary';
     }
   };
-  dispose(false);
-  assert.deepEqual([handle, rooted, retired, removes], [12, true, true, 1]);
-  // NCDESTROY отзывает адрес до forwarding; root освобождается только после него.
-  handle = 0;
-  assert.equal(rooted, true);
-  rooted = false;
-  dispose(true);
-  dispose(true);
-  assert.deepEqual([handle, rooted, retired, removes], [0, false, true, 1]);
-  // Здоровое снятие и reentrant Dispose не вызывают повторный native Remove.
-  handle = 24; rooted = true; retired = false; removes = 0;
-  const activeCallbackRetainsOwner = true;
-  dispose(true);
-  dispose(true);
-  assert.deepEqual([handle, rooted, retired, removes], [0, false, true, 1]);
-  assert.equal(activeCallbackRetainsOwner, true); // Source связывает это с GC.KeepAlive(this).
+  receive(current);
+  dispose(current, false);
+  assert.deepEqual(current, { subscribed: true, retired: true, fault: 'unsubscribe-primary' });
+  receive(current);
+  queue.forEach(apply);
+  assert.equal(changes, 0);
+  dispose(current, true);
+  dispose(current, true);
+  assert.deepEqual([current.subscribed, current.retired, current.fault, removals], [false, true, 'unsubscribe-primary', 2]);
+  active = { subscribed: true, retired: false, fault: null };
+  queue.forEach(apply);
+  assert.equal(changes, 0, 'старый queued callback не принимает новую subscription');
+  receive(active);
+  apply(queue.at(-1));
+  assert.equal(changes, 1, 'здоровый native callback допускает полезную реакцию');
+  const unrelated = { subscribed: true, retired: false, fault: null };
+  receive(unrelated);
+  apply(queue.at(-1));
+  assert.equal(changes, 1, 'чужая subscription не получает эффект current page');
 });
