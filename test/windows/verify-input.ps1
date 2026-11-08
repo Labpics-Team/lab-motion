@@ -1,0 +1,616 @@
+param(
+    [Parameter(Mandatory = $true)][string]$ApplicationDirectory,
+    [Parameter(Mandatory = $true)][string]$OutputDirectory,
+    [switch]$ConfigureHostedAnimations
+)
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+$output = [IO.Path]::GetFullPath($OutputDirectory)
+if (Test-Path -LiteralPath $output) { throw 'Каталог результата уже существует.' }
+$evidence = New-Item -ItemType Directory -Path (Join-Path $output 'evidence')
+$app = Join-Path ([IO.Path]::GetFullPath($ApplicationDirectory)) 'NativeWindow.exe'
+$trace = Join-Path $evidence 'press.jsonl'
+$saved = @{}
+foreach ($name in @('LAB_MOTION_PROBE_OUTPUT', 'LAB_MOTION_PRESS_TRACE', 'WINAPP_UI_WORKFLOW_ID', 'WINAPP_CLI_TELEMETRY_OPTOUT', 'WINAPP_CLI_UPDATE_CHECK', 'LAB_MOTION_SETTER_PID', 'LAB_MOTION_SETTER_TID', 'LAB_MOTION_SETTER_STATION')) {
+    $saved[$name] = [Environment]::GetEnvironmentVariable($name)
+}
+$process = $null
+$recording = $null
+$passed = $false
+$primaryFailure = $null
+$animationBefore = $null
+$commands = [Collections.Generic.List[object]]::new()
+$scenarios = [Collections.Generic.List[object]]::new()
+$toolTimeoutMilliseconds = 30000
+$restTimeoutSeconds = 8
+$recordReadyTimeoutSeconds = 15
+# Время mouse-hold вместе с запуском записи: ready, покой до ввода, CLI, покой после.
+$recordInputBudgetMilliseconds = ($recordReadyTimeoutSeconds + 2 * $restTimeoutSeconds) * 1000 + $toolTimeoutMilliseconds
+$recordDurationSeconds = [int]($recordInputBudgetMilliseconds / 1000) + 1
+
+. (Join-Path $PSScriptRoot 'process-tools.ps1')
+
+function Start-Tool([string]$Name, [string[]]$Arguments) {
+    $info = [Diagnostics.ProcessStartInfo]::new($script:cli)
+    $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
+    foreach ($argument in $Arguments) { $info.ArgumentList.Add($argument) }
+    $child = [Diagnostics.Process]::Start($info)
+    $stdout = $child.StandardOutput.ReadToEndAsync()
+    $stderr = if ($Name -eq 'record') { $null } else { $child.StandardError.ReadToEndAsync() }
+    return @{ process = $child; stdout = $stdout; stderr = $stderr; prefix = ''; ended = $false; name = $Name; arguments = $Arguments }
+}
+
+function Invoke-Ui([string]$Name, [string[]]$Arguments) {
+    $tool = Start-Tool $Name (@('ui') + $Arguments + @('-w', $script:window, '--json'))
+    Finish-Tool $tool | Out-Null
+}
+
+function Read-Trace {
+    if (!(Test-Path -LiteralPath $trace)) { return @() }
+    # Flush ненадолго владеет записью; повторяем лишь гонку совместного чтения.
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+        try {
+            $stream = [IO.FileStream]::new($trace, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+            $reader = [IO.StreamReader]::new($stream)
+            try { $text = $reader.ReadToEnd() } finally { $reader.Dispose() }
+            # Последняя строка могла ещё записываться; следующая выборка её увидит.
+            $lines = $text.Split("`n") | Select-Object -SkipLast 1
+            break
+        }
+        catch [IO.IOException] { if ($attempt -eq 9) { throw }; Start-Sleep -Milliseconds 20 }
+    }
+    return @($lines | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json })
+}
+
+function Wait-Rest([long]$After = 0) {
+    $deadline = [DateTime]::UtcNow.AddSeconds($restTimeoutSeconds)
+    do {
+        $events = @(Read-Trace)
+        if (@($events | Where-Object { $_.kind -in @('error', 'truncated') }).Count) { throw 'Трасса ввода содержит ошибку или обрезана.' }
+        $intents = @($events | Where-Object kind -eq 'intent')
+        if ($intents.Count) {
+            $last = $intents[-1].data
+            $ends = @($events | Where-Object { $_.kind -in @('completed', 'snapReadback') -and $_.data.operation -eq $last.operation })
+            if ($intents[-1].sequence -gt $After -and !$last.pressed -and $ends.Count) { return }
+        }
+        Start-Sleep -Milliseconds 50
+    } while ([DateTime]::UtcNow -lt $deadline)
+    try { throw "Кнопка не вернулась в отпущенное состояние за $restTimeoutSeconds секунд." }
+    catch {
+        $failure = $_
+        try {
+            $summary = Get-RestSummary -After $After -Events $events
+            $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`nwait-rest: " + $summary)
+        } catch {
+            try { $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`nwait-rest: unavailable") }
+            catch { }
+        }
+        throw $failure
+    }
+}
+
+function Read-InputPhaseField($Data, [string]$Field, [string]$Type) {
+    if ($null -eq $Data) { return $null }
+    $property = $Data.PSObject.Properties[$Field]
+    if ($null -eq $property) { return $null }
+    $value = $property.Value
+    switch ($Type) {
+        'number' { if (($value -is [int] -or $value -is [long]) -and $value -ge 0 -and $value -le 9007199254740991) { return $value } }
+        'positive' { if (($value -is [int] -or $value -is [long]) -and $value -gt 0 -and $value -le 9007199254740991) { return $value } }
+        'bool' { if ($value -is [bool]) { return $value } }
+        'reason' { if ($value -is [string] -and $value -cin @('settled', 'snap', 'replaced', 'stopped', 'disposed', 'interaction')) { return $value } }
+        'end' { if ($value -is [string] -and $value -cin @('Finished', 'Stopped')) { return $value } }
+        'outcome' { if ($value -is [string] -and $value -cin @('Missing', 'Stale', 'Detached', 'Deduplicated', 'Update')) { return $value } }
+        'entryOutcome' { if ($value -is [string] -and $value -cin @('None', 'Admitted', 'Rejected')) { return $value } }
+        'trigger' { if ($value -is [string] -and $value -cin @('attach', 'pressed', 'enabled', 'localPreference', 'systemPreference')) { return $value } }
+        'restKind' { if ($value -is [string] -and $value -cin @('completed', 'snapReadback')) { return $value } }
+        'identityState' { if ($value -is [string] -and $value -cin @('Hashed', 'NotLoaded', 'NoLocation', 'TooLarge', 'Unavailable', 'Ambiguous')) { return $value } }
+        'throwType' { if ($value -is [string] -and $value -cin @('COM', 'InvalidCast', 'Argument', 'InvalidOperation', 'TypeLoad', 'MissingMethod', 'FileNotFound', 'NotSupported')) { return $value } }
+        'throwOwner' { if ($value -is [string] -and $value -cin @('UISettings', 'WinRTRuntime', 'Application', 'CoreRuntime', 'Other')) { return $value } }
+        'nativeState' { if ($value -is [string] -and $value -cin @('Ready', 'Faulted', 'Unavailable')) { return $value } }
+        'hresult' { if (($value -is [int] -or $value -is [long]) -and $value -ge -2147483648 -and $value -le 2147483647) { return $value } }
+        'version' {
+            if ($value -is [string] -and $value -cmatch '^[0-9]{1,5}(\.[0-9]{1,5}){3}$' -and
+                @($value.Split('.') | Where-Object { [int]$_ -gt 65535 }).Count -eq 0) { return $value }
+        }
+        'mvid' { if ($value -is [string] -and $value -cmatch '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') { return $value } }
+        'sha256' { if ($value -is [string] -and $value -cmatch '^[0-9a-f]{64}$') { return $value } }
+    }
+    return $null
+}
+
+function Get-RestSummary([long]$After, [object[]]$Events) {
+    # Последний уже прочитанный snapshot; attach не отбрасывается как не-input trigger.
+    $intentData = $null
+    $intent = $null
+    $completion = $null
+    $invalid = 0
+    foreach ($event in $Events) {
+        if ($null -eq $event) { $invalid++; continue }
+        $sequence = Read-InputPhaseField $event 'sequence' 'number'
+        if ($null -eq $sequence) { $invalid++ }
+        $kind = $event.PSObject.Properties['kind']
+        if ($null -eq $kind -or $kind.Value -isnot [string]) { $invalid++; continue }
+        if ($kind.Value -cne 'intent') { continue }
+        $property = $event.PSObject.Properties['data']
+        $intentData = if ($null -ne $property) { $property.Value } else { $null }
+        if ($null -eq $intentData) { $invalid++ }
+        $intent = @($sequence, (Read-InputPhaseField $intentData 'operation' 'number'),
+            (Read-InputPhaseField $intentData 'pressed' 'bool'), (Read-InputPhaseField $intentData 'localAnimation' 'bool'),
+            (Read-InputPhaseField $intentData 'systemAnimation' 'bool'), (Read-InputPhaseField $intentData 'trigger' 'trigger'))
+    }
+    $operation = Read-InputPhaseField $intentData 'operation' 'number'
+    if ($null -ne $operation) {
+        foreach ($event in $Events) {
+            if ($null -eq $event) { continue }
+            $sequence = Read-InputPhaseField $event 'sequence' 'number'
+            $kind = Read-InputPhaseField $event 'kind' 'restKind'
+            if ($null -eq $kind) { continue }
+            $property = $event.PSObject.Properties['data']
+            $data = if ($null -ne $property) { $property.Value } else { $null }
+            $endOperation = Read-InputPhaseField $data 'operation' 'number'
+            # Unknown operation не совпадает с unknown и не заимствует прежний completion.
+            if ($null -eq $endOperation -or $endOperation -ne $operation) { continue }
+            $completion = @($sequence, $kind, (Read-InputPhaseField $data 'reason' 'reason'), (Read-InputPhaseField $data 'end' 'end'))
+        }
+    }
+    $count = if ($null -eq $Events) { 0 } else { $Events.Count }
+    $summary = [ordered]@{ schema = 1; after = (Read-InputPhaseField ([pscustomobject]@{ value = $After }) 'value' 'number');
+        count = $count; invalid = $invalid; intent = $intent; completion = $completion } | ConvertTo-Json -Depth 3 -Compress
+    if ($summary.Length -gt 1800) { throw 'Диагностика ожидания превысила свой фиксированный предел.' }
+    return $summary
+}
+
+function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $Setter = $null) {
+    # Только фиксированные enums/bool/числа; никакие data, args или тексты ошибок не сериализуются.
+    $scenario = if ($Name -cin @('disable-animation', 'system-disable-animation')) { $Name } else { 'unknown' }
+    $rows = [Collections.Generic.List[object]]::new()
+    $timing = [Collections.Generic.List[object]]::new()
+    # Снимок именно запретившего SET; позднее восстановление не заменяет его.
+    $setterSummary = @((Read-InputPhaseField $Setter 'SetEnteredQpc' 'positive'),
+        (Read-InputPhaseField $Setter 'SetReturnedQpc' 'positive'),
+        (Read-InputPhaseField $Setter 'SetSucceeded' 'bool'),
+        (Read-InputPhaseField $Setter 'ReadbackQpc' 'positive'),
+        (Read-InputPhaseField $Setter 'ReadbackEnabled' 'bool'),
+        (Read-InputPhaseField $Setter 'QpcFrequency' 'positive'), (Read-InputPhaseField $Setter 'ContextStillMatches' 'bool'))
+    $invalid = 0
+    $projectionSummary = $null
+    $nativeSummary = $null
+    $windowSummary = $null
+    $projectionSequence = -1L
+    foreach ($event in $Events) {
+        $sequence = Read-InputPhaseField $event 'sequence' 'number'
+        if ($null -eq $sequence) { $invalid++; continue }
+        if ($sequence -le $After) { continue }
+        $kindProperty = $event.PSObject.Properties['kind']
+        $dataProperty = $event.PSObject.Properties['data']
+        if ($null -eq $kindProperty -or $null -eq $dataProperty) { $invalid++; continue }
+        $data = $dataProperty.Value
+        $timingPhase = $null
+        switch -CaseSensitive ($kindProperty.Value) {
+            'completed' { $timingPhase = 'completed' }
+            'systemApply' { $timingPhase = 'systemApply' }
+            'systemNotification' {
+                $phaseProperty = if ($null -ne $data) { $data.PSObject.Properties['phase'] } else { $null }
+                if ($null -ne $phaseProperty -and $phaseProperty.Value -is [string] -and
+                    $phaseProperty.Value -cin @('Received', 'Queued', 'Delegate')) { $timingPhase = $phaseProperty.Value }
+            }
+        }
+        if ($null -ne $timingPhase) {
+            $timing.Add(@($sequence, $timingPhase, (Read-InputPhaseField $data 'qpc' 'positive'),
+                (Read-InputPhaseField $data 'qpcFrequency' 'positive'),
+                (Read-InputPhaseField $data 'notification' 'positive'),
+                (Read-InputPhaseField $data 'clientAreaAnimation' 'bool'),
+                (Read-InputPhaseField $data 'outcome' 'outcome'),
+                (Read-InputPhaseField $data 'enabled' 'bool'), (Read-InputPhaseField $data 'observed' 'bool')))
+        }
+        $phase = $null
+        switch -CaseSensitive ($kindProperty.Value) {
+            'intent' {
+                $triggerProperty = if ($null -ne $data) { $data.PSObject.Properties['trigger'] } else { $null }
+                if ($null -ne $triggerProperty) {
+                    switch -CaseSensitive ($triggerProperty.Value) {
+                        'pressed' { if ((Read-InputPhaseField $data 'pressed' 'bool') -ceq $false) { $phase = 'release' } }
+                        'localPreference' { $phase = 'localPreference' }
+                        'systemPreference' { $phase = 'systemPreference' }
+                    }
+                }
+            }
+            'motion' {
+                $phaseProperty = if ($null -ne $data) { $data.PSObject.Properties['phase'] } else { $null }
+                if ($null -ne $phaseProperty -and $phaseProperty.Value -ceq 'requested') { $phase = 'requested' }
+            }
+            'completed' { $phase = 'completed' }
+            'snapRequested' { $phase = 'snapRequested' }
+            'snapReadback' { $phase = 'snapReadback' }
+            'systemNotification' {
+                $phaseProperty = if ($null -ne $data) { $data.PSObject.Properties['phase'] } else { $null }
+                if ($null -ne $phaseProperty) {
+                    switch -CaseSensitive ($phaseProperty.Value) {
+                        'Received' { $phase = 'systemCallback' }
+                        'Queued' { $phase = 'systemQueued' }
+                        'Delegate' { $phase = 'systemDelegate' }
+                    }
+                }
+            }
+        }
+        if ($null -eq $phase) { continue }
+        $operationField = if ($phase -eq 'requested') { 'pageOperation' } else { 'operation' }
+        $subscriptionSummary = $null
+        $subscription = $null
+        # Latest определяется completed identity, даже если data отсутствуют/повреждены.
+        $captureProjection = $phase -eq 'completed' -and $sequence -gt $projectionSequence
+        if ($captureProjection) {
+            $projectionSequence = $sequence
+            $projectionSummary = $null
+            $nativeSummary = $null
+            $windowSummary = $null
+        }
+        if ($phase -eq 'completed' -and $null -ne $data) {
+            $subscriptionProperty = $data.PSObject.Properties['subscriptionDiagnostics']
+            if ($null -ne $subscriptionProperty -and $null -ne $subscriptionProperty.Value) {
+                $subscription = $subscriptionProperty.Value
+                $subscriptionSummary = @((Read-InputPhaseField $subscription 'Registration' 'positive'),
+                    (Read-InputPhaseField $subscription 'RawEntries' 'number'),
+                    (Read-InputPhaseField $subscription 'AdmittedEntries' 'number'),
+                    (Read-InputPhaseField $subscription 'LastEntry' 'entryOutcome'),
+                    (Read-InputPhaseField $subscription 'LastEntryQpc' 'positive'),
+                    (Read-InputPhaseField $subscription 'QpcFrequency' 'positive'),
+                    (Read-InputPhaseField $subscription 'Attached' 'bool'),
+                    (Read-InputPhaseField $subscription 'Active' 'bool'),
+                    (Read-InputPhaseField $subscription 'Faulted' 'bool'),
+                    (Read-InputPhaseField $data 'subscriptionIsCurrent' 'bool'))
+            }
+            # Последняя completed-выборка captured registration; не identity SPI/event.
+            if ($captureProjection) {
+                $windowProperty = $data.PSObject.Properties['windowDiagnostics']
+                if ($null -ne $windowProperty -and $null -ne $windowProperty.Value) {
+                    $window = $windowProperty.Value
+                    $windowSummary = @($sequence, (Read-InputPhaseField $subscription 'Registration' 'positive'),
+                        (Read-InputPhaseField $window 'State' 'nativeState'),
+                        (Read-InputPhaseField $window 'OwnerMatched' 'bool'), (Read-InputPhaseField $window 'SameSession' 'bool'),
+                        (Read-InputPhaseField $window 'SameDesktop' 'bool'), (Read-InputPhaseField $window 'ContextHResult' 'hresult'),
+                        (Read-InputPhaseField $window 'ControlPassed' 'bool'), (Read-InputPhaseField $window 'ControlCount' 'number'),
+                        (Read-InputPhaseField $window 'ControlQpc' 'positive'), (Read-InputPhaseField $window 'RawCount' 'number'),
+                        (Read-InputPhaseField $window 'ActionCount' 'number'), (Read-InputPhaseField $window 'LastRawQpc' 'positive'),
+                        (Read-InputPhaseField $window 'LastActionQpc' 'positive'), (Read-InputPhaseField $window 'QpcFrequency' 'positive'),
+                        (Read-InputPhaseField $window 'ForwardCount' 'number'), (Read-InputPhaseField $window 'AddHResult' 'hresult'),
+                        (Read-InputPhaseField $window 'RemoveHResult' 'hresult'), (Read-InputPhaseField $window 'Attached' 'bool'),
+                        (Read-InputPhaseField $window 'Active' 'bool'), (Read-InputPhaseField $window 'Faulted' 'bool'),
+                        (Read-InputPhaseField $window 'Destroyed' 'bool'))
+                }
+                $nativeProperty = $data.PSObject.Properties['nativeDiagnostics']
+                if ($null -ne $nativeProperty -and $null -ne $nativeProperty.Value) {
+                    $native = $nativeProperty.Value
+                    $nativeSummary = @($sequence, (Read-InputPhaseField $subscription 'Registration' 'positive'),
+                        (Read-InputPhaseField $native 'State' 'nativeState'),
+                        (Read-InputPhaseField $native 'SameSource' 'bool'), (Read-InputPhaseField $native 'ControlPassed' 'bool'),
+                        (Read-InputPhaseField $native 'SourceHResult' 'hresult'), (Read-InputPhaseField $native 'DelegateHResult' 'hresult'),
+                        (Read-InputPhaseField $native 'MarshalHResult' 'hresult'), (Read-InputPhaseField $native 'ControlHResult' 'hresult'),
+                        (Read-InputPhaseField $native 'ControlCount' 'number'), (Read-InputPhaseField $native 'ControlQpc' 'positive'),
+                        (Read-InputPhaseField $native 'QpcFrequency' 'positive'), (Read-InputPhaseField $native 'AddHResult' 'hresult'),
+                        (Read-InputPhaseField $native 'Count' 'number'), (Read-InputPhaseField $native 'LastEntryQpc' 'positive'),
+                        (Read-InputPhaseField $native 'Attached' 'bool'), (Read-InputPhaseField $native 'Active' 'bool'),
+                        (Read-InputPhaseField $native 'Faulted' 'bool'), (Read-InputPhaseField $native 'RemoveHResult' 'hresult'))
+                }
+                $projectionProperty = $data.PSObject.Properties['projectionDiagnostics']
+                if ($null -ne $projectionProperty -and $null -ne $projectionProperty.Value) {
+                    $projection = $projectionProperty.Value
+                    $identities = [Collections.Generic.List[object]]::new()
+                    foreach ($role in @('UISettingsAssembly', 'WinRTRuntimeAssembly')) {
+                        $property = $projection.PSObject.Properties[$role]
+                        $identity = if ($null -ne $property) { $property.Value } else { $null }
+                        $identities.Add(@((Read-InputPhaseField $identity 'State' 'identityState'),
+                            (Read-InputPhaseField $identity 'Version' 'version'), (Read-InputPhaseField $identity 'Mvid' 'mvid'),
+                            (Read-InputPhaseField $identity 'Sha256' 'sha256')))
+                    }
+                    $throws = [Collections.Generic.List[object]]::new()
+                    foreach ($field in @('Last', 'LastProjection')) {
+                        $property = $projection.PSObject.Properties[$field]
+                        $entry = if ($null -ne $property) { $property.Value } else { $null }
+                        if ($null -eq $entry) { $throws.Add($null); continue }
+                        $throws.Add(@((Read-InputPhaseField $entry 'Order' 'positive'), (Read-InputPhaseField $entry 'Qpc' 'positive'),
+                            (Read-InputPhaseField $entry 'Type' 'throwType'), (Read-InputPhaseField $entry 'HResult' 'hresult'),
+                            (Read-InputPhaseField $entry 'ThrowingOwner' 'throwOwner')))
+                    }
+                    $projectionSummary = @($sequence, (Read-InputPhaseField $subscription 'Registration' 'positive'), @($identities.ToArray()),
+                        (Read-InputPhaseField $projection 'StartedQpc' 'positive'), (Read-InputPhaseField $projection 'QpcFrequency' 'positive'),
+                        (Read-InputPhaseField $projection 'Active' 'bool'), (Read-InputPhaseField $projection 'Faulted' 'bool'),
+                        (Read-InputPhaseField $projection 'ReentrantSkipped' 'number'), (Read-InputPhaseField $projection 'Count' 'number'),
+                        (Read-InputPhaseField $projection 'Omitted' 'number'), (Read-InputPhaseField $projection 'ProjectionCount' 'number'),
+                        (Read-InputPhaseField $projection 'ProjectionOmitted' 'number'), @($throws.ToArray()))
+                }
+            }
+        }
+        # Schema2 сохраняет прежние13 полей; поле14 — nullable subscription tuple.
+        $rows.Add(@($sequence, $phase, (Read-InputPhaseField $data $operationField 'number'),
+            (Read-InputPhaseField $data 'nativeOperation' 'number'), (Read-InputPhaseField $data 'pressed' 'bool'),
+            (Read-InputPhaseField $data 'localAnimation' 'bool'), (Read-InputPhaseField $data 'systemAnimation' 'bool'),
+            (Read-InputPhaseField $data 'reason' 'reason'), (Read-InputPhaseField $data 'end' 'end'),
+            (Read-InputPhaseField $data 'isCurrent' 'bool'), (Read-InputPhaseField $data 'notification' 'number'),
+            (Read-InputPhaseField $data 'queued' 'bool'), (Read-InputPhaseField $data 'diagnosticFailed' 'bool'), $subscriptionSummary))
+    }
+    $count = $rows.Count
+    $timingCount = $timing.Count
+    # Сохраняем начало и конец в исходном порядке; пропуск явно учитывается, не означает отсутствия фазы.
+    while ($rows.Count -gt 12) { $rows.RemoveAt([int][Math]::Floor($rows.Count / 2)) }
+    while ($timing.Count -gt 12) { $timing.RemoveAt([int][Math]::Floor($timing.Count / 2)) }
+    do {
+        $summary = [ordered]@{ schema = 2; scenario = $scenario; after = $After; count = $count;
+            omitted = $count - $rows.Count; invalid = $invalid; rows = @($rows.ToArray()); setter = $setterSummary;
+            timingCount = $timingCount; timingOmitted = $timingCount - $timing.Count; timing = @($timing.ToArray());
+            projection = $projectionSummary; native = $nativeSummary; window = $windowSummary } | ConvertTo-Json -Depth 5 -Compress
+        if ($summary.Length -le 1800) { return $summary }
+        if ($rows.Count -gt 2) { $rows.RemoveAt([int][Math]::Floor($rows.Count / 2)) }
+        elseif ($timing.Count -gt 2) { $timing.RemoveAt([int][Math]::Floor($timing.Count / 2)) }
+        else { break }
+    } while ($true)
+    throw 'Диагностика фаз превысила свой фиксированный предел.'
+}
+
+function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArguments = @()) {
+    $systemSetterReceipt = $null
+    Wait-Rest
+    $before = @(Read-Trace)[-1].sequence
+    if ($BeforeArguments.Count -and $Name -ne 'disable-animation') { Invoke-Ui "$Name-press" $BeforeArguments }
+    if ($Name -in @('disable-animation', 'system-disable-animation')) {
+        $releaseTool = $null
+        $releaseFailure = $null
+        $releaseClock = [Diagnostics.Stopwatch]::StartNew()
+        try {
+            $releaseName = $Name
+            $releaseArguments = $Arguments
+            if ($Name -eq 'disable-animation') {
+                if (!$BeforeArguments.Count) { throw 'Локальному запрету нужна предшествующая команда отпускания.' }
+                $releaseName = "$Name-press"
+                $releaseArguments = $BeforeArguments
+            }
+            # Выход CLI не подтверждает обработку release приложением и может опоздать к settled.
+            $releaseTool = Start-Tool $releaseName (@('ui') + $releaseArguments + @('-w', $script:window, '--json'))
+            $deadline = [DateTime]::UtcNow.AddSeconds(8)
+            $active = $false
+            do {
+                $events = @(Read-Trace)
+                if (@($events | Where-Object { $_.kind -in @('error', 'truncated') }).Count) { throw 'Трасса ввода содержит ошибку или обрезана.' }
+                $released = @($events | Where-Object { $_.sequence -gt $before -and $_.kind -eq 'intent' -and
+                    $_.data.trigger -eq 'pressed' -and !$_.data.pressed -and $_.data.localAnimation -and $_.data.systemAnimation })
+                if ($released.Count) {
+                    $operation = $released[-1].data.operation
+                    $requested = @($events | Where-Object { $_.kind -eq 'motion' -and $_.data.pageOperation -eq $operation -and $_.data.phase -eq 'requested' })
+                    $completed = @($events | Where-Object { $_.kind -eq 'completed' -and $_.data.operation -eq $operation })
+                    if ($completed.Count) { throw 'Операция завершилась до запрета анимации.' }
+                    if ($requested.Count) { $active = $true; break }
+                }
+                Start-Sleep -Milliseconds 50
+            } while ([DateTime]::UtcNow -lt $deadline -and $releaseClock.ElapsedMilliseconds -lt 30000)
+            if (!$active) { throw 'Нет незавершённой операции перед запретом анимации.' }
+            if ($releaseClock.ElapsedMilliseconds -ge 30000) { throw 'Таймаут winapp до запрета анимации.' }
+            # Значения кадра буферизуются; итоговая проверка подтвердит движение до preference и snap.
+            # Перед запретом не ждём exit release CLI, value или покоя.
+            if ($Name -eq 'disable-animation') {
+                Invoke-Ui $Name $Arguments
+            } else {
+                [ClientAreaAnimation]::Write($false)
+                $systemSetterReceipt = [pscustomobject]@{
+                    SetEnteredQpc = [ClientAreaAnimation]::SetEnteredQpc
+                    SetReturnedQpc = [ClientAreaAnimation]::SetReturnedQpc
+                    SetSucceeded = [ClientAreaAnimation]::SetSucceeded
+                    ReadbackQpc = [ClientAreaAnimation]::ReadbackQpc
+                    ReadbackEnabled = [ClientAreaAnimation]::ReadbackEnabled
+                    QpcFrequency = [ClientAreaAnimation]::QpcFrequency
+                    ContextStillMatches = [ClientAreaAnimation]::ContextStillMatches
+                }
+                @{ enabled = [ClientAreaAnimation]::Read(); timing = $systemSetterReceipt } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
+            }
+        } catch { $releaseFailure = $_ }
+        finally {
+            if ($null -ne $releaseTool) {
+                try {
+                    # Наблюдение расходует исходные 30s; Finish-Tool не получает новый полный срок.
+                    $remaining = [int][Math]::Max(0, 30000 - $releaseClock.ElapsedMilliseconds)
+                    Finish-Tool $releaseTool $remaining | Out-Null
+                } catch { Save-CleanupFailure $_ ([ref]$releaseFailure) }
+            }
+        }
+        if ($null -ne $releaseFailure) { throw $releaseFailure }
+    } else {
+        Invoke-Ui $Name $Arguments
+    }
+    Wait-Rest $before
+    if ($Name -in @('disable-animation', 'system-disable-animation')) {
+        $deadline = [DateTime]::UtcNow.AddSeconds($restTimeoutSeconds)
+        do {
+            $events = @(Read-Trace)
+            $stopped = @($events | Where-Object { $_.sequence -gt $before -and $_.kind -eq 'completed' -and $_.data.reason -eq 'snap' })
+            if ($stopped.Count) { break }
+            Start-Sleep -Milliseconds 50
+        } while ([DateTime]::UtcNow -lt $deadline)
+        if (!$stopped.Count) {
+            $failure = [Management.Automation.ErrorRecord]::new(
+                [InvalidOperationException]::new(('Переключатель не прервал движение: completed/snap не наблюдался. [scenario={0}]' -f $Name)),
+                'InputSnapNotObserved', [Management.Automation.ErrorCategory]::InvalidResult, $null)
+            try {
+                $summary = Get-InputPhaseSummary -Name $Name -After $before -Events $events -Setter $systemSetterReceipt
+                $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`ninput-phase: " + $summary)
+            } catch { # Ошибка диагностической проекции не заменяет сохранённый отказ ввода.
+                try { $failure.ErrorDetails = [Management.Automation.ErrorDetails]::new($failure.Exception.Message + "`ninput-phase: unavailable") }
+                catch { }
+            }
+            throw $failure
+        }
+    }
+    $after = @(Read-Trace)[-1].sequence
+    $scenarios.Add(@{ name = $Name; after = $before; through = $after })
+}
+
+try {
+    if (!$ConfigureHostedAnimations) {
+        throw 'Полный набор ввода включает системный запрет: нужен -ConfigureHostedAnimations в одноразовой hosted-сессии GitHub.'
+    }
+    # Подменная ClientAreaAnimation теста живёт в отдельном процессе.
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'cleanup.test.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Проверка восстановления после ошибки не прошла.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'projection-diagnostics.test.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Проверка ограниченной projection диагностики не прошла.' }
+    & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'native-preference.test.ps1')
+    if ($LASTEXITCODE -ne 0) { throw 'Native diagnostic reader controls не прошли.' }
+    & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs') (Join-Path $PSScriptRoot 'dispose.test.mjs') (Join-Path $PSScriptRoot 'window-preference.test.mjs')
+    if ($LASTEXITCODE -ne 0) { throw 'Проверки различающей силы input oracle не прошли.' }
+    $env:LAB_MOTION_PROBE_OUTPUT = $null
+    $env:LAB_MOTION_PRESS_TRACE = $trace
+    $env:WINAPP_UI_WORKFLOW_ID = [guid]::NewGuid().ToString()
+    $env:WINAPP_CLI_TELEMETRY_OPTOUT = '1'
+    $env:WINAPP_CLI_UPDATE_CHECK = '0'
+    if ($ConfigureHostedAnimations) {
+        if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted') {
+            throw 'Изменение настройки разрешено только в одноразовой hosted-сессии GitHub.'
+        }
+        Add-Type -Path (Join-Path $PSScriptRoot 'animation-settings.cs')
+        [ClientAreaAnimation]::CaptureWindowDiagnosticContext()
+        $animationBefore = [ClientAreaAnimation]::Read()
+        [ClientAreaAnimation]::Write($true)
+        @{ before = $animationBefore; enabled = [ClientAreaAnimation]::Read() } |
+            ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-settings.json')
+    }
+    $zip = Join-Path $output 'winapp.zip'
+    Invoke-WebRequest 'https://github.com/microsoft/winappCli/releases/download/v0.7.1/winappcli-x64.zip' -OutFile $zip
+    $digest = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($digest -ne 'd925d1e32cdc320b6d271f653fd2cd3c05b5d7558deb20d1b548bead77900fcf') { throw 'SHA256 winapp CLI не совпал.' }
+    Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $output 'tool')
+    $executables = @(Get-ChildItem -LiteralPath (Join-Path $output 'tool') -Filter winapp.exe -Recurse -File)
+    if ($executables.Count -ne 1) { throw 'Ожидался один winapp.exe.' }
+    $script:cli = $executables[0].FullName
+    $process = Start-Process -FilePath $app -WorkingDirectory $ApplicationDirectory -WindowStyle Hidden -PassThru
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    do {
+        $process.Refresh()
+        if (Read-ProcessHasExited $process) { throw 'Приложение завершилось до появления окна.' }
+        if ($process.MainWindowHandle -ne 0) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($process.MainWindowHandle -eq 0) { throw 'Не найдено окно собственного процесса.' }
+    $script:window = $process.MainWindowHandle.ToInt64().ToString()
+    @{ pid = $process.Id; window = $window; source = (git -C $PSScriptRoot rev-parse HEAD);
+        os = [Environment]::OSVersion.VersionString; appSha256 = (Get-FileHash $app).Hash;
+        librarySha256 = (Get-FileHash (Join-Path $ApplicationDirectory 'LabMotion.WinUI.dll')).Hash;
+        cliVersion = '0.7.1'; cliZipSha256 = $digest } | ConvertTo-Json | Set-Content (Join-Path $evidence 'identity.json')
+    Wait-Rest
+    $initialIntent = @(Read-Trace | Where-Object kind -eq 'intent')[-1]
+    if (!$initialIntent.data.systemAnimation) { throw 'UISettings не подтверждает включённую системную анимацию для animated-сценариев.' }
+    Invoke-Ui 'inspect' @('inspect')
+    Invoke-Ui 'rest-before' @('screenshot', '--output', (Join-Path $evidence 'rest-before.png'))
+
+    $recordClock = [Diagnostics.Stopwatch]::StartNew()
+    $deadline = [DateTime]::UtcNow.AddSeconds($recordReadyTimeoutSeconds)
+    $recording = Start-Tool 'record' @('ui', 'record', '-w', $window, '--frames', '--duration-sec', "$recordDurationSeconds", '--fps', '10', '--max-edge', '1000', '--output', (Join-Path $evidence 'press.mp4'), '--json')
+    $started = $false
+    $lineTask = $recording.process.StandardError.ReadLineAsync()
+    do {
+        if (Read-ProcessHasExited $recording.process) { throw 'Запись завершилась до подтверждения первого кадра.' }
+        if (!$lineTask.Wait(100)) { continue }
+        $line = $lineTask.GetAwaiter().GetResult()
+        if ($null -eq $line) { throw 'Поток записи закрыт до первого кадра.' }
+        $recording.prefix += "$line`n"
+        try { $recordEvent = $line | ConvertFrom-Json } catch { $recordEvent = $null }
+        if ($recordEvent -and $recordEvent.PSObject.Properties['event'] -and $recordEvent.event -eq 'recording-started') { $started = $true; break }
+        $lineTask = $recording.process.StandardError.ReadLineAsync()
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if (!$started -or $recordClock.Elapsed.TotalSeconds -gt $recordReadyTimeoutSeconds) { throw 'Нет подтверждения первого кадра в пределах бюджета запуска.' }
+    $recording.stderr = $recording.process.StandardError.ReadToEndAsync()
+    $inputStartedMs = $recordClock.Elapsed.TotalMilliseconds
+    Scenario 'mouse-hold' @('drag', 'Press', 'Press', '--hold-ms', '1000')
+    $inputCompletedMs = $recordClock.Elapsed.TotalMilliseconds
+    @{ inputStartedMs = $inputStartedMs; inputCompletedMs = $inputCompletedMs } |
+        ConvertTo-Json | Set-Content (Join-Path $evidence 'capture-window.json')
+    if ($inputCompletedMs -gt $recordInputBudgetMilliseconds) { throw 'Mouse-hold вышел за бюджет записи.' }
+    # Ожидаем длительность capture и прежний бюджет завершения CLI; покрытие решает индекс кадров.
+    $recordResult = Finish-Tool $recording -Timeout ($recordDurationSeconds * 1000 + $toolTimeoutMilliseconds)
+    $recording = $null
+    if ($recordResult.mode -ne 'wgc' -or $recordResult.frames -lt 10) { throw 'Запись не подтвердила одновременный WGC capture и ввод.' }
+
+    Scenario 'mouse-interrupt' @('drag', 'Press', 'Press', '--hold-ms', '0')
+    Scenario 'pointer-out' @('drag', 'Press', 'Animation', '--hold-ms', '100')
+    Scenario 'keyboard' @('send-keys', 'space', '--target', 'Press', '--via', 'send-input')
+    Scenario 'disable-animation' @('send-keys', 'space', '--target', 'Animation', '--via', 'send-input') @('drag', 'Press', 'Press', '--hold-ms', '0')
+    Scenario 'reduced-motion' @('drag', 'Press', 'Press', '--hold-ms', '200')
+    # Системный запрет должен работать при включённом локальном переключателе.
+    $beforePreference = @(Read-Trace)[-1].sequence
+    Invoke-Ui 'enable-local-animation' @('send-keys', 'space', '--target', 'Animation', '--via', 'send-input')
+    Wait-Rest $beforePreference
+    $localEnabled = @(Read-Trace | Where-Object kind -eq 'intent')[-1]
+    if (!$localEnabled.data.localAnimation -or !$localEnabled.data.systemAnimation) {
+        throw 'Повторное включение локальной анимации не подтверждено приложением.'
+    }
+    Scenario 'system-disable-animation' @('drag', 'Press', 'Press', '--hold-ms', '0')
+    $systemDisabled = @(Read-Trace | Where-Object kind -eq 'intent')[-1]
+    if ($systemDisabled.data.systemAnimation -or !$systemDisabled.data.localAnimation -or $systemDisabled.data.trigger -ne 'systemPreference') {
+        throw 'UISettings не подтвердил системный запрет при включённой локальной анимации.'
+    }
+    Scenario 'system-reduced-motion' @('drag', 'Press', 'Press', '--hold-ms', '200')
+    $beforePreference = @(Read-Trace)[-1].sequence
+    [ClientAreaAnimation]::Write($true)
+    Wait-Rest $beforePreference
+    $systemEnabled = @(Read-Trace | Where-Object kind -eq 'intent')[-1]
+    if (!$systemEnabled.data.systemAnimation -or !$systemEnabled.data.localAnimation -or $systemEnabled.data.trigger -ne 'systemPreference') {
+        throw 'UISettings не подтвердил возврат обеих настроек для animated-состояния.'
+    }
+    Scenario 'system-restored-motion' @('drag', 'Press', 'Press', '--hold-ms', '200')
+    Invoke-Ui 'rest-after' @('screenshot', '--output', (Join-Path $evidence 'rest-after.png'))
+    $scenarios | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'scenarios.json')
+    & node (Join-Path $PSScriptRoot 'assert-input.mjs') $evidence
+    if ($LASTEXITCODE -ne 0) { throw 'Проверка трассы ввода не прошла.' }
+    $passed = $true
+} catch {
+    $primaryFailure = $_
+    try { $primaryFailure | Out-String | Set-Content (Join-Path $evidence 'failure.txt') }
+    catch { Write-Warning 'Не удалось записать первичную ошибку.' -WarningAction Continue }
+    throw $primaryFailure
+} finally {
+    $closed = $false
+    $cleanupFailure = $null
+    if ($recording -and !$recording.ended) {
+        try {
+            $recordCleanupClock = [Diagnostics.Stopwatch]::StartNew()
+            $null = Close-OwnedProcess $recording.process -Timeout $toolTimeoutMilliseconds
+            $remaining = [int][Math]::Max(0, $toolTimeoutMilliseconds - $recordCleanupClock.ElapsedMilliseconds)
+            $stderr = if ($recording.stderr) { $recording.stderr.WaitAsync([TimeSpan]::FromMilliseconds($remaining)).GetAwaiter().GetResult() } else { '' }
+            [IO.File]::WriteAllText((Join-Path $evidence 'record.stderr.log'), $recording.prefix + $stderr)
+        } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+        finally {
+            try { $recording.process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+        }
+    }
+    if ($process) {
+        try {
+            $receipt = Close-OwnedProcess $process -Timeout 5000 -Graceful
+            $closed = !$receipt.forced -and $receipt.exited -and $receipt.exitCode -eq 0
+            $receipt | ConvertTo-Json | Set-Content (Join-Path $evidence 'close.json')
+        } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+        finally {
+            try { $process.Dispose() } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+        }
+    }
+    try { $commands | ConvertTo-Json -Depth 8 | Set-Content (Join-Path $evidence 'commands.json') }
+    catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+    foreach ($name in $saved.Keys) {
+        try { [Environment]::SetEnvironmentVariable($name, $saved[$name]) }
+        catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+    }
+    if ($null -ne $animationBefore) {
+        try { [ClientAreaAnimation]::Write($animationBefore) }
+        catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+        try {
+            @{ expected = $animationBefore; actual = [ClientAreaAnimation]::Read() } |
+                ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-restored.json')
+        } catch { Save-CleanupFailure $_ ([ref]$cleanupFailure) }
+    }
+    if ($null -ne $cleanupFailure) {
+        if ($null -eq $primaryFailure) { throw $cleanupFailure }
+        Write-Warning 'Очистка после ошибки не завершена.' -WarningAction Continue
+    }
+    if ($null -eq $primaryFailure -and $passed -and !$closed) { throw 'Приложение не подтвердило штатное завершение.' }
+}

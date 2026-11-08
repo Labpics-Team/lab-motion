@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -64,18 +64,44 @@ const events = (value: unknown): string[] => {
 };
 const bash = process.platform === 'win32'
   ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git/bin/bash.exe') : 'bash';
-const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation', 'security'];
+const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation', 'security', 'native-windows'];
 const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
+const nativeFailureDiagnostics = [
+  "$stopMarker = [Guid]::NewGuid().ToString(\"N\")",
+  "Write-Output \"::stop-commands::$stopMarker\"",
+  "try {",
+  "    foreach ($relative in @(\"native-windows/process.json\", \"native-input/evidence/failure.txt\", \"native-input/evidence/close.json\")) {",
+  "        Write-Output \"native-diagnostic: $relative\"",
+  "        $path = Join-Path $env:RUNNER_TEMP $relative",
+  "        if (!(Test-Path -LiteralPath $path -PathType Leaf)) {",
+  "            Write-Output \"[missing]\"",
+  "            continue",
+  "        }",
+  "        try {",
+  "            $reader = [IO.File]::OpenText($path)",
+  "            try {",
+  "                $buffer = [char[]]::new(4096)",
+  "                $count = $reader.ReadBlock($buffer, 0, $buffer.Length)",
+  "                $lines = @([regex]::Split([string]::new($buffer, 0, $count), \"\\r\\n|\\n|\\r\"))",
+  "                Write-Output (($lines | Select-Object -First 64) -join \"`n\")",
+  "                if ($reader.Peek() -ne -1 -or $lines.Length -gt 64) { Write-Output \"[truncated: 4096 chars / 64 lines]\" }",
+  "            } finally { $reader.Dispose() }",
+  "        } catch {",
+  "            Write-Output (\"[unreadable: {0}]\" -f $_.Exception.GetType().Name)",
+  "        }",
+  "    }",
+  "} finally { Write-Output \"::${stopMarker}::\" }",
+].join('\n');
 const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
 const gateCommand = 'set -euo pipefail\n'
   + 'if [[ "$EVENT_NAME" == workflow_dispatch && ( "$S5_CAPTURE_DIAGNOSTIC" == true || "$PERFORMANCE_CONTRACT_ONLY" == true ) ]]; then\n'
-  + '  [[ "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ]]\n'
-  + '  [[ "$PROFILE_BASELINE" != true ]]\n'
-  + '  [[ "$S5_CAPTURE_DIAGNOSTIC" != true || "$PERFORMANCE_CONTRACT_ONLY" != true ]]\n'
-  + 'fi\n[[ "$VERIFY_RESULT" == success ]]\n'
-  + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
-  + '[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]\n'
-  + '[[ "$SECURITY_RESULT" == success ]]';
+  + '  [[ "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ]] || exit 1\n'
+  + '  [[ "$PROFILE_BASELINE" != true ]] || exit 1\n'
+  + '  [[ "$S5_CAPTURE_DIAGNOSTIC" != true || "$PERFORMANCE_CONTRACT_ONLY" != true ]] || exit 1\n'
+  + 'fi\n[[ "$VERIFY_RESULT" == success ]] || exit 1\n'
+  + '[[ "$TESTS_RESULT" == success ]] || exit 1\n[[ "$MUTATION_RESULT" == success ]] || exit 1\n'
+  + '[[ "$BROWSER_RESULT" == success ]] || exit 1\n[[ "$DOCS_RESULT" == success ]] || exit 1\n'
+  + '[[ "$SECURITY_RESULT" == success ]] || exit 1\n[[ "$WINDOWS_RESULT" == success ]] || exit 1';
 const actionlintCommand = [
   'archive="$RUNNER_TEMP/actionlint.tar.gz"',
   'install_dir="$RUNNER_TEMP/actionlint"',
@@ -180,7 +206,7 @@ const browserCommands = [
 // Закрепление внешних actions проверяется правилом, а не значениями: SHA и версию меняет
 // Dependabot, поэтому контракт требует полный SHA разрешённого репозитория, а не конкретный.
 const allowedActions = new Set([
-  'actions/checkout', 'actions/setup-node', 'actions/upload-artifact', 'actions/download-artifact',
+  'actions/checkout', 'actions/setup-node', 'actions/setup-dotnet', 'actions/upload-artifact', 'actions/download-artifact',
 ]);
 const externalAction = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$/;
 const localWorkflow = /^\.\/\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/;
@@ -413,7 +439,7 @@ function assertNativeGraph(files: Map<string, string>) {
     } } },
   });
   expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'performance', 'profile-baseline', 'security', 'tests', 'verify']);
+  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'native-windows', 'performance', 'profile-baseline', 'security', 'tests', 'verify']);
   expect(ci.jobs['profile-baseline']).toEqual({
     if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline && !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}",
     uses: './.github/workflows/profile-01.yml',
@@ -501,6 +527,32 @@ function assertNativeGraph(files: Map<string, string>) {
   const tests = ci.jobs.tests!;
   const mutation = ci.jobs.mutation!;
   const security = ci.jobs.security!;
+  const windows = ci.jobs['native-windows']!;
+  expect(windows).toEqual({
+    name: 'Windows native motion',
+    'runs-on': 'windows-2025',
+    'timeout-minutes': 15,
+    permissions: { contents: 'read' },
+    env: { DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false' },
+    steps: [
+      { name: 'Checkout', uses: step(windows, 'Checkout').uses, with: { 'persist-credentials': false } },
+      { name: 'Setup .NET', uses: step(windows, 'Setup .NET').uses, with: { 'dotnet-version': '10.0.403' } },
+      { name: 'Build and run native consumer', shell: 'pwsh',
+        run: 'pwsh -File test/windows/verify.ps1 -OutputDirectory "$env:RUNNER_TEMP/native-windows"\n' },
+      { name: 'Native result', shell: 'pwsh',
+        run: 'Get-Content "$env:RUNNER_TEMP/native-windows/result.json" | Add-Content $env:GITHUB_STEP_SUMMARY\n' },
+      { name: 'Verify native input', shell: 'pwsh',
+        run: 'pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input" -ConfigureHostedAnimations\n' },
+      { name: 'Verify native touch', shell: 'pwsh',
+        run: 'pwsh -File test/windows/verify-touch.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -ToolDirectory "$env:RUNNER_TEMP/native-input/tool" -OutputDirectory "$env:RUNNER_TEMP/native-input/evidence/touch"\n' },
+      { name: 'Prepare native input evidence', if: '${{ !cancelled() }}', shell: 'pwsh',
+        run: 'node test/windows/prepare-input.mjs "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"\n' },
+      { name: 'Native failure diagnostics', if: '${{ failure() && !cancelled() }}', shell: 'pwsh',
+        run: nativeFailureDiagnostics + '\n' },
+    ],
+  });
+  expect(unpin(step(windows, 'Checkout').uses!)).toBe('actions/checkout@<sha>');
+  expect(unpin(step(windows, 'Setup .NET').uses!)).toBe('actions/setup-dotnet@<sha>');
   const conformance = browser.jobs.conformance!;
   for (const job of [verify, tests, mutation, security, conformance]) {
     expect(job['runs-on']).toBe('ubuntu-latest');
@@ -567,6 +619,7 @@ function assertNativeGraph(files: Map<string, string>) {
       BROWSER_RESULT: '${{ needs.browser-static.result }}',
       DOCS_RESULT: '${{ needs.documentation.result }}',
       SECURITY_RESULT: '${{ needs.security.result }}',
+      WINDOWS_RESULT: '${{ needs.native-windows.result }}',
       EVENT_NAME: '${{ github.event_name }}',
       S5_CAPTURE_DIAGNOSTIC: '${{ inputs.s5_capture_diagnostic }}',
       PERFORMANCE_CONTRACT_ONLY: '${{ inputs.performance_contract_only }}',
@@ -576,6 +629,45 @@ function assertNativeGraph(files: Map<string, string>) {
     run: `${gateCommand}\n`,
   }]);
 }
+
+describe('бюджет артефактов после native teardown', () => {
+  const prepare = (source: string, output: string) => spawnSync(process.execPath,
+    [fileURLToPath(new URL('./windows/prepare-input.mjs', import.meta.url)), source, output], { encoding: 'utf8' });
+
+  it('сохраняет полный малый набор и ограничивает поздний overflow отдельным отчётом', () => {
+    const temporary = mkdtempSync(join(tmpdir(), 'motion-input-upload-'));
+    try {
+      const source = join(temporary, 'evidence');
+      mkdirSync(join(source, 'press.frames'), { recursive: true });
+      writeFileSync(join(source, 'result.json'), '{"passed":false}');
+      writeFileSync(join(source, 'press.frames', 'frame.jpg'), 'frame');
+      const small = join(temporary, 'small');
+      expect(prepare(source, small).status).toBe(0);
+      expect(readFileSync(join(small, 'result.json'), 'utf8')).toBe('{"passed":false}');
+      expect(readFileSync(join(small, 'press.frames', 'frame.jpg'), 'utf8')).toBe('frame');
+      // Эти файлы появляются в finally после проверки размера основной трассы.
+      writeFileSync(join(source, 'commands.json'), '[]');
+      writeFileSync(join(source, 'close.json'), Buffer.alloc(10 * 1024 * 1024));
+      const large = join(temporary, 'large');
+      expect(prepare(source, large).status).toBe(1);
+      expect(readdirSync(large)).toEqual(['preparation.json']);
+      expect(JSON.parse(readFileSync(join(large, 'preparation.json'), 'utf8')).passed).toBe(false);
+      expect(statSync(join(large, 'preparation.json')).size).toBeLessThan(1024);
+      expect(statSync(join(source, 'close.json')).size).toBe(10 * 1024 * 1024);
+      expect(readFileSync(join(small, 'result.json'), 'utf8')).toBe('{"passed":false}');
+    } finally { rmSync(temporary, { recursive: true, force: true }); }
+  });
+
+  it('готовит отрицательный отчёт и при отказе до создания evidence', () => {
+    const temporary = mkdtempSync(join(tmpdir(), 'motion-input-upload-'));
+    try {
+      const output = join(temporary, 'upload');
+      expect(prepare(join(temporary, 'missing'), output).status).toBe(1);
+      expect(readdirSync(output)).toEqual(['preparation.json']);
+      expect(JSON.parse(readFileSync(join(output, 'preparation.json'), 'utf8')).passed).toBe(false);
+    } finally { rmSync(temporary, { recursive: true, force: true }); }
+  });
+});
 
 describe('нативный граф CI', () => {
   it('проверяет любой PR через явные обязательные jobs', () => assertNativeGraph(sources()));
@@ -655,6 +747,40 @@ describe('нативный граф CI', () => {
     }],
     ['игнорирование verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!['continue-on-error'] = true; }],
     ['пропуск verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!.if = false; }],
+    ['пропуск Windows', 'ci.yml', (w: Workflow) => { w.jobs['native-windows']!.if = false; }],
+    ['Windows только собирает consumer', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Build and run native consumer').run = 'dotnet build'; }],
+    ['Windows игнорирует отказ', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Build and run native consumer')['continue-on-error'] = true; }],
+    ['Windows пропускает ввод', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native input').if = false; }],
+    ['Windows скрывает отказ ввода', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native input')['continue-on-error'] = true; }],
+    ['Windows пропускает touch', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native touch').if = false; }],
+    ['Windows скрывает отказ touch', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native touch')['continue-on-error'] = true; }],
+    ['Windows подготовка evidence захватывает SDK', 'ci.yml', (w: Workflow) => {
+      const item = step(w.jobs['native-windows']!, 'Prepare native input evidence');
+      item.run = item.run!.replace('"$env:RUNNER_TEMP/native-input/evidence"', '"$env:RUNNER_TEMP/native-input"');
+    }],
+    ['Windows подготовка evidence обходит бюджет', 'ci.yml', (w: Workflow) => {
+      step(w.jobs['native-windows']!, 'Prepare native input evidence').run =
+        'Copy-Item -Recurse "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"\n';
+    }],
+    ['Windows не ограничивает неуспешные артефакты', 'ci.yml', (w: Workflow) => { delete step(w.jobs['native-windows']!, 'Prepare native input evidence').if; }],
+    ['Windows пропускает финальный бюджет', 'ci.yml', (w: Workflow) => {
+      w.jobs['native-windows']!.steps = w.jobs['native-windows']!.steps!.filter(item => item.name !== 'Prepare native input evidence');
+    }],
+    ['Windows скрывает отказ финального бюджета', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Prepare native input evidence')['continue-on-error'] = true; }],
+    ['Windows теряет малую диагностику отказа', 'ci.yml', (w: Workflow) => {
+      w.jobs['native-windows']!.steps = w.jobs['native-windows']!.steps!.filter(item => item.name !== 'Native failure diagnostics');
+    }],
+    ['Windows печатает диагностику успешного прогона', 'ci.yml', (w: Workflow) => {
+      step(w.jobs['native-windows']!, 'Native failure diagnostics').if = '${{ always() }}';
+    }],
+    ['Windows печатает диагностику без ограничения размера', 'ci.yml', (w: Workflow) => {
+      step(w.jobs['native-windows']!, 'Native failure diagnostics').run = 'Get-Content "$env:RUNNER_TEMP/native-input/evidence/failure.txt" -Raw';
+    }],
+    ...['Keep native input evidence', 'Keep native evidence'].map(name => [
+      `Windows возвращает архив: ${name}`, 'ci.yml', (w: Workflow) => {
+        w.jobs['native-windows']!.steps!.push({ name, uses: 'actions/upload-artifact@0123456789012345678901234567890123456789', with: { path: '${{ runner.temp }}/native-windows/' } });
+      },
+    ] as const),
     ['игнорирование browser caller', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!['continue-on-error'] = true; }],
     ['другой browser worker', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!.uses = './.github/workflows/release.yml'; }],
     ['нет Node floor', 'ci.yml', (w: Workflow) => { w.jobs.verify!.steps = w.jobs.verify!.steps!.filter(item => item.name !== 'Consumer smoke on minimum runtime'); }],
@@ -784,7 +910,7 @@ describe('нативный граф CI', () => {
     }
   });
 
-  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT', 'SECURITY_RESULT']
+  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT', 'SECURITY_RESULT', 'WINDOWS_RESULT']
     .flatMap((key) => ['success', 'failure', 'cancelled', 'skipped', 'neutral', 'pending', '', undefined]
       .map((result) => ({ key, result }))))('shell итога проверяет $key=$result', ({ key, result }) => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
@@ -792,7 +918,7 @@ describe('нативный граф CI', () => {
     const env: NodeJS.ProcessEnv = {
       ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
       MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
-      SECURITY_RESULT: 'success', EVENT_NAME: 'pull_request', S5_CAPTURE_DIAGNOSTIC: '',
+      SECURITY_RESULT: 'success', WINDOWS_RESULT: 'success', EVENT_NAME: 'pull_request', S5_CAPTURE_DIAGNOSTIC: '',
       PROFILE_BASELINE: '', PERFORMANCE_BASELINE: '', PERFORMANCE_CONTRACT_ONLY: '',
     };
     delete env[key];
@@ -824,7 +950,7 @@ describe('нативный граф CI', () => {
       encoding: 'utf8', timeout: 5000,
       env: { ...process.env, EVENT_NAME: event, S5_CAPTURE_DIAGNOSTIC: s5, PERFORMANCE_CONTRACT_ONLY: contract ?? 'false', PROFILE_BASELINE: profile,
         PERFORMANCE_BASELINE: baseline, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
-        MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success' },
+        MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success', WINDOWS_RESULT: 'success' },
     });
     expect(actual.error).toBeUndefined();
     expect(actual.status === 0, actual.stderr).toBe(passes);
