@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Numerics;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using System.Text.Json;
 using LabMotion.WinUI;
@@ -241,20 +242,41 @@ public sealed partial class InteractionProbe : Page
         if (detached) return;
         detached = true;
         ready = false;
+        ExceptionDispatchInfo? failure = null;
+        var secondaryFailures = new List<Exception>();
         initialPosition.TrySetCanceled();
-        foreach (var (routedEvent, handler) in inputHandlers) TouchStage.RemoveHandler(routedEvent, handler);
+        foreach (var (routedEvent, handler) in inputHandlers)
+            Attempt(() => TouchStage.RemoveHandler(routedEvent, handler));
         inputHandlers.Clear();
-        ElementCompositionPreview.SetElementChildVisual(TouchStage, null);
+        Attempt(() => ElementCompositionPreview.SetElementChildVisual(TouchStage, null));
         if (motion is not null)
         {
-            motion.Observed -= Observe;
-            motion.Dispose();
+            Attempt(() => motion.Observed -= Observe);
+            Attempt(motion.Dispose);
         }
-        for (var i = resources.Count - 1; i >= 0; i--) resources[i].Dispose();
+        for (var i = resources.Count - 1; i >= 0; i--) Attempt(resources[i].Dispose);
         resources.Clear();
-        trace.Add("detached", new { });
-        trace.Flush();
-        trace.Dispose();
+        Attempt(() => trace.Add("detached", new { completed = failure is null }));
+        Attempt(trace.Flush);
+        Attempt(trace.Dispose);
+        if (failure is not null)
+        {
+            Environment.ExitCode = 1;
+            // Сохраняем identity/stack первой ошибки, не теряя последующие отказы cleanup.
+            if (secondaryFailures.Count > 0)
+                failure.SourceException.Data["InteractionProbe.CleanupFailures"] = secondaryFailures.ToArray();
+            failure.Throw();
+        }
+
+        void Attempt(Action cleanup)
+        {
+            try { cleanup(); }
+            catch (Exception error)
+            {
+                if (failure is null) failure = ExceptionDispatchInfo.Capture(error);
+                else secondaryFailures.Add(error);
+            }
+        }
     }
 
     // Callback значения буферизуется; ввод и смена состояния сбрасывают весь буфер.
@@ -307,8 +329,16 @@ public sealed partial class InteractionProbe : Page
 
         private void OnProcessExit(object? sender, EventArgs args)
         {
-            Add("processExit", new { });
-            Dispose();
+            ExceptionDispatchInfo? failure = null;
+            try { Add("processExit", new { }); }
+            catch (Exception error) { failure = ExceptionDispatchInfo.Capture(error); }
+            try { Dispose(); }
+            catch (Exception error)
+            {
+                if (failure is null) failure = ExceptionDispatchInfo.Capture(error);
+                else failure.SourceException.Data["InteractionTrace.CleanupFailures"] = new[] { error };
+            }
+            failure?.Throw();
         }
 
         public void Dispose()
@@ -316,9 +346,13 @@ public sealed partial class InteractionProbe : Page
             lock (gate)
             {
                 if (disposed) return;
-                Flush();
-                disposed = true;
-                AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
+                // Flush может отказать; retirement и снятие callback от этого не зависят.
+                try { Flush(); }
+                finally
+                {
+                    disposed = true;
+                    AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
+                }
             }
         }
     }
