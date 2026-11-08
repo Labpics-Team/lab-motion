@@ -337,6 +337,11 @@ jobs:
         run: |
           pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input" -ConfigureHostedAnimations
 
+      - name: Verify native touch
+        shell: pwsh
+        run: |
+          pwsh -File test/windows/verify-touch.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -ToolDirectory "$env:RUNNER_TEMP/native-input/tool" -OutputDirectory "$env:RUNNER_TEMP/native-input/evidence/touch"
+
       # Проверяем полный бюджет после finally, включая поздние cleanup-файлы.
       # Подготовленный набор остаётся только в одноразовом каталоге runner.
       - name: Prepare native input evidence

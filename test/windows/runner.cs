@@ -8,7 +8,7 @@ var results = new List<object>();
 var passed = true;
 foreach (var reaction in new[] { "observe", "retarget", "stop", "snap", "dispose", "throw" })
 {
-    using var motion = new ScalarMotion(new Compositor(), -1000, 1000);
+    using var motion = new ScalarMotion(new Compositor(), -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
     var tracker = InteractionTracker.LastCreated;
     var first = motion.AnimateTo(200, new Spring(350, 0));
     var request = tracker.LastRequest;
@@ -45,7 +45,7 @@ foreach (var reaction in new[] { "observe", "retarget", "stop", "snap", "dispose
         nextTaskPending = next is { IsCompleted: false }, error
     });
 }
-using (var motion = new ScalarMotion(new Compositor(), -1000, 1000))
+using (var motion = new ScalarMotion(new Compositor(), -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy))
 {
     var tracker = InteractionTracker.LastCreated;
     var first = motion.AnimateTo(200, new Spring(350, 0));
@@ -59,6 +59,7 @@ using (var motion = new ScalarMotion(new Compositor(), -1000, 1000))
     var pendingAfterStaleIdle = !second.IsCompleted;
     motion.RequestIgnored(tracker, new() { RequestId = firstRequest });
     var pendingAfterStaleRejection = !second.IsCompleted;
+    tracker.Position = new(-100, 0, 0);
     motion.IdleStateEntered(tracker, new() { RequestId = secondRequest });
     var secondSettled = second.IsCompletedSuccessfully
         && second.Result == new MotionResult(2, MotionEnd.Finished, "settled");
@@ -71,7 +72,7 @@ using (var motion = new ScalarMotion(new Compositor(), -1000, 1000))
         firstReplaced, secondPending, pendingAfterStaleIdle, pendingAfterStaleRejection, secondSettled
     });
 }
-using (var motion = new ScalarMotion(new Compositor(), -1000, 1000))
+using (var motion = new ScalarMotion(new Compositor(), -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy))
 {
     var tracker = InteractionTracker.LastCreated;
     var operation = motion.AnimateTo(200, new Spring(350, 0));
@@ -88,7 +89,7 @@ using (var motion = new ScalarMotion(new Compositor(), -1000, 1000))
 }
 {
     var compositor = new Compositor();
-    using var motion = new ScalarMotion(compositor, -1000, 1000);
+    using var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
     var tracker = InteractionTracker.LastCreated;
     var observations = new List<MotionObservation>();
     motion.Observed += observations.Add;
@@ -110,10 +111,12 @@ using (var motion = new ScalarMotion(new Compositor(), -1000, 1000))
     var settingsUnchanged = settings.Scalars.Count == scalars.Count
         && scalars.All(scalar => settings.Scalars.TryGetValue(scalar.Key, out var value) && value == scalar.Value);
     var observationsUnchanged = observations.Count == observationCount;
+    tracker.Position = new(200, 0, 0);
     motion.IdleStateEntered(tracker, new() { RequestId = request });
     var originalSettled = operation.IsCompletedSuccessfully
         && operation.Result == new MotionResult(1, MotionEnd.Finished, "settled");
     var next = motion.AnimateTo(-100, new Spring(350, 0));
+    tracker.Position = new(-100, 0, 0);
     motion.IdleStateEntered(tracker, new() { RequestId = tracker.LastRequest });
     var generationUnchanged = next.IsCompletedSuccessfully
         && next.Result == new MotionResult(2, MotionEnd.Finished, "settled");
@@ -131,5 +134,9 @@ var bindings = BindingTests.Run();
 passed &= bindings.All(result => result.Passed);
 var disposals = DisposeTests.Run();
 passed &= disposals.Count == 11 && disposals.All(result => result.Passed);
-Console.WriteLine(JsonSerializer.Serialize(new { passed, results, bindings, disposals }, new JsonSerializerOptions { WriteIndented = true }));
+var pans = PanTests.Run();
+passed &= pans.All(result => result.Passed);
+var continuations = ContinuationTests.Run();
+passed &= continuations.All(result => result.Passed);
+Console.WriteLine(JsonSerializer.Serialize(new { passed, results, bindings, disposals, pans, continuations }, new JsonSerializerOptions { WriteIndented = true }));
 return passed ? 0 : 1;

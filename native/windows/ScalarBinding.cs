@@ -33,7 +33,7 @@ internal sealed class ScalarBinding : IDisposable
     }
 
     internal static ScalarBinding Create(DispatcherQueue dispatcher, InteractionTracker tracker, Visual visual,
-        ScalarProperty property, float coordinateScale, float multiplier, float offset, Action<ScalarBinding> released)
+        ScalarProperty property, ScalarAxis axis, float coordinateScale, float multiplier, float offset, Action<ScalarBinding> released)
     {
         ArgumentNullException.ThrowIfNull(visual);
         var path = property switch
@@ -53,7 +53,7 @@ internal sealed class ScalarBinding : IDisposable
         {
             owners.TryGetValue(property, out var previous);
             previous?.CheckAccess();
-            var expression = tracker.Compositor.CreateExpressionAnimation("motion.Position.X / coordinateScale * multiplier + offset");
+            var expression = tracker.Compositor.CreateExpressionAnimation($"motion.Position.{axis} / coordinateScale * multiplier + offset");
             try
             {
                 expression.SetReferenceParameter("motion", tracker);

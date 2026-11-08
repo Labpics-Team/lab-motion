@@ -188,6 +188,7 @@ public sealed partial class PressPage : Page
             pageOperation = operation,
             nativeOperation = value.Operation,
             phase = value.Phase,
+            origin = value.Origin.ToString(),
             position = value.Position,
             nativeVelocity = value.NativeVelocity,
             readbackPosition = value.ReadbackPosition,

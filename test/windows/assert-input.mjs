@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 const names = ['mouse-hold', 'mouse-interrupt', 'pointer-out', 'keyboard', 'disable-animation', 'reduced-motion', 'system-disable-animation', 'system-reduced-motion', 'system-restored-motion'];
 const require = (condition, message) => { if (!condition) throw new Error(message); };
 const near = (value, target) => Number.isFinite(value) && Math.abs(value - target) <= .001;
+const snapPhase = data => data.origin === 'Snap' && data.nativeOperation === 0 && ['requested', 'value', 'idle'].includes(data.phase);
 const readJson = (path) => JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
 const readLines = (path) => readFileSync(path, 'utf8').replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean).map(JSON.parse);
 
@@ -20,7 +21,8 @@ export function verifyTrace(events, scenarios) {
       ['pressed', 'enabled', 'localAnimation', 'systemAnimation'].every(key => typeof event.data[key] === 'boolean') &&
       event.data.target === Number(event.data.pressed), 'Повреждён intent.');
     if (event.kind === 'motion') require(['position', 'readbackPosition', 'nativeSeconds'].every(key => Number.isFinite(event.data[key])) &&
-      ['pageOperation', 'nativeOperation'].every(key => Number.isSafeInteger(event.data[key]) && event.data[key] >= 0) && typeof event.data.phase === 'string',
+      ['pageOperation', 'nativeOperation'].every(key => Number.isSafeInteger(event.data[key]) && event.data[key] >= 0) && typeof event.data.phase === 'string' &&
+      ['Animation', 'Input', 'Initial', 'Snap', 'Stop'].includes(event.data.origin),
       'Повреждено наблюдение движения.');
     if (event.kind === 'completed') require(['operation', 'nativeOperation'].every(key => Number.isSafeInteger(event.data[key]) && event.data[key] > 0) &&
       ['Finished', 'Stopped'].includes(event.data.end) && typeof event.data.reason === 'string' && typeof event.data.isCurrent === 'boolean', 'Повреждён исход движения.');
@@ -34,6 +36,7 @@ export function verifyTrace(events, scenarios) {
   require(scenarios.find(s => s.name === 'system-reduced-motion').after >= scenarios.find(s => s.name === 'system-disable-animation').through &&
     scenarios.find(s => s.name === 'system-restored-motion').after >= scenarios.find(s => s.name === 'system-reduced-motion').through,
   'Нарушен порядок системного отключения, ввода и восстановления.');
+  const targets = new Map(events.filter(event => event.kind === 'intent').map(event => [event.data.operation, event.data.target]));
 
   return names.map(name => {
     const { after, through } = scenarios.find(s => s.name === name);
@@ -55,7 +58,12 @@ export function verifyTrace(events, scenarios) {
     const snap = intent => {
       need('snapRequested', d => d.operation === intent.data.operation && d.target === intent.data.target, 'нет запроса SnapTo');
       need('snapReadback', d => d.operation === intent.data.operation && d.target === intent.data.target && near(d.position, intent.data.target), 'нет readback у цели SnapTo');
-      require(select('motion', d => d.pageOperation === intent.data.operation && d.phase === 'requested').length === 0, `${name}: анимация при отключённом движении`);
+      const observations = select('motion', d => d.pageOperation === intent.data.operation);
+      require(observations.every(e => snapPhase(e.data)),
+        `${name}: ${name.startsWith('system-') ? 'движение после системного запрета' : 'анимация при отключённом движении'}`);
+      need('motion', d => d.pageOperation === intent.data.operation && d.origin === 'Snap' && d.phase === 'requested', 'нет наблюдения запроса SnapTo');
+      require(observations.filter(e => e.data.phase !== 'requested').every(e =>
+        near(e.data.position, intent.data.target) && near(e.data.readbackPosition, intent.data.target)), `${name}: нет readback у цели SnapTo`);
     };
     if (name === 'disable-animation' || name === 'system-disable-animation') {
       const system = name === 'system-disable-animation';
@@ -82,7 +90,9 @@ export function verifyTrace(events, scenarios) {
         require(interrupted.data.isCurrent === false, `${name}: прерванная операция осталась актуальной`);
         const offThrough = scenarios.find(s => s.name === 'system-reduced-motion').through;
         require(!events.some(e => e.kind === 'motion' && e.sequence > preference.sequence && e.sequence <= offThrough &&
-          e.data.pageOperation >= up.data.operation && ['requested', 'value'].includes(e.data.phase)),
+          e.data.pageOperation >= up.data.operation && (!snapPhase(e.data) || !targets.has(e.data.pageOperation) ||
+            e.data.phase !== 'requested' && (!near(e.data.position, targets.get(e.data.pageOperation)) ||
+              !near(e.data.readbackPosition, targets.get(e.data.pageOperation))))),
         `${name}: движение после системного запрета`);
       }
       return { name, passed: true, observed: `mid-flight-${system ? 'systemPreference' : 'localPreference'}`,

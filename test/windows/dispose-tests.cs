@@ -14,7 +14,7 @@ internal static class DisposeTests
             Test("dispose-" + fault, () =>
             {
                 var compositor = new Compositor();
-                var motion = new ScalarMotion(compositor, -1000, 1000);
+                var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
                 var tracker = InteractionTracker.LastCreated;
                 var first = new Visual(compositor);
                 var sibling = new Visual(compositor);
@@ -69,7 +69,7 @@ internal static class DisposeTests
         Test("dispose-reentrant-callback", () =>
         {
             var compositor = new Compositor();
-            var motion = new ScalarMotion(compositor, -1000, 1000);
+            var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             var pending = motion.AnimateTo(200, new Spring(350, 0));
             var visual = new Visual(compositor);
@@ -95,7 +95,7 @@ internal static class DisposeTests
         Test("dispose-wrong-thread-preserves-owner", () =>
         {
             var compositor = new Compositor();
-            using var motion = new ScalarMotion(compositor, -1000, 1000);
+            using var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var tracker = InteractionTracker.LastCreated;
             var visual = new Visual(compositor);
             motion.BindOffsetX(visual);
@@ -113,7 +113,7 @@ internal static class DisposeTests
         Test("binding-compound-failure-primary", () =>
         {
             var compositor = new Compositor();
-            using var motion = new ScalarMotion(compositor, -1000, 1000);
+            using var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0, endpointAccuracy: BoundaryTestSettings.EndpointAccuracy);
             var visual = new Visual(compositor);
             var tracker = InteractionTracker.LastCreated;
             var releases = 0;
@@ -121,7 +121,7 @@ internal static class DisposeTests
             var expressionFailure = new IOException("Первичный expression.Dispose.");
             var releaseFailure = new IOException("Вторичный released callback.");
             var binding = ScalarBinding.Create(DispatcherQueue.GetForCurrentThread(), tracker, visual,
-                ScalarProperty.OffsetX, 1, 1, 0, _ => { releases++; throw releaseFailure; });
+                ScalarProperty.OffsetX, ScalarAxis.X, 1, 1, 0, _ => { releases++; throw releaseFailure; });
             var expression = visual.Animations["Offset.X"].Source;
             visual.StopFailure = stopFailure;
             expression.DisposeFailure = expressionFailure;
@@ -133,7 +133,7 @@ internal static class DisposeTests
                 "Compound failure допустил повторный effect.");
             visual.StopFailure = null;
             var next = ScalarBinding.Create(DispatcherQueue.GetForCurrentThread(), tracker, visual,
-                ScalarProperty.OffsetX, 1, 1, 0, _ => { releases++; throw releaseFailure; });
+                ScalarProperty.OffsetX, ScalarAxis.X, 1, 1, 0, _ => { releases++; throw releaseFailure; });
             var nextExpression = visual.Animations["Offset.X"].Source;
             nextExpression.DisposeFailure = expressionFailure;
             error = Capture(next.Dispose);
@@ -142,7 +142,7 @@ internal static class DisposeTests
             next.Dispose();
             Require(releases == 2 && nextExpression.DisposeCount == 1, "Release выполнился повторно.");
             var last = ScalarBinding.Create(DispatcherQueue.GetForCurrentThread(), tracker, visual,
-                ScalarProperty.OffsetY, 1, 1, 0, _ => { releases++; throw releaseFailure; });
+                ScalarProperty.OffsetY, ScalarAxis.X, 1, 1, 0, _ => { releases++; throw releaseFailure; });
             var lastExpression = visual.Animations["Offset.Y"].Source;
             error = Capture(last.Dispose);
             Require(ReferenceEquals(error, releaseFailure) && releases == 3 && lastExpression.DisposeCount == 1

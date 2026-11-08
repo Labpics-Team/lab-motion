@@ -1,6 +1,17 @@
 using System.Numerics;
 using Microsoft.UI.Composition.Interactions;
 
+internal static class BoundaryTestSettings
+{
+    // Accuracy in the fixture's coordinate units; these lifecycle doubles do not integrate motion.
+    internal const float EndpointAccuracy = .5f;
+}
+
+namespace Microsoft.UI.Input
+{
+    public sealed class PointerPoint { }
+}
+
 // Подменяется только native-граница. ScalarMotion компилируется без изменений.
 namespace Microsoft.UI.Dispatching
 {
@@ -114,9 +125,12 @@ namespace Microsoft.UI.Composition.Interactions
         public int DisposeCount { get; private set; }
         public Exception? DisposeFailure { get; set; }
         public Action? OnDispose { get; set; }
+        public string? ConfiguredAxis { get; private set; }
+        public List<VisualInteractionSource> InteractionSources { get; } = [];
         public static InteractionTracker CreateWithOwner(Compositor compositor, IInteractionTrackerOwner owner)
             => LastCreated = new() { Compositor = compositor };
-        public void ConfigurePositionXInertiaModifiers(InteractionTrackerInertiaMotion[] modifiers) { }
+        public void ConfigurePositionXInertiaModifiers(InteractionTrackerInertiaMotion[] modifiers) => ConfiguredAxis = "X";
+        public void ConfigurePositionYInertiaModifiers(InteractionTrackerInertiaMotion[] modifiers) => ConfiguredAxis = "Y";
         public int TryUpdatePosition(Vector3 value) { Position = value; return ++LastRequest; }
         public int TryUpdatePositionBy(Vector3 value) { Position += value; return ++LastRequest; }
         public int TryUpdatePositionWithAdditionalVelocity(Vector3 value)
@@ -130,6 +144,27 @@ namespace Microsoft.UI.Composition.Interactions
             OnDispose?.Invoke();
             if (DisposeFailure is { } error) throw error;
         }
+    }
+    public enum InteractionSourceMode { Disabled, EnabledWithInertia }
+    public enum InteractionChainingMode { Never }
+    public enum VisualInteractionSourceRedirectionMode { CapableTouchpadOnly }
+    public sealed class VisualInteractionSource : IDisposable
+    {
+        public static VisualInteractionSource LastCreated { get; private set; } = null!;
+        public InteractionSourceMode PositionXSourceMode { get; set; }
+        public InteractionSourceMode PositionYSourceMode { get; set; }
+        public InteractionSourceMode ScaleSourceMode { get; set; }
+        public InteractionChainingMode PositionXChainingMode { get; set; }
+        public InteractionChainingMode PositionYChainingMode { get; set; }
+        public InteractionChainingMode ScaleChainingMode { get; set; }
+        public bool IsPositionXRailsEnabled { get; set; }
+        public bool IsPositionYRailsEnabled { get; set; }
+        public VisualInteractionSourceRedirectionMode ManipulationRedirectionMode { get; set; }
+        public int RedirectCount { get; private set; }
+        public int DisposeCount { get; private set; }
+        public static VisualInteractionSource Create(Visual visual) => LastCreated = new();
+        public void TryRedirectForManipulation(Microsoft.UI.Input.PointerPoint point) => RedirectCount++;
+        public void Dispose() => DisposeCount++;
     }
     public sealed class InteractionTrackerInertiaMotion : IDisposable
     {
@@ -161,6 +196,6 @@ namespace Microsoft.UI.Composition.Interactions
     }
     public sealed class InteractionTrackerIdleStateEnteredArgs { public int RequestId { get; init; } }
     public sealed class InteractionTrackerInteractingStateEnteredArgs { }
-    public sealed class InteractionTrackerCustomAnimationStateEnteredArgs { }
+    public sealed class InteractionTrackerCustomAnimationStateEnteredArgs { public int RequestId { get; init; } }
     public sealed class InteractionTrackerRequestIgnoredArgs { public int RequestId { get; init; } }
 }

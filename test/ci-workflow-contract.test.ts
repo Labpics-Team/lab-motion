@@ -543,6 +543,8 @@ function assertNativeGraph(files: Map<string, string>) {
         run: 'Get-Content "$env:RUNNER_TEMP/native-windows/result.json" | Add-Content $env:GITHUB_STEP_SUMMARY\n' },
       { name: 'Verify native input', shell: 'pwsh',
         run: 'pwsh -File test/windows/verify-input.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -OutputDirectory "$env:RUNNER_TEMP/native-input" -ConfigureHostedAnimations\n' },
+      { name: 'Verify native touch', shell: 'pwsh',
+        run: 'pwsh -File test/windows/verify-touch.ps1 -ApplicationDirectory "$env:RUNNER_TEMP/native-windows/app" -ToolDirectory "$env:RUNNER_TEMP/native-input/tool" -OutputDirectory "$env:RUNNER_TEMP/native-input/evidence/touch"\n' },
       { name: 'Prepare native input evidence', if: '${{ !cancelled() }}', shell: 'pwsh',
         run: 'node test/windows/prepare-input.mjs "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"\n' },
       { name: 'Native failure diagnostics', if: '${{ failure() && !cancelled() }}', shell: 'pwsh',
@@ -750,6 +752,10 @@ describe('нативный граф CI', () => {
     ['Windows игнорирует отказ', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Build and run native consumer')['continue-on-error'] = true; }],
     ['Windows пропускает ввод', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native input').if = false; }],
     ['Windows скрывает отказ ввода', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native input')['continue-on-error'] = true; }],
+    ['Windows пропускает touch', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native touch').if = false; }],
+    ['Windows скрывает отказ touch', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native touch')['continue-on-error'] = true; }],
+    ['Windows ввод архивирует SDK', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native input evidence').with!.path = '${{ runner.temp }}/native-input/'; }],
+    ['Windows загружает evidence мимо бюджета', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native input evidence').with!.path = '${{ runner.temp }}/native-input/evidence/'; }],
     ['Windows не ограничивает неуспешные артефакты', 'ci.yml', (w: Workflow) => { delete step(w.jobs['native-windows']!, 'Prepare native input evidence').if; }],
     ['Windows пропускает финальный бюджет', 'ci.yml', (w: Workflow) => {
       w.jobs['native-windows']!.steps = w.jobs['native-windows']!.steps!.filter(item => item.name !== 'Prepare native input evidence');

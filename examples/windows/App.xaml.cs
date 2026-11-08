@@ -10,11 +10,13 @@ public partial class App : Application
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
+        var interaction = Environment.GetEnvironmentVariable("LAB_MOTION_INTERACTION_OUTPUT") is not null;
         window = new Window
         {
             Title = "LabMotion — проверка движения",
         };
-        if (Environment.GetEnvironmentVariable("LAB_MOTION_PROBE_OUTPUT") is null)
+        if (interaction) window.Content = new InteractionProbe();
+        else if (Environment.GetEnvironmentVariable("LAB_MOTION_PROBE_OUTPUT") is null)
         {
             var press = new PressPage(window);
             window.Content = press;
@@ -22,7 +24,7 @@ public partial class App : Application
         }
         else window.Content = new MainPage();
         window.AppWindow.Resize(new Windows.Graphics.SizeInt32(640,
-            Environment.GetEnvironmentVariable("LAB_MOTION_PROBE_OUTPUT") is null ? 440 : 360));
+            interaction ? 560 : Environment.GetEnvironmentVariable("LAB_MOTION_PROBE_OUTPUT") is null ? 440 : 360));
         window.Activate();
     }
 }

@@ -15,6 +15,7 @@ public sealed partial class MainPage : Page
     // Два тестовых режима: критическое затухание и пружина с отскоком.
     private static readonly Spring Smooth = new(350, 0);
     private static readonly Spring Expressive = new(500, .3f);
+    private const double EndpointAccuracyPhysicalPixels = .5;
 
     public MainPage()
     {
@@ -38,6 +39,7 @@ public sealed partial class MainPage : Page
             await Progress("down");
             await Progress("reverse");
             await Progress("velocity");
+            await Boundaries();
             Status.Text = "Траектории проверены";
             Save("captured", null);
         }
@@ -61,7 +63,8 @@ public sealed partial class MainPage : Page
         sprite.Size = new System.Numerics.Vector2(32, 32);
         sprite.Brush = compositor.CreateColorBrush(((SolidColorBrush)Status.Foreground).Color);
         ElementCompositionPreview.SetElementChildVisual(Stage, sprite);
-        var motion = new ScalarMotion(compositor, -1000, 1000);
+        var motion = new ScalarMotion(compositor, -1000, 1000, initial: 0,
+            endpointAccuracy: (float)(EndpointAccuracyPhysicalPixels / XamlRoot.RasterizationScale));
         motion.Observed += trace.Add;
         motion.BindOffsetX(sprite);
         return motion;
@@ -124,7 +127,7 @@ public sealed partial class MainPage : Page
         Require(reset ? entry.NativeVelocity == 0 : entry.NativeVelocity * direction > 0, "Не сохранена семантика native velocity.");
         Require(reset ? (after.Position - entry.Position) * direction <= 0 : (after.Position - entry.Position) * direction > 0,
             "Траектория не отличает сохранение скорости от сброса.");
-        Require(Math.Abs(motion.Position + 100 * direction) * XamlRoot.RasterizationScale <= .5,
+        Require(Math.Abs(motion.Position + 100 * direction) * XamlRoot.RasterizationScale <= EndpointAccuracyPhysicalPixels,
             "Native settling дальше половины физического пикселя от цели.");
     }
 
@@ -137,7 +140,7 @@ public sealed partial class MainPage : Page
         runs.Add(new { kind = "smooth-settle", spring, outcome, trace });
         Require(outcome.End == MotionEnd.Finished, "Пружина из покоя не завершилась.");
         Require(trace.Where(x => x.Phase == "value").All(x => x.Position <= 200), "Критическая пружина перескочила цель.");
-        Require(Math.Abs(motion.Position - 200) * XamlRoot.RasterizationScale <= .5,
+        Require(Math.Abs(motion.Position - 200) * XamlRoot.RasterizationScale <= EndpointAccuracyPhysicalPixels,
             "Native settling дальше половины физического пикселя от цели.");
     }
 
@@ -217,6 +220,34 @@ public sealed partial class MainPage : Page
             Require(Math.Abs(trace.First(x => x.Phase == "inertia").NativeVelocity!.Value - 2) <= .00001f,
                 "Скорость канала возвращается не в единицах прогресса в секунду.");
         ElementCompositionPreview.SetElementChildVisual(Stage, null);
+    }
+
+    private async Task Boundaries()
+    {
+        var compositor = ElementCompositionPreview.GetElementVisual(Stage).Compositor;
+        using var sprite = compositor.CreateSpriteVisual();
+        sprite.Size = new System.Numerics.Vector2(24, 24);
+        using var brush = compositor.CreateColorBrush(((SolidColorBrush)Status.Foreground).Color);
+        sprite.Brush = brush;
+        ElementCompositionPreview.SetElementChildVisual(Stage, sprite);
+        var passed = true;
+        try
+        {
+            foreach (var coordinates in new[] { "progress", "raw-x", "raw-y" })
+            {
+                foreach (var (name, initial, velocity) in new[] { ("lower", 0f, -1f), ("interior", .5f, -1f), ("upper", 1f, 1f) })
+                {
+                    foreach (var setter in coordinates == "progress" ? new[] { false, true } : new[] { false })
+                    {
+                        var capture = await BoundaryProbe.Capture(compositor, sprite, coordinates, name, initial, velocity, setter);
+                        runs.Add(capture.Evidence);
+                        passed &= capture.Passed;
+                    }
+                }
+            }
+        }
+        finally { ElementCompositionPreview.SetElementChildVisual(Stage, null); }
+        Require(passed, "Native boundary или SetTarget не подтвердили цель и единственный terminal.");
     }
 
     private static async Task Until(Func<bool> condition)

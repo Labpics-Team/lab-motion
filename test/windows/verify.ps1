@@ -50,7 +50,12 @@ function Get-BootTraceSummary([string]$Path) {
                 $kind = $last.PSObject.Properties['kind']
                 if ($kind -and $kind.Value -is [string] -and $kind.Value -cin @('idle-reentrant-retarget',
                     'retarget-preserve', 'retarget-reset-mutant', 'smooth-settle', 'lifetime',
-                    'progress-up', 'progress-down', 'progress-reverse', 'progress-velocity')) {
+                    'progress-up', 'progress-down', 'progress-reverse', 'progress-velocity',
+                    'boundary-progress-lower-settle', 'boundary-progress-lower-setter',
+                    'boundary-progress-interior-settle', 'boundary-progress-interior-setter',
+                    'boundary-progress-upper-settle', 'boundary-progress-upper-setter',
+                    'boundary-raw-x-lower-settle', 'boundary-raw-x-interior-settle', 'boundary-raw-x-upper-settle',
+                    'boundary-raw-y-lower-settle', 'boundary-raw-y-interior-settle', 'boundary-raw-y-upper-settle')) {
                     $traceSummary.lastRunKind = $kind.Value
                 }
             }
@@ -74,6 +79,7 @@ function Get-BootTraceSummary([string]$Path) {
                 'System.InvalidOperationException: Stop выдал неверное завершение.' { 'lifetime-stop' }
                 'System.InvalidOperationException: Dispose выдал неверное завершение.' { 'lifetime-dispose' }
                 'System.InvalidOperationException: Канал доступен или сообщает события после Dispose.' { 'lifetime-retirement' }
+                'System.InvalidOperationException: Native boundary или SetTarget не подтвердили цель и единственный terminal.' { 'boundary-completion' }
                 'System.InvalidOperationException: Нормализованный канал завершился дальше 0.001 от цели.' { 'progress-completion' }
                 'System.InvalidOperationException: Не наблюдалось промежуточное движение прогресса.' { 'progress-intermediate' }
                 'System.InvalidOperationException: Нормализация потеряла непрерывность разворота.' { 'progress-reverse' }
@@ -98,8 +104,14 @@ $expectedLifecycle = @('idle-reentrant-observe', 'idle-reentrant-retarget', 'idl
 if (!$unitResult.passed -or $unitResult.results.Count -ne $expectedLifecycle.Count -or @($unitResult.results | Where-Object { !$_.passed }).Count -ne 0) {
     throw 'Lifecycle-пробы не подтвердили все сценарии.'
 }
-if ($unitResult.bindings.Count -ne 14 -or @($unitResult.bindings | Where-Object { !$_.Passed }).Count -ne 0) {
-    throw 'Проверки привязок и единиц прогресса не подтвердили все четырнадцать сценариев.'
+if ($unitResult.bindings.Count -ne 15 -or @($unitResult.bindings | Where-Object { !$_.Passed }).Count -ne 0) {
+    throw 'Проверки привязок и единиц прогресса не подтвердили все пятнадцать сценариев.'
+}
+if ($unitResult.pans.Count -ne 22 -or @($unitResult.pans | Where-Object { !$_.Passed }).Count -ne 0) {
+    throw 'Проверки канала ввода не подтвердили все двадцать два сценария.'
+}
+if ($unitResult.continuations.Count -ne 16 -or @($unitResult.continuations | Where-Object { !$_.Passed }).Count -ne 0) {
+    throw 'Проверки продолжения движения не подтвердили все шестнадцать сценариев.'
 }
 $actualLifecycle = @($unitResult.results | ForEach-Object { $_.scenario }) | Sort-Object
 if (Compare-Object $expectedLifecycle $actualLifecycle) { throw 'Состав lifecycle-сценариев изменился.' }
@@ -188,12 +200,17 @@ try {
 }
 
 $trace = Get-Content -LiteralPath $tracePath -Raw | ConvertFrom-Json
-if ($trace.status -ne 'captured' -or $trace.error -or $trace.runs.Count -ne 11) {
-    throw 'Не получены все одиннадцать нативных сценариев.'
+if ($trace.status -ne 'captured' -or $trace.error -or $trace.runs.Count -ne 23) {
+    throw 'Не получены все двадцать три нативных сценария.'
 }
 $expected = @('idle-reentrant-retarget', 'lifetime', 'retarget-preserve:-1', 'retarget-preserve:1',
     'retarget-reset-mutant:-1', 'retarget-reset-mutant:1', 'smooth-settle',
-    'progress-up', 'progress-down', 'progress-reverse', 'progress-velocity') | Sort-Object
+    'progress-up', 'progress-down', 'progress-reverse', 'progress-velocity',
+    'boundary-progress-lower-settle', 'boundary-progress-lower-setter',
+    'boundary-progress-interior-settle', 'boundary-progress-interior-setter',
+    'boundary-progress-upper-settle', 'boundary-progress-upper-setter',
+    'boundary-raw-x-lower-settle', 'boundary-raw-x-interior-settle', 'boundary-raw-x-upper-settle',
+    'boundary-raw-y-lower-settle', 'boundary-raw-y-interior-settle', 'boundary-raw-y-upper-settle') | Sort-Object
 $actual = @($trace.runs | ForEach-Object {
     if ($_.kind -like 'retarget-*') { "$($_.kind):$($_.direction)" } else { $_.kind }
 }) | Sort-Object
@@ -202,6 +219,9 @@ foreach ($run in $trace.runs) {
     if ($run.trace.Count -eq 0 -or @($run.trace | Where-Object { $_.Phase -eq 'inertia' }).Count -eq 0) {
         throw "Сценарий $($run.kind) не наблюдал нативное движение."
     }
+    if ($run.kind -like 'boundary-*' -and !$run.passed) {
+        throw "Сценарий $($run.kind) не подтвердил границы движения."
+    }
 }
-[ordered]@{ passed = $true; lifecycleScenarios = $expectedLifecycle.Count; bindingScenarios = 14; nativeScenarios = 11; scale = $trace.scale } |
+[ordered]@{ passed = $true; lifecycleScenarios = $expectedLifecycle.Count; bindingScenarios = 15; disposalScenarios = 11; panScenarios = 22; continuationScenarios = 16; nativeScenarios = 23; scale = $trace.scale } |
     ConvertTo-Json | Tee-Object -FilePath (Join-Path $output 'result.json')

@@ -24,9 +24,15 @@ function fixture() {
         systemAnimation, target: Number(pressed) });
       return id;
     };
-    const motion = (id, phase, position) => add('motion', { pageOperation: id, nativeOperation: id, phase, position, readbackPosition: position, nativeSeconds: events.length / 100 });
-    const snap = (id, target) => {
+    const motion = (id, phase, position, origin = 'Animation') => add('motion', {
+      pageOperation: id, nativeOperation: origin === 'Animation' ? id : 0, origin, phase, position,
+      readbackPosition: position, nativeSeconds: events.length / 100,
+    });
+    const snap = (id, target, previous) => {
+      motion(id, 'requested', previous, 'Snap');
       add('snapRequested', { operation: id, target });
+      motion(id, 'value', target, 'Snap');
+      motion(id, 'idle', target, 'Snap');
       add('snapReadback', { operation: id, target, position: target });
     };
     const complete = (id, target) => {
@@ -44,12 +50,12 @@ function fixture() {
       add('completed', { operation: down, nativeOperation: down, end: 'Stopped', reason: 'replaced', isCurrent: false });
       const system = name === 'system-disable-animation';
       const id = intent(false, system ? 'systemPreference' : 'localPreference', system, !system);
-      snap(id, 0);
+      snap(id, 0, .4);
       add('completed', { operation: up, nativeOperation: up, end: 'Stopped', reason: 'snap', isCurrent: false });
     } else {
       input(name === 'keyboard' ? 'keyDown' : 'pointerPressed');
       const down = intent(true);
-      if (name.endsWith('reduced-motion')) snap(down, 1);
+      if (name.endsWith('reduced-motion')) snap(down, 1, 0);
       else {
         motion(down, 'requested', 0);
         for (const value of [.2, .5, .8]) motion(down, 'value', value);
@@ -58,7 +64,7 @@ function fixture() {
       if (name === 'pointer-out') input('pointerExited');
       input(name === 'keyboard' ? 'keyUp' : 'pointerReleased');
       const up = intent(false);
-      if (name.endsWith('reduced-motion')) snap(up, 0);
+      if (name.endsWith('reduced-motion')) snap(up, 0, 1);
       else {
         motion(up, 'requested', .8);
         motion(up, 'value', .4);
@@ -113,7 +119,7 @@ test('замена ожидающего request не подменяет прер
 test('reduced motion отклоняет настоящий запрос анимации', () => {
   const blocks = fixture();
   const id = blocks[5].events.find(e => e.kind === 'intent').data.operation;
-  blocks[5].events.push({ kind: 'motion', data: { pageOperation: id, nativeOperation: id, phase: 'requested', position: 0, readbackPosition: 0, nativeSeconds: 0 } });
+  blocks[5].events.push({ kind: 'motion', data: { pageOperation: id, nativeOperation: id, origin: 'Animation', phase: 'requested', position: 0, readbackPosition: 0, nativeSeconds: 0 } });
   assert.throws(() => verify(blocks), /анимация при отключённом/);
 });
 
@@ -123,7 +129,7 @@ test('system reduced motion требует local=true/system=false и откло
   const block = healthy.find(b => b.name === 'system-reduced-motion');
   const id = block.events.find(event => event.kind === 'intent').data.operation;
   block.events.push({ kind: 'motion', data: { pageOperation: id, nativeOperation: id,
-    phase: 'requested', position: 0, readbackPosition: 0, nativeSeconds: 0 } });
+    origin: 'Animation', phase: 'requested', position: 0, readbackPosition: 0, nativeSeconds: 0 } });
   assert.throws(() => verify(healthy), /движение после системного/);
   for (const key of ['localAnimation', 'systemAnimation']) {
     const wrongState = fixture();
@@ -275,6 +281,74 @@ test('process witness retains getter faults, invalid identity and a non-effect .
   assert(!source.includes('$unassociated.Start('));
 });
 
+for (const name of ['disable-animation', 'reduced-motion']) {
+  test(`${name}: Snap/requested разрешает прежнее положение, value и idle уже у цели`, () => {
+    const blocks = fixture();
+    const events = blocks.find(block => block.name === name).events;
+    const requests = events.filter(e => e.kind === 'motion' && e.data.origin === 'Snap' && e.data.phase === 'requested');
+    assert.ok(requests.every(e => e.data.position !== events.find(intent => intent.kind === 'intent' && intent.data.operation === e.data.pageOperation).data.target));
+    assert.doesNotThrow(() => verify(blocks));
+  });
+
+  test(`${name}: ни один Snap не допускает другой origin или анимационную фазу`, () => {
+    const baseline = fixture();
+    assert.doesNotThrow(() => verify(baseline));
+    const ids = baseline.find(block => block.name === name).events.filter(e => e.kind === 'snapRequested').map(e => e.data.operation);
+    for (const id of ids) {
+      for (const [origin, phase] of [
+        ['Animation', 'requested'], ['Input', 'requested'], ['Initial', 'requested'], ['Stop', 'requested'],
+        ['Animation', 'value'], ['Animation', 'inertia'], ['Snap', 'inertia'], ['Snap', 'custom'], ['Snap', 'interacting'],
+      ]) {
+        const blocks = fixture();
+        const block = blocks.find(block => block.name === name);
+        const index = block.events.findIndex(e => e.kind === 'motion' && e.data.pageOperation === id);
+        const target = block.events.find(e => e.kind === 'intent' && e.data.operation === id).data.target;
+        block.events.splice(index + 1, 0, { kind: 'motion', data: {
+          ...block.events[index].data, origin, phase, position: target, readbackPosition: target,
+        } });
+        assert.throws(() => verify(blocks), /анимация при отключённом/, `${name}, operation=${id}, ${origin}/${phase}`);
+      }
+    }
+  });
+
+  test(`${name}: декларация SnapTo без наблюдения Snap/requested недостаточна`, () => {
+    const ids = fixture().find(block => block.name === name).events.filter(e => e.kind === 'snapRequested').map(e => e.data.operation);
+    for (const id of ids) {
+      const blocks = fixture();
+      const block = blocks.find(block => block.name === name);
+      block.events = block.events.filter(e => !(e.kind === 'motion' && e.data.pageOperation === id && e.data.phase === 'requested'));
+      assert.throws(() => verify(blocks), /SnapTo/, `${name}, operation=${id}`);
+    }
+  });
+
+  test(`${name}: неверное положение или readback любого value/idle не скрывается последующим покоем`, () => {
+    const ids = fixture().find(block => block.name === name).events.filter(e => e.kind === 'snapRequested').map(e => e.data.operation);
+    for (const id of ids) {
+      for (const phase of ['value', 'idle']) {
+        for (const field of ['position', 'readbackPosition']) {
+          const blocks = fixture();
+          const event = blocks.find(block => block.name === name).events.find(e => e.kind === 'motion' && e.data.pageOperation === id && e.data.phase === phase);
+          event.data[field] = .5;
+          assert.throws(() => verify(blocks), /SnapTo/, `${name}, operation=${id}, ${phase}.${field}`);
+        }
+      }
+    }
+  });
+}
+
+test('каждое наблюдение требует известный origin, включая трассы до добавления поля', () => {
+  for (const name of ['mouse-hold', 'disable-animation', 'reduced-motion']) {
+    for (const origin of [undefined, null, '', 'Unknown', 0]) {
+      const blocks = fixture();
+      const block = blocks.find(block => block.name === name);
+      const event = block.events.find(e => e.kind === 'motion' && (name === 'mouse-hold' || e.data.origin === 'Snap'));
+      if (origin === undefined) delete event.data.origin;
+      else event.data.origin = origin;
+      assert.throws(() => verify(blocks), /Повреждено наблюдение движения/, `${name}, origin=${origin}`);
+    }
+  }
+});
+
 test('правильный SnapTo request с неверным положением не проходит', () => {
   const blocks = fixture();
   blocks[5].events.find(e => e.kind === 'snapReadback').data.position = .5;
@@ -305,11 +379,11 @@ for (const [name, mutate, expected] of [
   }, /операция завершилась до/],
   ['late current value', events => {
     const preference = events.find(e => e.data.trigger === 'systemPreference').data.operation;
-    events.push({ kind: 'motion', data: { pageOperation: preference, nativeOperation: preference - 1, phase: 'value', position: .3, readbackPosition: .3, nativeSeconds: 1 } });
+    events.push({ kind: 'motion', data: { pageOperation: preference, nativeOperation: preference - 1, origin: 'Animation', phase: 'value', position: .3, readbackPosition: .3, nativeSeconds: 1 } });
   }, /движение после системного/],
   ['late requested', events => {
     const up = events.filter(e => e.kind === 'intent' && e.data.trigger === 'pressed').at(-1).data.operation;
-    events.push({ kind: 'motion', data: { pageOperation: up, nativeOperation: up, phase: 'requested', position: .3, readbackPosition: .3, nativeSeconds: 1 } });
+    events.push({ kind: 'motion', data: { pageOperation: up, nativeOperation: up, origin: 'Animation', phase: 'requested', position: .3, readbackPosition: .3, nativeSeconds: 1 } });
   }, /движение после системного/],
 ]) test(`системное выключение: ${name}`, () => {
   const blocks = fixture();
@@ -321,8 +395,19 @@ test('системный запрет отклоняет late current value за
   const blocks = fixture();
   const block = blocks.find(b => b.name === 'system-reduced-motion');
   const id = block.events.find(e => e.kind === 'intent').data.operation;
-  block.events.push({ kind: 'motion', data: { pageOperation: id, nativeOperation: id - 1, phase: 'value', position: .3, readbackPosition: .3, nativeSeconds: 1 } });
+  block.events.push({ kind: 'motion', data: { pageOperation: id, nativeOperation: id - 1, origin: 'Animation', phase: 'value', position: .3, readbackPosition: .3, nativeSeconds: 1 } });
   assert.throws(() => verify(blocks), /движение после системного/);
+});
+
+test('системный запрет допускает только собственный Snap и его endpoint после requested', () => {
+  assert.doesNotThrow(() => verify(fixture()));
+  for (const [field, value] of [['nativeOperation', 1], ['position', .3], ['readbackPosition', .3], ['phase', 'inertia']]) {
+    const blocks = fixture();
+    const block = blocks.find(item => item.name === 'system-reduced-motion');
+    const sample = block.events.find(item => item.kind === 'motion' && item.data.phase === 'value');
+    sample.data[field] = value;
+    assert.throws(() => verify(blocks), /движение после системного/, field);
+  }
 });
 
 test('возвращённые bool без здорового движения не подменяют animated restoration', () => {

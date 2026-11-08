@@ -32,7 +32,7 @@ test('замена binding не оставляет unreturned successor при �
   assert(controls.includes('ReferenceEquals(error, primary)'));
   assert(controls.includes('successor.DisposeCount == 1'));
   assert(controls.includes('visual.Stops == 1 && previous.DisposeCount == 1 && successor.DisposeCount == 1'));
-  assert.equal([...controls.matchAll(/Test\("[^"]+",/g)].length, 11);
+  assert.equal([...controls.matchAll(/Test\("[^"]+",/g)].length, 12);
   for (const projection of ['OffsetX', 'OffsetY', 'Opacity'])
     assert(controls.includes(`(ScalarProperty.${projection},`), projection);
   assert(controls.includes('Test($"projection-{property}",'));
@@ -40,7 +40,7 @@ test('замена binding не оставляет unreturned successor при �
   const runner = read('./runner.cs');
   assert(/var bindings = BindingTests.Run\(\);\s*passed &= bindings.All\(result => result.Passed\);/.test(runner));
   const verify = read('./verify.ps1');
-  assert(verify.includes('$unitResult.bindings.Count -ne 14 -or @($unitResult.bindings | Where-Object { !$_.Passed }).Count -ne 0'));
+  assert(verify.includes('$unitResult.bindings.Count -ne 15 -or @($unitResult.bindings | Where-Object { !$_.Passed }).Count -ne 0'));
 });
 function ownerViolations(source) {
   const body = source.slice(source.indexOf('    public void Dispose()'), source.indexOf('    private void CheckAccess()'));

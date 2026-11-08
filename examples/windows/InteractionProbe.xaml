@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page x:Class="NativeWindow.InteractionProbe"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:local="using:NativeWindow">
+  <StackPanel Spacing="16" Padding="32">
+    <TextBlock Text="LabMotion — вертикальный ввод" FontSize="24" />
+    <TextBlock x:Name="Status" Text="Инициализация"
+               AutomationProperties.AutomationId="TouchStatus" />
+    <local:InteractionViewport x:Name="TouchStage" Width="480" Height="320" HorizontalAlignment="Left"
+          Background="{ThemeResource ControlFillColorDefaultBrush}"
+          AutomationProperties.AutomationId="TouchStage"
+          AutomationProperties.Name="Область вертикального ввода" />
+  </StackPanel>
+</Page>
