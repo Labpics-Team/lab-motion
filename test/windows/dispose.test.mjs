@@ -97,7 +97,7 @@ test('binding сохраняет Stop/выражение primary и обязат
 test('существующий C# consumer включает faults, healthy, reentrance и wrong-thread controls', () => {
   const runner = read('./runner.cs');
   assert(runner.includes('var disposals = DisposeTests.Run();'));
-  assert(runner.includes('disposals.Count == 11 && disposals.All(result => result.Passed)'));
+  assert(runner.includes('disposals.Count == 14 && disposals.All(result => result.Passed)'));
   const controls = read('./dispose-tests.cs');
   for (const name of ['healthy', 'stop', 'tracker', 'modifier', 'condition', 'force', 'settings', 'all',
     'dispose-reentrant-callback', 'dispose-wrong-thread-preserves-owner', 'binding-compound-failure-primary']) assert(controls.includes('"' + name + '"'), name);
@@ -106,4 +106,50 @@ test('существующий C# consumer включает faults, healthy, ree
   assert(controls.includes('DisposeCount == 1'));
   assert(controls.includes('GetInvocationList()'));
   assert(controls.includes('pending.Result == new MotionResult(1, MotionEnd.Stopped, "disposed")'));
+});
+
+function panCleanupViolations(source) {
+  const create = source.slice(source.indexOf('internal static ScalarPan Create'), source.indexOf('public void Redirect'));
+  const dispose = source.slice(source.indexOf('public void Dispose()'), source.indexOf('private void CheckAccess()'));
+  return [
+    ['create primary', !create.includes('ExceptionDispatchInfo.Capture(error)') || !create.includes('primary.Throw();')],
+    ['create secondary', !create.includes('error.Data[CleanupFailuresKey]')],
+    ['owner-thread admission', !/if \(disposed\) return;\s+CheckAccess\(\);\s+disposed = true;/.test(dispose)],
+    ...['tracker.InteractionSources.Remove(source)', 'source.Dispose', 'released(this)'].map(effect =>
+      [effect, !dispose.includes(`Attempt(${effect.includes('(') ? '() => ' : ''}${effect});`)]),
+    ['dispose primary', !dispose.includes('if (failure is null) failure = ExceptionDispatchInfo.Capture(error);') ||
+      !dispose.includes('failure?.Throw();')],
+    ['dispose secondary', !dispose.includes('failure.SourceException.Data[CleanupFailuresKey]') ||
+      !dispose.includes('else (secondary ??= []).Add(error);')],
+  ].filter(([, invalid]) => invalid).map(([name]) => name);
+}
+
+test('ScalarPan пытается выполнить все cleanup effects, сохраняет primary и наблюдаемые secondary (SOURCE only)', () => {
+  const source = read('../../native/windows/ScalarPan.cs');
+  for (const raw of [source, source.replaceAll('\n', '\r\n')]) {
+    const normalized = normalizeSourceText(raw);
+    assert.deepEqual(panCleanupViolations(normalized), []);
+    for (const [before, after, finding] of [
+      ['primary.Throw();', 'throw;', 'create primary'],
+      ['error.Data[CleanupFailuresKey]', 'error.Data["ignored"]', 'create secondary'],
+      ['CheckAccess();\n        disposed = true;', 'disposed = true;\n        CheckAccess();', 'owner-thread admission'],
+      ['Attempt(() => tracker.InteractionSources.Remove(source));', '', 'tracker.InteractionSources.Remove(source)'],
+      ['Attempt(source.Dispose);', '', 'source.Dispose'],
+      ['Attempt(() => released(this));', '', 'released(this)'],
+      ['if (failure is null) failure = ExceptionDispatchInfo.Capture(error);', 'failure = ExceptionDispatchInfo.Capture(error);', 'dispose primary'],
+      ['else (secondary ??= []).Add(error);', '', 'dispose secondary'],
+    ]) {
+      const mutant = normalized.replace(before, after);
+      assert.notEqual(mutant, normalized);
+      assert(panCleanupViolations(mutant).includes(finding), finding);
+    }
+  }
+  const controls = read('./dispose-tests.cs');
+  for (const name of ['pan-dispose-failure-order', 'pan-create-failure-order', 'pan-owner-dispose-failure-order'])
+    assert(controls.includes(`Test("${name}",`), name);
+  assert(controls.includes('faults < 8'));
+  assert(controls.includes('CheckPanFailures(error, expected);'));
+  assert(controls.includes('CheckPanFailures(error, [primary, secondary]);'));
+  assert(controls.includes('error.Data["ScalarPan.CleanupFailures"]'));
+  assert(controls.includes('tracker.InteractionSources.RemoveCount == 1'));
 });

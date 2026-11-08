@@ -8,6 +8,8 @@ if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
 Get-Command dotnet -ErrorAction Stop | Out-Null
 & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'process-cleanup.test.ps1')
 if ($LASTEXITCODE -ne 0) { throw 'Проверка владения нативным процессом не прошла.' }
+& pwsh -NoProfile -File (Join-Path $PSScriptRoot 'interaction-cleanup.test.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'Проверка освобождения touch-потребителя не прошла.' }
 $output = [IO.Path]::GetFullPath($OutputDirectory)
 if (Test-Path -LiteralPath $output) { throw 'Каталог результата уже существует.' }
 New-Item -ItemType Directory -Path $output | Out-Null
@@ -247,5 +249,5 @@ foreach ($run in $trace.runs) {
         throw "Сценарий $($run.kind) не подтвердил границы движения."
     }
 }
-[ordered]@{ passed = $true; lifecycleScenarios = $expectedLifecycle.Count; bindingScenarios = 15; disposalScenarios = 11; panScenarios = 22; continuationScenarios = 16; retargetMeterScenarios = 14; nativeScenarios = 23; scale = $trace.scale } |
+[ordered]@{ passed = $true; lifecycleScenarios = $expectedLifecycle.Count; bindingScenarios = 15; disposalScenarios = 14; panScenarios = 22; continuationScenarios = 16; retargetMeterScenarios = 14; nativeScenarios = 23; scale = $trace.scale } |
     ConvertTo-Json | Tee-Object -FilePath (Join-Path $output 'result.json')

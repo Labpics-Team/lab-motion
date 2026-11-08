@@ -88,6 +88,7 @@ namespace Microsoft.UI.Composition
         public bool FailNextStart { get; set; }
         public Exception? StopFailure { get; set; }
         public Action? OnStop { get; set; }
+        public Action<VisualInteractionSource>? OnInteractionSourceCreated { get; set; }
         public void StartAnimation(string name, ExpressionAnimation animation)
         {
             StartAttempts++;
@@ -126,7 +127,7 @@ namespace Microsoft.UI.Composition.Interactions
         public Exception? DisposeFailure { get; set; }
         public Action? OnDispose { get; set; }
         public string? ConfiguredAxis { get; private set; }
-        public List<VisualInteractionSource> InteractionSources { get; } = [];
+        public InteractionSourceCollection InteractionSources { get; } = new();
         public static InteractionTracker CreateWithOwner(Compositor compositor, IInteractionTrackerOwner owner)
             => LastCreated = new() { Compositor = compositor };
         public void ConfigurePositionXInertiaModifiers(InteractionTrackerInertiaMotion[] modifiers) => ConfiguredAxis = "X";
@@ -148,10 +149,42 @@ namespace Microsoft.UI.Composition.Interactions
     public enum InteractionSourceMode { Disabled, EnabledWithInertia }
     public enum InteractionChainingMode { Never }
     public enum VisualInteractionSourceRedirectionMode { CapableTouchpadOnly }
+    public sealed class InteractionSourceCollection
+    {
+        private readonly List<VisualInteractionSource> sources = [];
+        public int Count => sources.Count;
+        public int AddCount { get; private set; }
+        public int RemoveCount { get; private set; }
+        public Exception? AddFailure { get; set; }
+        public Exception? RemoveFailure { get; set; }
+        public void Add(VisualInteractionSource source)
+        {
+            AddCount++;
+            if (AddFailure is { } error) throw error;
+            sources.Add(source);
+        }
+        public void Remove(VisualInteractionSource source)
+        {
+            RemoveCount++;
+            if (RemoveFailure is { } error) throw error;
+            sources.Remove(source);
+        }
+    }
     public sealed class VisualInteractionSource : IDisposable
     {
         public static VisualInteractionSource LastCreated { get; private set; } = null!;
-        public InteractionSourceMode PositionXSourceMode { get; set; }
+        private InteractionSourceMode positionXSourceMode;
+        public Exception? ConfigurationFailure { get; set; }
+        public Exception? DisposeFailure { get; set; }
+        public InteractionSourceMode PositionXSourceMode
+        {
+            get => positionXSourceMode;
+            set
+            {
+                if (ConfigurationFailure is { } error) throw error;
+                positionXSourceMode = value;
+            }
+        }
         public InteractionSourceMode PositionYSourceMode { get; set; }
         public InteractionSourceMode ScaleSourceMode { get; set; }
         public InteractionChainingMode PositionXChainingMode { get; set; }
@@ -162,9 +195,18 @@ namespace Microsoft.UI.Composition.Interactions
         public VisualInteractionSourceRedirectionMode ManipulationRedirectionMode { get; set; }
         public int RedirectCount { get; private set; }
         public int DisposeCount { get; private set; }
-        public static VisualInteractionSource Create(Visual visual) => LastCreated = new();
+        public static VisualInteractionSource Create(Visual visual)
+        {
+            var source = LastCreated = new();
+            visual.OnInteractionSourceCreated?.Invoke(source);
+            return source;
+        }
         public void TryRedirectForManipulation(Microsoft.UI.Input.PointerPoint point) => RedirectCount++;
-        public void Dispose() => DisposeCount++;
+        public void Dispose()
+        {
+            DisposeCount++;
+            if (DisposeFailure is { } error) throw error;
+        }
     }
     public sealed class InteractionTrackerInertiaMotion : IDisposable
     {
