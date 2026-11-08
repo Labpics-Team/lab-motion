@@ -64,6 +64,120 @@ static Handle* Open(Settings* source, Snapshot& snapshot)
     return handle;
 }
 
+namespace WindowControls
+{
+    namespace W = WindowPreferenceDiagnostics;
+    struct State { int settingForwards = 0; bool revokedBeforeDestroyForward = false; W::Record* record = nullptr; };
+    constexpr LRESULT ForwardResult = 0x13579;
+    LRESULT CALLBACK Base(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+    {
+        auto* state = reinterpret_cast<State*>(GetWindowLongPtrW(window, GWLP_USERDATA));
+        if (state && message == WM_SETTINGCHANGE) { ++state->settingForwards; return ForwardResult; }
+        if (state && state->record && message == WM_NCDESTROY)
+            state->revokedBeforeDestroyForward = (W::Read(state->record).flags & W::Destroyed) && !(W::Read(state->record).flags & W::Active);
+        return DefWindowProcW(window, message, wParam, lParam);
+    }
+    struct Window
+    {
+        State state;
+        HWND value;
+        Window()
+        {
+            value = CreateWindowExW(0, L"LabMotion.PassiveWindowControl", L"", WS_OVERLAPPED, 0, 0, 1, 1,
+                nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
+            Require(value != nullptr, "window-fixture-create");
+            SetWindowLongPtrW(value, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(&state));
+        }
+        ~Window() { if (value) DestroyWindow(value); }
+        void Destroy() { Require(DestroyWindow(value) != FALSE, "window-fixture-destroy"); value = nullptr; }
+    };
+    void Run()
+    {
+        WNDCLASSW type{};
+        type.lpfnWndProc = Base;
+        type.hInstance = GetModuleHandleW(nullptr);
+        type.lpszClassName = L"LabMotion.PassiveWindowControl";
+        Require(RegisterClassW(&type) != 0, "window-fixture-register");
+        wchar_t station[256]{};
+        DWORD required = 0;
+        Require(GetUserObjectInformationW(GetProcessWindowStation(), UOI_NAME, station, sizeof(station), &required) != FALSE,
+            "window-fixture-context");
+        const DWORD pid = GetCurrentProcessId(), tid = GetCurrentThreadId();
+        W::Snapshot captured{};
+        W::Record* record = nullptr;
+        Require(FAILED(WindowPreferenceDiagnosticsCreate(nullptr, pid, tid, station, &record, &captured)) && !record &&
+            !(captured.flags & W::Attached), "window-missing-owner-fault-not-zero");
+        {
+            Window window;
+            Require(FAILED(WindowPreferenceDiagnosticsCreate(window.value, pid, 0, station, &record, &captured)) && !record &&
+                (captured.flags & W::OwnerMatched) && !(captured.flags & W::SessionChecked) && !(captured.flags & W::SameSession),
+                "window-unknown-context-not-match");
+            Require(FAILED(WindowPreferenceDiagnosticsCreate(window.value, pid, tid, L"DifferentStation", &record, &captured)) && !record &&
+                (captured.flags & W::DesktopChecked) && !(captured.flags & W::SameDesktop), "window-different-station-not-default-match");
+            Require(SUCCEEDED(WindowPreferenceDiagnosticsCreate(window.value, pid, tid, station, &record, &captured)) && record,
+                "window-own-context-create");
+            window.state.record = record;
+            Require((captured.flags & (W::OwnerMatched | W::SameSession | W::SameDesktop | W::Attached | W::Active | W::ControlPassed)) ==
+                (W::OwnerMatched | W::SameSession | W::SameDesktop | W::Attached | W::Active | W::ControlPassed) && captured.controlCount == 1 &&
+                captured.controlQpc > 0 && captured.rawCount == 0 && captured.actionCount == 0 && captured.forwardCount == 0,
+                "window-control-separate-from-message");
+            W::Record* duplicate = nullptr;
+            Require(FAILED(WindowPreferenceDiagnosticsCreate(window.value, pid, tid, station, &duplicate, &captured)) && !duplicate &&
+                W::recordsAlive == 1, "window-no-subclass-ref-overwrite");
+            // Только local synthetic messages: ни SPI, ни broadcast, ни профиль.
+            for (const WPARAM action : { WPARAM(0), WPARAM(1), W::ClientAreaAnimation })
+                Require(SendMessageW(window.value, WM_SETTINGCHANGE, action, LPARAM(1)) == ForwardResult, "window-actual-forward-result");
+            WindowPreferenceDiagnosticsRead(record, &captured);
+            Require(captured.rawCount == 3 && captured.actionCount == 1 && captured.forwardCount == 3 &&
+                captured.lastRawQpc > 0 && captured.lastActionQpc > 0 && window.state.settingForwards == 3,
+                "window-raw-action-forward-not-control");
+            HRESULT wrong = S_OK;
+            std::thread other([&]() { W::Snapshot value{}; wrong = WindowPreferenceDiagnosticsClose(record, &value); });
+            other.join();
+            captured = W::Read(record);
+            Require(wrong == E_ACCESSDENIED && (captured.flags & W::Attached) && !(captured.flags & (W::Active | W::RemoveAttempted)),
+                "window-wrong-thread-no-remove");
+            Require(SUCCEEDED(WindowPreferenceDiagnosticsClose(record, &captured)) && !(captured.flags & (W::Attached | W::Active)) &&
+                captured.removeResult == S_OK, "window-owner-remove");
+            Require(SUCCEEDED(WindowPreferenceDiagnosticsClose(record, &captured)), "window-owner-remove-once");
+            Require(SendMessageW(window.value, WM_SETTINGCHANGE, W::ClientAreaAnimation, LPARAM(1)) == ForwardResult &&
+                W::Read(record).rawCount == 3, "window-success-remove-no-recorder");
+            window.state.record = nullptr;
+            WindowPreferenceDiagnosticsRelease(record);
+            Require(W::recordsAlive == 0, "window-success-record-reclaimed");
+        }
+        {
+            Window window;
+            Require(SUCCEEDED(WindowPreferenceDiagnosticsCreate(window.value, pid, tid, station, &record, &captured)), "window-failed-remove-create");
+            window.state.record = record;
+            W::failRemove = true;
+            Require(FAILED(WindowPreferenceDiagnosticsClose(record, &captured)) && (captured.flags & W::Attached) &&
+                (captured.flags & W::Faulted) && !(captured.flags & W::Active), "window-failed-remove-retains-record");
+            W::failRemove = false;
+            Require(FAILED(WindowPreferenceDiagnosticsClose(record, &captured)), "window-failed-remove-not-retried");
+            WindowPreferenceDiagnosticsRelease(record);
+            Require(W::recordsAlive == 1 && SendMessageW(window.value, WM_SETTINGCHANGE, W::ClientAreaAnimation, LPARAM(1)) == ForwardResult &&
+                W::Read(record).actionCount == 1, "window-owner-release-late-callback-safe");
+            window.Destroy();
+            Require(window.state.revokedBeforeDestroyForward && W::recordsAlive == 0, "window-destroy-revoke-forward-reclaim");
+        }
+        {
+            Window window;
+            Require(SUCCEEDED(WindowPreferenceDiagnosticsCreate(window.value, pid, tid, station, &record, &captured)), "window-overflow-create");
+            window.state.record = record;
+            record->snapshot.rawCount = W::MaximumSafeInteger;
+            SendMessageW(window.value, WM_SETTINGCHANGE, W::ClientAreaAnimation, LPARAM(1));
+            Require(W::Read(record).rawCount == W::MaximumSafeInteger && (W::Read(record).flags & W::Faulted), "window-overflow-explicit");
+            window.Destroy();
+            captured = W::Read(record);
+            Require((captured.flags & W::Destroyed) && !(captured.flags & (W::Active | W::Attached)) &&
+                window.state.revokedBeforeDestroyForward, "window-destroy-owner-snapshot");
+            WindowPreferenceDiagnosticsRelease(record);
+        }
+        Require(W::recordsAlive == 0 && UnregisterClassW(type.lpszClassName, type.hInstance) != FALSE, "window-fixture-all-reclaimed");
+    }
+}
+
 int main()
 {
     const HRESULT initialized = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -147,6 +261,7 @@ int main()
             PreferenceDiagnosticsRelease(handle);
         }
         Require(recordsAlive == 0, "all-records-reclaimed");
+        WindowControls::Run();
         std::cout << "native preference controls: typed ABI/FTM/control-reset/lifetime/faults/concurrency PASS\n";
         return 0;
     }

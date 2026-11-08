@@ -64,3 +64,42 @@ if ($text.Length -gt 1800 -or $text -match '[^\x00-\x7f]' -or $decoded.omitted -
     $decoded.native[0] -ne 370 -or $decoded.native[1] -ne 40 -or $decoded.projection[1] -ne 40 -or
     $decoded.rows[0][0] -ne 331 -or $decoded.rows[-1][0] -ne 370) { throw 'native-reader-composed-bounded' }
 'native reader: actual PowerShell healthy/control/fault/latest-null/malformed/composed-budget controls PASS'
+
+$window = [pscustomobject]@{ State = 'Ready'; OwnerMatched = $true; SameSession = $true; SameDesktop = $true;
+    ContextHResult = 0; ControlPassed = $true; ControlCount = 1L; ControlQpc = 100L; RawCount = 2L; ActionCount = 1L;
+    LastRawQpc = 390L; LastActionQpc = 380L; QpcFrequency = 10000000L; ForwardCount = 2L;
+    AddHResult = 0; RemoveHResult = $null; Attached = $true; Active = $true; Faulted = $false; Destroyed = $false }
+$data | Add-Member -NotePropertyName windowDiagnostics -NotePropertyValue $window
+$setter = [pscustomobject]@{ ContextStillMatches = $true }
+$text = Get-InputPhaseSummary -Name 'system-disable-animation' -After 327 -Events $events -Setter $setter
+$decoded = $text | ConvertFrom-Json
+if ($decoded.window.Count -ne 22 -or $decoded.window[0] -ne 395 -or $decoded.window[1] -ne 1 -or
+    $decoded.window[8] -ne 1 -or $decoded.window[10] -ne 2 -or $decoded.window[11] -ne 1 -or
+    $decoded.window[15] -ne 2 -or $decoded.setter.Count -ne 7 -or $decoded.setter[6] -ne $true -or
+    $decoded.native.Count -ne 19 -or $decoded.rows[0].Count -ne 14 -or $text.Length -gt 1800) { throw 'window-reader-healthy-additive' }
+$window.RawCount = 0L; $window.ActionCount = 0L; $window.LastRawQpc = $null; $window.LastActionQpc = $null
+$decoded = Get-InputPhaseSummary -Name 'system-disable-animation' -After 327 -Events $events | ConvertFrom-Json
+if ($decoded.window[8] -ne 1 -or $decoded.window[10] -ne 0 -or $decoded.window[11] -ne 0) { throw 'window-reader-control-not-system-delivery' }
+$window.SameSession = $null; $window.SameDesktop = $null
+$decoded = Get-InputPhaseSummary -Name 'system-disable-animation' -After 327 -Events $events | ConvertFrom-Json
+if ($decoded.window[4] -ne $null -or $decoded.window[5] -ne $null -or $decoded.setter[6] -ne $null) { throw 'window-reader-unknown-not-match' }
+foreach ($missingData in @($null, 'malformed-data', [pscustomobject]@{ operation = 18L })) {
+    $newest = @($events) + @([pscustomobject]@{ sequence = 400L; kind = 'completed'; data = $missingData })
+    if ((Get-InputPhaseSummary -Name 'system-disable-animation' -After 327 -Events $newest | ConvertFrom-Json).window -ne $null) {
+        throw 'window-reader-latest-null-clears-positive'
+    }
+}
+$window.State = 'private'; $window.ContextHResult = '::error::'; $window.LastRawQpc = 'secret'; $window.SameDesktop = 'Default'
+$text = Get-InputPhaseSummary -Name 'system-disable-animation' -After 327 -Events $events
+$decoded = $text | ConvertFrom-Json
+if ($text -match 'private|secret|Default|::error::' -or $decoded.window[2] -ne $null -or $decoded.window[5] -ne $null -or
+    $decoded.window[6] -ne $null -or $decoded.window[12] -ne $null) { throw 'window-reader-closed-no-context-values' }
+$window.State = 'Ready'; $window.ContextHResult = 0; $window.LastRawQpc = 9007199254740991L; $window.SameDesktop = $true
+$window.RawCount = 9007199254740991L; $window.ActionCount = 9007199254740991L; $window.LastActionQpc = 9007199254740991L
+$window.ControlQpc = 9007199254740991L; $window.ForwardCount = 9007199254740991L
+foreach ($event in $many) { $event.data | Add-Member -NotePropertyName windowDiagnostics -NotePropertyValue $window }
+$text = Get-InputPhaseSummary -Name 'system-disable-animation' -After 327 -Events $many
+$decoded = $text | ConvertFrom-Json
+if ($text.Length -gt 1800 -or $text -match '[^\x00-\x7f]' -or $decoded.window[0] -ne 370 -or $decoded.window[1] -ne 40 -or
+    $decoded.native[1] -ne 40 -or $decoded.projection[1] -ne 40) { throw 'window-reader-composed-fixed-budget' }
+'window reader: synthetic/control/context/unknown/latest-null/closed/composed-budget controls PASS'

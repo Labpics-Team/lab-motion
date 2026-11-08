@@ -12,7 +12,7 @@ $evidence = New-Item -ItemType Directory -Path (Join-Path $output 'evidence')
 $app = Join-Path ([IO.Path]::GetFullPath($ApplicationDirectory)) 'NativeWindow.exe'
 $trace = Join-Path $evidence 'press.jsonl'
 $saved = @{}
-foreach ($name in @('LAB_MOTION_PROBE_OUTPUT', 'LAB_MOTION_PRESS_TRACE', 'WINAPP_UI_WORKFLOW_ID', 'WINAPP_CLI_TELEMETRY_OPTOUT', 'WINAPP_CLI_UPDATE_CHECK')) {
+foreach ($name in @('LAB_MOTION_PROBE_OUTPUT', 'LAB_MOTION_PRESS_TRACE', 'WINAPP_UI_WORKFLOW_ID', 'WINAPP_CLI_TELEMETRY_OPTOUT', 'WINAPP_CLI_UPDATE_CHECK', 'LAB_MOTION_SETTER_PID', 'LAB_MOTION_SETTER_TID', 'LAB_MOTION_SETTER_STATION')) {
     $saved[$name] = [Environment]::GetEnvironmentVariable($name)
 }
 $process = $null
@@ -237,10 +237,11 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
         (Read-InputPhaseField $Setter 'SetSucceeded' 'bool'),
         (Read-InputPhaseField $Setter 'ReadbackQpc' 'positive'),
         (Read-InputPhaseField $Setter 'ReadbackEnabled' 'bool'),
-        (Read-InputPhaseField $Setter 'QpcFrequency' 'positive'))
+        (Read-InputPhaseField $Setter 'QpcFrequency' 'positive'), (Read-InputPhaseField $Setter 'ContextStillMatches' 'bool'))
     $invalid = 0
     $projectionSummary = $null
     $nativeSummary = $null
+    $windowSummary = $null
     $projectionSequence = -1L
     foreach ($event in $Events) {
         $sequence = Read-InputPhaseField $event 'sequence' 'number'
@@ -308,6 +309,7 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
             $projectionSequence = $sequence
             $projectionSummary = $null
             $nativeSummary = $null
+            $windowSummary = $null
         }
         if ($phase -eq 'completed' -and $null -ne $data) {
             $subscriptionProperty = $data.PSObject.Properties['subscriptionDiagnostics']
@@ -326,6 +328,22 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
             }
             # Последняя completed-выборка captured registration; не identity SPI/event.
             if ($captureProjection) {
+                $windowProperty = $data.PSObject.Properties['windowDiagnostics']
+                if ($null -ne $windowProperty -and $null -ne $windowProperty.Value) {
+                    $window = $windowProperty.Value
+                    $windowSummary = @($sequence, (Read-InputPhaseField $subscription 'Registration' 'positive'),
+                        (Read-InputPhaseField $window 'State' 'nativeState'),
+                        (Read-InputPhaseField $window 'OwnerMatched' 'bool'), (Read-InputPhaseField $window 'SameSession' 'bool'),
+                        (Read-InputPhaseField $window 'SameDesktop' 'bool'), (Read-InputPhaseField $window 'ContextHResult' 'hresult'),
+                        (Read-InputPhaseField $window 'ControlPassed' 'bool'), (Read-InputPhaseField $window 'ControlCount' 'number'),
+                        (Read-InputPhaseField $window 'ControlQpc' 'positive'), (Read-InputPhaseField $window 'RawCount' 'number'),
+                        (Read-InputPhaseField $window 'ActionCount' 'number'), (Read-InputPhaseField $window 'LastRawQpc' 'positive'),
+                        (Read-InputPhaseField $window 'LastActionQpc' 'positive'), (Read-InputPhaseField $window 'QpcFrequency' 'positive'),
+                        (Read-InputPhaseField $window 'ForwardCount' 'number'), (Read-InputPhaseField $window 'AddHResult' 'hresult'),
+                        (Read-InputPhaseField $window 'RemoveHResult' 'hresult'), (Read-InputPhaseField $window 'Attached' 'bool'),
+                        (Read-InputPhaseField $window 'Active' 'bool'), (Read-InputPhaseField $window 'Faulted' 'bool'),
+                        (Read-InputPhaseField $window 'Destroyed' 'bool'))
+                }
                 $nativeProperty = $data.PSObject.Properties['nativeDiagnostics']
                 if ($null -ne $nativeProperty -and $null -ne $nativeProperty.Value) {
                     $native = $nativeProperty.Value
@@ -386,7 +404,7 @@ function Get-InputPhaseSummary([string]$Name, [long]$After, [object[]]$Events, $
         $summary = [ordered]@{ schema = 2; scenario = $scenario; after = $After; count = $count;
             omitted = $count - $rows.Count; invalid = $invalid; rows = @($rows.ToArray()); setter = $setterSummary;
             timingCount = $timingCount; timingOmitted = $timingCount - $timing.Count; timing = @($timing.ToArray());
-            projection = $projectionSummary; native = $nativeSummary } | ConvertTo-Json -Depth 5 -Compress
+            projection = $projectionSummary; native = $nativeSummary; window = $windowSummary } | ConvertTo-Json -Depth 5 -Compress
         if ($summary.Length -le 1800) { return $summary }
         if ($rows.Count -gt 2) { $rows.RemoveAt([int][Math]::Floor($rows.Count / 2)) }
         elseif ($timing.Count -gt 2) { $timing.RemoveAt([int][Math]::Floor($timing.Count / 2)) }
@@ -445,6 +463,7 @@ function Scenario([string]$Name, [string[]]$Arguments, [string[]]$BeforeArgument
                     ReadbackQpc = [ClientAreaAnimation]::ReadbackQpc
                     ReadbackEnabled = [ClientAreaAnimation]::ReadbackEnabled
                     QpcFrequency = [ClientAreaAnimation]::QpcFrequency
+                    ContextStillMatches = [ClientAreaAnimation]::ContextStillMatches
                 }
                 @{ enabled = [ClientAreaAnimation]::Read(); timing = $systemSetterReceipt } | ConvertTo-Json | Set-Content (Join-Path $evidence 'animation-system-disabled.json')
             }
@@ -500,7 +519,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Проверка ограниченной projection диагностики не прошла.' }
     & pwsh -NoProfile -File (Join-Path $PSScriptRoot 'native-preference.test.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Native diagnostic reader controls не прошли.' }
-    & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs') (Join-Path $PSScriptRoot 'dispose.test.mjs')
+    & node --test (Join-Path $PSScriptRoot 'assert-input.test.mjs') (Join-Path $PSScriptRoot 'system-preference.test.mjs') (Join-Path $PSScriptRoot 'dispose.test.mjs') (Join-Path $PSScriptRoot 'window-preference.test.mjs')
     if ($LASTEXITCODE -ne 0) { throw 'Проверки различающей силы input oracle не прошли.' }
     $env:LAB_MOTION_PROBE_OUTPUT = $null
     $env:LAB_MOTION_PRESS_TRACE = $trace
@@ -512,6 +531,7 @@ try {
             throw 'Изменение настройки разрешено только в одноразовой hosted-сессии GitHub.'
         }
         Add-Type -Path (Join-Path $PSScriptRoot 'animation-settings.cs')
+        [ClientAreaAnimation]::CaptureWindowDiagnosticContext()
         $animationBefore = [ClientAreaAnimation]::Read()
         [ClientAreaAnimation]::Write($true)
         @{ before = $animationBefore; enabled = [ClientAreaAnimation]::Read() } |

@@ -27,6 +27,7 @@ internal sealed class SystemPreferenceNotifications : IDisposable
     private readonly long registration;
     private readonly ProjectionDiagnostics? projectionDiagnostics;
     private readonly NativePreferenceDiagnostics? nativeDiagnostics;
+    private WindowPreferenceDiagnostics? windowDiagnostics;
     private long rawEntries;
     private long admittedEntries;
     private EntryOutcome lastEntry;
@@ -77,6 +78,17 @@ internal sealed class SystemPreferenceNotifications : IDisposable
 
     internal ProjectionDiagnostics.Snapshot? ReadProjectionDiagnostics() => projectionDiagnostics?.ReadSnapshot();
     internal NativePreferenceDiagnostics.Snapshot? ReadNativeDiagnostics() => nativeDiagnostics?.ReadSnapshot();
+    internal WindowPreferenceDiagnostics.Snapshot? ReadWindowDiagnostics()
+    {
+        CheckAccess();
+        return windowDiagnostics?.ReadSnapshot();
+    }
+    internal void AttachWindowDiagnostics(Microsoft.UI.Xaml.Window window)
+    {
+        CheckAccess();
+        if (captureDiagnostics && windowDiagnostics is null)
+            windowDiagnostics = WindowPreferenceDiagnostics.Create(window);
+    }
 
     private static long? SafeNumber(long value, bool positive = false)
         => value >= (positive ? 1 : 0) && value <= MaximumSafeInteger ? value : null;
@@ -139,9 +151,18 @@ internal sealed class SystemPreferenceNotifications : IDisposable
         }
         finally
         {
-            try { nativeDiagnostics?.Dispose(); }
+            try { windowDiagnostics?.Dispose(); }
             catch (Exception error) { lock (gate) nativeCleanupFailure ??= ExceptionDispatchInfo.Capture(error); }
-            finally { projectionDiagnostics?.Dispose(); }
+            finally
+            {
+                try { nativeDiagnostics?.Dispose(); }
+                catch (Exception error)
+                {
+                    lock (gate) nativeCleanupFailure = ExceptionDispatchInfo.Capture(nativeCleanupFailure is null ? error
+                        : new AggregateException(nativeCleanupFailure.SourceException, error));
+                }
+                finally { projectionDiagnostics?.Dispose(); }
+            }
         }
         ThrowIfFaulted();
     }
