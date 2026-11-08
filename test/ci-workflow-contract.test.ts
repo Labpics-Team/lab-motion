@@ -754,8 +754,14 @@ describe('нативный граф CI', () => {
     ['Windows скрывает отказ ввода', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native input')['continue-on-error'] = true; }],
     ['Windows пропускает touch', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native touch').if = false; }],
     ['Windows скрывает отказ touch', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Verify native touch')['continue-on-error'] = true; }],
-    ['Windows ввод архивирует SDK', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native input evidence').with!.path = '${{ runner.temp }}/native-input/'; }],
-    ['Windows загружает evidence мимо бюджета', 'ci.yml', (w: Workflow) => { step(w.jobs['native-windows']!, 'Keep native input evidence').with!.path = '${{ runner.temp }}/native-input/evidence/'; }],
+    ['Windows подготовка evidence захватывает SDK', 'ci.yml', (w: Workflow) => {
+      const item = step(w.jobs['native-windows']!, 'Prepare native input evidence');
+      item.run = item.run!.replace('"$env:RUNNER_TEMP/native-input/evidence"', '"$env:RUNNER_TEMP/native-input"');
+    }],
+    ['Windows подготовка evidence обходит бюджет', 'ci.yml', (w: Workflow) => {
+      step(w.jobs['native-windows']!, 'Prepare native input evidence').run =
+        'Copy-Item -Recurse "$env:RUNNER_TEMP/native-input/evidence" "$env:RUNNER_TEMP/native-input-upload"\n';
+    }],
     ['Windows не ограничивает неуспешные артефакты', 'ci.yml', (w: Workflow) => { delete step(w.jobs['native-windows']!, 'Prepare native input evidence').if; }],
     ['Windows пропускает финальный бюджет', 'ci.yml', (w: Workflow) => {
       w.jobs['native-windows']!.steps = w.jobs['native-windows']!.steps!.filter(item => item.name !== 'Prepare native input evidence');
