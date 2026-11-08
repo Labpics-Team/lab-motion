@@ -399,6 +399,24 @@ failed remove сохраняет Attached/Faulted и отдельную cleanup-
 различитель удаляется либо обычный путь отдельно проверяется без него в прежней приёмке.
 Ни control, ни native positive не заменяют original typed input witness.
 
+Отдельный capture-only receiver в той же DLL пассивно наблюдает `WM_SETTINGCHANGE`
+на собственном HWND через `SetWindowSubclass`. Он сохраняет исходный вызов и результат
+`DefSubclassProc`, не читает `lParam`, не вызывает getter, Apply, SPI или очередь.
+Его ABI 96 байт не меняет прежний UISettings ABI 72 байта. Добавочное поле `window`
+schema 2 содержит 22 значения: sequence, registration, State, OwnerMatched,
+SameSession, SameDesktop, ContextHResult, ControlPassed, ControlCount, ControlQpc,
+RawCount, ActionCount, LastRawQpc, LastActionQpc, QpcFrequency, ForwardCount,
+AddHResult, RemoveHResult, Attached, Active, Faulted, Destroyed. Synthetic control,
+raw messages и сообщения нужного action учитываются раздельно; поздний null сбрасывает
+предыдущую выборку. Сохраняется общий предел 1800 ASCII-символов с отказом при превышении.
+`setter` содержит шестое nullable поле `ContextStillMatches`: readonly проверку
+PID/TID/window station непосредственно перед прежним SET с flags 2. SameDesktop
+проверяется при attach, а не для каждого сообщения. Эти поля не идентифицируют
+конкретный SPI; положительный count не доказывает причину или своевременное прерывание,
+нулевой — отсутствие OS delivery. Failed remove сохраняет HWND reference до destroy;
+неудачная очистка не считается detached PASS. Provider остаётся исходным UISettings,
+а диагностический GREEN не квалифицирует обычный путь без этого наблюдения.
+
 В режиме trace callback делает один Flush после enqueue: иначе отказ очереди не
 имел бы будущего Update, способного записать receipt и false. Этот дополнительный
 lock/IO может изменить расписание и не доказывает причину исчезнувшего отказа.
