@@ -19,7 +19,8 @@ test('extracted Scenario/Finish-Tool controls bind both owner timeouts before ex
   }
   const owner = read('./verify-input.ps1');
   assert(/^\$restTimeoutSeconds = 8$/m.test(owner) && /^\$toolTimeoutMilliseconds = 30000$/m.test(owner));
-  assert(owner.includes('function Finish-Tool($Tool, [int]$Timeout = $toolTimeoutMilliseconds)'));
+  assert(owner.includes(". (Join-Path $PSScriptRoot 'process-tools.ps1')"));
+  assert(read('./process-tools.ps1').includes('function Finish-Tool($Tool, [int]$Timeout = $toolTimeoutMilliseconds)'));
 });
 
 function nativeReceiverViolations(source, wrapper, adapter) {
