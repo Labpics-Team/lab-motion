@@ -68,7 +68,7 @@ namespace WindowControls
 {
     namespace W = WindowPreferenceDiagnostics;
     // Конечные числовые фазы fixture; без адресов, HWND, lParam или текста OS error.
-    void Phase(unsigned value) { std::cerr << "window-control-phase: " << value << '\n' << std::flush; }
+    void Phase(unsigned value) { std::cout << "window-control-phase: " << value << '\n' << std::flush; }
     struct State { int settingForwards = 0; bool revokedBeforeDestroyForward = false; W::Record* record = nullptr; };
     constexpr LRESULT ForwardResult = 0x13579;
     LRESULT CALLBACK Base(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
