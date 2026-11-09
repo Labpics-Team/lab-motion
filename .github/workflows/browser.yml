@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: |
           corepack enable
-          corepack install --global pnpm@11.11.0
+          corepack install
 
       - name: Install dependencies
         shell: bash
@@ -61,12 +61,7 @@ jobs:
         shell: bash
         run: pnpm exec playwright install --dry-run ${{ matrix.browser }}
 
-      # Типопроверка browser-спеков (отдельный tsconfig: DOM lib + /dist/*→src/*
-      # path-mapping) — специфичный tsc не входит в основной `pnpm typecheck`.
-      - name: Typecheck browser specs
-        shell: bash
-        run: pnpm typecheck:browser
-
+      # Типы browser-спеков проверяет обязательный verify через check:static.
       - name: Build library
         shell: bash
         run: pnpm build

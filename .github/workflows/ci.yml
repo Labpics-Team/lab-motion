@@ -90,7 +90,7 @@ jobs:
       - name: Activate pinned pnpm
         run: |
           corepack enable
-          corepack install --global pnpm@11.11.0
+          corepack install
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -101,8 +101,8 @@ jobs:
       # Нативный TypeScript — обязательный merge-гейт (бриф D3), но отдельным
       # шагом, а не внутри check:static: его отказ должен быть виден как свой
       # красный чек, а release.yml зовёт check:static и не обязан зависеть от
-      # preview-компилятора. Согласованность шага с package.json стережёт
-      # check:native-ci — выпадение native-скрипта из CI ловится тестом.
+      # preview-компилятора. Тест разобранного workflow проверяет обязательный
+      # вызов native-скрипта, включая отказ от условного пропуска.
       - name: Native typecheck (TS7)
         run: pnpm typecheck:native
 
@@ -190,7 +190,7 @@ jobs:
       - name: Activate pinned pnpm
         run: |
           corepack enable
-          corepack install --global pnpm@11.11.0
+          corepack install
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -199,7 +199,6 @@ jobs:
         run: pnpm build
 
       - name: Vitest
-        id: vitest
         shell: bash
         run: |
           set +e
@@ -221,6 +220,7 @@ jobs:
     name: driver mutation
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    # Stryker и выбранные тесты читают src; dist проверяется другими наборами.
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -235,13 +235,10 @@ jobs:
       - name: Activate pinned pnpm
         run: |
           corepack enable
-          corepack install --global pnpm@11.11.0
+          corepack install
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm build
 
       # Исторический phase-2b driver был оставлен ниже mutation-пола. Гейт мутирует
       # весь src/driver.ts и использует capability-shaped suite; unknown killable
@@ -313,12 +310,7 @@ jobs:
       - name: Require every candidate check
         shell: bash
         env:
-          VERIFY_RESULT: ${{ needs.verify.result }}
-          TESTS_RESULT: ${{ needs.tests.result }}
-          MUTATION_RESULT: ${{ needs.mutation.result }}
-          BROWSER_RESULT: ${{ needs.browser-static.result }}
-          DOCS_RESULT: ${{ needs.documentation.result }}
-          SECURITY_RESULT: ${{ needs.security.result }}
+          CHECK_RESULTS: ${{ toJSON(needs) }}
           EVENT_NAME: ${{ github.event_name }}
           S5_CAPTURE_DIAGNOSTIC: ${{ inputs.s5_capture_diagnostic }}
           PERFORMANCE_CONTRACT_ONLY: ${{ inputs.performance_contract_only }}
@@ -331,9 +323,11 @@ jobs:
             [[ "$PROFILE_BASELINE" != true ]]
             [[ "$S5_CAPTURE_DIAGNOSTIC" != true || "$PERFORMANCE_CONTRACT_ONLY" != true ]]
           fi
-          [[ "$VERIFY_RESULT" == success ]]
-          [[ "$TESTS_RESULT" == success ]]
-          [[ "$MUTATION_RESULT" == success ]]
-          [[ "$BROWSER_RESULT" == success ]]
-          [[ "$DOCS_RESULT" == success ]]
-          [[ "$SECURITY_RESULT" == success ]]
+          python3 - <<'PY'
+          import json, os
+          results = json.loads(os.environ['CHECK_RESULTS'])
+          if (not isinstance(results, dict) or not results
+              or any(not isinstance(check, dict) or check.get('result') != 'success'
+                     for check in results.values())):
+              raise SystemExit('Every required check must succeed')
+          PY

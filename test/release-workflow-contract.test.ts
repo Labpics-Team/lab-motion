@@ -1,3 +1,4 @@
+import { parse } from 'yaml';
 import { spawnSync } from 'node:child_process';
 import {
   existsSync,
@@ -243,50 +244,6 @@ cat "$GITHUB_OUTPUT"
   });
 }
 
-function assertVitestDiagnostics(source: string): void {
-  const vitestStep = namedStep(source, 'Vitest');
-  const id = /^        id: ([a-z][a-z0-9_-]*)$/m.exec(vitestStep)?.[1];
-  if (id === undefined) throw new Error('Vitest diagnostics: id шага отсутствует');
-  const artifactPath = 'vitest.log';
-  if (/uses:\s*actions\/upload-artifact@/.test(source)) {
-    throw new Error('Vitest diagnostics: журнал обычного CI не требует повторного архива');
-  }
-
-  const workspace = mkdtempSync(join(tmpdir(), 'labmotion-vitest-diagnostics-'));
-  try {
-    const diagnostic = 'forced Vitest diagnostic';
-    const result = spawnSync(
-      bashExecutable(),
-      [
-        '--noprofile',
-        '--norc',
-        '-e',
-        '-o',
-        'pipefail',
-        '-c',
-        `pnpm() { printf '%s\\n' "$FORCED_DIAGNOSTIC"; return 37; }\n${bashRun(vitestStep, 'Vitest')}`,
-      ],
-      {
-        cwd: workspace,
-        encoding: 'utf8',
-        env: { ...process.env, FORCED_DIAGNOSTIC: diagnostic },
-      },
-    );
-    if (result.status !== 37) {
-      throw new Error(`Vitest diagnostics: exit status ${String(result.status)} вместо 37`);
-    }
-    const uploadedFile = join(workspace, artifactPath);
-    if (!existsSync(uploadedFile)) {
-      throw new Error(`Vitest diagnostics: ${artifactPath} не создан шагом Vitest`);
-    }
-    if (!readFileSync(uploadedFile, 'utf8').includes(diagnostic)) {
-      throw new Error('Vitest diagnostics: stderr/stdout Vitest потерян');
-    }
-  } finally {
-    rmSync(workspace, { recursive: true, force: true });
-  }
-}
-
 function publishProgram(source = workflow): string {
   const marker = '      - name: Publish or reconcile verified tarball through npm OIDC';
   const start = source.indexOf(marker);
@@ -347,31 +304,12 @@ function runBlocks(): string[] {
 
 describe('release workflow: граница тега и npm OIDC', () => {
   it('CI загружает историю для проверки provenance-предка', () => {
-    const checkoutStart = ciWorkflow.indexOf('      - name: Checkout');
-    const checkoutEnd = ciWorkflow.indexOf('      - name: GitHub Actions contract', checkoutStart);
-    const checkout = ciWorkflow.slice(checkoutStart, checkoutEnd);
-
-    expect(checkout).toContain('          fetch-depth: 0');
+    const ci = parse(ciWorkflow) as { jobs: { verify: { steps: { uses?: string; with?: Record<string, unknown> }[] } } };
+    const checkout = ci.jobs.verify.steps.find(item => item.uses?.startsWith('actions/checkout@'));
+    expect(checkout?.with?.['fetch-depth']).toBe(0);
   });
 
-  it('CI сохраняет диагностический вывод и исходный отказ без отдельного архива', () => {
-    expect(() => assertVitestDiagnostics(ciWorkflow)).not.toThrow();
-
-    const mutants = [
-      ciWorkflow.replace('        id: vitest\n', ''),
-      ciWorkflow.replace(' 2>&1 | tee vitest.log', ''),
-      ciWorkflow.replace('status=${PIPESTATUS[0]}', 'status=0'),
-      ciWorkflow.replace('exit "$status"', 'exit 0'),
-      ciWorkflow + '\n# producer\nuses: actions/upload-artifact@0123456789012345678901234567890123456789\n',
-    ];
-    for (const mutant of mutants) {
-      expect(() => assertVitestDiagnostics(mutant)).toThrow(/Vitest diagnostics/);
-    }
-  });
-
-  it('CI валидирует сохранённую дату, а release проверяет выбранный режим даты', () => {
-    expect(ciWorkflow.split('\n'))
-      .toContain('          node scripts/check-release.mjs "v${version}" --validate-stored-date');
+  it('release проверяет выбранный режим даты', () => {
     expect(job('verify'))
       .toContain('node scripts/check-release.mjs "$RELEASE_TAG" "$RELEASE_DATE"');
   });

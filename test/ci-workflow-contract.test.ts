@@ -1,11 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { isMap, isScalar, isSeq, parse, parseDocument, stringify } from 'yaml';
-import vitestConfig from '../vitest.config.js';
+import { createVitest, type CliOptions } from 'vitest/node';
 
 type Step = {
   uses?: string;
@@ -48,13 +48,15 @@ type Workflow = {
 
 const playwrightPackage = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const playwrightVersion = playwrightPackage.devDependencies['@playwright/test'] as string;
-// Образ закреплён в контракте; обновление пакета требует повторной проверки образа.
-const playwrightImage = 'mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea';
+const nodeFloor = String(playwrightPackage.engines.node).replace(/^>=/, '').split('.');
+while (nodeFloor.length < 3) nodeFloor.push('0');
+const minimumNode = nodeFloor.join('.');
 
 const directory = fileURLToPath(new URL('../.github/workflows/', import.meta.url));
-const sources = () => new Map(readdirSync(directory)
+const sourceFiles = new Map(readdirSync(directory)
   .filter((name) => /\.ya?ml$/.test(name))
   .map((name) => [name, readFileSync(join(directory, name), 'utf8')]));
+const sources = () => new Map(sourceFiles);
 const candidateEvents = new Set(['pull_request', 'pull_request_target', 'merge_group']);
 const events = (value: unknown): string[] => {
   if (typeof value === 'string') return [value];
@@ -64,119 +66,11 @@ const events = (value: unknown): string[] => {
 };
 const bash = process.platform === 'win32'
   ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git/bin/bash.exe') : 'bash';
-const peers = ['verify', 'tests', 'mutation', 'browser-static', 'documentation', 'security'];
-const activatePnpm = 'corepack enable\ncorepack install --global pnpm@11.11.0';
-const vitestCommand = 'set +e\npnpm vitest run 2>&1 | tee vitest.log\nstatus=${PIPESTATUS[0]}\nexit "$status"';
-const gateCommand = 'set -euo pipefail\n'
-  + 'if [[ "$EVENT_NAME" == workflow_dispatch && ( "$S5_CAPTURE_DIAGNOSTIC" == true || "$PERFORMANCE_CONTRACT_ONLY" == true ) ]]; then\n'
-  + '  [[ "$PERFORMANCE_BASELINE" =~ ^[0-9a-f]{40}$ ]]\n'
-  + '  [[ "$PROFILE_BASELINE" != true ]]\n'
-  + '  [[ "$S5_CAPTURE_DIAGNOSTIC" != true || "$PERFORMANCE_CONTRACT_ONLY" != true ]]\n'
-  + 'fi\n[[ "$VERIFY_RESULT" == success ]]\n'
-  + '[[ "$TESTS_RESULT" == success ]]\n[[ "$MUTATION_RESULT" == success ]]\n'
-  + '[[ "$BROWSER_RESULT" == success ]]\n[[ "$DOCS_RESULT" == success ]]\n'
-  + '[[ "$SECURITY_RESULT" == success ]]';
-const actionlintCommand = [
-  'archive="$RUNNER_TEMP/actionlint.tar.gz"',
-  'install_dir="$RUNNER_TEMP/actionlint"',
-  "curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \\",
-  '  "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" \\',
-  '  --output "$archive"',
-  "printf '%s  %s\\n' \"$ACTIONLINT_ARCHIVE_SHA256\" \"$archive\" | sha256sum --check --status -",
-  'mkdir "$install_dir"',
-  'tar -xzf "$archive" -C "$install_dir"',
-  '"$install_dir/actionlint"',
-].join('\n');
-// Скан зависимостей, конфигурации и секретов: trivy закреплён по sha256, принятые записи берутся
-// только из .trivyignore.yaml, ни переменные TRIVY_*, ни trivy.yaml проверяемого дерева настройки не
-// меняют, уязвимость с вышедшим исправлением блокирует и при записи, а секреты ищутся и в тестах,
-// примерах и документации и не принимаются никакими записями.
-const securityCommand = [
-  'set -euo pipefail',
-  '# trivy читает переменные TRIVY_* как флаги: охват проверки задаёт только этот шаг.',
-  'unset "${!TRIVY_@}"',
-  'version=0.74.0',
-  'sum=2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a',
-  'dir="$RUNNER_TEMP/trivy"',
-  'mkdir -p "$dir"',
-  'curl -fsSL --retry 3 --retry-all-errors -o "$dir/trivy.tgz" \\',
-  '  "https://github.com/aquasecurity/trivy/releases/download/v$version/trivy_${version}_Linux-64bit.tar.gz"',
-  'echo "$sum  $dir/trivy.tgz" | sha256sum -c -',
-  'tar -xzf "$dir/trivy.tgz" -C "$dir" trivy',
-  'accepted=(--ignorefile /dev/null)',
-  '[ -f .trivyignore.yaml ] && accepted=(--ignorefile .trivyignore.yaml)',
-  '# Настройки сканера задаёт шаг: trivy.yaml из проверяемого дерева их не меняет.',
-  'scan() { "$dir/trivy" fs --config /dev/null --cache-dir "$dir/cache" --exit-code 1 --no-progress "$@" .; }',
-  'scan --scanners vuln,misconfig --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps "${accepted[@]}"',
-  '# Исправление вышло — принятая раньше уязвимость снова блокирует.',
-  'scan --scanners vuln --severity UNKNOWN,HIGH,CRITICAL --include-dev-deps --ignore-unfixed --ignorefile /dev/null',
-  '# Секрет в тестах, примерах и документации — такая же утечка: встроенные исключения trivy для них сняты,',
-  '# а записи .trivyignore.yaml к секретам не применяются.',
-  String.raw`printf 'disable-allow-rules:\n  - tests\n  - examples\n  - markdown\n' > "$dir/secret.yaml"`,
-  'scan --scanners secret --secret-config "$dir/secret.yaml" --ignorefile /dev/null',
-  '# Тот же путь сканирования должен заметить тестовый ключ внутри examples/.',
-  '# Проба живёт только в окружении CI и не попадает в исходники.',
-  'probe_dir=$(mktemp -d examples/ci-trivy-canary.XXXXXXXX)',
-  String.raw`trap 'rm -rf -- "$probe_dir"' EXIT`,
-  'probe_file="$probe_dir/credentials.txt"',
-  'python3 test/ci-trivy-canary.py seed "$probe_file"',
-  'set +e',
-  'scan --scanners secret --secret-config "$dir/secret.yaml" --ignorefile /dev/null --format json > "$dir/secret-canary.json"',
-  'canary_status=$?',
-  'set -e',
-  'python3 test/ci-trivy-canary.py verify "$dir/secret-canary.json" "$probe_file" "$canary_status"',
-  'rm -rf -- "$probe_dir"',
-  'trap - EXIT',
-].join('\n');
-const floorCommand = 'shopt -s nullglob\narchives=(node-floor-artifact/*.tgz)\n'
-  + '[[ ${#archives[@]} -eq 1 ]] \\\n'
-  + '  || { echo "::error::ожидался ровно один tgz, найдено: ${#archives[@]}"; exit 1; }\n'
-  + 'node scripts/pack-smoke.mjs "${archives[0]}"';
-const floorMinimumCommand = 'test "$(node --version)" = v22.0.0\n' + floorCommand;
-
-const verifyCommands = [
-  actionlintCommand,
-  activatePnpm,
-  'pnpm install --frozen-lockfile',
-  'pnpm check:static',
-  'pnpm typecheck:native',
-  'pnpm build',
-  'node scripts/check-docs-facts.mjs',
-  'node scripts/check-docs-drift.mjs',
-  'node scripts/check-issue-forms.mjs',
-  'version="$(node -p "require(\'./package.json\').version")"\n'
-    + 'node scripts/check-release.mjs "v${version}" --validate-stored-date',
-  'pnpm size',
-  'pnpm pack:compat',
-  'pnpm acceptance:compiler',
-  'mkdir node-floor-artifact\npnpm pack --pack-destination node-floor-artifact',
-  floorCommand,
-  floorMinimumCommand,
-];
-const testCommands = [
-  activatePnpm,
-  'pnpm install --frozen-lockfile',
-  'pnpm build',
-  vitestCommand,
-  'node test/fixtures/server-thread-cpu-clock-check.mjs',
-];
-const securityCommands = [securityCommand];
-const mutationCommands = [
-  activatePnpm,
-  'pnpm install --frozen-lockfile',
-  'pnpm build',
-  'pnpm exec stryker run stryker.driver.config.mjs',
-];
-const browserCommands = [
-  activatePnpm,
-  'pnpm install --frozen-lockfile',
-  'pnpm exec playwright install --dry-run ${{ matrix.browser }}',
-  'pnpm typecheck:browser',
-  'pnpm build',
-  'pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }} --fail-on-flaky-tests',
-];
-
-
+// Windows alias python3 может вести в Store; shell-проверки используют установленный Python.
+const pythonPath = process.platform === 'win32'
+  ? spawnSync('python', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' }).stdout.trim() : '';
+const pythonSetup = process.platform === 'win32'
+  ? `python3() { '${pythonPath.replaceAll('\\', '/').replaceAll("'", "'\\''")}' "$@"; }\nexport -f python3\n` : '';
 // Закрепление внешних actions проверяется правилом, а не значениями: SHA и версию меняет
 // Dependabot, поэтому контракт требует полный SHA разрешённого репозитория, а не конкретный.
 const allowedActions = new Set([
@@ -233,266 +127,264 @@ function assertPinned(files: Map<string, string>) {
   }
 }
 
-// Порядок и inputs actions задают реальную ОС, Node и передачу проверенного архива.
-const requiredActions = {
-  "verify": [
-    {
-      "index": 0,
-      "name": "Checkout",
-      "uses": "actions/checkout@<sha>",
-      "with": {
-        "persist-credentials": false,
-        "fetch-depth": 0
-      }
-    },
-    {
-      "index": 2,
-      "name": "Setup Node",
-      "uses": "actions/setup-node@<sha>",
-      "with": {
-        "node-version": "24"
-      }
-    },
-    {
-      "index": 17,
-      "name": "Setup consumer Node floor",
-      "uses": "actions/setup-node@<sha>",
-      "with": {
-        "node-version": "22.0.0"
-      }
-    }
-  ],
-  "conformance": [
-    {
-      "index": 0,
-      "name": "Checkout",
-      "uses": "actions/checkout@<sha>",
-      "with": {
-        "persist-credentials": false
-      }
-    },
-    {
-      "index": 1,
-      "name": "Setup Node",
-      "uses": "actions/setup-node@<sha>",
-      "with": {
-        "node-version": "24"
-      }
-    }
-  ],
-  "tests": [
-    {
-      "index": 0,
-      "name": "Checkout",
-      "uses": "actions/checkout@<sha>",
-      "with": {
-        "persist-credentials": false,
-        "fetch-depth": 0
-      }
-    },
-    {
-      "index": 1,
-      "name": "Setup Node",
-      "uses": "actions/setup-node@<sha>",
-      "with": {
-        "node-version": "24"
-      }
-    },
-    {
-      "index": 6,
-      "name": "Setup registered native-clock Node",
-      "uses": "actions/setup-node@<sha>",
-      "with": {
-        "node-version": "24.19.0"
-      }
-    }
-  ],
-  "mutation": [
-    {
-      "index": 0,
-      "name": "Checkout",
-      "uses": "actions/checkout@<sha>",
-      "with": {
-        "persist-credentials": false
-      }
-    },
-    {
-      "index": 1,
-      "name": "Setup Node",
-      "uses": "actions/setup-node@<sha>",
-      "with": {
-        "node-version": "24"
-      }
-    }
-  ],
-  "security": [
-    {
-      "index": 0,
-      "name": "Checkout",
-      "uses": "actions/checkout@<sha>",
-      "with": {
-        "persist-credentials": false
-      }
-    }
-  ]
-};
 
-function step(job: Job, name: string): Step {
-  const found = job.steps?.find((item) => item.name === name);
-  if (!found) throw new Error(`Нет обязательного шага ${name}`);
-  return found;
+function runStep(job: Job, pattern: RegExp): Step {
+  const found = (job.steps ?? []).filter(item => item.run && pattern.test(item.run));
+  expect(found, `Ожидался один executable шаг: ${pattern}`).toHaveLength(1);
+  return found[0]!;
 }
 
-function assertCommands(job: Job, commands: string[]) {
-  const runs = (job.steps ?? []).filter((item) => item.run);
-  expect(runs.map((item) => item.run!.trim())).toEqual(commands);
-  for (const item of runs) {
-    expect(item.if).toBeUndefined();
-    expect(item['continue-on-error']).toBeUndefined();
+function admitted(job: Job, item?: Step) {
+  for (const value of [job, ...(item ? [item] : [])]) {
+    expect(value.if).toBeUndefined();
+    expect(value['continue-on-error']).toBeUndefined();
+    expect((value as Job).defaults).toBeUndefined();
+  }
+  if (item) {
     expect(item['working-directory']).toBeUndefined();
     expect([undefined, 'bash']).toContain(item.shell);
   }
 }
 
+// Одна публичная команда — один executable шаг; текст heredoc и недостижимая ветка им не являются.
+const executableLines = (item: Step) => item.run!.trim().split('\n')
+  .map(line => line.trim()).filter(line => line && !line.startsWith('#'));
+function command(job: Job, line: string) {
+  const found = (job.steps ?? []).filter(item => item.run && executableLines(item).join('\n') === line);
+  expect(found, `Ожидался один executable шаг: ${line}`).toHaveLength(1);
+  admitted(job, found[0]);
+  if (line !== 'pnpm install --frozen-lockfile') {
+    before(job, command(job, 'pnpm install --frozen-lockfile'), found[0]!);
+    runtime(job, found[0]!);
+  }
+  return found[0]!;
+}
+
+function before(job: Job, first: Step, second: Step) {
+  expect(job.steps!.indexOf(first)).toBeLessThan(job.steps!.indexOf(second));
+}
+
+// Читаются поля наблюдаемого argv, а не shell-текст. Pflag slice-флаги дополняются,
+// scalar-флаги заменяются последним значением; оба способа записи поля равноправны.
+function optionValues(args: string[], ...names: string[]): string[] {
+  const values: string[] = [];
+  for (const [index, arg] of args.entries()) {
+    for (const name of names) {
+      if (arg === name) values.push(args[index + 1]!);
+      else if (arg.startsWith(name + '=')) values.push(arg.slice(name.length + 1));
+      else if (/^-[^-]$/.test(name) && arg.startsWith(name)) values.push(arg.slice(name.length));
+    }
+  }
+  return values;
+}
+const sliceOption = (args: string[], name: string) => optionValues(args, name).flatMap(value => value.split(',')).filter(Boolean);
+const scalarOption = (args: string[], name: string) => optionValues(args, name).at(-1);
+function booleanOption(args: string[], name: string): boolean {
+  return args.filter(arg => arg === name || arg.startsWith(name + '=')).at(-1) === name
+    || args.filter(arg => arg === name || arg.startsWith(name + '=')).at(-1) === name + '=true';
+}
+function toolCalls(path: string): string[][] {
+  return readFileSync(path, 'utf8').split('\0\0').filter(Boolean).map(call => call.split('\0'));
+}
+function assertArchiveLineage(temp: string, expectedDigest?: string, extracted = true) {
+  const downloads = toolCalls(join(temp, 'download.args'));
+  const extracts = toolCalls(join(temp, 'extract.args'));
+  expect(downloads).toHaveLength(1);
+  expect(extracts).toHaveLength(extracted ? 1 : 0);
+  const output = optionValues(downloads[0]!, '--output', '-o');
+  expect(output).toHaveLength(1);
+  const check = /^([a-f0-9]{64})\s+(.+)$/.exec(readFileSync(join(temp, 'checksum.input'), 'utf8').trim());
+  expect(check, 'Checksum должен читать скачанный архив').not.toBeNull();
+  if (expectedDigest) expect(check![1]).toBe(expectedDigest);
+  const checks = toolCalls(join(temp, 'checksum.args'));
+  expect(checks).toHaveLength(1);
+  expect(checks[0]!.some(arg => arg === '--check' || /^-[^-]*c/.test(arg))).toBe(true);
+  expect(checks[0]).toContain('-');
+  expect(resolve(check![2]!)).toBe(resolve(output[0]!));
+  if (!extracted) return;
+  let archive: string | undefined;
+  for (const [index, arg] of extracts[0]!.entries()) {
+    if (arg === '--file') archive = extracts[0]![index + 1];
+    else if (arg.startsWith('--file=')) archive = arg.slice('--file='.length);
+    const shortFile = /^-([^-]*?)f(.*)$/.exec(arg);
+    if (shortFile) archive = shortFile[2] || extracts[0]![index + 1];
+  }
+  expect(archive).toBeDefined();
+  expect(resolve(archive!)).toBe(resolve(output[0]!));
+}
+
+// Эти seams наблюдают внешние команды; выбор файла, pipeline и распространение отказа
+// исполняет настоящий Bash из workflow. NUL сохраняет границы argv, включая пробелы.
+const archiveTrace = `
+curl() { printf '%s\\0' "$@" >> "$RUNNER_TEMP/download.args"; printf '\\0' >> "$RUNNER_TEMP/download.args"; }
+sha256sum() { printf '%s\\0' "$@" >> "$RUNNER_TEMP/checksum.args"; printf '\\0' >> "$RUNNER_TEMP/checksum.args"; cat > "$RUNNER_TEMP/checksum.input"; return "$CHECKSUM_STATUS"; }
+tar() {
+  printf '%s\\0' "$@" >> "$RUNNER_TEMP/extract.args"; printf '\\0' >> "$RUNNER_TEMP/extract.args"
+  TEST_TOOL_DIRECTORY=
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -C|--directory) shift; TEST_TOOL_DIRECTORY="$1" ;;
+      -C*) TEST_TOOL_DIRECTORY="\${1:2}" ;;
+      --directory=*) TEST_TOOL_DIRECTORY="\${1#--directory=}" ;;
+    esac
+    shift
+  done
+  [[ -d "$TEST_TOOL_DIRECTORY" ]]
+  install_test_tool
+}
+`;
+function initializeArchiveTrace(temp: string) {
+  for (const name of ['download.args', 'extract.args', 'checksum.args', 'checksum.input']) writeFileSync(join(temp, name), '');
+}
+
+function assertActionlintStep(item: Step, checksumStatus = 0, toolStatus = 0) {
+  const temp = mkdtempSync(join(tmpdir(), 'motion-ci-actionlint-'));
+  initializeArchiveTrace(temp);
+  try {
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c',
+      `${archiveTrace}\ninstall_test_tool() { printf '#!/bin/sh\\nexit ${toolStatus}\\n' > "$TEST_TOOL_DIRECTORY/actionlint"; chmod +x "$TEST_TOOL_DIRECTORY/actionlint"; }\n${item.run}`], {
+      encoding: 'utf8', timeout: 5000,
+      env: { ...process.env, ...item.env, RUNNER_TEMP: temp.replaceAll('\\', '/'), CHECKSUM_STATUS: String(checksumStatus), MSYS2_ARG_CONV_EXCL: '*' },
+    });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status, actual.stderr).toBe(checksumStatus || toolStatus);
+    assertArchiveLineage(temp, item.env!.ACTIONLINT_ARCHIVE_SHA256, checksumStatus === 0);
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+}
+
+function assertSecurityStep(item: Step, code = 0, checksumStatus = 0) {
+  const temp = mkdtempSync(join(tmpdir(), 'motion-ci-security-'));
+  const trace = join(temp, 'calls.jsonl');
+  const scanner = join(temp, 'trivy.sh');
+  initializeArchiveTrace(temp);
+  writeFileSync(trace, '');
+  // Настоящий Python seed/verify остаётся в shell-пути. Seams заменяют только внешние tools.
+  writeFileSync(scanner, `#!/usr/bin/env bash\npython3 - "$@" <<'PY'\nimport json, os, sys\nfrom pathlib import Path\nargs = sys.argv[1:]\nwith open(os.environ['SCANNER_TRACE'], 'a') as out:\n    out.write(json.dumps({'args': args, 'env': [key for key in os.environ if key.startswith('TRIVY_')]}) + '\\n')\nif any(arg == '--format' or arg.startswith('--format=') for arg in args):\n    print(json.dumps({'Results': [{'Target': probe.as_posix(), 'Secrets': [{'RuleID': 'aws-access-key-id'}]} for probe in Path('examples').glob('ci-trivy-canary.*/credentials.txt')]}))\n    sys.exit(1)\nsys.exit(${code})\nPY\n`, { mode: 0o755 });
+  try {
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c',
+      `${pythonSetup}${archiveTrace}\ninstall_test_tool() { cp "$SCANNER_STUB" "$TEST_TOOL_DIRECTORY/trivy"; chmod +x "$TEST_TOOL_DIRECTORY/trivy"; }\n${item.run}`], {
+      cwd: fileURLToPath(new URL('../', import.meta.url)), encoding: 'utf8', timeout: 5000,
+      env: { ...process.env, RUNNER_TEMP: temp.replaceAll('\\', '/'), SCANNER_TRACE: trace.replaceAll('\\', '/'),
+        SCANNER_STUB: scanner.replaceAll('\\', '/'), CHECKSUM_STATUS: String(checksumStatus), TRIVY_SKIP_DIRS: 'examples', MSYS2_ARG_CONV_EXCL: '*' },
+    });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status, actual.stderr).toBe(checksumStatus || code);
+    assertArchiveLineage(temp, undefined, checksumStatus === 0);
+    const lines = readFileSync(trace, 'utf8').trim();
+    const calls = lines ? lines.split('\n').map(line => JSON.parse(line) as { args: string[]; env: string[] }) : [];
+    expect(calls).toHaveLength(checksumStatus ? 0 : code ? 1 : 4);
+    for (const call of calls) {
+      expect(call.env).toEqual([]);
+      expect(call.args[0]).toBe('fs');
+      expect(call.args.at(-1)).toBe('.');
+      expect(scalarOption(call.args, '--config')).toBe('/dev/null');
+      expect(scalarOption(call.args, '--exit-code')).toBe('1');
+      expect(sliceOption(call.args, '--skip-dirs')).toEqual([]);
+      expect(sliceOption(call.args, '--skip-files')).toEqual([]);
+    }
+    if (checksumStatus) return;
+    const severities = (args: string[]) => optionValues(args, '--severity').length
+      ? sliceOption(args, '--severity') : ['UNKNOWN', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+    expect(sliceOption(calls[0]!.args, '--scanners')).toEqual(expect.arrayContaining(['vuln', 'misconfig']));
+    expect(severities(calls[0]!.args)).toEqual(expect.arrayContaining(['UNKNOWN', 'HIGH', 'CRITICAL']));
+    expect(booleanOption(calls[0]!.args, '--include-dev-deps')).toBe(true);
+    expect(booleanOption(calls[0]!.args, '--ignore-unfixed')).toBe(false);
+    expect(scalarOption(calls[0]!.args, '--ignorefile')).toBe(
+      readdirSync(fileURLToPath(new URL('../', import.meta.url))).includes('.trivyignore.yaml') ? '.trivyignore.yaml' : '/dev/null');
+    if (!code) {
+      expect(sliceOption(calls[1]!.args, '--scanners')).toContain('vuln');
+      expect(severities(calls[1]!.args)).toEqual(expect.arrayContaining(['UNKNOWN', 'HIGH', 'CRITICAL']));
+      expect(booleanOption(calls[1]!.args, '--include-dev-deps')).toBe(true);
+      expect(booleanOption(calls[1]!.args, '--ignore-unfixed')).toBe(true);
+      for (const index of [1, 2, 3]) expect(scalarOption(calls[index]!.args, '--ignorefile')).toBe('/dev/null');
+      for (const index of [2, 3]) {
+        expect(sliceOption(calls[index]!.args, '--scanners')).toContain('secret');
+        expect(severities(calls[index]!.args)).toEqual(expect.arrayContaining(['UNKNOWN', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']));
+        const config = parse(readFileSync(scalarOption(calls[index]!.args, '--secret-config')!, 'utf8'));
+        expect(config['disable-allow-rules']).toEqual(expect.arrayContaining(['tests', 'examples', 'markdown']));
+      }
+      expect(scalarOption(calls[3]!.args, '--format')).toBe('json');
+    }
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+}
+
+function assertPackConsumer(item: Step, floor: boolean, count: number, code = 0, version = minimumNode) {
+  const temp = mkdtempSync(join(tmpdir(), 'motion-ci-consumer-'));
+  const trace = join(temp, 'node.args');
+  mkdirSync(join(temp, 'node-floor-artifact'));
+  for (let index = 0; index < count; index++) writeFileSync(join(temp, 'node-floor-artifact', `${index}.tgz`), 'package seam');
+  writeFileSync(trace, '');
+  try {
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c',
+      `node() { printf '%s\\0' "$@" >> "$NODE_TRACE"; printf '\\0' >> "$NODE_TRACE"; if [[ "$1" == --version ]]; then printf 'v%s\\n' "$NODE_VERSION"; else return "$SMOKE_STATUS"; fi; }\n${item.run}`], {
+      cwd: temp, encoding: 'utf8', timeout: 5000,
+      env: { ...process.env, NODE_TRACE: trace.replaceAll('\\', '/'), NODE_VERSION: version, SMOKE_STATUS: String(code) },
+    });
+    expect(actual.error).toBeUndefined();
+    const wrongFloor = floor && version !== minimumNode;
+    expect(actual.status, actual.stderr).toBe(wrongFloor || count !== 1 ? 1 : code);
+    const expected = floor ? [['--version']] : [];
+    if (!wrongFloor && count === 1) expected.push(['scripts/pack-smoke.mjs', 'node-floor-artifact/0.tgz']);
+    expect(toolCalls(trace)).toEqual(expected);
+  } finally { rmSync(temp, { recursive: true, force: true }); }
+}
+
+function runtime(job: Job, consumer: Step, version?: string) {
+  const prior = job.steps!.slice(0, job.steps!.indexOf(consumer));
+  const setup = prior.findLast(item => item.uses?.startsWith('actions/setup-node@'));
+  expect(setup, 'Runtime должен быть настроен до потребителя').toBeDefined();
+  admitted(job, setup);
+  const actual = String(setup!.with?.['node-version']);
+  if (version) expect(actual).toBe(version);
+  else expect(Number(actual.split('.')[0])).toBeGreaterThanOrEqual(Number(nodeFloor[0]));
+}
+
+function preparation(job: Job) {
+  const install = command(job, 'pnpm install --frozen-lockfile');
+  const checkout = job.steps!.find(item => item.uses?.startsWith('actions/checkout@'));
+  expect(checkout).toBeDefined();
+  admitted(job, checkout);
+  expect(checkout!.with?.['persist-credentials']).toBe(false);
+  expect(checkout!.with?.ref).toBeUndefined();
+  before(job, checkout!, install);
+  runtime(job, install);
+  const activate = runStep(job, /(?:^|\n)\s*corepack install\s*(?:\n|$)/);
+  admitted(job, activate);
+  expect(executableLines(activate)).toEqual(['corepack enable', 'corepack install']);
+  before(job, activate, install);
+  runtime(job, activate);
+  return install;
+}
+
+// Полнота не зависит от нынешнего количества долей и их порядка.
+function assertShards(parts: BrowserShard[]) {
+  for (const browser of ['chromium', 'firefox', 'webkit']) {
+    const selected = parts.filter(part => part.browser === browser);
+    expect(selected.length, browser).toBeGreaterThan(0);
+    const total = selected[0]!.shards;
+    expect(Number.isSafeInteger(total) && total > 0, browser).toBe(true);
+    expect(selected.every(part => part.shards === total), browser).toBe(true);
+    expect(selected.length, browser).toBe(total);
+    expect(new Set(selected.map(part => part.shard)).size, browser).toBe(total);
+    expect(selected.every(part => Number.isSafeInteger(part.shard) && part.shard >= 1 && part.shard <= total), browser).toBe(true);
+  }
+  expect(parts.every(part => ['chromium', 'firefox', 'webkit'].includes(part.browser))).toBe(true);
+}
+
 function assertNativeGraph(files: Map<string, string>) {
   assertPinned(files);
   const workflows = new Map([...files].map(([name, source]) => [name, parse(source) as Workflow]));
-  expect([...workflows].filter(([, w]) => events(w.on).some((event) => candidateEvents.has(event)))
-    .map(([name]) => name).sort()).toEqual(['ci.yml']);
-  expect(files.has('ci-gate.yml')).toBe(false);
-  // Обычная проверка кандидата не выгружает архивы. Экспорт разрешён только
-  // защищённому release и явно запрошенному измерению производительности.
-  for (const [name, workflow] of workflows) {
-    if (name === 'release.yml') continue;
-    for (const [id, job] of Object.entries(workflow.jobs)) {
-      for (const [index, item] of (job.steps ?? []).entries()) {
-        if (name === 'performance.yml' && id === 'compare' && index === job.steps!.length - 1) {
-          const { name: _name, ...contract } = item;
-          expect({ ...contract, uses: unpin(item.uses ?? '') }).toEqual({
-            if: '${{ always() }}',
-            uses: 'actions/upload-artifact@<sha>',
-            with: {
-              name: 'motion-performance-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
-              path: 'candidate/bench/compare/results/\n${{ runner.temp }}/motion-performance/\n',
-              'retention-days': 5,
-              'if-no-files-found': 'error',
-            },
-          });
-        } else {
-          expect(item.uses ?? '').not.toMatch(/^actions\/(upload-artifact|upload-pages-artifact)@/);
-        }
-      }
-    }
-  }
-  const release = workflows.get('release.yml')!;
-  const sealed = step(release.jobs.verify!, 'Upload sealed package');
-  expect(sealed.uses).toMatch(/^actions\/upload-artifact@/);
-  expect(sealed.with?.['retention-days']).toBe(30);
-  expect(sealed.if).toBeUndefined();
-  expect(sealed['continue-on-error']).toBeUndefined();
-  expect(release.jobs.publish!.environment).toBe('npm');
-  const download = step(release.jobs.publish!, 'Download sealed package by artifact ID');
-  expect(download.uses).toMatch(/^actions\/download-artifact@/);
-  expect(download.with?.['artifact-ids']).toBe('$' + '{{ needs.verify.outputs.artifact_id }}');
+  expect([...workflows].filter(([, w]) => events(w.on).some(event => candidateEvents.has(event)))
+    .map(([name]) => name)).toEqual(['ci.yml']);
   const ci = workflows.get('ci.yml')!;
-  const browser = workflows.get('browser.yml')!;
-  const ciEvents = structuredClone(ci.on);
-  // Descriptions are prose, not the dispatch interface under test.
-  const dispatch = ciEvents.workflow_dispatch as { inputs: Record<string, { description?: string }> };
-  for (const input of Object.values(dispatch.inputs)) delete input.description;
-  expect(ciEvents).toEqual({
-    push: { branches: ['main'] }, pull_request: null, merge_group: null,
-    workflow_dispatch: { inputs: { profile_baseline: {
-      type: 'boolean', default: false,
-    }, performance_baseline: {
-      type: 'string', default: '',
-    }, s5_capture_diagnostic: {
-      type: 'boolean', default: false,
-    }, performance_contract_only: {
-      type: 'boolean', default: false,
-    } } },
-  });
-  expect(browser.on).toEqual({ workflow_call: null });
-  expect(Object.keys(ci.jobs).sort()).toEqual(['CI', 'browser-static', 'documentation', 'mutation', 'performance', 'profile-baseline', 'security', 'tests', 'verify']);
-  expect(ci.jobs['profile-baseline']).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline && !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}",
-    uses: './.github/workflows/profile-01.yml',
-  });
-  expect(ci.jobs.performance).toEqual({
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.performance_baseline != '' && !(inputs.profile_baseline && (inputs.s5_capture_diagnostic || inputs.performance_contract_only)) && !(inputs.s5_capture_diagnostic && inputs.performance_contract_only) }}",
-    uses: './.github/workflows/performance.yml',
-    with: { baseline: '${{ inputs.performance_baseline }}', s5_capture_diagnostic: '${{ inputs.s5_capture_diagnostic }}', performance_contract_only: '${{ inputs.performance_contract_only }}' },
-  });
-  const performance = workflows.get('performance.yml')!;
-  expect(performance.on).toEqual({ workflow_call: { inputs: {
-    baseline: { type: 'string', required: true }, s5_capture_diagnostic: { type: 'boolean', default: false },
-    performance_contract_only: { type: 'boolean', default: false },
-  } } });
-  expect(performance.permissions).toEqual({ contents: 'read' });
-  expect(performance.defaults).toBeUndefined();
-  expect(Object.keys(performance.jobs)).toEqual(['compare']);
-  const compare = performance.jobs.compare!;
-  expect(compare['runs-on']).toBe('ubuntu-latest');
-  expect(compare['timeout-minutes']).toBe(90);
-  expect(compare.strategy).toBeUndefined();
-  expect(compare['continue-on-error']).toBeUndefined();
-  expect(compare.if).toBeUndefined();
-  expect(compare.defaults).toBeUndefined();
-  expect(compare.permissions).toBeUndefined();
-  const { name: _baselineName, ...baselineValidation } = compare.steps![0]!;
-  expect(baselineValidation).toEqual({
-    shell: 'bash', env: { BASELINE: '${{ inputs.baseline }}' },
-    run: 'set -euo pipefail\n[[ "$BASELINE" =~ ^[0-9a-f]{40}$ ]]\n[[ "${{ inputs.s5_capture_diagnostic }}" != true || "${{ inputs.performance_contract_only }}" != true ]]\n',
-  });
-  const checkouts = compare.steps!.filter(item => item.uses?.startsWith('actions/checkout@'));
-  expect(checkouts.map(({ name: _name, uses, ...contract }) => ({ ...contract, uses: unpin(uses!) })))
-    .toEqual([
-      { uses: 'actions/checkout@<sha>', with: { path: 'candidate', 'persist-credentials': false, 'fetch-depth': 0 } },
-      { uses: 'actions/checkout@<sha>', with: { path: 'baseline', ref: '${{ inputs.baseline }}', 'persist-credentials': false, 'fetch-depth': 0 } },
-    ]);
-  const setup = compare.steps!.filter(item => item.uses?.startsWith('actions/setup-node@'));
-  expect(setup.map(({ name: _name, uses, ...contract }) => ({ ...contract, uses: unpin(uses!) })))
-    .toEqual([{ uses: 'actions/setup-node@<sha>', with: { 'node-version': '24.19.0' } }]);
-  for (const item of compare.steps!) expect(item['continue-on-error']).toBeUndefined();
-  const performanceRuns = compare.steps!.filter(item => item.run).slice(1);
-  expect(performanceRuns.map(({ name: _name, ...contract }) => ({ ...contract, run: contract.run!.trim() })))
-    .toEqual([
-      { if: '${{ inputs.s5_capture_diagnostic }}', 'working-directory': 'candidate', shell: 'bash',
-        env: { BASELINE: '${{ inputs.baseline }}' },
-        run: 'set -euo pipefail\ngit diff --exit-code "$BASELINE" HEAD -- src bench/compare/entries' },
-      { run: activatePnpm },
-      { id: 'build', run: 'pnpm --dir baseline install --frozen-lockfile\npnpm --dir candidate install --frozen-lockfile\npnpm --dir baseline build\npnpm --dir candidate build' },
-      { if: '${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}', run: 'mkdir -p "$RUNNER_TEMP/motion-performance"\nnode candidate/bench/consumer-size.mjs baseline candidate "$RUNNER_TEMP/motion-performance/consumer-size.json"' },
-      { if: '${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}', run: 'node candidate/bench/easing-pair.mjs baseline candidate "$RUNNER_TEMP/motion-performance/easing.json"' },
-      { run: 'pnpm --dir candidate/bench/compare install --frozen-lockfile' },
-      { run: 'pnpm --dir candidate/bench/compare exec playwright install --with-deps chromium' },
-      { if: '${{ inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nmkdir -p "$RUNNER_TEMP/motion-performance"\nprintf \'mode=performance-contract-only\\n\' > "$RUNNER_TEMP/motion-performance/contract-only.txt"' },
-      { if: '${{ !inputs.s5_capture_diagnostic }}', run: 'xvfb-run -a node --test candidate/bench/compare/transition-profile.contract.test.mjs' },
-      { if: '${{ inputs.s5_capture_diagnostic }}', 'working-directory': 'candidate',
-        run: 'pnpm exec vitest run test/benchmark-cli-contract.test.ts test/ci-workflow-contract.test.ts' },
-      { if: '${{ inputs.s5_capture_diagnostic }}', 'working-directory': 'candidate', shell: 'bash',
-        env: { S5_CAPTURE_DIAGNOSTIC: '1', S5_CAPTURE_DIAGNOSTIC_DIR: '${{ runner.temp }}/motion-performance/s5-capture' },
-        run: 'set -euo pipefail\n[[ "$S5_CAPTURE_DIAGNOSTIC_DIR" = /* ]]\nmkdir -p "$RUNNER_TEMP/motion-performance"\nxvfb-run -a node bench/compare/conformance-smoke.mjs' },
-      { if: '${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/spring" spring-pair baseline\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/js" js-pair baseline' },
-      { if: '${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}', shell: 'bash', run: 'set -euo pipefail\nxvfb-run -a node candidate/bench/compare/transition-profile.mjs candidate "$RUNNER_TEMP/motion-performance/transition" full baseline' },
-      { if: '${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only }}', 'working-directory': 'candidate/bench/compare', run: 'xvfb-run -a node bench.mjs' },
-      { if: "${{ !inputs.s5_capture_diagnostic && !inputs.performance_contract_only && !cancelled() && steps.build.outcome == 'success' }}", shell: 'bash', run: [
-        'set -euo pipefail', 'mkdir -p "$RUNNER_TEMP/motion-performance"', 'motion_size_status=0',
-        'node baseline/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/baseline-size.txt" || motion_size_status=1',
-        'node candidate/scripts/size-gate.mjs | tee "$RUNNER_TEMP/motion-performance/candidate-size.txt" || motion_size_status=1',
-        'exit "$motion_size_status"',
-      ].join('\n') },
-    ]);
-  const performanceCallers = [...workflows].flatMap(([file, workflow]) =>
-    Object.entries(workflow.jobs).filter(([, job]) => job.uses === './.github/workflows/performance.yml')
-      .map(([id]) => [file, id]));
-  expect(performanceCallers).toEqual([['ci.yml', 'performance']]);
-  expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
-  expect(Object.keys(browser.jobs)).toEqual(['conformance']);
-  for (const document of [ci, browser]) {
-    expect(document.permissions).toEqual({ contents: 'read' });
-    expect(document.defaults).toBeUndefined();
-    for (const job of Object.values(document.jobs)) {
+  expect(ci.on.pull_request).toBeNull();
+  expect(ci.on.merge_group).toBeNull();
+  expect(ci.on.push).toEqual({ branches: ['main'] });
+  for (const name of ['ci.yml', 'browser.yml', 'docs.yml']) {
+    const workflow = workflows.get(name)!;
+    expect(workflow.permissions).toEqual({ contents: 'read' });
+    expect(workflow.defaults).toBeUndefined();
+    for (const job of Object.values(workflow.jobs)) {
       expect(job['continue-on-error']).toBeUndefined();
       expect(job.defaults).toBeUndefined();
     }
@@ -500,308 +392,211 @@ function assertNativeGraph(files: Map<string, string>) {
   const verify = ci.jobs.verify!;
   const tests = ci.jobs.tests!;
   const mutation = ci.jobs.mutation!;
+  for (const job of [verify, tests, mutation]) preparation(job);
+  const build = command(verify, 'pnpm build');
+  runtime(verify, build);
+  before(verify, command(verify, 'pnpm check:static'), build);
+  for (const line of ['node scripts/check-docs-facts.mjs', 'node scripts/check-docs-drift.mjs', 'node scripts/check-issue-forms.mjs']) command(verify, line);
+  const release = runStep(verify, /node scripts\/check-release\.mjs /);
+  admitted(verify, release);
+  before(verify, command(verify, 'pnpm install --frozen-lockfile'), release);
+  const actionlint = runStep(verify, /\/actionlint"/);
+  admitted(verify, actionlint);
+  expect(actionlint.env?.ACTIONLINT_VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+  expect(actionlint.env?.ACTIONLINT_ARCHIVE_SHA256).toMatch(/^[a-f0-9]{64}$/);
+  if (playwrightPackage.scripts['typecheck:native']) command(verify, 'pnpm typecheck:native');
+  expect(playwrightPackage.scripts['check:static']).toMatch(/(?:^| && )pnpm typecheck:browser(?: && |$)/);
+  for (const line of ['pnpm size', 'pnpm pack:compat', 'pnpm acceptance:compiler']) {
+    before(verify, build, command(verify, line));
+  }
+  const consumers = verify.steps!.filter(item => item.run?.includes('node scripts/pack-smoke.mjs'));
+  expect(consumers).toHaveLength(2);
+  const pack = runStep(verify, /pnpm pack --pack-destination /);
+  admitted(verify, pack);
+  expect(executableLines(pack)).toEqual(['mkdir node-floor-artifact', 'pnpm pack --pack-destination node-floor-artifact']);
+  before(verify, build, pack);
+  for (const item of consumers) {
+    admitted(verify, item);
+    before(verify, pack, item);
+  }
+  runtime(verify, consumers[0]!);
+  runtime(verify, consumers[1]!, minimumNode);
+  const vitest = runStep(tests, /(?:^|\n)pnpm (?:exec )?vitest run(?: 2>&1 \| tee [\w./-]+)?(?:\n|$)/);
+  admitted(tests, vitest);
+  before(tests, command(tests, 'pnpm build'), vitest);
+  const clock = command(tests, 'node test/fixtures/server-thread-cpu-clock-check.mjs');
+  runtime(tests, clock, '24.19.0');
+  command(mutation, 'pnpm exec stryker run stryker.driver.config.mjs');
   const security = ci.jobs.security!;
+  const scan = runStep(security, /python3 test\/ci-trivy-canary\.py verify /);
+  admitted(security, scan);
+  const callers = Object.values(ci.jobs).filter(job => job.uses?.match(/\/(browser|docs)\.yml$/));
+  expect(callers.map(job => job.uses).sort()).toEqual(['./.github/workflows/browser.yml', './.github/workflows/docs.yml']);
+  for (const caller of callers) admitted(caller);
+  const browser = workflows.get('browser.yml')!;
+  expect(browser.on).toEqual({ workflow_call: null });
   const conformance = browser.jobs.conformance!;
-  for (const job of [verify, tests, mutation, security, conformance]) {
-    expect(job['runs-on']).toBe('ubuntu-latest');
-    expect(job.if).toBeUndefined();
-  }
-  expect(ci.jobs['browser-static']).toEqual({ uses: './.github/workflows/browser.yml' });
-  expect(ci.jobs.documentation).toEqual({ uses: './.github/workflows/docs.yml' });
-  expect(workflows.get('docs.yml')!.on).toEqual({ workflow_call: null });
+  preparation(conformance);
+  const image = /^mcr\.microsoft\.com\/playwright:v([^@]+)-noble@sha256:[a-f0-9]{64}$/.exec(conformance.container!.image);
+  expect(image?.[1]).toBe(playwrightVersion);
+  expect(conformance.container!.options).toBe('--user 1001');
+  expect(conformance.strategy!['fail-fast']).toBe(false);
+  assertShards(conformance.strategy!.matrix.include!);
+  const browserRun = command(conformance, 'pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}/${{ matrix.shards }} --fail-on-flaky-tests');
+  before(conformance, command(conformance, 'pnpm build'), browserRun);
   const reader = workflows.get('docs.yml')!.jobs.reader!;
-  expect(reader['runs-on']).toBe('ubuntu-latest');
-  assertCommands(reader, [activatePnpm, 'pnpm install --frozen-lockfile', 'pnpm docs:build',
-    'pnpm exec playwright install --with-deps chromium firefox webkit', 'pnpm docs:test']);
-  // Нет ложных последовательных зависимостей: всё сходится только в CI.
-  for (const job of [verify, tests, mutation, security]) expect(job.needs).toBeUndefined();
-  expect(conformance.name).toBe('${{ matrix.browser }} · ${{ matrix.shard }}/${{ matrix.shards }}');
-  expect(conformance.needs).toBeUndefined();
-  // Полнота задаётся независимо от workflow: потеря/дубль доли не может стать GREEN.
-  expect(conformance.strategy).toEqual({
-    'fail-fast': false,
-    'max-parallel': 4,
-    matrix: { include: [
-      { browser: 'chromium', shard: 1, shards: 1 },
-      { browser: 'firefox', shard: 1, shards: 1 },
-      { browser: 'webkit', shard: 1, shards: 2 },
-      { browser: 'webkit', shard: 2, shards: 2 },
-    ] },
-  });
-  const actionlint = step(verify, 'GitHub Actions contract');
-  expect(actionlint.if).toBeUndefined();
-  expect(actionlint['continue-on-error']).toBeUndefined();
-  expect(actionlint.shell).toBe('bash');
-  expect(actionlint.env).toEqual({
-    ACTIONLINT_VERSION: '1.7.12',
-    ACTIONLINT_ARCHIVE_SHA256: '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8',
-  });
-  for (const [name, job] of Object.entries({ verify, tests, mutation, security, conformance })) {
-    expect(job.steps!.map((item, index) => ({ index, ...item })).filter((item) => item.uses)
-      .map((item) => ({ ...item, uses: unpin(item.uses!) })))
-      .toEqual(requiredActions[name as keyof typeof requiredActions]);
-  }
-  assertCommands(verify, verifyCommands);
-  assertCommands(tests, testCommands);
-  assertCommands(mutation, mutationCommands);
-  assertCommands(security, securityCommands);
-  assertCommands(conformance, browserCommands);
-  expect(conformance.container).toEqual({ image: playwrightImage, options: '--user 1001' });
-  const imageVersion = /^mcr\.microsoft\.com\/playwright:v([^@]+)-noble@sha256:[a-f0-9]{64}$/.exec(conformance.container!.image);
-  expect(imageVersion?.[1]).toBe(playwrightVersion);
-  for (const item of conformance.steps!.filter(item => item.run)) expect(item.shell).toBe('bash');
-  expect(step(tests, 'Vitest').id).toBe('vitest');
+  expect(workflows.get('docs.yml')!.on).toEqual({ workflow_call: null });
+  preparation(reader);
+  before(reader, command(reader, 'pnpm docs:build'), command(reader, 'pnpm docs:test'));
   const gate = ci.jobs.CI!;
-  expect(gate.name).toBe('CI');
+  expect(gate.name).toBe('CI'); // Имя обязательного итогового check.
   expect(gate.if).toBe('${{ always() }}');
-  expect(gate.needs).toEqual(peers);
-  expect(gate['runs-on']).toBe('ubuntu-latest');
   expect(gate.permissions).toEqual({});
-  expect(gate.steps).toEqual([{
-    name: 'Require every candidate check',
-    shell: 'bash',
-    env: {
-      VERIFY_RESULT: '${{ needs.verify.result }}',
-      TESTS_RESULT: '${{ needs.tests.result }}',
-      MUTATION_RESULT: '${{ needs.mutation.result }}',
-      BROWSER_RESULT: '${{ needs.browser-static.result }}',
-      DOCS_RESULT: '${{ needs.documentation.result }}',
-      SECURITY_RESULT: '${{ needs.security.result }}',
-      EVENT_NAME: '${{ github.event_name }}',
-      S5_CAPTURE_DIAGNOSTIC: '${{ inputs.s5_capture_diagnostic }}',
-      PERFORMANCE_CONTRACT_ONLY: '${{ inputs.performance_contract_only }}',
-      PROFILE_BASELINE: '${{ inputs.profile_baseline }}',
-      PERFORMANCE_BASELINE: '${{ inputs.performance_baseline }}',
-    },
-    run: `${gateCommand}\n`,
-  }]);
+  const required = Object.entries(ci.jobs).filter(([id, job]) => id !== 'CI'
+    && !['./.github/workflows/performance.yml', './.github/workflows/profile-01.yml'].includes(job.uses ?? ''))
+    .map(([id, job]) => { admitted(job); return id; });
+  expect([...gate.needs!].sort()).toEqual(required.sort());
+  const verdict = gate.steps!.find(item => item.run)!;
+  admitted({ ...gate, if: undefined }, verdict);
+  expect(verdict.env?.CHECK_RESULTS).toBe('${{ toJSON(needs) }}');
+  // Диагностические workflow вызываются только явно; измеряемый baseline имеет immutable identity.
+  expect(ci.jobs.performance!.uses).toBe('./.github/workflows/performance.yml');
+  expect(ci.jobs.performance!.with?.s5_capture_diagnostic).toBe('${{ inputs.s5_capture_diagnostic }}');
+  expect(ci.jobs.performance!.with?.performance_contract_only).toBe('${{ inputs.performance_contract_only }}');
+  expect(ci.jobs.performance!.if).toContain("github.event_name == 'workflow_dispatch'");
+  expect(ci.jobs.performance!.if).toContain("inputs.performance_baseline != ''");
+  expect(ci.jobs.performance!.with?.baseline).toBe('${{ inputs.performance_baseline }}');
+  expect(ci.jobs['profile-baseline']!.uses).toBe('./.github/workflows/profile-01.yml');
+  expect(workflows.get('profile-01.yml')!.on).toEqual({ workflow_call: null });
+  expect(ci.jobs['profile-baseline']!.if).toContain("github.event_name == 'workflow_dispatch'");
+  expect(ci.jobs['profile-baseline']!.if).toContain('inputs.profile_baseline');
+  const performance = workflows.get('performance.yml')!;
+  expect(performance.on).toEqual({ workflow_call: { inputs: {
+    baseline: { type: 'string', required: true }, s5_capture_diagnostic: { type: 'boolean', default: false },
+    performance_contract_only: { type: 'boolean', default: false },
+  } } });
+  const compare = performance.jobs.compare!;
+  expect(compare.strategy).toBeUndefined();
+  expect(compare['continue-on-error']).toBeUndefined();
+  const baselineGuard = runStep(compare, /\[\[ "\$BASELINE" =~ /);
+  admitted(compare, baselineGuard);
+  expect(baselineGuard.env?.BASELINE).toBe('${{ inputs.baseline }}');
+  expect(baselineGuard.run).toContain('^[0-9a-f]{40}$');
+  const checkouts = compare.steps!.filter(item => item.uses?.startsWith('actions/checkout@'));
+  expect(checkouts).toHaveLength(2);
+  const original = checkouts.find(item => item.with?.path === 'baseline')!;
+  expect(original.with?.ref).toBe('${{ inputs.baseline }}');
+  for (const checkout of checkouts) {
+    admitted(compare, checkout);
+    expect(checkout.with?.['persist-credentials']).toBe(false);
+    expect(checkout.with?.['fetch-depth']).toBe(0);
+    before(compare, baselineGuard, checkout);
+  }
+  for (const item of compare.steps!) expect(item['continue-on-error']).toBeUndefined();
+  runtime(compare, runStep(compare, /pnpm --dir candidate build/), '24.19.0');
+  const assertions = runStep(compare, /^xvfb-run -a node bench\.mjs\s*$/);
+  expect(assertions['working-directory']).toBe('candidate/bench/compare');
+  for (const [name, workflow] of workflows) {
+    for (const job of Object.values(workflow.jobs)) {
+      const exports = (job.steps ?? []).filter(item => item.uses?.startsWith('actions/upload-artifact@'));
+      if (name === 'release.yml') continue;
+      if (name !== 'performance.yml') expect(exports).toHaveLength(0);
+      else {
+        expect(exports).toHaveLength(1);
+        const exported = exports[0]!;
+        expect(exported).toBe(job.steps!.at(-1));
+        expect(exported.if).toBe('${{ always() }}');
+        expect(exported.with?.name).toBe('motion-performance-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}');
+        expect(exported.with?.path).toBe('candidate/bench/compare/results/\n${{ runner.temp }}/motion-performance/\n');
+        expect(exported.with?.['retention-days']).toBe(5);
+        expect(exported.with?.['if-no-files-found']).toBe('error');
+      }
+    }
+  }
 }
 
-describe('нативный граф CI', () => {
-  it('проверяет любой PR через явные обязательные jobs', () => assertNativeGraph(sources()));
+describe('свойства CI', () => {
+  it('сохраняет обязательные проверки и потребительские границы', () => assertNativeGraph(sources()));
+  it('принимает переименование шагов и полный новый порядок browser-долей', () => {
+    const files = sources();
+    const ci = parse(files.get('ci.yml')!) as Workflow;
+    for (const job of Object.values(ci.jobs)) {
+      for (const item of job.steps ?? []) item.name = `Другое имя: ${item.name}`;
+    }
+    // Независимые проверки допускают иной порядок, подготовка и потребители сохраняются.
+    const checks = ci.jobs.verify!.steps!;
+    const staticCheck = checks.findIndex(item => item.run === 'pnpm check:static');
+    const nativeCheck = checks.findIndex(item => item.run === 'pnpm typecheck:native');
+    [checks[staticCheck], checks[nativeCheck]] = [checks[nativeCheck]!, checks[staticCheck]!];
+    files.set('ci.yml', stringify(ci));
+    const browser = parse(files.get('browser.yml')!) as Workflow;
+    browser.jobs.conformance!.strategy!.matrix.include = ['webkit', 'firefox', 'chromium'].flatMap(browser =>
+      [3, 1, 2].map(shard => ({ browser, shard, shards: 3 })));
+    files.set('browser.yml', stringify(browser));
+    assertNativeGraph(files);
+  });
 
   it.each([
-    ['PR base filter', 'ci.yml', (w: Workflow) => { w.on.pull_request = { branches: ['main'] }; }],
-    ['PR path filter', 'ci.yml', (w: Workflow) => { w.on.pull_request = { paths: ['src/**'] }; }],
-    ['нет always', 'ci.yml', (w: Workflow) => { delete w.jobs.CI!.if; }],
-    ...peers.map((peer) => [`нет needs ${peer}`, 'ci.yml', (w: Workflow) => {
-      w.jobs.CI!.needs = w.jobs.CI!.needs!.filter((item) => item !== peer);
-    }] as const),
-    ['tests ждёт verify без необходимости', 'ci.yml', (w: Workflow) => { w.jobs.tests!.needs = ['verify']; }],
-    ['mutation ждёт tests без необходимости', 'ci.yml', (w: Workflow) => { w.jobs.mutation!.needs = ['tests']; }],
-    ['новая job вне итога', 'ci.yml', (w: Workflow) => { w.jobs.extra = { 'runs-on': 'ubuntu-latest' }; }],
-    ['архив обычного CI', 'ci.yml', (w: Workflow) => {
-      w.jobs.verify!.steps!.push({ name: 'Keep package', uses: 'actions/upload-artifact@0123456789012345678901234567890123456789', with: { path: 'node-floor-artifact' } });
-    }],
-    ...['verify', 'tests', 'mutation', 'security'].map((id) => [`performance export в обычном CI/${id}`, 'ci.yml', (w: Workflow) => {
-      const performance = parse(sources().get('performance.yml')!) as Workflow;
-      w.jobs[id]!.steps!.push(performance.jobs.compare!.steps!.at(-1)!);
-    }] as const),
-    ['performance без ручного события', 'ci.yml', (w: Workflow) => { w.jobs.performance!.if = "${{ inputs.performance_baseline != '' }}"; }],
-    ['performance без явного baseline', 'ci.yml', (w: Workflow) => { w.jobs.performance!.if = "${{ github.event_name == 'workflow_dispatch' }}"; }],
-    ['performance с подменой baseline', 'ci.yml', (w: Workflow) => { w.jobs.performance = { ...w.jobs.performance, with: { baseline: 'main' } };  }],
-    ['performance обход caller через docs', 'docs.yml', (w: Workflow) => { w.jobs.export = { uses: './.github/workflows/performance.yml' }; }],
-    ['performance push trigger', 'performance.yml', (w: Workflow) => { w.on.push = null; }],
-    ['performance прямой dispatch', 'performance.yml', (w: Workflow) => { w.on.workflow_dispatch = null; }],
-    ['performance без обязательного input', 'performance.yml', (w: Workflow) => { w.on.workflow_call = { inputs: { baseline: { type: 'string', required: false } } }; }],
-    ['S5 не передан caller', 'ci.yml', (w: Workflow) => { delete w.jobs.performance!.with!.s5_capture_diagnostic; }],
-    ['S5 запускает PROFILE', 'ci.yml', (w: Workflow) => { w.jobs['profile-baseline']!.if = "${{ github.event_name == 'workflow_dispatch' && inputs.profile_baseline }}"; }],
-    ['S5 обход product guard', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run?.includes('git diff --exit-code'))!.if = false; }],
-    ['S5 обход entries guard', 'performance.yml', (w: Workflow) => { const item = w.jobs.compare!.steps!.find(item => item.run?.includes('git diff --exit-code'))!; item.run = item.run!.replace('src bench/compare/entries', 'src'); }],
-    ['S5 запускает A/B', 'performance.yml', (w: Workflow) => { delete w.jobs.compare!.steps!.find(item => item.run?.includes('spring-pair baseline'))!.if; }],
-    ['S5 пропускает focused CLI', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run?.includes('pnpm exec vitest run test/benchmark-cli-contract'))!.if = false; }],
-    ['S5 скрывает capture failure', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run?.includes('node bench/compare/conformance-smoke'))!['continue-on-error'] = true; }],
-    ['S5 относительный raw path', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.env?.S5_CAPTURE_DIAGNOSTIC === '1')!.env!.S5_CAPTURE_DIAGNOSTIC_DIR = 'results/s5'; }],
-    ['performance дополнительная job', 'performance.yml', (w: Workflow) => { w.jobs.extra = { 'runs-on': 'ubuntu-latest' }; }],
-    ['performance расширяет timeout', 'performance.yml', (w: Workflow) => { w.jobs.compare!['timeout-minutes'] = 360; }],
-    ['performance дублирует измерение matrix', 'performance.yml', (w: Workflow) => { w.jobs.compare!.strategy = { 'fail-fast': false, matrix: { node: ['24', '24'] } }; }],
-    ['performance пропускает сравнительные assertions', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run === 'xvfb-run -a node bench.mjs')!.if = false; }],
-    ['performance скрывает отказ сравнительных assertions', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.run === 'xvfb-run -a node bench.mjs')!.run += ' || true'; }],
-    ['performance скрывает отказ размера', 'performance.yml', (w: Workflow) => { const item = w.jobs.compare!.steps!.find(item => item.run?.includes('exit "$motion_size_status"'))!; item.run = item.run!.replace('exit "$motion_size_status"', 'exit 0'); }],
-    ['performance игнорирует failure', 'performance.yml', (w: Workflow) => { w.jobs.compare!['continue-on-error'] = true; }],
-    ['performance пропускает baseline validation', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.if = false; }],
-    ['performance ослабляет identity baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.run = 'true\n'; }],
-    ['performance подменяет input baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!.env!.BASELINE = 'main'; }],
-    ['performance подменяет checkout baseline', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![2]!.with!.ref = 'main'; }],
-    ['performance скрывает исходный failure', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![0]!['continue-on-error'] = true; }],
-    ['performance подменяет Node', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.uses?.startsWith('actions/setup-node@'))!.with!['node-version'] = '24'; }],
-    ['performance пропускает setup Node', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.find(item => item.uses?.startsWith('actions/setup-node@'))!.if = false; }],
-    ['performance пропускает checkout', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps![1]!.if = false; }],
-    ['performance export не последний', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.push({ run: 'true' }); }],
-    ['performance второй export', 'performance.yml', (w: Workflow) => { w.jobs.compare!.steps!.unshift(w.jobs.compare!.steps!.at(-1)!); }],
-    ...['if', 'uses', 'with', 'continue-on-error'].map((field) => [`performance export mutation ${field}`, 'performance.yml', (w: Workflow) => {
-      const item = w.jobs.compare!.steps!.at(-1)!;
-      if (field === 'if') item.if = '${{ success() }}';
-      else if (field === 'uses') item.uses = item.uses!.replace('upload-artifact', 'upload-pages-artifact');
-      else if (field === 'with') delete item.with;
-      else item['continue-on-error'] = true;
-    }] as const),
-    ...([
-      ['name', 'motion-performance-${{ github.sha }}'],
-      ['name', 'motion-performance-${{ github.run_id }}-${{ github.run_attempt }}'],
-      ['path', 'candidate/bench/compare/results/\n'],
-      ['path', '${{ runner.temp }}/motion-performance/\n'],
-      ['path', '**/*\n'],
-      ['retention-days', 30],
-      ['if-no-files-found', 'ignore'],
-    ] as const).map(([field, value]) => [`performance export option ${field}=${value}`, 'performance.yml', (w: Workflow) => {
-      w.jobs.compare!.steps!.at(-1)!.with![field] = value;
-    }] as const),
-    ['раннее истечение release-пакета при ожидании approval', 'release.yml', (w: Workflow) => {
-      step(w.jobs.verify!, 'Upload sealed package').with!['retention-days'] = 1;
-    }],
-    ['неверный artifact ID после approval', 'release.yml', (w: Workflow) => {
-      step(w.jobs.publish!, 'Download sealed package by artifact ID').with!['artifact-ids'] = 'wrong-artifact-id';
-    }],
-    ['игнорирование verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!['continue-on-error'] = true; }],
-    ['пропуск verify', 'ci.yml', (w: Workflow) => { w.jobs.verify!.if = false; }],
-    ['игнорирование browser caller', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!['continue-on-error'] = true; }],
-    ['другой browser worker', 'ci.yml', (w: Workflow) => { w.jobs['browser-static']!.uses = './.github/workflows/release.yml'; }],
-    ['нет Node floor', 'ci.yml', (w: Workflow) => { w.jobs.verify!.steps = w.jobs.verify!.steps!.filter(item => item.name !== 'Consumer smoke on minimum runtime'); }],
-    ['подмена Node floor настройкой Node 24', 'ci.yml', (w: Workflow) => {
-      step(w.jobs.verify!, 'Setup consumer Node floor').with!['node-version'] = '24';
-    }],
-    ['несовпадение версии browser-образа', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.image = playwrightImage.replace(`v${playwrightVersion}`, 'v0.0.0'); }],
-    ['несовпадение digest browser-образа', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.image = playwrightImage.replace(/sha256:[a-f0-9]{64}$/, `sha256:${'0'.repeat(64)}`); }],
-    ['browser-образ без закреплённого digest', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.image = playwrightImage.split('@')[0]!; }],
-    ['запуск browser-контейнера с root UID', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.options = '--user 0'; }],
-    ['неявный UID browser-контейнера', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.options = ''; }],
-    ['привилегированные параметры browser-контейнера', 'browser.yml', (w: Workflow) => { w.jobs.conformance!.container!.options += ' --privileged'; }],
-    ['неявная оболочка browser-шага', 'browser.yml', (w: Workflow) => { delete step(w.jobs.conformance!, 'Install Playwright browser').shell; }],
-    ['пропуск browser Setup Node', 'browser.yml', (w: Workflow) => {
-      step(w.jobs.conformance!, 'Setup Node').if = false;
-    }],
-    ['пропущенный consumer', 'ci.yml', (w: Workflow) => {
-      step(w.jobs.verify!, 'Consumer smoke on minimum runtime').if = false;
-    }],
-    ['другой Vitest outcome', 'ci.yml', (w: Workflow) => { step(w.jobs.tests!, 'Vitest').id = 'other'; }],
-    ['фальшивый итог', 'ci.yml', (w: Workflow) => { w.jobs.CI!.steps![0]!.env!.BROWSER_RESULT = 'success'; }],
-    ['пустой успех', 'ci.yml', (w: Workflow) => { w.jobs.CI!.steps![0]!.run = 'true\n'; }],
-    ['игнорирование итога', 'ci.yml', (w: Workflow) => { w.jobs.CI!['continue-on-error'] = true; }],
-    ['добавлен trigger browser', 'browser.yml', (w: Workflow) => { w.on.pull_request = null; }],
-    ['добавлен PR trigger PROFILE', 'profile-01.yml', (w: Workflow) => { w.on.pull_request = null; }],
-    ['PROFILE запущен для обычного кандидата', 'ci.yml', (w: Workflow) => { delete w.jobs['profile-baseline']!.if; }],
-    ['PROFILE без явного запроса', 'ci.yml', (w: Workflow) => {
-      w.jobs['profile-baseline']!.if = "${{ github.event_name == 'workflow_dispatch' }}";
-    }],
-    ['нет workflow_call', 'browser.yml', (w: Workflow) => { w.on = { workflow_dispatch: null }; }],
-    ...['chromium', 'firefox', 'webkit'].map((engine) => [`нет ${engine}`, 'browser.yml', (w: Workflow) => {
-      const matrix = w.jobs.conformance!.strategy!.matrix;
-      matrix.include = matrix.include!.filter((item) => item.browser !== engine);
-    }] as const),
-    ['потеря второй доли WebKit', 'browser.yml', (w: Workflow) => {
-      w.jobs.conformance!.strategy!.matrix.include!.pop();
-    }],
-    ['дублирование первой доли WebKit', 'browser.yml', (w: Workflow) => {
-      w.jobs.conformance!.strategy!.matrix.include![3]!.shard = 1;
-    }],
-    ['невыполненная третья доля WebKit', 'browser.yml', (w: Workflow) => {
-      for (const part of w.jobs.conformance!.strategy!.matrix.include!) {
-        if (part.browser === 'webkit') part.shards = 3;
-      }
-    }],
-    ['неполный Firefox', 'browser.yml', (w: Workflow) => {
-      w.jobs.conformance!.strategy!.matrix.include![1]!.shards = 2;
-    }],
-    ['отмена соседних browser jobs после сбоя', 'browser.yml', (w: Workflow) => {
-      w.jobs.conformance!.strategy!['fail-fast'] = true;
-    }],
-    ['лишняя последовательная browser зависимость', 'browser.yml', (w: Workflow) => {
-      w.jobs.conformance!.needs = ['verify'];
-    }],
-    ['игнорирование browser', 'browser.yml', (w: Workflow) => { w.jobs.conformance!['continue-on-error'] = true; }],
-  ] as const)('отвергает изменение: %s', (_, file, mutate) => {
+    ['пропущенная доля', [{ browser: 'chromium', shard: 1, shards: 2 }]],
+    ['дубликат доли', [{ browser: 'chromium', shard: 1, shards: 2 }, { browser: 'chromium', shard: 1, shards: 2 }]],
+    ['противоречивый total', [{ browser: 'chromium', shard: 1, shards: 1 }, { browser: 'chromium', shard: 2, shards: 2 }]],
+  ] as const)('отвергает неполное покрытие: %s', (_, bad) => {
+    const complete = ['firefox', 'webkit'].map(browser => ({ browser, shard: 1, shards: 1 }));
+    expect(() => assertShards([...complete, ...bad])).toThrow();
+  });
+
+  it.each(['remove', 'if', 'continue-on-error', 'echo'] as const)('нативный TypeScript обязан исполняться: %s', mutation => {
     const files = sources();
-    assertNativeGraph(files);
-    const workflow = parse(files.get(file)!) as Workflow;
-    mutate(workflow);
-    files.set(file, stringify(workflow));
+    const ci = parse(files.get('ci.yml')!) as Workflow;
+    const job = ci.jobs.verify!;
+    const target = command(job, 'pnpm typecheck:native');
+    if (mutation === 'remove') job.steps = job.steps!.filter(item => item !== target);
+    else if (mutation === 'echo') target.run = 'echo pnpm typecheck:native';
+    else if (mutation === 'if') target.if = false;
+    else target['continue-on-error'] = true;
+    files.set('ci.yml', stringify(ci));
     expect(() => assertNativeGraph(files)).toThrow();
   });
 
-  it.each([{ trigger: 'pull_request' }, { trigger: ['merge_group'] }, { trigger: { pull_request_target: null } }])(
-    'новый candidate workflow требует включения в граф: %j', ({ trigger }) => {
-      const files = sources();
-      assertNativeGraph(files);
-      files.set('new-check.yaml', stringify({ on: trigger, jobs: {} }));
-      expect(() => assertNativeGraph(files)).toThrow();
-    },
-  );
-
-  it.each([
-    ['ci.yml', 'verify', verifyCommands],
-    ['ci.yml', 'tests', testCommands],
-    ['ci.yml', 'mutation', mutationCommands],
-    ['ci.yml', 'security', securityCommands],
-    ['browser.yml', 'conformance', browserCommands],
-  ] as const)('%s/%s сохраняет каждую обязательную команду', (file, jobId, commands) => {
-    const original = sources();
-    assertNativeGraph(original);
-    for (const command of commands) {
-      for (const mutation of ['command', 'if', 'continue-on-error', 'shell'] as const) {
-        const files = new Map(original);
-        const workflow = parse(files.get(file)!) as Workflow;
-        const target = workflow.jobs[jobId]!.steps!.find((item) => item.run?.trim() === command)!;
-        if (mutation === 'command') target.run = 'true';
-        else if (mutation === 'if') target.if = false;
-        else if (mutation === 'shell') target.shell = 'bash {0}';
-        else target['continue-on-error'] = true;
-        files.set(file, stringify(workflow));
-        expect(() => assertNativeGraph(files), `${jobId}: ${command}; ${mutation}`).toThrow();
-      }
+  it.each(['runtime-after', 'wrong-floor', 'unobserved-job', 'fake-result'] as const)('отвергает разрыв потребительского пути: %s', mutation => {
+    const files = sources();
+    const ci = parse(files.get('ci.yml')!) as Workflow;
+    if (mutation === 'unobserved-job') ci.jobs.extra = { 'runs-on': 'ubuntu-latest' };
+    else if (mutation === 'fake-result') ci.jobs.CI!.steps![0]!.env!.CHECK_RESULTS = '{"fake":{"result":"success"}}';
+    else {
+      const job = ci.jobs.verify!;
+      const floor = job.steps!.find(item => item.with?.['node-version'] === minimumNode)!;
+      if (mutation === 'wrong-floor') floor.with!['node-version'] = '24';
+      else { job.steps = job.steps!.filter(item => item !== floor); job.steps!.push(floor); }
     }
-  }, 30_000);
-
-  it.each([
-    ['ci.yml', 'verify'],
-    ['ci.yml', 'tests'],
-    ['ci.yml', 'mutation'],
-    ['ci.yml', 'security'],
-    ['browser.yml', 'conformance'],
-  ] as const)('%s/%s сохраняет настройку каждого action', (file, jobId) => {
-    const original = sources();
-    assertNativeGraph(original);
-    const steps = (parse(original.get(file)!) as Workflow).jobs[jobId]!.steps!;
-    for (const [index, item] of steps.entries()) {
-      if (!item.uses) continue;
-      for (const mutation of ['remove', 'uses', 'with', 'if', 'continue-on-error', 'order'] as const) {
-        const files = new Map(original);
-        const workflow = parse(files.get(file)!) as Workflow;
-        const actions = workflow.jobs[jobId]!.steps!;
-        const target = actions[index]!;
-        if (mutation === 'remove') actions.splice(index, 1);
-        else if (mutation === 'uses') target.uses = target.uses!.split('@')[0] + '@main';
-        else if (mutation === 'with') target.with = { ...target.with, 'unexpected-input': true };
-        else if (mutation === 'if') target.if = false;
-        else if (mutation === 'continue-on-error') target['continue-on-error'] = true;
-        else {
-          actions.splice(index, 1);
-          actions.splice(index === 0 ? 1 : 0, 0, target);
-        }
-        files.set(file, stringify(workflow));
-        expect(() => assertNativeGraph(files), `${jobId}: ${item.uses}; ${mutation}`).toThrow();
-      }
-    }
+    files.set('ci.yml', stringify(ci));
+    expect(() => assertNativeGraph(files)).toThrow();
   });
 
-  it.each(['VERIFY_RESULT', 'TESTS_RESULT', 'MUTATION_RESULT', 'BROWSER_RESULT', 'DOCS_RESULT', 'SECURITY_RESULT']
-    .flatMap((key) => ['success', 'failure', 'cancelled', 'skipped', 'neutral', 'pending', '', undefined]
-      .map((result) => ({ key, result }))))('shell итога проверяет $key=$result', ({ key, result }) => {
-    const ci = parse(sources().get('ci.yml')!) as Workflow;
-    const program = ci.jobs.CI!.steps![0]!.run!;
-    const env: NodeJS.ProcessEnv = {
-      ...process.env, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
-      MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success',
-      SECURITY_RESULT: 'success', EVENT_NAME: 'pull_request', S5_CAPTURE_DIAGNOSTIC: '',
-      PROFILE_BASELINE: '', PERFORMANCE_BASELINE: '', PERFORMANCE_CONTRACT_ONLY: '',
-    };
-    delete env[key];
-    if (result !== undefined) env[key] = result;
-    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
-      env, encoding: 'utf8', timeout: 5000,
+  const required = (parse(sources().get('ci.yml')!) as Workflow).jobs.CI!.needs!;
+  const success = Object.fromEntries(required.map(key => [key, { result: 'success' }]));
+  const verdict = (results: unknown) => {
+    const program = pythonSetup + (parse(sources().get('ci.yml')!) as Workflow).jobs.CI!.steps![0]!.run!;
+    return spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
+      encoding: 'utf8', timeout: 5000,
+      env: { ...process.env, CHECK_RESULTS: typeof results === 'string' ? results : JSON.stringify(results),
+        EVENT_NAME: 'pull_request', S5_CAPTURE_DIAGNOSTIC: '', PROFILE_BASELINE: '',
+        PERFORMANCE_BASELINE: '', PERFORMANCE_CONTRACT_ONLY: '' },
     });
+  };
+  it('принимает успех всех настоящих зависимостей', () => {
+    const actual = verdict(success);
     expect(actual.error).toBeUndefined();
-    expect(actual.status === 0, `${key}=${result}: ${actual.stderr}`).toBe(result === 'success');
+    expect(actual.status, actual.stderr).toBe(0);
+  });
+  it.each([...required, 'future-check'].flatMap(key => ['failure', 'cancelled', 'skipped']
+    .map(result => ({ key, result }))))('настоящий shell итога проверяет $key=$result', ({ key, result }) => {
+    const actual = verdict({ ...success, [key]: { result } });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status, actual.stderr).not.toBe(0);
+  });
+  it.each([{}, null, [], { absent: null }, { absent: {} }, { absent: { result: 'unknown' } }, 'not-json'])('не принимает пустой или повреждённый итог: %j', results => {
+    expect(verdict(results).status).not.toBe(0);
   });
 
   it.each([
@@ -820,11 +615,10 @@ describe('нативный граф CI', () => {
     { event: 'pull_request', s5: '', profile: '', baseline: '', passes: true },
   ])('diagnostic aggregate guard $event/$s5/$profile/$baseline', ({ event, s5, profile, baseline, passes, contract }) => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
-    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', ci.jobs.CI!.steps![0]!.run!], {
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', pythonSetup + ci.jobs.CI!.steps![0]!.run!], {
       encoding: 'utf8', timeout: 5000,
       env: { ...process.env, EVENT_NAME: event, S5_CAPTURE_DIAGNOSTIC: s5, PERFORMANCE_CONTRACT_ONLY: contract ?? 'false', PROFILE_BASELINE: profile,
-        PERFORMANCE_BASELINE: baseline, VERIFY_RESULT: 'success', TESTS_RESULT: 'success',
-        MUTATION_RESULT: 'success', BROWSER_RESULT: 'success', DOCS_RESULT: 'success', SECURITY_RESULT: 'success' },
+        PERFORMANCE_BASELINE: baseline, CHECK_RESULTS: JSON.stringify(success) },
     });
     expect(actual.error).toBeUndefined();
     expect(actual.status === 0, actual.stderr).toBe(passes);
@@ -870,9 +664,120 @@ describe('нативный граф CI', () => {
     expect(actual.stdout.trim().split('\n')).toEqual(['diff', '--exit-code', 'a'.repeat(40), 'HEAD', '--', 'src', 'bench/compare/entries']);
   });
 
+
+  it.each([0, 17])('сравнительные assertions действительно запускаются и возвращают отказ %i', code => {
+    const workflow = parse(sources().get('performance.yml')!) as Workflow;
+    const item = runStep(workflow.jobs.compare!, /^xvfb-run -a node bench\.mjs\s*$/);
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c',
+      `xvfb-run() { shift; "$@"; }\nnode() { printf '%s\\n' "$@"; return ${code}; }\n${item.run}`], {
+      encoding: 'utf8', timeout: 5000,
+    });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status, actual.stderr).toBe(code);
+    expect(actual.stdout.trim().split('\n')).toEqual(['bench.mjs']);
+  });
+
+  it.each([0, 17])('release smoke исполняет проверку stored-date и возвращает отказ %i', code => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    const item = runStep(ci.jobs.verify!, /node scripts\/check-release\.mjs /);
+    const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c',
+      `node() { if [[ "$1" == -p ]]; then printf '0.0.0\\n'; else printf '%s\\n' "$@"; return ${code}; fi; }\n${item.run}`], {
+      encoding: 'utf8', timeout: 5000,
+    });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status, actual.stderr).toBe(code);
+    expect(actual.stdout.trim().split('\n')).toEqual(['scripts/check-release.mjs', 'v0.0.0', '--validate-stored-date']);
+  });
+
+  it.each([false, true])('package consumer действительно вызывается на runtime floor=%s', floor => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    const consumers = ci.jobs.verify!.steps!.filter(item => item.run?.includes('node scripts/pack-smoke.mjs'));
+    const item = consumers[floor ? 1 : 0]!;
+    for (const count of [0, 2]) assertPackConsumer(item, floor, count);
+    for (const code of [0, 17]) assertPackConsumer(item, floor, 1, code);
+    if (floor) assertPackConsumer(item, floor, 1, 0, '24.0.0');
+  });
+
+  it('heredoc не может заменить исполнение package consumer', () => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    const item = ci.jobs.verify!.steps!.find(item => item.run?.includes('node scripts/pack-smoke.mjs'))!;
+    expect(() => assertPackConsumer({ ...item, run: `cat <<'PRINTED'\n${item.run}PRINTED\n` }, false, 1)).toThrow();
+  });
+
+  it.each([0, 17])('security вызывает scanner с полной политикой и возвращает отказ %i', code => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    assertSecurityStep(runStep(ci.jobs.security!, /test\/ci-trivy-canary\.py verify/), code);
+  });
+
+  it('security останавливается до scanner при отказе checksum', () => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    assertSecurityStep(runStep(ci.jobs.security!, /test\/ci-trivy-canary\.py verify/), 0, 17);
+  });
+
+  it.each([
+    ['секреты только высокой severity', (run: string) => run.replaceAll('scan --scanners secret', 'scan --scanners secret --severity HIGH,CRITICAL')],
+    ['исключён lockfile', (run: string) => run.replace('"$@" .;', '"$@" --skip-files pnpm-lock.yaml .;')],
+    ['поздний config', (run: string) => run.replace('"$@" .;', '"$@" --config=trivy.yaml .;')],
+    ['поздний exit-code', (run: string) => run.replace('"$@" .;', '"$@" --exit-code=0 .;')],
+    ['поздний include-dev-deps', (run: string) => run.replace('"$@" .;', '"$@" --include-dev-deps=false .;')],
+    ['поздний secret ignorefile', (run: string) => run.replaceAll('scan --scanners secret', 'scan --scanners secret --ignorefile accepted.yaml')
+      .replaceAll('--ignorefile /dev/null --format', '--ignorefile /dev/null --ignorefile=accepted.yaml --format')
+      .replace('"$@" .;', '"$@" --ignorefile=accepted.yaml .;')],
+    ['распакован другой архив', (run: string) => run.replace('tar -xzf "$dir/trivy.tgz"', 'tar -xzf "$RUNNER_TEMP/unverified.tgz"')],
+    ['scanner распакован в другом месте', (run: string) => 'mkdir "$RUNNER_TEMP/elsewhere"\n' + run.replace(' -C "$dir" trivy', ' -C "$RUNNER_TEMP/elsewhere" trivy')],
+  ] as const)('security witness замечает нарушение: %s', (_, mutate) => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    const item = runStep(ci.jobs.security!, /test\/ci-trivy-canary\.py verify/);
+    expect(mutate(item.run!)).not.toBe(item.run);
+    expect(() => assertSecurityStep({ ...item, run: mutate(item.run!) })).toThrow();
+  });
+
+  it('security принимает attached flags, порядок и дополняющие списки', () => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    const item = runStep(ci.jobs.security!, /test\/ci-trivy-canary\.py verify/);
+    const run = item.run!
+      .replace('--config /dev/null', '--config=unused.yaml --config=/dev/null')
+      .replace('--exit-code 1', '--exit-code=0 --exit-code=1')
+      .replaceAll('--scanners vuln,misconfig', '--scanners=misconfig --scanners=vuln')
+      .replaceAll('--severity UNKNOWN,HIGH,CRITICAL', '--severity=CRITICAL --severity=HIGH,UNKNOWN')
+      .replaceAll('--include-dev-deps', '--include-dev-deps=true')
+      .replaceAll('--ignore-unfixed', '--ignore-unfixed=true')
+      .replaceAll('scan --scanners secret', 'scan --severity=MEDIUM,LOW --severity=UNKNOWN,HIGH,CRITICAL --scanners=secret')
+      .replaceAll('--ignorefile /dev/null', '--ignorefile=unused.yaml --ignorefile=/dev/null')
+      .replaceAll('--format json', '--format=json');
+    assertSecurityStep({ ...item, run });
+  });
+
+  it.each([{ checksumStatus: 0, toolStatus: 0 }, { checksumStatus: 0, toolStatus: 1 }, { checksumStatus: 17, toolStatus: 1 }])(
+    'actionlint передаёт отказ checksum=$checksumStatus/tool=$toolStatus', ({ checksumStatus, toolStatus }) => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    assertActionlintStep(runStep(ci.jobs.verify!, /\/actionlint"/), checksumStatus, toolStatus);
+  });
+
+  it.each([
+    ['распакован другой архив', (run: string) => run.replace('tar -xzf "$archive"', 'tar -xzf "$RUNNER_TEMP/unverified.tar.gz"')],
+    ['поздний tar file', (run: string) => run.replace('tar -xzf "$archive"', 'tar -xzf "$archive" --file="$RUNNER_TEMP/unverified.tar.gz"')],
+    ['checksum другого архива', (run: string) => run.replace('"$archive" | sha256sum', '"$RUNNER_TEMP/unverified.tar.gz" | sha256sum')],
+    ['checksum не проверяет digest', (run: string) => run.replace('--check --status -', '--status -')],
+    ['tool распакован в другом месте', (run: string) => 'mkdir "$RUNNER_TEMP/elsewhere"\n' + run.replace(' -C "$install_dir"', ' -C "$RUNNER_TEMP/elsewhere"')],
+  ] as const)('actionlint witness связывает проверенный архив: %s', (_, mutate) => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    const item = runStep(ci.jobs.verify!, /\/actionlint"/);
+    expect(mutate(item.run!)).not.toBe(item.run);
+    expect(() => assertActionlintStep({ ...item, run: mutate(item.run!) })).toThrow();
+  });
+
+  it('actionlint принимает attached output и канонически тот же tar file', () => {
+    const ci = parse(sources().get('ci.yml')!) as Workflow;
+    const item = runStep(ci.jobs.verify!, /\/actionlint"/);
+    assertActionlintStep({ ...item, run: item.run!.replace('--output "$archive"', '-o"$archive"')
+      .replace('tar -xzf "$archive"', 'tar -xz --file="$RUNNER_TEMP/./actionlint.tar.gz"')
+      .replace('-C "$install_dir"', '--directory="$RUNNER_TEMP/./actionlint"') });
+  });
+
   it('shell Vitest сохраняет код отказа после tee для diagnostics', () => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
-    const program = step(ci.jobs.tests!, 'Vitest').run!;
+    const program = runStep(ci.jobs.tests!, /(?:^|\n)pnpm (?:exec )?vitest run(?: |$)/).run!;
     const cwd = mkdtempSync(join(tmpdir(), 'motion-ci-vitest-'));
     try {
       for (const code of [0, 17]) {
@@ -891,17 +796,24 @@ describe('нативный граф CI', () => {
 });
 
 
-describe('Единый полный набор Vitest', () => {
-  it('сохраняет автоматический выбор fuzz-файлов без второго запуска', () => {
+
+// Discovery берёт настоящий default config, которым пользуется команда CI, без исполнения suites.
+async function assertFullDiscovery(overrides: CliOptions = {}) {
+  const vitest = await createVitest({ watch: false, ...overrides });
+  try {
     const root = fileURLToPath(new URL('../test/', import.meta.url));
-    const fuzz = readdirSync(root).filter(name => name.endsWith('finiteness-fuzz.test.ts'));
-    expect(fuzz.length).toBeGreaterThan(0);
-    expect(vitestConfig.test?.include).toEqual(['test/**/*.test.ts']);
-    expect(vitestConfig.test?.exclude).toBeUndefined();
-    expect(vitestConfig.test?.testNamePattern).toBeUndefined();
-    for (const name of ['ci.yml', 'release.yml']) {
-      expect(sources().get(name)).not.toContain('pnpm vitest run --reporter=verbose test/*finiteness-fuzz.test.ts');
-    }
+    const expected = readdirSync(root, { recursive: true }).filter(name => name.endsWith('.test.ts'))
+      .map(name => resolve(root, name).replaceAll('\\', '/')).sort();
+    const actual = (await vitest.globTestSpecifications()).map(spec => spec.moduleId.replaceAll('\\', '/')).sort();
+    expect(actual).toEqual(expected);
+    expect(vitest.config.testNamePattern).toBeUndefined();
+  } finally { await vitest.close(); }
+}
+
+describe('полный автоматический выбор Vitest', () => {
+  it('выбирает все test-файлы, включая fuzz, в единственном обычном запуске', () => assertFullDiscovery());
+  it('замечает исключение целого класса fuzz-файлов', async () => {
+    await expect(assertFullDiscovery({ exclude: ['**/*finiteness-fuzz.test.ts'] })).rejects.toThrow();
   });
 });
 
