@@ -391,8 +391,7 @@ function assertNativeGraph(files: Map<string, string>) {
   }
   const verify = ci.jobs.verify!;
   const tests = ci.jobs.tests!;
-  expect(ci.jobs.mutation!.if).toBe("${{ github.event_name != 'pull_request' }}");
-  const mutation = { ...ci.jobs.mutation!, if: undefined };
+  const mutation = ci.jobs.mutation!;
   for (const job of [verify, tests, mutation]) preparation(job);
   const build = command(verify, 'pnpm build');
   runtime(verify, build);
@@ -594,7 +593,7 @@ describe('свойства CI', () => {
     .map(result => ({ key, result }))))('настоящий shell итога проверяет $key=$result', ({ key, result }) => {
     const actual = verdict({ ...success, [key]: { result } });
     expect(actual.error).toBeUndefined();
-    expect(actual.status === 0, actual.stderr).toBe(key === 'mutation' && result === 'skipped');
+    expect(actual.status, actual.stderr).not.toBe(0);
   });
   it.each(['merge_group', 'push', 'workflow_dispatch'].flatMap(event => ['failure', 'cancelled', 'skipped']
     .map(result => ({ event, result }))))('требует успех mutation на $event: $result', ({ event, result }) => {
