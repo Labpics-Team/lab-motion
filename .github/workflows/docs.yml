@@ -15,6 +15,9 @@ jobs:
   reader:
     name: build and reader journeys
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
+      options: --user 1001
     timeout-minutes: 15
     steps:
       - name: Checkout
@@ -28,19 +31,21 @@ jobs:
           node-version: "24"
 
       - name: Activate pinned pnpm
+        shell: bash
         run: |
           corepack enable
           corepack install
 
       - name: Install dependencies
+        shell: bash
         run: pnpm install --frozen-lockfile
 
       - name: Build documentation
+        shell: bash
         run: pnpm docs:build
 
-      - name: Install browsers
-        run: pnpm exec playwright install --with-deps chromium firefox webkit
-
+      # Браузеры и системные зависимости уже есть в закреплённом runtime.
       - name: Reader journeys
+        shell: bash
         run: pnpm docs:test
 
