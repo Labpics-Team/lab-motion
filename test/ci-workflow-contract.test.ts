@@ -391,8 +391,7 @@ function assertNativeGraph(files: Map<string, string>) {
   }
   const verify = ci.jobs.verify!;
   const tests = ci.jobs.tests!;
-  expect(ci.jobs.mutation!.if).toBe("${{ github.event_name != 'pull_request' }}");
-  const mutation = { ...ci.jobs.mutation!, if: undefined };
+  const mutation = ci.jobs.mutation!;
   for (const job of [verify, tests, mutation]) preparation(job);
   const build = command(verify, 'pnpm build');
   runtime(verify, build);

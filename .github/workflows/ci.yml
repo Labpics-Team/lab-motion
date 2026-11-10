@@ -218,9 +218,8 @@ jobs:
 
   mutation:
     name: driver mutation
-    # PR уже выполняет все driver properties в обязательном test · fuzz.
-    # Силу этого suite проверяем на merge_group и на каждом новом main.
-    if: ${{ github.event_name != 'pull_request' }}
+    # Пока merge queue не применена, сила driver properties проверяется
+    # до слияния на PR; merge_group и main сохраняют ту же проверку.
     runs-on: ubuntu-latest
     timeout-minutes: 60
     # Stryker и выбранные тесты читают src; dist проверяется другими наборами.
