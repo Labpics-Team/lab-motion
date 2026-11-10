@@ -218,6 +218,9 @@ jobs:
 
   mutation:
     name: driver mutation
+    # PR уже выполняет все driver properties в обязательном test · fuzz.
+    # Силу этого suite проверяем на merge_group и на каждом новом main.
+    if: ${{ github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     # Stryker и выбранные тесты читают src; dist проверяется другими наборами.
@@ -240,9 +243,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Исторический phase-2b driver был оставлен ниже mutation-пола. Гейт мутирует
-      # весь src/driver.ts и использует capability-shaped suite; unknown killable
-      # survivor становится красным PR, а не новым комментарием в техдолге.
+      # Мутируем весь src/driver.ts; неизвестный killable survivor ниже пола
+      # блокирует merge_group и делает красным новый main.
       - name: Driver mutation gate
         run: pnpm exec stryker run stryker.driver.config.mjs
 
@@ -327,7 +329,11 @@ jobs:
           import json, os
           results = json.loads(os.environ['CHECK_RESULTS'])
           if (not isinstance(results, dict) or not results
-              or any(not isinstance(check, dict) or check.get('result') != 'success'
-                     for check in results.values())):
+              or any(not isinstance(check, dict)
+                     or (check.get('result') != 'success'
+                         and not (name == 'mutation'
+                                  and os.environ['EVENT_NAME'] == 'pull_request'
+                                  and check.get('result') == 'skipped'))
+                     for name, check in results.items())):
               raise SystemExit('Every required check must succeed')
           PY

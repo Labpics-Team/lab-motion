@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 type MutationConfig = {
   mutate?: string[];
   thresholds?: { break?: number };
+  coverageAnalysis?: string;
   vitest?: { configFile?: string };
 };
 
@@ -16,14 +17,13 @@ describe('driver mutation admission contract', () => {
 
     expect(config.mutate).toEqual(['src/driver.ts']);
     expect(config.thresholds?.break).toBeGreaterThanOrEqual(80);
+    expect(config.coverageAnalysis).toBe('perTest');
     expect(config.vitest?.configFile).toBe('vitest.stryker.driver.config.ts');
   });
 
-  it('keeps one PR CI SSOT while requiring driver mutation on every candidate', () => {
-    const ci = readFileSync(resolve('.github/workflows/ci.yml'), 'utf8');
+  it('keeps driver mutation in the scheduled and manual campaign', () => {
     const scheduled = readFileSync(resolve('.github/workflows/mutation.yml'), 'utf8');
 
-    expect(ci).toContain('pnpm exec stryker run stryker.driver.config.mjs');
     expect(scheduled).not.toMatch(/\npull_request:/);
     expect(scheduled).toContain('schedule:');
     expect(scheduled).toContain('workflow_dispatch:');

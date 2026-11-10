@@ -7,7 +7,7 @@
  *
  * ТЕКУЩИЙ КОНТРАКТ исполняемый: `stryker.driver.config.mjs` мутирует весь
  * `src/driver.ts`, использует capability-shaped driver suite и имеет break >=80;
- * native `ci.yml` требует этот gate на каждом candidate. Точный mutation score
+ * каденцию обязательного прогона задаёт native `ci.yml`. Точный mutation score
  * принадлежит CI/report artifact конкретного SHA, а не устаревающему комментарию.
  *
  * Этот файл остаётся одной частью oracle. Точные state-machine, convergence,
