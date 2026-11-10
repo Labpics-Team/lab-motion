@@ -329,10 +329,7 @@ jobs:
           results = json.loads(os.environ['CHECK_RESULTS'])
           if (not isinstance(results, dict) or not results
               or any(not isinstance(check, dict)
-                     or (check.get('result') != 'success'
-                         and not (name == 'mutation'
-                                  and os.environ['EVENT_NAME'] == 'pull_request'
-                                  and check.get('result') == 'skipped'))
-                     for name, check in results.items())):
+                     or check.get('result') != 'success'
+                     for check in results.values())):
               raise SystemExit('Every required check must succeed')
           PY
