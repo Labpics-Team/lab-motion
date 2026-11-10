@@ -446,8 +446,12 @@ function assertNativeGraph(files: Map<string, string>) {
   before(conformance, command(conformance, 'pnpm build'), browserRun);
   const reader = workflows.get('docs.yml')!.jobs.reader!;
   expect(workflows.get('docs.yml')!.on).toEqual({ workflow_call: null });
+  expect(reader.container).toEqual(conformance.container);
   preparation(reader);
   before(reader, command(reader, 'pnpm docs:build'), command(reader, 'pnpm docs:test'));
+  expect(reader.steps!.map(item => item.run ?? '').join('\n')).not.toMatch(
+    /(?:^|\n)\s*(?:sudo\s+)?(?:apt(?:-get)?\b|pnpm\s+exec\s+playwright\s+install\b)/,
+  );
   const gate = ci.jobs.CI!;
   expect(gate.name).toBe('CI'); // Имя обязательного итогового check.
   expect(gate.if).toBe('${{ always() }}');
@@ -517,6 +521,23 @@ function assertNativeGraph(files: Map<string, string>) {
 
 describe('свойства CI', () => {
   it('сохраняет обязательные проверки и потребительские границы', () => assertNativeGraph(sources()));
+  it.each(['missing-runtime', 'different-runtime', 'browser-download', 'system-install'] as const)(
+    'reader использует готовый browser runtime без повторной установки: %s', mutation => {
+      const files = sources();
+      const docs = parse(files.get('docs.yml')!) as Workflow;
+      const reader = docs.jobs.reader!;
+      if (mutation === 'missing-runtime') delete reader.container;
+      else if (mutation === 'different-runtime') reader.container!.image = reader.container!.image.replace(/:v\d+\.\d+\.\d+/, ':v0.0.0');
+      else reader.steps!.splice(reader.steps!.length - 1, 0, {
+        shell: 'bash',
+        run: mutation === 'browser-download'
+          ? 'pnpm exec playwright install --with-deps chromium firefox webkit'
+          : 'sudo apt-get install -y libnss3',
+      });
+      files.set('docs.yml', stringify(docs));
+      expect(() => assertNativeGraph(files)).toThrow();
+    },
+  );
   it('принимает переименование шагов и полный новый порядок browser-долей', () => {
     const files = sources();
     const ci = parse(files.get('ci.yml')!) as Workflow;
