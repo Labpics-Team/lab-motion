@@ -739,7 +739,7 @@ if (mode === 'reentry') {
   assert.equal(retainedComponentReferences, 0, 'terminal controls удерживают уничтоженные компоненты');
   assert.equal(controls.addedLiveReleased, 0, 'тот же уничтоженный live scope/presence удерживает компонент');
 } else {
-  // До candidate фиксированы измеримость и правило отказа. Полоса — разрешение
+  // До измерений фиксированы измеримость и правило отказа. Полоса — разрешение
   // стенда, не новый budget продукта: шире 256 KiB калибровка не принимается.
   // Контрольный Array содержит 131 072 элемента; измеренный сигнал должен
   // различаться минимум в 4× band независимо от представления элементов V8.
@@ -763,6 +763,9 @@ if (mode === 'reentry') {
     return process.memoryUsage();
   };
   const heap = async () => (await memory()).heapUsed;
+  const writeReport = report => new Promise((resolve, reject) => {
+    process.stdout.write(JSON.stringify(report) + '\n', error => error ? reject(error) : resolve());
+  });
   // Одинаковая нагрузка между чтениями в прогреве, A/A и измеряемых префиксах.
   batch(BATCH_CYCLES);
   await heap();
@@ -770,10 +773,10 @@ if (mode === 'reentry') {
   for (let i = 0; i < 8; i++) { batch(BATCH_CYCLES); calibration.push(await heap()); }
   const low = Math.min(...calibration), high = Math.max(...calibration);
   const band = high - low + READOUT_ALLOWANCE;
-  const baseline = { low, high, band, maximumResolvableBand: MAX_RESOLVABLE_BAND,
+  const baseline = Object.freeze({ low, high, band, maximumResolvableBand: MAX_RESOLVABLE_BAND,
     warmupCyclesPerOwner: BATCH_CYCLES, calibrationCyclesPerSample: BATCH_CYCLES,
-    workloadCyclesPerSample: BATCH_CYCLES, collector: 'major/async/last-resort', optimizer, samples: calibration };
-  console.log(JSON.stringify({ phase: 'baseline', mode, corpus, baseline }));
+    workloadCyclesPerSample: BATCH_CYCLES, collector: 'major/async/last-resort', optimizer, samples: calibration });
+  await writeReport({ phase: 'baseline', mode, corpus, baseline });
   assert.ok(band <= MAX_RESOLVABLE_BAND, 'named gap: A/A heap baseline не разрешает 256 KiB; candidate admission не запущен');
 
   let deliberate = [component(1, CONTROL_WORDS)];
@@ -796,35 +799,58 @@ if (mode === 'reentry') {
   const droppedControl = await heap();
   assert.ok(droppedControl <= high + band, 'dropped owner не вернулся в baseline');
 
-  const samples = [];
-  resetExecutions();
-  for (let prefix = BATCH_CYCLES; prefix <= CYCLES; prefix += BATCH_CYCLES) {
-    batch(BATCH_CYCLES);
-    const measured = await memory();
-    samples.push({ cyclesPerOwner: prefix, ...measured });
-  }
-  // Фиксированный terminal tail дополняет все пять промежуточных измерений.
+  // Один подготовленный corpus проходит полные healthy/prefix/growing серии.
+  // Их отчёты уходят в parent до следующего измерения, а исходная полоса
+  // остаётся неизменной даже после заведомо удерживающих controls.
   const upper = high + band;
-  const excess = samples.map(sample => Math.max(0, sample.heapUsed - upper));
-  const terminalTail = [];
-  for (let i = 0; i < 4; i++) terminalTail.push(await memory());
-  const tailExcess = terminalTail.map(sample => Math.max(0, sample.heapUsed - upper));
-  // Основной corpus проверяется на каждом префиксе. Presence/scope использует
-  // свою прежнюю terminal-tail границу; численные допуски обоих наборов сохранены.
   const prefixRequired = corpus !== 'presence-scope';
-  const retained = tailExcess.every(bytes => bytes === 0)
-    && (!prefixRequired || excess.every(bytes => bytes === 0));
-  const report = { status: retained ? 'pass' : 'fail', mode, corpus, cyclesPerOwner: CYCLES,
-    executions: executions(), baseline,
-    controls: { deliberateHeap, deliberateSignal, releasedControl, liveHeap, liveSignal, droppedControl },
-    samples, excess, terminalTail, tailExcess,
-    accounting: { componentPayload: 'JS Array', boundedCaches: 'warmed before A/A',
-      terminalShells: 'отдельный retention proof; в bytes owners dropped',
-      prefixSamples: prefixRequired
-        ? 'historical guard: каждый prefix + terminal tail обязаны быть в полосе'
-        : 'new-6 diagnostic churn; admission принадлежит фиксированному terminal tail после 10k',
-      process: 'heapUsed, heapTotal, external, arrayBuffers и rss показаны отдельно',
-      nativeGpuBytes: 'не измерены этим Node host' } };
-  console.log(JSON.stringify(report));
-  assert.ok(retained, `retained heap выше ${upper} B: prefixes=${JSON.stringify(samples.map((sample, i) => [sample.cyclesPerOwner, excess[i]]))}; tail=${tailExcess.join(',')}`);
+  async function measureSeries(series) {
+    const samples = [];
+    resetExecutions();
+    for (let prefix = BATCH_CYCLES; prefix <= CYCLES; prefix += BATCH_CYCLES) {
+      batch(BATCH_CYCLES);
+      if (series === 'prefix') {
+        globalThis.__resourceChurnControl = prefix === BATCH_CYCLES ? component(prefix, CONTROL_WORDS) : undefined;
+      } else if (series === 'growing') {
+        (globalThis.__resourceChurnControl ??= []).push(component(prefix, CONTROL_WORDS));
+      }
+      const measured = await memory();
+      samples.push({ cyclesPerOwner: prefix, ...measured });
+    }
+    // Фиксированный terminal tail дополняет все пять промежуточных измерений.
+    const excess = samples.map(sample => Math.max(0, sample.heapUsed - upper));
+    const terminalTail = [];
+    for (let i = 0; i < 4; i++) terminalTail.push(await memory());
+    const tailExcess = terminalTail.map(sample => Math.max(0, sample.heapUsed - upper));
+    // Presence/scope сохраняет свою прежнюю отдельную terminal-tail границу.
+    const retained = tailExcess.every(bytes => bytes === 0)
+      && (!prefixRequired || excess.every(bytes => bytes === 0));
+    await writeReport({ phase: 'series', series, status: retained ? 'pass' : 'fail', mode, corpus,
+      cyclesPerOwner: CYCLES, executions: executions(), baseline,
+      controls: { deliberateHeap, deliberateSignal, releasedControl, liveHeap, liveSignal, droppedControl },
+      samples, excess, terminalTail, tailExcess,
+      accounting: { componentPayload: 'JS Array', boundedCaches: 'warmed before A/A',
+        terminalShells: 'отдельный retention proof; в bytes owners dropped',
+        prefixSamples: prefixRequired
+          ? 'historical guard: каждый prefix + terminal tail обязаны быть в полосе'
+          : 'new-6 diagnostic churn; admission принадлежит фиксированному terminal tail после 10k',
+        process: 'heapUsed, heapTotal, external, arrayBuffers и rss показаны отдельно',
+        nativeGpuBytes: 'не измерены этим Node host' } });
+    return retained;
+  }
+  const results = [];
+  for (const series of corpus === 'existing' ? ['healthy', 'prefix', 'growing'] : ['healthy']) {
+    let retained;
+    try { retained = await measureSeries(series); }
+    finally { globalThis.__resourceChurnControl = undefined; }
+    // В завершённой функции больше нет samples/report. Остались только
+    // небольшие итоги; нейтральные Promise roots дрейнятся той же GC-границей.
+    const released = await heap();
+    await writeReport({ phase: 'released', series, mode, corpus, heapUsed: released, upper,
+      pendingPromises: componentPromises.length, controlsReleased: globalThis.__resourceChurnControl === undefined });
+    assert.ok(released <= upper, `${series}: после release heap не вернулся в исходную baseline-полосу`);
+    results.push({ series, retained });
+  }
+  assert.ok(results.every(result => result.retained),
+    `retained heap выше ${upper} B: ${results.map(result => `${result.series}=${result.retained ? 'pass' : 'fail'}`).join(', ')}`);
 }

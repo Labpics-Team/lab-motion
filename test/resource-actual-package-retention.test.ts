@@ -40,6 +40,7 @@ describe('RESOURCE-01: реальные байты установленного 
   let app: string;
   let entry: string;
   let evidenceRun: string;
+  let existingByteSeries: Record<string, Record<string, unknown>> | undefined;
 
   beforeAll(() => {
     mkdirSync(EVIDENCE, { recursive: true });
@@ -109,6 +110,40 @@ describe('RESOURCE-01: реальные байты установленного 
     expect(measured.every(owner => owner.cycles === 10_000)).toBe(true);
   }
 
+  function byteSeries(corpus: string): Record<string, Record<string, unknown>> {
+    const run = spawnSync(process.execPath, [...vmFlags('bytes', true), entry, 'bytes', corpus], {
+      cwd: app, encoding: 'utf8', timeout: 90_000, maxBuffer: 4 * 1024 * 1024,
+    });
+    writeFileSync(join(evidenceRun, `bytes-${corpus}.stdout.log`), run.stdout ?? '');
+    writeFileSync(join(evidenceRun, `bytes-${corpus}.stderr.log`), run.stderr ?? '');
+    // Отказ измерителя и timeout различаются: отрицательные controls обязаны
+    // завершить все серии и вернуть обычный assertion failure.
+    expect(run.error).toBeUndefined();
+    expect(run.status, run.stderr).toBe(corpus === 'existing' ? 1 : 0);
+    const receipts = run.stdout.trim().split('\n').map(line => JSON.parse(line) as Record<string, unknown>);
+    const baselines = receipts.filter(result => result.phase === 'baseline');
+    expect(baselines).toHaveLength(1);
+    const baseline = baselines[0]!.baseline as { high: number; band: number };
+    const expected = corpus === 'existing' ? ['healthy', 'prefix', 'growing'] : ['healthy'];
+    const reports = receipts.filter(result => result.phase === 'series');
+    expect(reports.map(result => result.series)).toEqual(expected);
+    for (const result of reports) {
+      expect(result.corpus).toBe(corpus);
+      expect(result.baseline).toEqual(baseline);
+    }
+    const released = receipts.filter(result => result.phase === 'released');
+    expect(released.map(result => result.series)).toEqual(expected);
+    for (const result of released) {
+      expect(result.upper).toBe(baseline.high + baseline.band);
+      expect(result.heapUsed).toBeLessThanOrEqual(baseline.high + baseline.band);
+      expect(result.pendingPromises).toBe(0);
+      expect(result.controlsReleased).toBe(true);
+    }
+    return Object.fromEntries(reports.map(result => [result.series as string, result]));
+  }
+
+  const existingSeries = () => existingByteSeries ??= byteSeries('existing');
+
   it('packed ESM/CJS сохраняют один frame clock после getter reentry и частичного host failure', () => {
     const result = probe('reentry');
     expect(result.status).toBe('pass');
@@ -138,7 +173,7 @@ describe('RESOURCE-01: реальные байты установленного 
   }, 120_000);
 
   it('dropped owners возвращают heap в заранее разрешённую A/A baseline-полосу без роста по циклам', () => {
-    const result = probe('bytes', true, 'existing');
+    const result = existingSeries().healthy!;
     expect(result.status).toBe('pass');
     completeCycles(result, ownerNames(EXISTING_KINDS));
     expect(result.baseline).toMatchObject({ warmupCyclesPerOwner: 2000,
@@ -149,22 +184,7 @@ describe('RESOURCE-01: реальные байты установленного 
   }, 120_000);
 
   it.each(['prefix', 'growing'] as const)('измеритель обнаруживает %s удержание в установленном пакете', (kind) => {
-    const source = readFileSync(entry, 'utf8');
-    const boundary = '    const measured = await memory();';
-    expect(source.split(boundary)).toHaveLength(2);
-    const injection = kind === 'prefix'
-      ? 'globalThis.__resourceChurnControl = prefix === BATCH_CYCLES ? component(prefix, CONTROL_WORDS) : undefined;'
-      : '(globalThis.__resourceChurnControl ??= []).push(component(prefix, CONTROL_WORDS));';
-    const mutant = join(app, `retained-${kind}.mjs`);
-    writeFileSync(mutant, source.replace(boundary, `    ${injection}\n${boundary}`));
-    const run = spawnSync(process.execPath, [...vmFlags('bytes', true), mutant, 'bytes', 'existing'], {
-      cwd: app, encoding: 'utf8', timeout: 90_000, maxBuffer: 4 * 1024 * 1024,
-    });
-    writeFileSync(join(evidenceRun, `retained-${kind}.stdout.log`), run.stdout ?? '');
-    writeFileSync(join(evidenceRun, `retained-${kind}.stderr.log`), run.stderr ?? '');
-    expect(run.error).toBeUndefined();
-    expect(run.status, run.stderr).toBe(1);
-    const result = JSON.parse(run.stdout.trim().split('\n').at(-1)!) as Record<string, unknown>;
+    const result = existingSeries()[kind]!;
     expect(result.status).toBe('fail');
     completeCycles(result, ownerNames(EXISTING_KINDS));
     const excess = result.excess as number[];
@@ -181,7 +201,7 @@ describe('RESOURCE-01: реальные байты установленного 
   }, 120_000);
 
   it('presence/scope после 10 000 циклов имеет стабильный terminal tail в своей A/A baseline-полосе', () => {
-    const result = probe('bytes', true, 'presence-scope');
+    const result = byteSeries('presence-scope').healthy!;
     expect(result.status).toBe('pass');
     completeCycles(result, ownerNames(ADDED_KINDS));
     const tailExcess = result.tailExcess as number[];
