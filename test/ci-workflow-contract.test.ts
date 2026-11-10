@@ -391,7 +391,8 @@ function assertNativeGraph(files: Map<string, string>) {
   }
   const verify = ci.jobs.verify!;
   const tests = ci.jobs.tests!;
-  const mutation = ci.jobs.mutation!;
+  expect(ci.jobs.mutation!.if).toBe("${{ github.event_name != 'pull_request' }}");
+  const mutation = { ...ci.jobs.mutation!, if: undefined };
   for (const job of [verify, tests, mutation]) preparation(job);
   const build = command(verify, 'pnpm build');
   runtime(verify, build);
@@ -454,7 +455,7 @@ function assertNativeGraph(files: Map<string, string>) {
   expect(gate.permissions).toEqual({});
   const required = Object.entries(ci.jobs).filter(([id, job]) => id !== 'CI'
     && !['./.github/workflows/performance.yml', './.github/workflows/profile-01.yml'].includes(job.uses ?? ''))
-    .map(([id, job]) => { admitted(job); return id; });
+    .map(([id, job]) => { admitted(id === 'mutation' ? mutation : job); return id; });
   expect([...gate.needs!].sort()).toEqual(required.sort());
   const verdict = gate.steps!.find(item => item.run)!;
   admitted({ ...gate, if: undefined }, verdict);
@@ -575,12 +576,12 @@ describe('свойства CI', () => {
 
   const required = (parse(sources().get('ci.yml')!) as Workflow).jobs.CI!.needs!;
   const success = Object.fromEntries(required.map(key => [key, { result: 'success' }]));
-  const verdict = (results: unknown) => {
+  const verdict = (results: unknown, event = 'pull_request') => {
     const program = pythonSetup + (parse(sources().get('ci.yml')!) as Workflow).jobs.CI!.steps![0]!.run!;
     return spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
       encoding: 'utf8', timeout: 5000,
       env: { ...process.env, CHECK_RESULTS: typeof results === 'string' ? results : JSON.stringify(results),
-        EVENT_NAME: 'pull_request', S5_CAPTURE_DIAGNOSTIC: '', PROFILE_BASELINE: '',
+        EVENT_NAME: event, S5_CAPTURE_DIAGNOSTIC: '', PROFILE_BASELINE: '',
         PERFORMANCE_BASELINE: '', PERFORMANCE_CONTRACT_ONLY: '' },
     });
   };
@@ -592,6 +593,12 @@ describe('свойства CI', () => {
   it.each([...required, 'future-check'].flatMap(key => ['failure', 'cancelled', 'skipped']
     .map(result => ({ key, result }))))('настоящий shell итога проверяет $key=$result', ({ key, result }) => {
     const actual = verdict({ ...success, [key]: { result } });
+    expect(actual.error).toBeUndefined();
+    expect(actual.status === 0, actual.stderr).toBe(key === 'mutation' && result === 'skipped');
+  });
+  it.each(['merge_group', 'push', 'workflow_dispatch'].flatMap(event => ['failure', 'cancelled', 'skipped']
+    .map(result => ({ event, result }))))('требует успех mutation на $event: $result', ({ event, result }) => {
+    const actual = verdict({ ...success, mutation: { result } }, event);
     expect(actual.error).toBeUndefined();
     expect(actual.status, actual.stderr).not.toBe(0);
   });
@@ -807,11 +814,19 @@ async function assertFullDiscovery(overrides: CliOptions = {}) {
     const actual = (await vitest.globTestSpecifications()).map(spec => spec.moduleId.replaceAll('\\', '/')).sort();
     expect(actual).toEqual(expected);
     expect(vitest.config.testNamePattern).toBeUndefined();
+    const driver = await createVitest({ watch: false, config: 'vitest.stryker.driver.config.ts' });
+    try {
+      const semantic = await driver.globTestSpecifications();
+      expect(semantic.length).toBeGreaterThan(0);
+      expect(semantic.every(spec => actual.includes(spec.moduleId.replaceAll('\\', '/')))).toBe(true);
+      expect(driver.config.environment).toBe(vitest.config.environment);
+      expect(driver.config.testNamePattern).toBeUndefined();
+    } finally { await driver.close(); }
   } finally { await vitest.close(); }
 }
 
 describe('полный автоматический выбор Vitest', () => {
-  it('выбирает все test-файлы, включая fuzz, в единственном обычном запуске', () => assertFullDiscovery());
+  it('выбирает все test-файлы, включая fuzz и driver semantic suite, в единственном обычном запуске', () => assertFullDiscovery());
   it('замечает исключение целого класса fuzz-файлов', async () => {
     await expect(assertFullDiscovery({ exclude: ['**/*finiteness-fuzz.test.ts'] })).rejects.toThrow();
   });
