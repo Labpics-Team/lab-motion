@@ -92,12 +92,10 @@ Browser typecheck выполняется один раз через обязат
 Набор, задание CI и доля параллельного исполнения имеют
 разное назначение: [suite](https://vitest.dev/api/describe) объединяет поведение, а [job](https://docs.github.com/en/actions/about-github-actions/understanding-github-actions#jobs) распределяет исполнение.
 
-Список выводится из самих тестов, без отдельного каталога:
-
 Проверки workflow запускают настоящие Bash-команды: для них нужен Bash **4.1
 или новее**, где `[[ … ]]` подчиняется `set -e` ([изменение GNU Bash](https://groups.google.com/g/gnu.announce/c/xvx66bHeCxA)).
-Системный Bash 3.2 в macOS для этих проверок не подходит. Установленный современный
-Bash должен стоять первым в `PATH`; например, при использовании Homebrew:
+В Linux и macOS Bash выбирается через `PATH`. Системный Bash 3.2 в macOS не подходит;
+установленный современный Bash должен стоять первым в `PATH`, например с Homebrew:
 
 ```sh
 brew install bash
@@ -105,10 +103,21 @@ export PATH="$(brew --prefix bash)/bin:$PATH"
 bash --version
 ```
 
+В Windows [тест workflow](test/ci-workflow-contract.test.ts) использует
+`%ProgramFiles%\Git\bin\bash.exe` из Git for Windows, а не `PATH`.
+Если `ProgramFiles` не задана, используется `C:\Program Files\Git\bin\bash.exe`.
+Проверяйте версию именно этого файла: Git в другом каталоге автоматически не обнаруживается.
+
+Список выводится из самих тестов, без отдельного каталога. В Vitest 5 обычный
+`list` разбирает файлы статически и не раскрывает варианты `it.each`.
+[`--no-static-parse`](https://vitest.dev/guide/cli#vitest-list) импортирует файлы
+для сбора полного списка, но не выполняет тела тестов:
+
 ```bash
-pnpm exec vitest list test/ci-workflow-contract.test.ts
+pnpm exec vitest list test/ci-workflow-contract.test.ts --no-static-parse
 pnpm exec vitest run test/ci-workflow-contract.test.ts
-pnpm exec vitest run test/ci-workflow-contract.test.ts -t 'CI: итог обязательных проверок'
+pnpm exec vitest list test/ci-workflow-contract.test.ts --no-static-parse -t 'требует успех mutation на push: failure'
+pnpm exec vitest run test/ci-workflow-contract.test.ts -t 'требует успех mutation на push: failure'
 pnpm exec playwright test --list --project=chromium
 ```
 
@@ -118,7 +127,7 @@ Reporter `default` в Vitest раскрывает дерево при запус
 Адресный запуск проверяет только выбранное поведение, не весь обязательный CI.
 Фильтр имени без совпадений может вернуть exit 0 с одними skipped-тестами:
 проверяйте, что итог показывает непустой выполненный набор. `vitest list`
-с теми же фильтрами помогает уточнить выбор, но не выполняет тесты.
+с `--no-static-parse` и теми же фильтрами помогает уточнить выбор, но не заменяет запуск.
 Если выбранный тест читает собранный пакет, сначала выполните `pnpm build`;
 `pnpm test` уже включает сборку. Браузерные тесты всегда требуют `dist`;
 Playwright показывает файл, свойство и браузер в штатном `list`-выводе.
