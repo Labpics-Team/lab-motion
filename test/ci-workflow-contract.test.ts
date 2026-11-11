@@ -519,7 +519,7 @@ function assertNativeGraph(files: Map<string, string>) {
   }
 }
 
-describe('свойства CI', () => {
+describe('CI: подготовка и полнота проверок', () => {
   it('сохраняет обязательные проверки и потребительские границы', () => assertNativeGraph(sources()));
   it.each(['missing-runtime', 'different-runtime', 'browser-download', 'system-install'] as const)(
     'reader использует готовый browser runtime без повторной установки: %s', mutation => {
@@ -593,7 +593,9 @@ describe('свойства CI', () => {
     files.set('ci.yml', stringify(ci));
     expect(() => assertNativeGraph(files)).toThrow();
   });
+});
 
+describe('CI: итог обязательных проверок', () => {
   const required = (parse(sources().get('ci.yml')!) as Workflow).jobs.CI!.needs!;
   const success = Object.fromEntries(required.map(key => [key, { result: 'success' }]));
   const verdict = (results: unknown, event = 'pull_request') => {
@@ -650,7 +652,9 @@ describe('свойства CI', () => {
     expect(actual.error).toBeUndefined();
     expect(actual.status === 0, actual.stderr).toBe(passes);
   });
+});
 
+describe('CI: сравнительные измерения', () => {
   it.each([
     { s5: false, contract: false, cli: true, measurements: true },
     { s5: true, contract: false, cli: false, measurements: false },
@@ -703,7 +707,9 @@ describe('свойства CI', () => {
     expect(actual.status, actual.stderr).toBe(code);
     expect(actual.stdout.trim().split('\n')).toEqual(['bench.mjs']);
   });
+});
 
+describe('CI: проверки выпуска и потребителя пакета', () => {
   it.each([0, 17])('release smoke исполняет проверку stored-date и возвращает отказ %i', code => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
     const item = runStep(ci.jobs.verify!, /node scripts\/check-release\.mjs /);
@@ -730,7 +736,9 @@ describe('свойства CI', () => {
     const item = ci.jobs.verify!.steps!.find(item => item.run?.includes('node scripts/pack-smoke.mjs'))!;
     expect(() => assertPackConsumer({ ...item, run: `cat <<'PRINTED'\n${item.run}PRINTED\n` }, false, 1)).toThrow();
   });
+});
 
+describe('CI: проверка безопасности', () => {
   it.each([0, 17])('security вызывает scanner с полной политикой и возвращает отказ %i', code => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
     assertSecurityStep(runStep(ci.jobs.security!, /test\/ci-trivy-canary\.py verify/), code);
@@ -774,7 +782,9 @@ describe('свойства CI', () => {
       .replaceAll('--format json', '--format=json');
     assertSecurityStep({ ...item, run });
   });
+});
 
+describe('CI: проверка workflow', () => {
   it.each([{ checksumStatus: 0, toolStatus: 0 }, { checksumStatus: 0, toolStatus: 1 }, { checksumStatus: 17, toolStatus: 1 }])(
     'actionlint передаёт отказ checksum=$checksumStatus/tool=$toolStatus', ({ checksumStatus, toolStatus }) => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
@@ -801,7 +811,9 @@ describe('свойства CI', () => {
       .replace('tar -xzf "$archive"', 'tar -xz --file="$RUNNER_TEMP/./actionlint.tar.gz"')
       .replace('-C "$install_dir"', '--directory="$RUNNER_TEMP/./actionlint"') });
   });
+});
 
+describe('CI: вывод Vitest', () => {
   it('shell Vitest сохраняет код отказа после tee для diagnostics', () => {
     const ci = parse(sources().get('ci.yml')!) as Workflow;
     const program = runStep(ci.jobs.tests!, /(?:^|\n)pnpm (?:exec )?vitest run(?: |$)/).run!;
@@ -845,7 +857,7 @@ async function assertFullDiscovery(overrides: CliOptions = {}) {
   } finally { await vitest.close(); }
 }
 
-describe('полный автоматический выбор Vitest', () => {
+describe('CI: автоматический выбор Vitest', () => {
   it('выбирает все test-файлы, включая fuzz и driver semantic suite, в единственном обычном запуске', () => assertFullDiscovery());
   it('замечает исключение целого класса fuzz-файлов', async () => {
     await expect(assertFullDiscovery({ exclude: ['**/*finiteness-fuzz.test.ts'] })).rejects.toThrow();
@@ -908,7 +920,7 @@ const pinMutants: ReadonlyArray<readonly [string, (source: string) => string]> =
 const decoy = (sha: string) => '      - name: Decoy\n        env:\n          TEXT: |\n'
   + `            uses: actions/checkout@${sha} # v7.0.1\n        run: "true"\n`;
 
-describe('закрепление внешних actions', () => {
+describe('CI: закрепление внешних actions', () => {
   it('закрепляет каждый внешний action полным SHA с комментарием версии', () => assertPinPolicy(sources()));
 
   it.each([...allowedActions])('принимает обновление %s: новый SHA и версия во всех workflow', (action) => {
