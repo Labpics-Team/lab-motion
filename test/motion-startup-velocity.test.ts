@@ -13,8 +13,8 @@ it('sequence publishes a completed first segment before its following gap', asyn
     expect(track._owner).toBeUndefined();
     expect(track._group._tracks.has(track._program._key)).toBe(false);
     expect(track._program._duration).toBe(1200);
-    expect(track._program._segments[0]!._end).toBe(0);
-    expect(track._program._segments[1]!._at).toBe(200);
+    expect(track._program._end).toBe(0);
+    expect(track._program._tail![0]!._at).toBe(200);
     expect(track._value.length).toBe(track._program._final.length);
     expect(track._velocity.length).toBe(track._value.length);
     for (let i = 0; i < track._value.length; i++) {
