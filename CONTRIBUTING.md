@@ -90,9 +90,20 @@ Browser typecheck выполняется один раз через обязат
 условие и наблюдаемый результат. Например, `test/ci-workflow-contract.test.ts` →
 `CI: итог обязательных проверок` → `не принимает пустой или повреждённый итог`.
 Набор, задание CI и доля параллельного исполнения имеют
-[разное назначение](https://github.com/Labpics-Team/.github/blob/main/docs/testing.md#наборы-и-навигация).
+разное назначение: [suite](https://vitest.dev/api/describe) объединяет поведение, а [job](https://docs.github.com/en/actions/about-github-actions/understanding-github-actions#jobs) распределяет исполнение.
 
 Список выводится из самих тестов, без отдельного каталога:
+
+Проверки workflow запускают настоящие Bash-команды: для них нужен Bash **4.1
+или новее**, где `[[ … ]]` подчиняется `set -e` ([изменение GNU Bash](https://groups.google.com/g/gnu.announce/c/xvx66bHeCxA)).
+Системный Bash 3.2 в macOS для этих проверок не подходит. Установленный современный
+Bash должен стоять первым в `PATH`; например, при использовании Homebrew:
+
+```sh
+brew install bash
+export PATH="$(brew --prefix bash)/bin:$PATH"
+bash --version
+```
 
 ```bash
 pnpm exec vitest list test/ci-workflow-contract.test.ts
