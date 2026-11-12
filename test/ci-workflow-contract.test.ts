@@ -391,7 +391,9 @@ function assertNativeGraph(files: Map<string, string>) {
   }
   const verify = ci.jobs.verify!;
   const tests = ci.jobs.tests!;
-  const mutation = ci.jobs.mutation!;
+  expect(ci.jobs.mutation!.if).toBe("${{ github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}");
+  // Условия допуска проверены выше; подготовка и сама кампания без пропусков.
+  const mutation = { ...ci.jobs.mutation!, if: undefined };
   for (const job of [verify, tests, mutation]) preparation(job);
   const build = command(verify, 'pnpm build');
   runtime(verify, build);
@@ -598,6 +600,11 @@ describe('CI: подготовка и полнота проверок', () => {
 describe('CI: итог обязательных проверок', () => {
   const required = (parse(sources().get('ci.yml')!) as Workflow).jobs.CI!.needs!;
   const success = Object.fromEntries(required.map(key => [key, { result: 'success' }]));
+  // Ожидаемая матрица следует назначению событий, независимо от условия workflow.
+  const mutationByEvent: Record<string, string> = {
+    pull_request: 'skipped', push: 'skipped', merge_group: 'success', workflow_dispatch: 'success',
+  };
+  const eventResults = (event: string) => ({ ...success, mutation: { result: mutationByEvent[event] } });
   const verdict = (results: unknown, event = 'pull_request') => {
     const program = pythonSetup + (parse(sources().get('ci.yml')!) as Workflow).jobs.CI!.steps![0]!.run!;
     return spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', program], {
@@ -607,25 +614,45 @@ describe('CI: итог обязательных проверок', () => {
         PERFORMANCE_BASELINE: '', PERFORMANCE_CONTRACT_ONLY: '' },
     });
   };
-  it('принимает успех всех настоящих зависимостей', () => {
-    const actual = verdict(success);
+  it.each(Object.keys(mutationByEvent))('принимает полный итог на $0', event => {
+    const actual = verdict(eventResults(event), event);
     expect(actual.error).toBeUndefined();
     expect(actual.status, actual.stderr).toBe(0);
   });
-  it.each([...required, 'future-check'].flatMap(key => ['failure', 'cancelled', 'skipped']
-    .map(result => ({ key, result }))))('настоящий shell итога проверяет $key=$result', ({ key, result }) => {
-    const actual = verdict({ ...success, [key]: { result } });
+  it.each(Object.keys(mutationByEvent).flatMap(event =>
+    [...required.filter(key => key !== 'mutation'), 'future-check'].flatMap(key =>
+      ['failure', 'cancelled', 'skipped'].map(result => ({ event, key, result }))),
+  ))('настоящий shell итога проверяет $event/$key=$result', ({ event, key, result }) => {
+    const actual = verdict({ ...eventResults(event), [key]: { result } }, event);
     expect(actual.error).toBeUndefined();
     expect(actual.status, actual.stderr).not.toBe(0);
   });
-  it.each(['merge_group', 'push', 'workflow_dispatch'].flatMap(event => ['failure', 'cancelled', 'skipped']
+  it.each(['merge_group', 'workflow_dispatch'].flatMap(event => ['failure', 'cancelled', 'skipped']
     .map(result => ({ event, result }))))('требует успех mutation на $event: $result', ({ event, result }) => {
+    const actual = verdict({ ...success, mutation: { result } }, event);
+    expect(actual.error).toBeUndefined();
+    expect(actual.status, actual.stderr).not.toBe(0);
+  });
+  it.each(['pull_request', 'push'].flatMap(event =>
+    ['success', 'failure', 'cancelled'].map(result => ({ event, result })),
+  ))('принимает только штатный пропуск mutation на $event: $result', ({ event, result }) => {
     const actual = verdict({ ...success, mutation: { result } }, event);
     expect(actual.error).toBeUndefined();
     expect(actual.status, actual.stderr).not.toBe(0);
   });
   it.each([{}, null, [], { absent: null }, { absent: {} }, { absent: { result: 'unknown' } }, 'not-json'])('не принимает пустой или повреждённый итог: %j', results => {
     expect(verdict(results).status).not.toBe(0);
+  });
+  it.each(Object.keys(mutationByEvent))('не принимает отсутствующий результат mutation на $0', event => {
+    const results = eventResults(event) as Record<string, unknown>;
+    delete results.mutation;
+    expect(verdict(results, event).status).not.toBe(0);
+    for (const result of [null, {}, { result: 'unknown' }]) {
+      expect(verdict({ ...results, mutation: result }, event).status).not.toBe(0);
+    }
+  });
+  it('не разрешает неизвестному событию пропустить mutation', () => {
+    expect(verdict(eventResults('pull_request'), 'schedule').status).not.toBe(0);
   });
 
   it.each([
@@ -647,7 +674,7 @@ describe('CI: итог обязательных проверок', () => {
     const actual = spawnSync(bash, ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', pythonSetup + ci.jobs.CI!.steps![0]!.run!], {
       encoding: 'utf8', timeout: 5000,
       env: { ...process.env, EVENT_NAME: event, S5_CAPTURE_DIAGNOSTIC: s5, PERFORMANCE_CONTRACT_ONLY: contract ?? 'false', PROFILE_BASELINE: profile,
-        PERFORMANCE_BASELINE: baseline, CHECK_RESULTS: JSON.stringify(success) },
+        PERFORMANCE_BASELINE: baseline, CHECK_RESULTS: JSON.stringify(eventResults(event)) },
     });
     expect(actual.error).toBeUndefined();
     expect(actual.status === 0, actual.stderr).toBe(passes);
