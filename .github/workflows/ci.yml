@@ -218,8 +218,10 @@ jobs:
 
   mutation:
     name: driver mutation
-    # Пока merge queue не применена, сила driver properties проверяется
-    # до слияния на PR; merge_group и main сохраняют ту же проверку.
+    # Обязательная merge queue проверяет полный driver на собранном источнике
+    # до слияния; PR и последующий main не повторяют эту тяжёлую кампанию.
+    # Ручной CI сохраняет полную квалификацию по явному запросу.
+    if: ${{ github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     # Stryker и выбранные тесты читают src; dist проверяется другими наборами.
@@ -243,7 +245,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Мутируем весь src/driver.ts; неизвестный killable survivor ниже пола
-      # блокирует merge_group и делает красным новый main.
+      # блокирует merge_group и не допускает слияние.
       - name: Driver mutation gate
         run: pnpm exec stryker run stryker.driver.config.mjs
 
@@ -327,9 +329,15 @@ jobs:
           python3 - <<'PY'
           import json, os
           results = json.loads(os.environ['CHECK_RESULTS'])
+          event = os.environ['EVENT_NAME']
+          if event not in {'pull_request', 'push', 'merge_group', 'workflow_dispatch'}:
+              raise SystemExit('Unexpected CI event')
+          mutation_result = 'success' if event in {'merge_group', 'workflow_dispatch'} else 'skipped'
           if (not isinstance(results, dict) or not results
+              or not isinstance(results.get('mutation'), dict)
+              or results['mutation'].get('result') != mutation_result
               or any(not isinstance(check, dict)
                      or check.get('result') != 'success'
-                     for check in results.values())):
-              raise SystemExit('Every required check must succeed')
+                     for name, check in results.items() if name != 'mutation')):
+              raise SystemExit('Every required check must succeed; mutation must match the CI event')
           PY
