@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { isMap, isScalar, isSeq, parse, parseDocument, stringify } from 'yaml';
 import { createVitest, type CliOptions } from 'vitest/node';
+import { bashExecutable } from './helpers/bash.js';
 
 type Step = {
   uses?: string;
@@ -64,8 +65,7 @@ const events = (value: unknown): string[] => {
   if (value !== null && typeof value === 'object') return Object.keys(value);
   throw new Error('Некорректные события workflow');
 };
-const bash = process.platform === 'win32'
-  ? join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Git/bin/bash.exe') : 'bash';
+const bash = bashExecutable();
 // Windows alias python3 может вести в Store; shell-проверки используют установленный Python.
 const pythonPath = process.platform === 'win32'
   ? spawnSync('python', ['-c', 'import sys; print(sys.executable)'], { encoding: 'utf8' }).stdout.trim() : '';

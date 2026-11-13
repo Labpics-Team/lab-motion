@@ -1,7 +1,6 @@
 import { parse } from 'yaml';
 import { spawnSync } from 'node:child_process';
 import {
-  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -11,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { bashExecutable } from './helpers/bash.js';
 
 const workflowUrl = new URL('../.github/workflows/release.yml', import.meta.url);
 const workflow = readFileSync(workflowUrl, 'utf8').replace(
@@ -25,6 +25,7 @@ const releasePackage = JSON.parse(
 const releaseVersion = releasePackage.version;
 const releaseTag = `v${releaseVersion}`;
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
+const bash = bashExecutable();
 const supportedReplayTag = 'v0.3.0';
 const unsupportedReplayTag = 'v0.2.0';
 const releaseReplayProtocolBase = '851a37c9ff53beb3f46f466c0d1f1e92130fb46d';
@@ -79,19 +80,6 @@ function job(name: string): string {
 
 function stepRun(jobName: string, stepName: string): string {
   return bashRun(namedStep(job(jobName), stepName), stepName);
-}
-
-function bashExecutable(): string {
-  if (process.platform !== 'win32') return 'bash';
-  const candidates = [
-    process.env['GIT_BASH_PATH'],
-    'C:\\Program Files\\Git\\bin\\bash.exe',
-    'C:\\Program Files (x86)\\Git\\bin\\bash.exe',
-  ];
-  const executable = candidates.find((candidate): candidate is string =>
-    typeof candidate === 'string' && existsSync(candidate));
-  if (executable === undefined) throw new Error('Git Bash отсутствует');
-  return executable;
 }
 
 function gitOutput(args: string[], cwd = repositoryRoot): string {
@@ -170,7 +158,7 @@ ${stepRun('resolve', 'Resolve and validate version')}
 cat "$GITHUB_OUTPUT"
 `;
   return spawnSync(
-    bashExecutable(),
+    bash,
     ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script],
     {
       encoding: 'utf8',
@@ -226,7 +214,7 @@ ${stepRun('verify', 'Verify release source')}
 cat "$GITHUB_OUTPUT"
 `;
     return spawnSync(
-      bashExecutable(),
+      bash,
       ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', script],
       {
         cwd: workspace,
@@ -565,7 +553,7 @@ describe('release workflow: fail-closed npm registry state machine', () => {
       { status: 0, stderr: '' };
     expect(yaml.status, yaml.stderr).toBe(0);
     for (const block of runBlocks()) {
-      const shell = spawnSync(bashExecutable(), ['--noprofile', '--norc', '-n'], {
+      const shell = spawnSync(bash, ['--noprofile', '--norc', '-n'], {
         input: block,
         encoding: 'utf8',
         timeout: 5000,
