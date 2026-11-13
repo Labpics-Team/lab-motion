@@ -103,10 +103,10 @@ export PATH="$(brew --prefix bash)/bin:$PATH"
 bash --version
 ```
 
-В Windows [тест workflow](test/ci-workflow-contract.test.ts) использует
-`%ProgramFiles%\Git\bin\bash.exe` из Git for Windows, а не `PATH`.
-Если `ProgramFiles` не задана, используется `C:\Program Files\Git\bin\bash.exe`.
-Проверяйте версию именно этого файла: Git в другом каталоге автоматически не обнаруживается.
+В Windows [проверки workflow](test/helpers/bash.ts) выбирают Bash из установки
+Git for Windows, найденной через `git` в `PATH`. Используется launcher Git,
+который подготавливает окружение для внешних команд и вложенного Bash.
+Существующий путь в `GIT_BASH_PATH` задаёт явный выбор Bash.
 
 Список выводится из самих тестов, без отдельного каталога. В Vitest 5 обычный
 `list` разбирает файлы статически и не раскрывает варианты `it.each`.
