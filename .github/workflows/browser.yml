@@ -56,10 +56,6 @@ jobs:
         shell: bash
         run: pnpm install --frozen-lockfile
 
-      # Образ содержит браузеры точной версии и системные зависимости; apt не запускается.
-      - name: Install Playwright browser
-        shell: bash
-        run: pnpm exec playwright install --dry-run ${{ matrix.browser }}
 
       # Типы browser-спеков проверяет обязательный verify через check:static.
       - name: Build library
