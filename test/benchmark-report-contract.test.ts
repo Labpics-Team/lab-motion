@@ -476,7 +476,7 @@ function refreshMotionReport(report: ReturnType<typeof fixture>) {
   return report;
 }
 
-function motionFixture() {
+function createMotionFixture() {
   const report = fixture();
   report.payload.schema = 10;
   report.payload.motionContract = structuredClone(S5_MOTION_CONTRACT);
@@ -485,6 +485,12 @@ function motionFixture() {
     report.payload.results[id].raw.freeze = Array.from({ length: 8 }, () => motionFreezeRun(id));
   }
   return refreshMotionReport(report);
+}
+
+let motionTemplate: ReturnType<typeof fixture> | undefined;
+function motionFixture() {
+  motionTemplate ??= createMotionFixture();
+  return structuredClone(motionTemplate);
 }
 
 function freeze25To65(): MotionPoint[] {
@@ -563,6 +569,23 @@ describe('failed start semantic diagnostics', () => {
 });
 
 describe('schema 10 motion conformance admission', () => {
+  it('изменение и пересчёт одного отчёта не загрязняют следующий', () => {
+    const original = motionFixture();
+    const originalJson = JSON.stringify(original);
+    const originalX = original.payload.results.lab.raw.freeze[0].evidence.baseline[0].x;
+    const changed = motionFixture();
+    changed.payload.results.lab.raw.freeze[0].evidence.baseline[0].x = -100;
+    refreshMotionReport(changed);
+
+    expect(changed.payload.results.lab.raw.freeze[0].evidence.baseline[0].x).toBe(-100);
+    expect(original.payload.results.lab.raw.freeze[0].evidence.baseline[0].x).toBe(originalX);
+    expect(changed.payload.companion.markdownSha256).toBe(sha256Text(changed.markdown));
+    const next = motionFixture();
+    expect(JSON.stringify(next)).toBe(originalJson);
+    expect(next.payload.results.lab.raw.freeze[0].evidence.baseline)
+      .not.toBe(original.payload.results.lab.raw.freeze[0].evidence.baseline);
+  });
+
   it('публикация отклоняет аналитические точки без доказанной геометрии', () => {
     expect(() => validateBenchmarkReportForPublication(motionFixture())).toThrow(/motion conformance/);
   });
