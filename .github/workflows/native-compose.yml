@@ -1,0 +1,146 @@
+name: Native Compose
+
+on:
+  workflow_call:
+    inputs:
+      publication_version:
+        type: string
+        default: '0.1.0'
+      release_artifacts:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  inputs:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changed.outputs.value }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: changed
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          RELEASE: ${{ inputs.release_artifacts }}
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE" == true || -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
+            echo 'value=true' >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE" "$GITHUB_SHA" | grep -Eq '^(native/compose/|src/internal/motion-defaults\.ts$|src/motion/(model|types)\.ts$|\.github/workflows/(native-compose|release-compose|ci)\.yml$)'; then
+            echo 'value=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'value=false' >> "$GITHUB_OUTPUT"
+          fi
+
+  desktop-android:
+    needs: inputs
+    if: needs.inputs.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d
+      - name: Shared contract, JVM execution, Android packaging
+        env:
+          VERSION: ${{ inputs.publication_version }}
+        run: |
+          node native/compose/scripts/sync-defaults.mjs --check
+          bash native/compose/gradlew -p native/compose desktopTest \
+            publishDesktopPublicationToDistributionRepository \
+            publishAndroidReleasePublicationToDistributionRepository \
+            publishKotlinMultiplatformPublicationToDistributionRepository \
+            -PpublicationVersion="$VERSION" --console=plain
+      - name: Installed desktop consumer and real window
+        env:
+          VERSION: ${{ inputs.publication_version }}
+        run: |
+          bash native/compose/gradlew -p native/compose/consumer run --args=--verify \
+            -PmotionRepository="$GITHUB_WORKSPACE/native/compose/build/repository" -PmotionVersion="$VERSION" --console=plain
+          xvfb-run -a bash native/compose/gradlew -p native/compose/consumer run --args=--smoke \
+            -PmotionRepository="$GITHUB_WORKSPACE/native/compose/build/repository" -PmotionVersion="$VERSION" --console=plain
+      - name: Transfer release Maven modules
+        if: inputs.release_artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: compose-maven-desktop-android
+          path: native/compose/build/repository
+          retention-days: 7
+          if-no-files-found: error
+      - name: Failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: compose-desktop-failure
+          path: |
+            native/compose/build/reports
+            native/compose/consumer/build/native-consumer.png
+          retention-days: 7
+
+  apple:
+    needs: inputs
+    if: needs.inputs.outputs.changed == 'true'
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d
+      - name: Native simulator execution and Apple packages
+        env:
+          VERSION: ${{ inputs.publication_version }}
+        run: |
+          device=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if d["name"].startswith("iPhone")))')
+          xcrun simctl boot "$device" || xcrun simctl bootstatus "$device" -b
+          bash native/compose/gradlew -p native/compose iosSimulatorArm64Test \
+            publishIosArm64PublicationToDistributionRepository \
+            publishIosSimulatorArm64PublicationToDistributionRepository \
+            -PiosSimulatorDevice="$device" -PpublicationVersion="$VERSION" --console=plain
+      - name: Transfer release Maven modules
+        if: inputs.release_artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: compose-maven-apple
+          path: native/compose/build/repository
+          retention-days: 7
+          if-no-files-found: error
+      - name: Failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: compose-apple-failure
+          path: native/compose/build/reports
+          retention-days: 7
+
+  result:
+    if: always()
+    needs: [inputs, desktop-android, apple]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require applicable native checks
+        env:
+          INPUTS_RESULT: ${{ needs.inputs.result }}
+          CHANGED: ${{ needs.inputs.outputs.changed }}
+          DESKTOP_ANDROID: ${{ needs.desktop-android.result }}
+          APPLE: ${{ needs.apple.result }}
+        run: |
+          [[ "$INPUTS_RESULT" == success ]]
+          expected=skipped
+          [[ "$CHANGED" != true ]] || expected=success
+          [[ "$DESKTOP_ANDROID" == "$expected" && "$APPLE" == "$expected" ]]
