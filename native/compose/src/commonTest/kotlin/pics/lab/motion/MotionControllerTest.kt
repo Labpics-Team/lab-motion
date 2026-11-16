@@ -107,6 +107,23 @@ class MotionControllerTest {
         assertFalse(scene.clock.hasAwaiters)
         scene.motion.dispose(); scene.motion.dispose()
         assertFailsWith<IllegalStateException> { scene.motion.animate { to(x, 30f) } }
+
+        for (hold in listOf<(MotionPlayback) -> Unit>({ it.pause() }, { it.timeScale = 0f })) {
+            val heldScene = Scene(this)
+            val heldValue = heldScene.motion.value(0f)
+            val heldRun = heldScene.motion.animate { to(heldValue, 20f) }
+            heldScene.frame(0); heldScene.frame(50)
+            val heldPose = heldValue.value
+            hold(heldRun)
+            assertFalse(heldScene.clock.hasAwaiters)
+            heldScene.scope.cancel(); runCurrent()
+            assertTrue(heldRun.finished.isCompleted, "Scope cancellation must settle without a clock job")
+            assertEquals(MotionResult.Stopped, heldRun.finished.await())
+            assertEquals(PlaybackState.Stopped, heldRun.state)
+            assertEquals(heldPose, heldValue.value)
+            assertFalse(heldScene.clock.hasAwaiters)
+            heldScene.motion.dispose()
+        }
     }
 
     @Test fun reducedMotionIsImmediateIncludingAnInFlightPolicyChange() = runTest {

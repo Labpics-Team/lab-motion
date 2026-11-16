@@ -1,6 +1,6 @@
 plugins {
-    kotlin("multiplatform") version "2.2.21"
-    id("com.android.library") version "8.13.2"
+    kotlin("multiplatform") version "2.3.21"
+    id("com.android.kotlin.multiplatform.library") version "9.1.1"
     `maven-publish`
 }
 
@@ -9,8 +9,10 @@ version = providers.gradleProperty("publicationVersion").orElse("0.1.0").get()
 
 kotlin {
     jvm("desktop")
-    androidTarget {
-        publishLibraryVariants("release")
+    android {
+        namespace = "pics.lab.motion"
+        compileSdk = 37
+        minSdk = 33
         compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
     iosArm64()
@@ -33,15 +35,6 @@ kotlin {
 }
 tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest>().configureEach {
     providers.gradleProperty("iosSimulatorDevice").orNull?.let { device = it }
-}
-android {
-    namespace = "pics.lab.motion"
-    compileSdk = 36
-    defaultConfig { minSdk = 33 }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
 }
 publishing {
     repositories {

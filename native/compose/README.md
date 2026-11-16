@@ -61,7 +61,7 @@ cd native/compose
 ./gradlew -p consumer run --args=--smoke -PmotionRepository=/absolute/path/to/native/compose/build/repository
 ```
 
-Windows использует `gradlew.bat`. JDK 21 нужен сборке; выпуск JVM совместим с Java 17. Consumer — отдельная Gradle-сборка, которая получает только Maven-артефакт. `--verify` проверяет retarget с ненулевой скоростью, controls, reduced motion и disposal. `--smoke` открывает настоящее desktop-окно, выполняет те же действия, сохраняет изображение своего окна в `consumer/build/native-consumer.png` и закрывается. Без аргументов пример интерактивен.
+Windows использует `gradlew.bat`. Сборка использует JDK 21, Kotlin 2.3.21, Gradle 9.3.1, Android Gradle Plugin 9.1.1 и compileSdk 37; выпуск JVM совместим с Java 17. Версии учитывают требования Android AAR и Native KLIB ABI Compose 1.12.2. Consumer — отдельная Gradle-сборка, которая получает только Maven-артефакт. `--verify` проверяет retarget с ненулевой скоростью, controls, reduced motion и disposal. `--smoke` открывает настоящее desktop-окно, выполняет те же действия, сохраняет изображение своего окна в `consumer/build/native-consumer.png` и закрывается. Без аргументов пример интерактивен.
 
 `desktopTest`/`iosSimulatorArm64Test` используют один набор поведенческих тестов, управляемый `BroadcastFrameClock` и независимую аналитическую траекторию критически демпфированной пружины. CI выбирает проверки по изменённым native/source-contract входам. Android проходит compilation/packaging; JVM и iOS simulator исполняют тесты. Физические Android/iOS устройства не подменяются симулятором или сборкой.
 

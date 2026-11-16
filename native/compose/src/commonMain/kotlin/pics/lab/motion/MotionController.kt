@@ -17,6 +17,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -120,6 +121,9 @@ public class MotionPlayback internal constructor(
     private var job: Job? = null
     private var revision = 0
     private val completion = CompletableDeferred<MotionResult>()
+    // A lifecycle node, not a coroutine or frame waiter: pause/zero speed only stop the clock.
+    private val lifetime = Job(scope.coroutineContext[Job])
+    private var lifetimeCancellation: DisposableHandle? = null
     public val finished: Deferred<MotionResult> get() = completion
     public var state: PlaybackState by mutableStateOf(PlaybackState.Paused)
         private set
@@ -136,6 +140,10 @@ public class MotionPlayback internal constructor(
             if (state == PlaybackState.Running) runClock()
         }
     private val terminal: Boolean get() = completion.isCompleted
+
+    init {
+        lifetimeCancellation = lifetime.invokeOnCompletion { cause -> if (cause != null) stop() }
+    }
 
     public fun pause() {
         if (terminal || state == PlaybackState.Paused) return
@@ -181,6 +189,12 @@ public class MotionPlayback internal constructor(
         state = newState
         Snapshot.withMutableSnapshot { for (track in tracks) track.value.velocity = 0f }
         completion.complete(result)
+        releaseLifetime()
+    }
+    private fun releaseLifetime() {
+        lifetimeCancellation?.dispose()
+        lifetimeCancellation = null
+        lifetime.complete()
     }
     private fun runClock() {
         if (terminal || timeScale == 0f) return
@@ -213,6 +227,7 @@ public class MotionPlayback internal constructor(
                     state = PlaybackState.Failed
                     Snapshot.withMutableSnapshot { for (track in tracks) track.value.velocity = 0f }
                     completion.completeExceptionally(error)
+                    releaseLifetime()
                 }
             }
         }

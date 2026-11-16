@@ -74,7 +74,7 @@ const pythonSetup = process.platform === 'win32'
 // Закрепление внешних actions проверяется правилом, а не значениями: SHA и версию меняет
 // Dependabot, поэтому контракт требует полный SHA разрешённого репозитория, а не конкретный.
 const allowedActions = new Set([
-  'actions/checkout', 'actions/setup-node', 'actions/upload-artifact', 'actions/download-artifact',
+  'actions/checkout', 'actions/setup-node', 'actions/setup-java', 'actions/upload-artifact', 'actions/download-artifact',
 ]);
 const externalAction = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$/;
 const localWorkflow = /^\.\/\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/;
@@ -506,6 +506,17 @@ function assertNativeGraph(files: Map<string, string>) {
     for (const job of Object.values(workflow.jobs)) {
       const exports = (job.steps ?? []).filter(item => item.uses?.startsWith('actions/upload-artifact@'));
       if (name === 'release.yml') continue;
+      if (name === 'native-compose.yml') {
+        for (const exported of exports) {
+          expect(['inputs.release_artifacts', 'failure()']).toContain(exported.if);
+          expect(exported.with?.['retention-days']).toBe(7);
+          if (exported.if === 'inputs.release_artifacts') {
+            expect(exported.with?.path).toBe('native/compose/build/repository');
+            expect(exported.with?.['if-no-files-found']).toBe('error');
+          } else expect(exported.with?.path).toMatch(/^native\/compose\/build\/reports/);
+        }
+        continue;
+      }
       if (name !== 'performance.yml') expect(exports).toHaveLength(0);
       else {
         expect(exports).toHaveLength(1);
