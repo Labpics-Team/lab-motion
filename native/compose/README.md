@@ -26,10 +26,12 @@ val rotation = remember { motion.value(0f, "reload.rotate") }
 val opacity = remember { motion.value(1f, "reload.opacity") }
 DisposableEffect(motion) { onDispose { motion.dispose() } }
 
-// Обработчик действия; вызовы и чтение принадлежат UI-потоку.
-val playback = motion.animate {
-    to(rotation, 180f, MotionTransition.Spring(MotionSpring.response(420f, .2f)))
-    keyframes(opacity, listOf(.4f, 1f), durationMillis = 450)
+// Передайте onTurn в onClick; вызовы и чтение принадлежат UI-потоку.
+val onTurn: () -> Unit = {
+    motion.animate {
+        to(rotation, 180f, MotionTransition.Spring(MotionSpring.response(420f, .2f)))
+        keyframes(opacity, listOf(.4f, 1f), durationMillis = 450)
+    }
 }
 // В draw/layout: rotation.value, opacity.value. Состояние наблюдаемо Compose.
 ```
@@ -43,7 +45,7 @@ val playback = motion.animate {
 - `animate` сначала валидирует и компилирует весь эффект, затем прерывает прежний. Некорректная новая цель сохраняет действующее движение.
 - Retarget сохраняет позу и физическую скорость до отмены clock job. Spring продолжает обе; tween сохраняет позу и принимает новую производную авторского easing. Отложенная дорожка удерживает позу до начала.
 - `pause` удерживает позу, `play` продолжает ту же шкалу, `seek(ms)` сохраняет паузу. `reverse` меняет направление, `timeScale=0` удерживает позу без запроса кадров. `finish` применяет авторский конец даже при обратном воспроизведении. `stop` удерживает текущую позу.
-- `finished: Deferred<MotionResult>` разрешается `Finished` или `Stopped`; retarget, stop, отмена scope и dispose — `Stopped`. Старые controls после завершения не меняют новую операцию. Ошибка исполнения переводит controls в `Failed` и завершает Deferred исключением.
+- `finished: Deferred<MotionResult>` разрешается `Finished` или `Stopped`; retarget, stop, отмена scope (включая паузу/нулевую скорость) и dispose — `Stopped`. Явный `finished.cancel()` также останавливает выполнение, сохраняя стандартную отмену Deferred. Старые controls после завершения не меняют новую операцию. Ошибка исполнения переводит controls в `Failed` и завершает Deferred исключением.
 - `dispose` идемпотентен, отменяет clock job и запрещает новые значения/эффекты. Отдельная остановка не отменяет coroutine scope приложения.
 - Все дорожки публикуют один кадр внутри snapshot. В покое нет coroutine или frame-clock waiter. В кадре нет компиляции, SVG parsing, поиска ID или новых списков/карт каналов.
 

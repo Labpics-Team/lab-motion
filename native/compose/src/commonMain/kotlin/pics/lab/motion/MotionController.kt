@@ -139,10 +139,11 @@ public class MotionPlayback internal constructor(
             sample()
             if (state == PlaybackState.Running) runClock()
         }
-    private val terminal: Boolean get() = completion.isCompleted
+    private val terminal: Boolean get() = state == PlaybackState.Finished || state == PlaybackState.Stopped || state == PlaybackState.Failed
 
     init {
         lifetimeCancellation = lifetime.invokeOnCompletion { cause -> if (cause != null) stop() }
+        completion.invokeOnCompletion { cause -> if (cause is CancellationException) stop() }
     }
 
     public fun pause() {

@@ -124,6 +124,19 @@ class MotionControllerTest {
             assertFalse(heldScene.clock.hasAwaiters)
             heldScene.motion.dispose()
         }
+
+        val cancelledScene = Scene(this)
+        val cancelledValue = cancelledScene.motion.value(0f)
+        val cancelledRun = cancelledScene.motion.animate { to(cancelledValue, 20f) }
+        cancelledScene.frame(0); cancelledScene.frame(50)
+        val cancelledPose = cancelledValue.value
+        cancelledRun.finished.cancel()
+        cancelledScene.motion.dispose()
+        cancelledScene.frame(100)
+        assertEquals(PlaybackState.Stopped, cancelledRun.state)
+        assertEquals(cancelledPose, cancelledValue.value)
+        assertFalse(cancelledScene.clock.hasAwaiters)
+        cancelledScene.close()
     }
 
     @Test fun reducedMotionIsImmediateIncludingAnInFlightPolicyChange() = runTest {

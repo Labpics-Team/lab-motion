@@ -14,34 +14,52 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  validate:
+  resolve:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
     steps:
-      - env:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: source
+        env:
           VERSION: ${{ inputs.version }}
         run: |
+          set -euo pipefail
           [[ "$GITHUB_REF" == refs/heads/main ]]
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if git rev-parse --verify "refs/tags/compose-v$VERSION" >/dev/null 2>&1; then
+            sha=$(git rev-list -n 1 "compose-v$VERSION")
+          else
+            sha="$GITHUB_SHA"
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
   build:
-    needs: validate
+    needs: resolve
     permissions:
       contents: read
     uses: ./.github/workflows/native-compose.yml
     with:
       publication_version: ${{ inputs.version }}
       release_artifacts: true
+      source_sha: ${{ needs.resolve.outputs.source_sha }}
 
-  publish:
-    needs: build
+  verify:
+    needs: [resolve, build]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          persist-credentials: false
       - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
@@ -51,24 +69,49 @@ jobs:
           pattern: compose-maven-*
           merge-multiple: true
           path: native/compose/build/repository
-      - name: Verify the complete published dependency graph
+      - name: Verify complete Maven graph and installed consumer
         env:
           VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
         run: |
-          node native/compose/scripts/seal-repository.mjs native/compose/build/repository "$VERSION" "$GITHUB_SHA"
+          node native/compose/scripts/seal-repository.mjs native/compose/build/repository "$VERSION" "$SOURCE_SHA"
           bash native/compose/gradlew -p native/compose/consumer run --args=--verify \
             -PmotionRepository="$GITHUB_WORKSPACE/native/compose/build/repository" -PmotionVersion="$VERSION" --console=plain
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compose-maven-verified
+          path: native/compose/build/repository
+          retention-days: 7
+          if-no-files-found: error
+
+  publish:
+    needs: [resolve, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: compose-maven-verified
+          path: distribution
       - name: Atomically publish immutable source and Maven tags
         env:
           VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
         run: |
           set -euo pipefail
           source_tag="compose-v$VERSION"
           maven_tag="maven-compose-v$VERSION"
+          node -e 'const fs=require("node:fs");const s=JSON.parse(fs.readFileSync("distribution/source.json"));if(s.sourceSha!==process.env.SOURCE_SHA||s.version!==process.env.VERSION)throw Error("Artifact source differs")'
           if git rev-parse --verify "refs/tags/$source_tag" >/dev/null 2>&1; then
-            [[ "$(git rev-list -n 1 "$source_tag")" == "$GITHUB_SHA" ]]
+            [[ "$(git rev-list -n 1 "$source_tag")" == "$SOURCE_SHA" ]]
             git show "$maven_tag:source.json" > "$RUNNER_TEMP/compose-source.json"
-            node -e 'const fs=require("node:fs");const s=JSON.parse(fs.readFileSync(process.argv[1]));if(s.sourceSha!==process.env.GITHUB_SHA||s.version!==process.env.VERSION)throw Error("Immutable release identity differs")' "$RUNNER_TEMP/compose-source.json"
+            node -e 'const fs=require("node:fs");const s=JSON.parse(fs.readFileSync(process.argv[1]));if(s.sourceSha!==process.env.SOURCE_SHA||s.version!==process.env.VERSION)throw Error("Immutable release identity differs")' "$RUNNER_TEMP/compose-source.json"
           else
             if git rev-parse --verify "refs/tags/$maven_tag" >/dev/null 2>&1; then
               echo 'Maven tag already exists without its source tag' >&2
@@ -78,14 +121,30 @@ jobs:
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
             export GIT_INDEX_FILE="$RUNNER_TEMP/compose-maven.index"
             git read-tree --empty
-            git --work-tree="$GITHUB_WORKSPACE/native/compose/build/repository" add --all
+            git --work-tree="$GITHUB_WORKSPACE/distribution" add --all
             tree=$(git write-tree)
-            commit=$(printf 'Maven distribution %s from %s\n' "$VERSION" "$GITHUB_SHA" | git commit-tree "$tree")
+            commit=$(printf 'Maven distribution %s from %s\n' "$VERSION" "$SOURCE_SHA" | git commit-tree "$tree")
             unset GIT_INDEX_FILE
-            git tag "$source_tag" "$GITHUB_SHA"
+            git tag "$source_tag" "$SOURCE_SHA"
             git tag "$maven_tag" "$commit"
             git push --atomic origin "refs/tags/$source_tag" "refs/tags/$maven_tag"
           fi
+
+  verify-public:
+    needs: [resolve, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '21'
       - name: Install from the public Maven endpoint
         env:
           VERSION: ${{ inputs.version }}
@@ -93,9 +152,23 @@ jobs:
           bash native/compose/gradlew -p native/compose/consumer run --args=--verify \
             -PmotionRepository="https://raw.githubusercontent.com/$GITHUB_REPOSITORY/maven-compose-v$VERSION/" \
             -PmotionVersion="$VERSION" --refresh-dependencies --console=plain
+
+  release:
+    needs: [resolve, verify-public]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.source_sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - name: Publish release notes and fallback archive
         env:
           VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ needs.resolve.outputs.source_sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
@@ -108,7 +181,7 @@ jobs:
 
           Dependency: pics.lab:motion-compose:$VERSION
 
-          Source: $GITHUB_SHA. Android AAR, iOS arm64/simulator klib, desktop JVM, common metadata and sources. Contract tests execute on JVM and iOS simulator; a real Compose desktop window verifies retarget, reduced motion and disposal. Physical mobile-device UI qualification belongs to the consuming application.
+          Source: $SOURCE_SHA. Android AAR, iOS arm64/simulator klib, desktop JVM, common metadata and sources. Contract tests execute on JVM and iOS simulator; a real Compose desktop window verifies retarget, reduced motion and disposal. Physical mobile-device UI qualification belongs to the consuming application.
           EOF
           if gh release view "compose-v$VERSION" >/dev/null 2>&1; then
             gh release upload "compose-v$VERSION" "$RUNNER_TEMP/motion-compose-maven.zip" "$RUNNER_TEMP/motion-compose-maven.zip.sha256" --clobber

@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -22,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
+import kotlinx.coroutines.withTimeout
 import pics.lab.motion.*
 import java.awt.Rectangle
 import java.awt.Robot
@@ -46,9 +48,9 @@ fun main(args: Array<String>) {
             var turn by remember { mutableIntStateOf(0) }
             var reduced by remember { mutableStateOf(false) }
             DisposableEffect(motion) { onDispose { motion.dispose() } }
-            fun turn() {
+            fun turn(): MotionPlayback {
                 turn++
-                motion.animate {
+                return motion.animate {
                     to(part.rotation, turn * 180f, MotionTransition.Spring(MotionSpring.response(420f, .2f)))
                     keyframes(part.opacity, listOf(.35f, 1f), 450)
                 }
@@ -57,9 +59,11 @@ fun main(args: Array<String>) {
                 BasicText("Один жест. Один таймлайн.", style = TextStyle(Color.White, 25.sp))
                 BasicText("Нативное движение заранее подготовленных частей", style = TextStyle(Color(0xff9da3b5), 15.sp))
                 Canvas(Modifier.size(120.dp)) {
-                    rotate(part.rotation.value, Offset(60f, 60f)) {
-                        drawArc(Color(0xff92a5ff).copy(alpha = part.opacity.value.coerceIn(0f, 1f)), -45f, 290f, false, Offset(24f, 24f), androidx.compose.ui.geometry.Size(72f, 72f), style = Stroke(7f))
-                        drawPath(part.path, Color(0xff92a5ff).copy(alpha = part.opacity.value.coerceIn(0f, 1f)), style = Stroke(7f))
+                    scale(size.width / 120f, size.height / 120f, Offset.Zero) {
+                        rotate(part.rotation.value, Offset(60f, 60f)) {
+                            drawArc(Color(0xff92a5ff).copy(alpha = part.opacity.value.coerceIn(0f, 1f)), -45f, 290f, false, Offset(24f, 24f), androidx.compose.ui.geometry.Size(72f, 72f), style = Stroke(7f))
+                            drawPath(part.path, Color(0xff92a5ff).copy(alpha = part.opacity.value.coerceIn(0f, 1f)), style = Stroke(7f))
+                        }
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -73,7 +77,8 @@ fun main(args: Array<String>) {
             if ("--smoke" in args) LaunchedEffect(Unit) {
                 window.isAlwaysOnTop = true
                 window.toFront()
-                turn(); delay(80); turn(); delay(800)
+                turn(); delay(80)
+                withTimeout(5000) { check(turn().finished.await() == MotionResult.Finished) }
                 check(abs(part.rotation.value - 360f) < .1f)
                 motion.reducedMotion = true
                 turn()
