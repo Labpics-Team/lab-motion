@@ -73,6 +73,8 @@ jobs:
       - name: Installed desktop consumer and real window
         env:
           VERSION: ${{ inputs.publication_version }}
+          # Xvfb has no GPU context; select the supported software renderer directly.
+          SKIKO_RENDER_API: SOFTWARE
         run: |
           bash native/compose/gradlew -p native/compose/consumer run --args=--verify \
             -PmotionRepository="$GITHUB_WORKSPACE/native/compose/build/repository" -PmotionVersion="$VERSION" --console=plain

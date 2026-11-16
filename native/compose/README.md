@@ -67,6 +67,8 @@ Windows использует `gradlew.bat`. Сборка использует JD
 
 `desktopTest`/`iosSimulatorArm64Test` используют один набор поведенческих тестов, управляемый `BroadcastFrameClock` и независимую аналитическую траекторию критически демпфированной пружины. CI выбирает проверки по изменённым native/source-contract входам. Android проходит compilation/packaging; JVM и iOS simulator исполняют тесты. Физические Android/iOS устройства не подменяются симулятором или сборкой.
 
+Headless CI открывает настоящее окно в Xvfb с `SKIKO_RENDER_API=SOFTWARE`: доступность GPU не нужна для проверки renderer и жизненного цикла. Smoke требует завершения приложения за 30 секунд; при зависании выводит стеки JVM и возвращает ошибку. Обычный интерактивный запуск сохраняет выбор графического backend приложения.
+
 Workflow **Release Compose** принимает version и работает с main. Linux собирает Android/JVM/common, macOS — Apple. Проверяется полная цепочка `.module` → artifacts и SHA-256, затем отдельный consumer. Source tag `compose-vX.Y.Z` и Maven tag `maven-compose-vX.Y.Z` отправляются атомарно; версия не переписывается. Maven commit содержит `source.json` с исходным SHA. После публикации consumer повторно устанавливает зависимость по публичному URL; release содержит дополнительный архив.
 
 ## Первичные источники

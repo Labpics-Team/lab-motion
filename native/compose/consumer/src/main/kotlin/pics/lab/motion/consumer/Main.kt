@@ -29,7 +29,9 @@ import java.awt.Rectangle
 import java.awt.Robot
 import java.io.File
 import javax.imageio.ImageIO
+import kotlin.concurrent.thread
 import kotlin.math.abs
+import kotlin.system.exitProcess
 
 /** A renderer's prepared path and scalar handles: no SVG parsing or string lookup per frame. */
 private class PreparedPart(motion: MotionController) {
@@ -40,6 +42,15 @@ private class PreparedPart(motion: MotionController) {
 
 fun main(args: Array<String>) {
     if ("--verify" in args) { verifyInstalledArtifact(); return }
+    if ("--smoke" in args) thread(name = "native-smoke-deadline", isDaemon = true) {
+        Thread.sleep(30_000)
+        System.err.println("Native smoke did not close its window and application within 30 seconds")
+        for ((worker, stack) in Thread.getAllStackTraces()) {
+            System.err.println("Thread ${worker.name}: ${worker.state}")
+            stack.forEach { System.err.println("    at $it") }
+        }
+        exitProcess(1)
+    }
     application {
         Window(onCloseRequest = ::exitApplication, title = "Lab Motion · Native", state = rememberWindowState(width = 640.dp, height = 440.dp)) {
             val scope = rememberCoroutineScope()
