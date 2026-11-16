@@ -131,7 +131,9 @@ class MotionControllerTest {
         cancelledScene.frame(0); cancelledScene.frame(50)
         val cancelledPose = cancelledValue.value
         cancelledRun.finished.cancel()
-        cancelledScene.motion.dispose()
+        assertEquals(PlaybackState.Stopped, cancelledRun.state)
+        assertEquals(cancelledPose, cancelledValue.value)
+        assertFalse(cancelledScene.clock.hasAwaiters)
         cancelledScene.frame(100)
         assertEquals(PlaybackState.Stopped, cancelledRun.state)
         assertEquals(cancelledPose, cancelledValue.value)

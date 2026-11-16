@@ -37,6 +37,7 @@ jobs:
           else
             sha="$GITHUB_SHA"
           fi
+          git merge-base --is-ancestor "$sha" origin/main
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
   build:

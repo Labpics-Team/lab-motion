@@ -543,10 +543,14 @@ function assertNativeGraph(files: Map<string, string>) {
   const assertions = runStep(compare, /^xvfb-run -a node bench\.mjs\s*$/);
   expect(assertions['working-directory']).toBe('candidate/bench/compare');
   for (const [name, workflow] of workflows) {
-    for (const job of Object.values(workflow.jobs)) {
+    for (const [jobId, job] of Object.entries(workflow.jobs)) {
       const exports = (job.steps ?? []).filter(item => item.uses?.startsWith('actions/upload-artifact@'));
       if (name === 'release.yml' || name === 'release-compose.yml') continue;
       if (name === 'native-compose.yml') {
+        const publishes = jobId === 'desktop-android' || jobId === 'apple';
+        const release = exports.filter(step => step.if === 'inputs.release_artifacts');
+        expect(release).toHaveLength(publishes ? 1 : 0);
+        if (publishes) expect(release[0]!.with?.name).toBe(`compose-maven-${jobId}`);
         for (const exported of exports) {
           expect(['inputs.release_artifacts', 'failure()']).toContain(exported.if);
           expect(exported.with?.['retention-days']).toBe(7);
