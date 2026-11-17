@@ -74,11 +74,51 @@ const pythonSetup = process.platform === 'win32'
 // Закрепление внешних actions проверяется правилом, а не значениями: SHA и версию меняет
 // Dependabot, поэтому контракт требует полный SHA разрешённого репозитория, а не конкретный.
 const allowedActions = new Set([
-  'actions/checkout', 'actions/setup-node', 'actions/upload-artifact', 'actions/download-artifact',
+  'actions/checkout', 'actions/setup-node', 'actions/setup-java', 'actions/upload-artifact', 'actions/download-artifact',
 ]);
 const externalAction = /^([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+)@([0-9a-f]{40})$/;
 const localWorkflow = /^\.\/\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/;
 const versionComment = /^v\d+\.\d+\.\d+$/;
+
+describe('Compose release boundaries', () => {
+  it('runs repository builds without write credentials', () => {
+    for (const name of ['native-compose.yml', 'release-compose.yml']) {
+      const workflow = parse(sourceFiles.get(name)!) as Workflow;
+      for (const job of Object.values(workflow.jobs)) {
+        if (!(job.steps ?? []).some(step => /gradlew|node native\/compose\//.test(step.run ?? ''))) continue;
+        expect((job.permissions ?? workflow.permissions)?.contents).toBe('read');
+        for (const checkout of job.steps!.filter(step => step.uses?.startsWith('actions/checkout@'))) {
+          expect(checkout.with?.['persist-credentials']).toBe(false);
+        }
+      }
+    }
+  });
+
+  it.each(['relevant', 'irrelevant', 'large', 'renamed', 'failed'])('selects changed inputs without hiding git failure: %s', scenario => {
+    const workflow = parse(sourceFiles.get('native-compose.yml')!) as Workflow;
+    const step = workflow.jobs.inputs!.steps!.find(item => item.id === 'changed')!;
+    const directory = mkdtempSync(join(tmpdir(), 'motion-compose-inputs-'));
+    const normalized = directory.replaceAll('\\', '/');
+    try {
+      const script = `git() {
+        if [[ "$CASE" == failed ]]; then return 17; fi
+        if [[ "$CASE" == renamed && "$*" != *--no-renames* ]]; then echo moved/build.gradle.kts; return; fi
+        if [[ "$CASE" != irrelevant ]]; then echo native/compose/build.gradle.kts; fi
+        if [[ "$CASE" == large ]]; then for ((i=0;i<10000;i++)); do echo "other/long-path-$i.txt"; done; fi
+        echo README.md
+      }\n${step.run}`;
+      const result = spawnSync(bash, ['-c', script], { encoding: 'utf8', env: {
+        ...process.env, CASE: scenario, RELEASE: 'false', BASE: 'a'.repeat(40), GITHUB_SHA: 'b'.repeat(40),
+        RUNNER_TEMP: normalized, GITHUB_OUTPUT: `${normalized}/output`,
+      } });
+      if (scenario === 'failed') expect(result.status).not.toBe(0);
+      else {
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(join(directory, 'output'), 'utf8').trim()).toBe(`value=${scenario !== 'irrelevant'}`);
+      }
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+});
 
 function unpin(uses: string): string {
   const match = externalAction.exec(uses);
@@ -503,9 +543,24 @@ function assertNativeGraph(files: Map<string, string>) {
   const assertions = runStep(compare, /^xvfb-run -a node bench\.mjs\s*$/);
   expect(assertions['working-directory']).toBe('candidate/bench/compare');
   for (const [name, workflow] of workflows) {
-    for (const job of Object.values(workflow.jobs)) {
+    for (const [jobId, job] of Object.entries(workflow.jobs)) {
       const exports = (job.steps ?? []).filter(item => item.uses?.startsWith('actions/upload-artifact@'));
-      if (name === 'release.yml') continue;
+      if (name === 'release.yml' || name === 'release-compose.yml') continue;
+      if (name === 'native-compose.yml') {
+        const publishes = jobId === 'desktop-android' || jobId === 'apple';
+        const release = exports.filter(step => step.if === 'inputs.release_artifacts');
+        expect(release).toHaveLength(publishes ? 1 : 0);
+        if (publishes) expect(release[0]!.with?.name).toBe(`compose-maven-${jobId}`);
+        for (const exported of exports) {
+          expect(['inputs.release_artifacts', 'failure()']).toContain(exported.if);
+          expect(exported.with?.['retention-days']).toBe(7);
+          if (exported.if === 'inputs.release_artifacts') {
+            expect(exported.with?.path).toBe('native/compose/build/repository');
+            expect(exported.with?.['if-no-files-found']).toBe('error');
+          } else expect(exported.with?.path).toMatch(/^native\/compose\/build\/reports/);
+        }
+        continue;
+      }
       if (name !== 'performance.yml') expect(exports).toHaveLength(0);
       else {
         expect(exports).toHaveLength(1);

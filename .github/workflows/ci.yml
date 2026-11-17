@@ -302,10 +302,13 @@ jobs:
   browser-static:
     uses: ./.github/workflows/browser.yml
 
+  native-compose:
+    uses: ./.github/workflows/native-compose.yml
+
   CI:
     name: CI
     if: ${{ always() }}
-    needs: [verify, tests, mutation, browser-static, documentation, security]
+    needs: [verify, tests, mutation, browser-static, documentation, security, native-compose]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

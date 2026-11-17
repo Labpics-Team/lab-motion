@@ -1,0 +1,156 @@
+name: Native Compose
+
+on:
+  workflow_call:
+    inputs:
+      publication_version:
+        type: string
+        default: '0.1.0'
+      release_artifacts:
+        type: boolean
+        default: false
+      source_sha:
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  inputs:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.changed.outputs.value }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ inputs.source_sha || github.sha }}
+      - id: changed
+        shell: bash
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          RELEASE: ${{ inputs.release_artifacts }}
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE" == true || -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
+            echo 'value=true' >> "$GITHUB_OUTPUT"
+          else
+            git diff --no-renames --name-only "$BASE" "$GITHUB_SHA" > "$RUNNER_TEMP/compose-changed"
+            if grep -E '^(native/compose/|src/internal/motion-defaults\.ts$|src/motion/(model|types)\.ts$|\.github/workflows/(native-compose|release-compose|ci)\.yml$)' "$RUNNER_TEMP/compose-changed" > /dev/null; then
+              echo 'value=true' >> "$GITHUB_OUTPUT"
+            else
+              echo 'value=false' >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  desktop-android:
+    needs: inputs
+    if: needs.inputs.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Shared contract, JVM execution, Android packaging
+        env:
+          VERSION: ${{ inputs.publication_version }}
+        run: |
+          node native/compose/scripts/sync-defaults.mjs --check
+          node --test native/compose/scripts/seal-repository.test.mjs
+          bash native/compose/gradlew -p native/compose desktopTest \
+            publishDesktopPublicationToDistributionRepository \
+            publishAndroidPublicationToDistributionRepository \
+            publishKotlinMultiplatformPublicationToDistributionRepository \
+            -PpublicationVersion="$VERSION" --console=plain
+      - name: Installed desktop consumer and real window
+        env:
+          VERSION: ${{ inputs.publication_version }}
+          # Xvfb has no GPU context; select the supported software renderer directly.
+          SKIKO_RENDER_API: SOFTWARE
+        run: |
+          bash native/compose/gradlew -p native/compose/consumer run --args=--verify \
+            -PmotionRepository="$GITHUB_WORKSPACE/native/compose/build/repository" -PmotionVersion="$VERSION" --console=plain
+          xvfb-run -a bash native/compose/gradlew -p native/compose/consumer run --args=--smoke \
+            -PmotionRepository="$GITHUB_WORKSPACE/native/compose/build/repository" -PmotionVersion="$VERSION" --console=plain
+      - name: Transfer release Maven modules
+        if: inputs.release_artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compose-maven-desktop-android
+          path: native/compose/build/repository
+          retention-days: 7
+          if-no-files-found: error
+      - name: Failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compose-desktop-failure
+          path: |
+            native/compose/build/reports
+            native/compose/consumer/build/native-consumer.png
+          retention-days: 7
+
+  apple:
+    needs: inputs
+    if: needs.inputs.outputs.changed == 'true'
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.source_sha || github.sha }}
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Native simulator execution and Apple packages
+        env:
+          VERSION: ${{ inputs.publication_version }}
+        run: |
+          device=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; print(next(d["udid"] for ds in json.load(sys.stdin)["devices"].values() for d in ds if d["name"].startswith("iPhone")))')
+          xcrun simctl boot "$device" || xcrun simctl bootstatus "$device" -b
+          bash native/compose/gradlew -p native/compose iosSimulatorArm64Test \
+            publishIosArm64PublicationToDistributionRepository \
+            publishIosSimulatorArm64PublicationToDistributionRepository \
+            -PiosSimulatorDevice="$device" -PpublicationVersion="$VERSION" --console=plain
+      - name: Transfer release Maven modules
+        if: inputs.release_artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compose-maven-apple
+          path: native/compose/build/repository
+          retention-days: 7
+          if-no-files-found: error
+      - name: Failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: compose-apple-failure
+          path: native/compose/build/reports
+          retention-days: 7
+
+  result:
+    if: always()
+    needs: [inputs, desktop-android, apple]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require applicable native checks
+        env:
+          INPUTS_RESULT: ${{ needs.inputs.result }}
+          CHANGED: ${{ needs.inputs.outputs.changed }}
+          DESKTOP_ANDROID: ${{ needs.desktop-android.result }}
+          APPLE: ${{ needs.apple.result }}
+        run: |
+          [[ "$INPUTS_RESULT" == success ]]
+          expected=skipped
+          [[ "$CHANGED" != true ]] || expected=success
+          [[ "$DESKTOP_ANDROID" == "$expected" && "$APPLE" == "$expected" ]]
