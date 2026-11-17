@@ -1,0 +1,144 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "url": "../../motion-compose/0.1.0/motion-compose-0.1.0.module",
+    "group": "pics.lab",
+    "module": "motion-compose",
+    "version": "0.1.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.3.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "desktopApiElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.compose.animation",
+          "module": "animation-core",
+          "version": {
+            "requires": "1.12.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.compose.runtime",
+          "module": "runtime",
+          "version": {
+            "requires": "1.12.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.10.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.3.21"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "motion-compose-desktop-0.1.0.jar",
+          "url": "motion-compose-desktop-0.1.0.jar",
+          "size": 48448,
+          "sha512": "afbcc1b8b1de9140fc5b6378139978f2235e1ee2dcbc82ad9418ae4646ac4734da34af791162942c1015c9d745fc8bc9d37c8642b692f0a83710d51276d387c1",
+          "sha256": "e6adf335001d0a5bffd91970d882d66a50fbe26a77935682e5738f89ce550ecd",
+          "sha1": "2a2ad4069c3b2cc77f7efc262fdbdc6591040648",
+          "md5": "ab394c7b687729c546fd7e3c2cfa3c5b"
+        }
+      ]
+    },
+    {
+      "name": "desktopRuntimeElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.compose.animation",
+          "module": "animation-core",
+          "version": {
+            "requires": "1.12.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.compose.runtime",
+          "module": "runtime",
+          "version": {
+            "requires": "1.12.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.10.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.3.21"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "motion-compose-desktop-0.1.0.jar",
+          "url": "motion-compose-desktop-0.1.0.jar",
+          "size": 48448,
+          "sha512": "afbcc1b8b1de9140fc5b6378139978f2235e1ee2dcbc82ad9418ae4646ac4734da34af791162942c1015c9d745fc8bc9d37c8642b692f0a83710d51276d387c1",
+          "sha256": "e6adf335001d0a5bffd91970d882d66a50fbe26a77935682e5738f89ce550ecd",
+          "sha1": "2a2ad4069c3b2cc77f7efc262fdbdc6591040648",
+          "md5": "ab394c7b687729c546fd7e3c2cfa3c5b"
+        }
+      ]
+    },
+    {
+      "name": "desktopSourcesElements-published",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.jvm.environment": "standard-jvm",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "files": [
+        {
+          "name": "motion-compose-desktop-0.1.0-sources.jar",
+          "url": "motion-compose-desktop-0.1.0-sources.jar",
+          "size": 6549,
+          "sha512": "619ec0ed07a6c7b803eea768962c927ea6e24c28832f4f079a49da1946ee1110fb24c9a09f6f32424ad1ecbc0d28bced70f63f7c850b281419489a20db371d07",
+          "sha256": "bb0598665483e9643b11ac91a345ae7058289574c011247ab2e8aa2350fc00f0",
+          "sha1": "8860ffa8b28383c037178e67dfeee432d8bf3629",
+          "md5": "0030f9df5af56e78e8622be4b380d3f9"
+        }
+      ]
+    }
+  ]
+}

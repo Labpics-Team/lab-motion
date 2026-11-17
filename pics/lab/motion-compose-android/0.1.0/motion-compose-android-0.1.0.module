@@ -1,0 +1,144 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "url": "../../motion-compose/0.1.0/motion-compose-0.1.0.module",
+    "group": "pics.lab",
+    "module": "motion-compose",
+    "version": "0.1.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.3.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "androidApiElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.compose.animation",
+          "module": "animation-core",
+          "version": {
+            "requires": "1.12.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.compose.runtime",
+          "module": "runtime",
+          "version": {
+            "requires": "1.12.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.10.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.3.21"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "motion-compose.aar",
+          "url": "motion-compose-android-0.1.0.aar",
+          "size": 46511,
+          "sha512": "e2cda19d4026faf5af43448c43381c3610fba893c51bdb0fd2debe836a692c92f4c528d719181cda013c62c7c2b773bb491df46345fa1aeafa2c27ed21fe241f",
+          "sha256": "cb114410c74a4a79f63419f3620b5a7eb105b6822d832841a1791068360dc23c",
+          "sha1": "28a01697189b4b541f11311c1fa20fed685f7069",
+          "md5": "f8f97215072198ac650a2e7666c0dec5"
+        }
+      ]
+    },
+    {
+      "name": "androidRuntimeElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.compose.animation",
+          "module": "animation-core",
+          "version": {
+            "requires": "1.12.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.compose.runtime",
+          "module": "runtime",
+          "version": {
+            "requires": "1.12.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.10.2"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.3.21"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "motion-compose.aar",
+          "url": "motion-compose-android-0.1.0.aar",
+          "size": 46511,
+          "sha512": "e2cda19d4026faf5af43448c43381c3610fba893c51bdb0fd2debe836a692c92f4c528d719181cda013c62c7c2b773bb491df46345fa1aeafa2c27ed21fe241f",
+          "sha256": "cb114410c74a4a79f63419f3620b5a7eb105b6822d832841a1791068360dc23c",
+          "sha1": "28a01697189b4b541f11311c1fa20fed685f7069",
+          "md5": "f8f97215072198ac650a2e7666c0dec5"
+        }
+      ]
+    },
+    {
+      "name": "androidSourcesElements-published",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "androidJvm"
+      },
+      "files": [
+        {
+          "name": "motion-compose-android-0.1.0-sources.jar",
+          "url": "motion-compose-android-0.1.0-sources.jar",
+          "size": 6549,
+          "sha512": "619ec0ed07a6c7b803eea768962c927ea6e24c28832f4f079a49da1946ee1110fb24c9a09f6f32424ad1ecbc0d28bced70f63f7c850b281419489a20db371d07",
+          "sha256": "bb0598665483e9643b11ac91a345ae7058289574c011247ab2e8aa2350fc00f0",
+          "sha1": "8860ffa8b28383c037178e67dfeee432d8bf3629",
+          "md5": "0030f9df5af56e78e8622be4b380d3f9"
+        }
+      ]
+    }
+  ]
+}
