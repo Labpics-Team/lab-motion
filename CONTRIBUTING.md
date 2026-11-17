@@ -116,10 +116,13 @@ Git for Windows, найденной через `git` в `PATH`. Использу
 ```bash
 pnpm exec vitest list test/ci-workflow-contract.test.ts --no-static-parse
 pnpm exec vitest run test/ci-workflow-contract.test.ts
-pnpm exec vitest list test/ci-workflow-contract.test.ts --no-static-parse -t 'требует успех mutation на push: failure'
-pnpm exec vitest run test/ci-workflow-contract.test.ts -t 'требует успех mutation на push: failure'
+pnpm exec vitest list test/ci-workflow-contract.test.ts --no-static-parse -t 'требует успех mutation на merge_group: failure'
+pnpm exec vitest run test/ci-workflow-contract.test.ts -t 'требует успех mutation на merge_group: failure'
 pnpm exec playwright test --list --project=chromium
 ```
+
+Адресный `run` должен показать `1 passed`. Выбранный случай проверяет, что
+ошибка mutation блокирует `merge_group`.
 
 Reporter `default` в Vitest раскрывает дерево при запуске одного файла и при ошибке.
 Для нескольких выбранных файлов или сокращённого вывода в среде агента можно явно
