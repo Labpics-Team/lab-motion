@@ -85,6 +85,28 @@ const localWorkflow = /^\.\/\.github\/workflows\/[A-Za-z0-9_.-]+\.ya?ml$/;
 const versionComment = /^v\d+\.\d+\.\d+$/;
 
 describe('Compose release boundaries', () => {
+  it('stops superseded changed inputs before starting the native builds', () => {
+    const step = (parse(sources().get('native-compose.yml')!) as Workflow).jobs.inputs!.steps!
+      .find(item => item.env?.PR_HEAD)!;
+    expect(step.if).toBe("github.event_name == 'pull_request' && steps.changed.outputs.value == 'true'");
+    const sha = 'a'.repeat(40);
+    const evidence = { status: 'ahead', ahead_by: 1, behind_by: 0, base_commit: { sha }, merge_base_commit: { sha } };
+    const cases = [
+      [{}, 0, 1], [{ status: 'identical', ahead_by: 0 }, 0, 0], [{ status: 'behind', behind_by: 1 }, 0, 0],
+      [{ status: 'diverged' }, 0, 0], [{ base_commit: { sha: 'b'.repeat(40) } }, 0, 0], [{}, 28, 0],
+    ] as const;
+    for (const [patch, network, expected] of cases) {
+      const script = 'curl() { printf %s "$RESPONSE"; return "$CURL_STATUS"; }\n' + step.run;
+      const result = spawnSync(bash, ['-eo', 'pipefail', '-c', script], { encoding: 'utf8', env: {
+        ...process.env, GITHUB_API_URL: 'https://api.github.com', GITHUB_REPOSITORY: 'Labpics-Team/lab-motion',
+        PR_REPOSITORY: 'Labpics-Team/lab-motion', PR_NUMBER: '573', PR_HEAD: sha, GH_TOKEN: '',
+        RESPONSE: JSON.stringify({ ...evidence, ...patch }), CURL_STATUS: String(network),
+      } });
+      expect(result.error).toBeUndefined();
+      expect(result.status, result.stderr).toBe(expected);
+    }
+  });
+
   it('runs repository builds without write credentials', () => {
     for (const name of ['native-compose.yml', 'release-compose.yml']) {
       const workflow = parse(sourceFiles.get(name)!) as Workflow;
@@ -657,38 +679,38 @@ describe('CI: подготовка и полнота проверок', () => {
 });
 
 describe('CI: итог обязательных проверок', () => {
-  it('новые PR-проверки занимают свои группы независимо от прежнего итога', () => {
+  it('новые PR-проверки сохраняют свой результат при позднем повторе старой ревизии', () => {
     const workflows = sources();
     const ci = parse(workflows.get('ci.yml')!) as Workflow;
-    const event = (event_name: string, run_id: number, ref: string, number = 0) => ({
-      workflow: 'CI', event_name, run_id, ref, event: { pull_request: { number } },
+    const browser = parse(workflows.get('browser.yml')!) as Workflow;
+    const event = (event_name: string, run_id: number, run_attempt: number, ref: string, number = 0) => ({
+      workflow: 'CI', event_name, run_id, run_attempt, ref, event: { pull_request: { number } },
     });
     const render = (value: string | boolean, github: ReturnType<typeof event>) => String(value)
       .replace(/\$\{\{(.*?)\}\}/g, (_, expression: string) => String(runInNewContext(expression, {
-        github, format: (text: string, arg: number) => text.replace('{0}', String(arg)),
+        github, format: (pattern: string, ...args: number[]) =>
+          pattern.replace(/\{(\d+)\}/g, (_, index: string) => String(args[Number(index)])),
       }, { timeout: 100 }))).toLowerCase();
-    const request = (run: number, number = 8) => event('pull_request', run, 'refs/pull/' + number + '/merge', number);
-    const root = ci.concurrency!;
-    expect(render(root.group, request(1))).not.toBe(render(root.group, request(2)));
-    for (const name of ['push', 'workflow_dispatch', 'merge_group']) {
-      const ref = name === 'merge_group' ? 'refs/heads/gh-readonly-queue/main/pr-8' : 'refs/heads/main';
-      expect(render(root.group, event(name, 1, ref))).toBe(render(root.group, event(name, 2, ref)));
-      expect(render(root['cancel-in-progress'], event(name, 1, ref))).toBe(String(name === 'merge_group'));
+    const request = (run: number, attempt = 1) => event('pull_request', run, attempt, 'refs/pull/8/merge', 8);
+    const policies = [ci, browser, ...Object.values(ci.jobs), ...Object.values(browser.jobs)]
+      .flatMap(owner => owner.concurrency ? [owner.concurrency] : []);
+    for (const order of [[request(1), request(2), request(1, 2)], [request(2), request(1, 2), request(1)]]) {
+      const busy = new Set<string>();
+      for (const run of order) {
+        const keys = new Set(policies.map(policy => render(policy.group, run)));
+        for (const key of keys) {
+          expect(busy.has(key), key).toBe(false);
+          busy.add(key);
+        }
+      }
     }
-
-    const gate = ci.jobs.CI!;
-    expect(gate.concurrency).toBeUndefined();
-    const workers = gate.needs!.filter(name => name !== 'mutation'); // Mutation runs in the merge queue and manual CI.
-    const keys = workers.map(name => {
-      const caller = ci.jobs[name]!;
-      const policy = caller.concurrency ?? (parse(workflows.get(caller.uses!.split('/').at(-1)!)!) as Workflow).concurrency!;
-      const first = render(policy.group, request(1));
-      expect(render(policy.group, request(2)), name).toBe(first);
-      expect(render(policy.group, request(3, 9)), name).not.toBe(first);
-      expect(render(policy['cancel-in-progress'], request(2)), name).toBe('true');
-      return first;
-    });
-    expect(new Set(keys).size).toBe(workers.length);
+    for (const scope of [ci.concurrency!, browser.concurrency!]) {
+      for (const name of ['push', 'workflow_dispatch', 'merge_group']) {
+        const ref = name === 'merge_group' ? 'refs/heads/gh-readonly-queue/main/pr-8' : 'refs/heads/main';
+        expect(render(scope.group, event(name, 1, 1, ref))).toBe(render(scope.group, event(name, 2, 1, ref)));
+        expect(render(scope['cancel-in-progress'], event(name, 1, 1, ref))).toBe(String(name === 'merge_group'));
+      }
+    }
   });
 
   const required = (parse(sources().get('ci.yml')!) as Workflow).jobs.CI!.needs!;
