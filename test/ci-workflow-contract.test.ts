@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import { isMap, isScalar, isSeq, parse, parseDocument, stringify } from 'yaml';
 import { createVitest, type CliOptions } from 'vitest/node';
@@ -21,7 +22,9 @@ type Step = {
   'continue-on-error'?: boolean;
 };
 type BrowserShard = { browser: string; shard: number; shards: number };
+type Concurrency = { group: string; 'cancel-in-progress': string | boolean };
 type Job = {
+  concurrency?: Concurrency;
   name?: string;
   'runs-on'?: string;
   'timeout-minutes'?: number;
@@ -41,6 +44,7 @@ type Job = {
   };
 };
 type Workflow = {
+  concurrency?: Concurrency;
   on: Record<string, unknown>;
   permissions?: Record<string, string>;
   defaults?: unknown;
@@ -653,6 +657,40 @@ describe('CI: подготовка и полнота проверок', () => {
 });
 
 describe('CI: итог обязательных проверок', () => {
+  it('новые PR-проверки занимают свои группы независимо от прежнего итога', () => {
+    const workflows = sources();
+    const ci = parse(workflows.get('ci.yml')!) as Workflow;
+    const event = (event_name: string, run_id: number, ref: string, number = 0) => ({
+      workflow: 'CI', event_name, run_id, ref, event: { pull_request: { number } },
+    });
+    const render = (value: string | boolean, github: ReturnType<typeof event>) => String(value)
+      .replace(/\$\{\{(.*?)\}\}/g, (_, expression: string) => String(runInNewContext(expression, {
+        github, format: (text: string, arg: number) => text.replace('{0}', String(arg)),
+      }, { timeout: 100 }))).toLowerCase();
+    const request = (run: number, number = 8) => event('pull_request', run, 'refs/pull/' + number + '/merge', number);
+    const root = ci.concurrency!;
+    expect(render(root.group, request(1))).not.toBe(render(root.group, request(2)));
+    for (const name of ['push', 'workflow_dispatch', 'merge_group']) {
+      const ref = name === 'merge_group' ? 'refs/heads/gh-readonly-queue/main/pr-8' : 'refs/heads/main';
+      expect(render(root.group, event(name, 1, ref))).toBe(render(root.group, event(name, 2, ref)));
+      expect(render(root['cancel-in-progress'], event(name, 1, ref))).toBe(String(name === 'merge_group'));
+    }
+
+    const gate = ci.jobs.CI!;
+    expect(gate.concurrency).toBeUndefined();
+    const workers = gate.needs!.filter(name => name !== 'mutation'); // Mutation runs in the merge queue and manual CI.
+    const keys = workers.map(name => {
+      const caller = ci.jobs[name]!;
+      const policy = caller.concurrency ?? (parse(workflows.get(caller.uses!.split('/').at(-1)!)!) as Workflow).concurrency!;
+      const first = render(policy.group, request(1));
+      expect(render(policy.group, request(2)), name).toBe(first);
+      expect(render(policy.group, request(3, 9)), name).not.toBe(first);
+      expect(render(policy['cancel-in-progress'], request(2)), name).toBe('true');
+      return first;
+    });
+    expect(new Set(keys).size).toBe(workers.length);
+  });
+
   const required = (parse(sources().get('ci.yml')!) as Workflow).jobs.CI!.needs!;
   const success = Object.fromEntries(required.map(key => [key, { result: 'success' }]));
   // Ожидаемая матрица следует назначению событий, независимо от условия workflow.
