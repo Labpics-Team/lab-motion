@@ -1,34 +1,34 @@
+# Standard dependencies only; vendored sources and compatibility fixtures keep their product contracts.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
-      day: monday
-      time: "04:00"
-      timezone: Europe/Berlin
-    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 2
+    # This alias verifies the supported TypeScript 5 compatibility floor.
+    ignore:
+      - dependency-name: typescript5
     groups:
-      development-dependencies:
-        dependency-type: development
-        update-types:
-          - minor
-          - patch
-    commit-message:
-      prefix: "deps"
+      minor-and-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+      security:
+        applies-to: security-updates
+        patterns: ['*']
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-      day: monday
-      time: "04:30"
-      timezone: Europe/Berlin
-    open-pull-requests-limit: 5
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 1
     groups:
-      github-actions:
-        update-types:
-          - minor
-          - patch
-    commit-message:
-      prefix: "ci"
+      actions:
+        patterns: ['*']
+      security:
+        applies-to: security-updates
+        patterns: ['*']
