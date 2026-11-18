@@ -90,10 +90,12 @@ describe('Compose release boundaries', () => {
       .find(item => item.env?.PR_HEAD)!;
     expect(step.if).toBe("github.event_name == 'pull_request' && steps.changed.outputs.value == 'true'");
     const sha = 'a'.repeat(40);
-    const evidence = { status: 'ahead', ahead_by: 1, behind_by: 0, base_commit: { sha }, merge_base_commit: { sha } };
+    const url = `https://api.github.com/repos/Labpics-Team/lab-motion/compare/${sha}...refs/pull/573/head`;
+    const evidence = { url, status: 'ahead', ahead_by: 1, behind_by: 0, base_commit: { sha }, merge_base_commit: { sha } };
     const cases = [
       [{}, 0, 1], [{ status: 'identical', ahead_by: 0 }, 0, 0], [{ status: 'behind', behind_by: 1 }, 0, 0],
-      [{ status: 'diverged' }, 0, 0], [{ base_commit: { sha: 'b'.repeat(40) } }, 0, 0], [{}, 28, 0],
+      [{ status: 'diverged' }, 0, 0], [{ base_commit: { sha: 'b'.repeat(40) } }, 0, 0],
+      [{ url: url.replace('/573/', '/572/') }, 0, 0], [{ url: url.replace('/lab-motion/', '/another/') }, 0, 0], [{}, 28, 0],
     ] as const;
     for (const [patch, network, expected] of cases) {
       const script = 'curl() { printf %s "$RESPONSE"; return "$CURL_STATUS"; }\n' + step.run;

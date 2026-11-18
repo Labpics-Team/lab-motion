@@ -59,8 +59,9 @@ jobs:
           relation=$(curl --fail --silent --max-time 4 -H "Authorization: Bearer $GH_TOKEN" "$comparison" | node -e '
             try {
               const r = JSON.parse(require("node:fs").readFileSync(0, "utf8"));
-              const sha = process.env.PR_HEAD;
-              if (r.base_commit?.sha === sha && r.merge_base_commit?.sha === sha && r.behind_by === 0) {
+              const { GITHUB_API_URL, GITHUB_REPOSITORY, PR_HEAD: sha, PR_NUMBER } = process.env;
+              const url = `${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/compare/${sha}...refs/pull/${PR_NUMBER}/head`;
+              if (r.url === url && r.base_commit?.sha === sha && r.merge_base_commit?.sha === sha && r.behind_by === 0) {
                 if (r.status === "identical" && r.ahead_by === 0) process.stdout.write("current");
                 if (r.status === "ahead" && Number.isSafeInteger(r.ahead_by) && r.ahead_by > 0) process.stdout.write("superseded");
               }
