@@ -63,7 +63,8 @@ ui.dispose();
 
 ## Разработка
 
-[Участие в проекте](https://github.com/Labpics-Team/lab-motion/blob/main/CONTRIBUTING.md).
+[Участие в проекте](https://github.com/Labpics-Team/lab-motion/blob/main/CONTRIBUTING.md) ·
+[Найти и запустить тест](https://github.com/Labpics-Team/lab-motion/blob/main/CONTRIBUTING.md#найти-и-запустить-проверку).
 [Сообщить об уязвимости](https://github.com/Labpics-Team/lab-motion/blob/main/SECURITY.md).
 
 MIT. Labpics.
