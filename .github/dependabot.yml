@@ -11,6 +11,13 @@ updates:
     # This alias verifies the supported TypeScript 5 compatibility floor.
     ignore:
       - dependency-name: typescript5
+      # Local-search focus is qualified with an exact-version VitePress patch.
+      # Requalify dismissal and navigation together; security updates remain eligible.
+      - dependency-name: vitepress
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+          - version-update:semver-patch
     groups:
       minor-and-patch:
         patterns: ['*']
