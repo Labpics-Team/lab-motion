@@ -1,0 +1,13 @@
+vulnerabilities:
+  - id: CVE-2026-112366
+    purls:
+      - pkg:npm/picomatch
+    paths:
+      - pnpm-lock.yaml
+    expired_at: 2026-11-20
+    statement: >-
+      GitHub withdrew GHSA-fc5q-39xc-vjpf at 2026-11-18T15:38:56Z.
+      Trivy's published database still includes the withdrawn record.
+      This temporary database propagation exception expires on 2026-11-20.
+      Remove it once the published database reflects the withdrawal.
+      Source: https://github.com/github/advisory-database/blob/main/advisories/github-reviewed/2026/10/GHSA-fc5q-39xc-vjpf/GHSA-fc5q-39xc-vjpf.json
