@@ -28,7 +28,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # У каждой попытки PR своя группа, включая повтор старого запуска.
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-run-{0}-{1}', github.run_id, github.run_attempt) || github.ref }}
   # push в main не отменяем: каждый merge-коммит обязан получить завершённый
   # прогон (иначе красный промежуточный main живёт незамеченным, bisect ломается).
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
