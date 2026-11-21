@@ -8,7 +8,7 @@ function trajectory(count: number, gap = 0) {
     _at: index * (10 + gap), _end: index * (10 + gap) + 10,
     _from: [index], _to: [index + 1], _velocity: [0], _timing: clock, _artifact: undefined,
   }));
-  const program: Program = { _key: 'x', _unit: '', _segments: segments,
+  const program: Program = { ...segments[0]!, _key: 'x', _unit: '', _tail: segments.length > 1 ? segments.slice(1) : undefined,
     _duration: segments.at(-1)!._end, _final: [count], _nativeEase: undefined, _identity: undefined };
   return { segments, program };
 }
@@ -19,10 +19,20 @@ function read(program: Program, time: number) {
 }
 
 describe('поиск сегмента при произвольном времени', () => {
+  it('inline first end holds through a whole-trajectory gap without confusing final endpoint', () => {
+    const { program } = trajectory(2, 20);
+    expect(program._end).toBe(10); expect(program._duration).toBe(40);
+    expect(program._to).toEqual([1]); expect(program._final).toEqual([2]);
+    for (const time of [29, 10, 20, 30, 0, -Infinity])
+      expect(read(program, time)).toEqual({ value: time >= 10 ? 1 : 0, velocity: 0 });
+    expect(read(program, Infinity)).toEqual({ value: 2, velocity: 0 });
+    expect(() => read(program, NaN)).toThrow();
+  });
+
   it('читает логарифмическое число начал, включая перемотку назад', () => {
     const { program, segments } = trajectory(4096);
     let reads = 0;
-    for (const segment of segments) {
+    for (const segment of [program, ...program._tail!]) {
       const at = segment._at;
       Object.defineProperty(segment, '_at', { get() { reads++; return at; } });
     }
@@ -46,7 +56,7 @@ describe('поиск сегмента при произвольном време
   it('при совпадающих началах выбирает последний сегмент, как последовательный поиск', () => {
     const { program, segments } = trajectory(4);
     const equal = segments.map((segment, index) => ({ ...segment, _at: 0, _end: index === 3 ? 10 : 0 }));
-    const repeated: Program = { ...program, _segments: equal, _duration: 10 };
+    const repeated: Program = { ...program, ...equal[0]!, _tail: equal.slice(1), _duration: 10 };
     expect(read(repeated, 0)).toEqual({ value: 3, velocity: 0 });
     expect(read(repeated, 5).value).toBe(3.5);
     expect(read(repeated, 10)).toEqual({ value: 4, velocity: 0 });

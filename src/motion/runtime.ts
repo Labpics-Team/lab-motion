@@ -2,7 +2,7 @@ import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
@@ -262,7 +262,7 @@ class Surface {
     if (this._key === 'transform') {
       const state = this._transforms;
       for (const track of this._tracks.values()) {
-        const value = (at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value)[0]!;
+        const value = (at ? at === 1 ? track._program._from : track._program._to : track._value)[0]!;
         state[track._program._key] = value;
       }
       let identity = !at, translationOnly = !!at;
@@ -277,7 +277,7 @@ class Surface {
     if (!track) {
       const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
-    return format(track._program._key, at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value, track._program._unit);
+    return format(track._program._key, at ? at === 1 ? track._program._from : track._program._to : track._value, track._program._unit);
   }
   _render(): void {
     if (this._busy) failMotion('style: повторная запись');
@@ -333,11 +333,11 @@ class Surface {
     if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
     const active = [...this._tracks.values()];
     if (!active.some(moving)) { this._engine._idle(this); return; }
-    const first = active[0]!, seg = first._program._segments[0]!;
+    const first = active[0]!, seg = first._program;
     const _nativeEase = first._program._nativeEase;
     const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
-        track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
+      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._tail === undefined &&
+        track._program._duration === first._program._duration && track._program._at === seg._at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
     try {
       this._lock(true);
@@ -534,6 +534,10 @@ export class Runtime {
   }
   _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
     origin?: (element: Element, key: string) => Point | undefined): Draft[] {
+    return this._buildDraft(input, props, clock, offset, origin, false);
+  }
+  private _buildDraft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset: number,
+    origin: ((element: Element, key: string) => Point | undefined) | undefined, promote: boolean): Draft[] {
     const elements = targets(input);
     if (elements.length * props.reduce((sum, p) => sum + p._values.length, 0) > MAX_CHANNELS) failMotion('Слишком много каналов');
     const reduced = clock._reduced || this._host.reduced();
@@ -550,7 +554,11 @@ export class Runtime {
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
           const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
-          result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });
+          const draft = promote
+            ? { _element: element, _key: property._key, _program: spec, _reduced: reduced,
+              _group: undefined, _value: undefined, _velocity: undefined, _owner: undefined, _elapsed: 0, _rate: 1, _paused: false }
+            : { _element: element, _key: property._key, _program: spec, _reduced: reduced };
+          result.push(draft);
         }
       }
     } finally {
@@ -560,6 +568,9 @@ export class Runtime {
     return result;
   }
   _execute(drafts: readonly Draft[], total?: number): Playback {
+    return this._accept(drafts, total, false);
+  }
+  private _accept(drafts: readonly Draft[], total: number | undefined, promote: boolean): Playback {
     const run = new Run(total ?? 0);
     const touched = new Set<Surface>();
     try {
@@ -570,9 +581,11 @@ export class Runtime {
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
         if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
-        const first = draft._program._segments[0]!._from;
-        const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: first.map(() => 0),
-          _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _rate: 1, _paused: false };
+        const first = draft._program._from;
+        const track = (promote ? draft : { _program: draft._program }) as { -readonly [Key in keyof Track]: Track[Key] };
+        track._group = group; track._value = [...first]; track._velocity = first.map(() => 0);
+        track._owner = undefined; track._elapsed = draft._reduced ? draft._program._duration : 0; track._rate = 1; track._paused = false;
+        if (promote) (track as unknown as { _element: Element | undefined })._element = undefined;
         group._sample(track);
         run._own(track, draft._reduced); group._attach(track);
       }
@@ -588,7 +601,7 @@ export class Runtime {
   animate(target: MotionTarget, props: MotionProperties, options?: MotionOptions): Playback {
     const input = properties(props);
     const clock = timing(options);
-    return this._execute(this._draft(target, input, clock));
+    return this._accept(this._buildDraft(target, input, clock, 0, undefined, true), undefined, true);
   }
 }
 

@@ -48,10 +48,10 @@ export interface Segment {
   readonly _timing: Timing;
   readonly _artifact: SpringExecutionArtifactTuple | undefined;
 }
-export interface Program {
+export interface Program extends Segment {
   readonly _key: string;
   readonly _unit: string;
-  readonly _segments: readonly Segment[];
+  readonly _tail: readonly Segment[] | undefined;
   readonly _duration: number;
   readonly _final: readonly number[];
   /** Только точная форма, доступная нативному исполнителю. */
@@ -59,7 +59,8 @@ export interface Program {
   readonly _identity: readonly unknown[] | undefined;
 }
 
-function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration?: number): Segment {
+type MutableSegment = { -readonly [Key in keyof Segment]: Segment[Key] };
+function segment(target: MutableSegment, from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration?: number): void {
   if (from._unit !== to._unit || from._coordinates.length !== to._coordinates.length)
     failMotion('Разные единицы from/to');
   let normalized: number | undefined;
@@ -81,7 +82,8 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, energy) * 1000;
   }
   if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) failMotion('Непредставимая длительность');
-  return { _at: at, _end: at + length, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
+  target._at = at; target._end = at + length; target._from = from._coordinates; target._to = to._coordinates;
+  target._velocity = velocity; target._timing = timing; target._artifact = artifact;
 }
 
 export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0): Program {
@@ -95,39 +97,47 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   if (times && times.length !== resolved.length) failMotion('times: другая длина');
   if (timing._spring && resolved.length > 2) failMotion('keyframes: задайте duration/ease');
   // _draft и layout передают собственный снимок; Segment читает его без мутаций.
-  const _segments: Segment[] = [];
+  const trajectory = { _key: key, _unit: from._unit, _duration: 0, _final: from._coordinates,
+    _nativeEase: undefined as string | undefined, _identity: undefined as readonly unknown[] | undefined,
+    _at: 0, _end: 0, _from: from._coordinates, _to: from._coordinates, _velocity: initialVelocity, _timing: timing,
+    _artifact: undefined as SpringExecutionArtifactTuple | undefined, _tail: undefined as Segment[] | undefined };
+  let last: Segment = trajectory;
   const duration = timing._duration ?? 0;
   for (let i = 0; i < resolved.length - 1; i++) {
     const a = times?.[i] ?? i / (resolved.length - 1);
     const b = times?.[i + 1] ?? (i + 1) / (resolved.length - 1);
-    _segments.push(segment(resolved[i]!, resolved[i + 1]!, i === 0 ? initialVelocity : resolved[i]!._coordinates.map(() => 0), timing,
-      offset + timing._delay + a * duration, (b - a) * duration));
+    const next = i === 0 ? trajectory : { _at: 0, _end: 0, _from: resolved[i]!._coordinates,
+      _to: resolved[i + 1]!._coordinates, _velocity: resolved[i]!._coordinates.map(() => 0), _timing: timing,
+      _artifact: undefined as SpringExecutionArtifactTuple | undefined };
+    segment(next, resolved[i]!, resolved[i + 1]!, next._velocity, timing,
+      offset + timing._delay + a * duration, (b - a) * duration);
+    if (i !== 0) (trajectory._tail ??= []).push(next);
+    last = next;
   }
-  const last = _segments.at(-1)!;
-  const first = _segments[0]!;
   const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
-  return { _key: key, _unit: from._unit, _segments, _duration: last._end, _final: last._to,
-    _nativeEase: from._unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : _segments.length === 1 ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
-    _identity };
+  trajectory._duration = last._end; trajectory._final = last._to;
+  trajectory._nativeEase = from._unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : trajectory._tail === undefined ? trajectory._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined;
+  trajectory._identity = _identity;
+  return trajectory;
 }
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
 export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1): void {
-  const _segments = program._segments;
+  const tail = program._tail;
   if (time >= program._duration) {
     for (let i = 0; i < program._final.length; i++) { value[i] = program._final[i]!; velocity[i] = 0; }
     return;
   }
   // Последнее начало <= time: совпадающие границы и обратный seek сохраняют семантику.
-  let at = 0, end = _segments.length;
+  let at = 0, end = 1 + (tail?.length ?? 0);
   while (at + 1 < end) {
     const middle = (at + end) >>> 1;
-    if (time >= _segments[middle]!._at) at = middle;
+    if (time >= tail![middle - 1]!._at) at = middle;
     else end = middle;
   }
-  const segment = _segments[at]!;
+  const segment = at === 0 ? program : tail![at - 1]!;
   const _elapsed = Math.max(0, time - segment._at), duration = segment._end - segment._at;
   if (time >= segment._end) {
     for (let i = 0; i < segment._to.length; i++) { value[i] = segment._to[i]!; velocity[i] = 0; }

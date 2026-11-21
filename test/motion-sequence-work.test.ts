@@ -5,15 +5,18 @@ import type { Playback, SequenceStep } from '../src/motion/types.js';
 it('сборка длинной sequence читает сегменты линейно и не мутирует входные программы', async () => {
   const h = harness(), count = 128;
   const known = new WeakSet<object>();
-  const inputs: ReadonlyArray<unknown>[] = [];
+  const inputs: import('../src/motion/program.js').Program[] = [];
   const draft = h.runtime._draft.bind(h.runtime);
   const observe = vi.spyOn(h.runtime, '_draft').mockImplementation((...args) => {
     const result = draft(...args);
     for (const entry of result) {
-      const segments = entry._program._segments;
-      for (const segment of segments) known.add(segment);
-      Object.freeze(segments);
-      inputs.push(segments);
+      known.add(entry._program._from);
+      if (entry._program._tail) {
+        for (const segment of entry._program._tail) known.add(segment._from);
+        Object.freeze(entry._program._tail);
+      }
+      Object.freeze(entry._program);
+      inputs.push(entry._program);
     }
     return result;
   });
@@ -27,7 +30,7 @@ it('сборка длинной sequence читает сегменты лине�
     // Часы и длительность теста не участвуют в оценке сложности.
     Array.prototype[Symbol.iterator] = function* () {
       for (const value of iterator.call(this)) {
-        if (value && typeof value === 'object' && known.has(value)) visits++;
+        if (value && typeof value === 'object' && '_from' in value && known.has(value._from)) visits++;
         yield value;
       }
     };
@@ -39,7 +42,7 @@ it('сборка длинной sequence читает сегменты лине�
   try {
     expect(visits).toBeLessThanOrEqual(count * 2);
     expect(inputs).toHaveLength(count);
-    for (const segments of inputs) expect(segments).toHaveLength(1);
+    for (const program of inputs) { expect(program._tail).toBeUndefined(); expect(program._duration - program._at).toBe(10); }
     expect(run!.duration).toBe(count * 10);
     run!.seek(1235); expect(h.x()).toBe(123.5);
     run!.seek(5); expect(h.x()).toBe(0.5);
