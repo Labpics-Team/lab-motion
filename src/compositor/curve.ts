@@ -151,7 +151,7 @@ export function compileSpringExecutionArtifactTupleUnchecked(
  * Compile-as-preflight: cache hit возвращается сразу; безопасный miss строит и
  * кэширует готовый artifact; over-cap заканчивается до grid/RDP.
  */
-export type SpringExecutionRequest = readonly [undefined, readonly [number, number], number];
+export type SpringExecutionRequest = readonly [undefined, number, number, number];
 export function tryCompileSpringExecutionArtifactTupleUnchecked(
   spring: SpringParams, v0: number, tolerance: number,
   cache?: SpringLinearCache<SpringExecutionArtifactTuple>, defer?: false,
@@ -181,7 +181,7 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
   if (hit) return hit;
   const build = tryBuildSpringNodes(spring, v0, tolerance, defer);
   if (!build) return;
-  if (!build[0]) return [undefined, [v0, tolerance], build[1] * 1000];
+  if (!build[0]) return [undefined, v0, build[1] * 1000, tolerance];
   const artifact = emitArtifact(build[0], tolerance, build[1] * 1000);
   /* @__INLINE__ */ storeSpringLinearCache(
     cache,

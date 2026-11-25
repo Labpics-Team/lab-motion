@@ -2,7 +2,7 @@ import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, materialize, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, materialize, nativeEase, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
@@ -338,9 +338,9 @@ class Surface {
     const active = [...this._tracks.values()];
     if (!active.some(moving)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
-    const _nativeEase = first._program._nativeEase;
-    const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase != null && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase &&
+    const _nativeEase = nativeEase(first._program);
+    const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
+      active.every(track => !track._paused && track._rate === first._rate && nativeEase(track._program) === _nativeEase &&
         track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
     try {

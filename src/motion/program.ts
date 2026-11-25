@@ -54,7 +54,7 @@ export interface Program {
   readonly _segments: readonly Segment[];
   readonly _duration: number;
   /** Только точная форма, доступная нативному исполнителю. */
-  _nativeEase: string | null | undefined;
+  readonly _native: boolean;
   readonly _identity: readonly unknown[] | undefined;
 }
 
@@ -104,8 +104,14 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   const native = count === 1 && from._unit !== 'color' && (key !== 'opacity' ||
     Math.min(first._from[0]!, first._to[0]!) >= 0 && Math.max(first._from[0]!, first._to[0]!) <= 1);
   return { _key: key, _unit: from._unit, _segments, _duration: last._end,
-    _nativeEase: native ? first._artifact ? first._artifact[0] ?? null : timing._spring ? undefined : timing._cssEase : undefined,
+    _native: native,
     _identity };
+}
+
+export function nativeEase(path: Program): string | undefined {
+  if (!path._native) return;
+  const first = path._segments[0]!;
+  return first._artifact?.[0] ?? (first._timing._spring ? undefined : first._timing._cssEase);
 }
 
 // Materialize only paths actually accepted for playback; shared segments
@@ -114,9 +120,9 @@ export function materialize(path: Program): void {
   for (const seg of path._segments) {
     const artifact = seg._artifact;
     if (artifact && artifact[0] === undefined)
-      seg._artifact = tryCompileSpringExecutionArtifactTupleUnchecked(seg._timing._spring!, ...artifact[1]);
+      seg._artifact = tryCompileSpringExecutionArtifactTupleUnchecked(seg._timing._spring!, artifact[1], artifact[3]);
   }
-  if (path._nativeEase === null) path._nativeEase = path._segments[0]!._artifact?.[0];
+
 }
 
 // Отсутствующие координаты скорости означают ноль; внутренние сегменты не наследуют скорость.

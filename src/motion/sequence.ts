@@ -9,7 +9,7 @@ type SequenceDraft = Omit<Draft, '_program'> & {
   _program: Draft['_program'] & { readonly _segments: Segment[] };
 };
 type SequenceEnd = {
-  -readonly [Key in '_duration' | '_nativeEase' | '_identity']: Draft['_program'][Key];
+  -readonly [Key in '_duration' | '_native' | '_identity']: Draft['_program'][Key];
 };
 
 /** Планирование шкалы отделено от исполнения: одиночный animate не удерживает его код. */
@@ -49,7 +49,7 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     // Общая программа нескольких целей получает одинаковый конец. Сегменты
     // разных историй по-прежнему объединяются в отдельной оболочке выше.
     const program: SequenceEnd = draft._program;
-    program._duration = end; program._nativeEase = undefined; program._identity = undefined;
+    program._duration = end; program._native = false; program._identity = undefined;
     drafts.push(draft);
   }
   return engine._execute(drafts, drafts.every(draft => draft._reduced) ? 0 : end);
