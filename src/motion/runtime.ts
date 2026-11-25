@@ -38,20 +38,20 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
     ? (root ?? (typeof document === 'undefined' ? undefined : document))?.querySelectorAll(input)
     : input;
   if (selected === undefined) failMotion('Селектор: нет DOM');
-  let result: Element[];
-  if (selected && typeof selected === 'object' && 'style' in selected) result = [selected as Element];
+  const result = new Set<Element>();
+  if (selected && typeof selected === 'object' && 'style' in selected) result.add(selected as Element);
   else {
     if (!selected || typeof selected !== 'object') failMotion('Нужен Element/список');
     if (Symbol.iterator in selected) {
-      result = [];
+      let count = 0;
       for (const item of selected as Iterable<Element>) {
-        if (result.length === MAX_CHANNELS) failMotion('Лимит элементов');
-        result.push(item);
+        if (count++ === MAX_CHANNELS) failMotion('Лимит элементов');
+        result.add(item);
       }
     } else {
       const list = selected as ArrayLike<Element>, length = list.length;
       if (!Number.isSafeInteger(length) || length < 0 || length > MAX_CHANNELS) failMotion('Неверный список');
-      result = Array.from({ length }, (_, i) => list[i]!);
+      for (let i = 0; i < length; i++) result.add(list[i]!);
     }
   }
   for (const element of result) {
@@ -59,7 +59,7 @@ export function targets(input: MotionTarget, root?: ParentNode): Element[] {
     if (!style || typeof style.getPropertyValue !== 'function' || typeof style.setProperty !== 'function')
       failMotion('У цели нет CSS style');
   }
-  return [...new Set(result)];
+  return [...result];
 }
 function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   const values = { ...TRANSFORMS };
@@ -106,6 +106,10 @@ interface Track extends Draft {
   _elapsed: number;
   _rate: number;
   _paused: boolean;
+}
+
+function coordinates(track: Track, at: 0 | 1 | 2): readonly number[] {
+  return at === 0 ? track._value : at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to;
 }
 
 function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
@@ -199,15 +203,13 @@ export class Run implements Playback {
 class Surface {
   readonly _tracks: Map<string, Track> = new Map();
   private _rest: Point | undefined;
-  readonly _transforms: Record<string, number>;
+  private _transforms: Record<string, number> = {};
   _stamp: number;
   _busy = false;
   _native: Animation | undefined;
-  _nativeTime = 0;
   private _written: string | undefined;
   private _token: Promise<Animation> | undefined;
   constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string, stamp: number) {
-    this._transforms = {};
     this._stamp = stamp;
   }
   _lock(busy: boolean): void {
@@ -217,7 +219,7 @@ class Surface {
   }
   _refresh(): void {
     if (this._tracks.size || this._written === (this._element as HTMLElement).style.getPropertyValue(this._key)) return;
-    if (this._key === 'transform') Object.assign(this._transforms, initialTransforms(this._engine._host.styles(this._element)));
+    if (this._key === 'transform') this._transforms = initialTransforms(this._engine._host.styles(this._element));
     this._rest = undefined;
   }
   _read(key: string): Point & { readonly _velocity: readonly number[] } {
@@ -231,21 +233,23 @@ class Surface {
     }
     return { ...initial, _velocity: zeroVelocity };
   }
+  // Native currentTime уже находится на исходной шкале Program.
+  _position(track: Track, delta: number, local: CSSNumberish | null | undefined): number {
+    if (track._paused || !this._native && track._rate === 0) return track._elapsed;
+    const time = this._native
+      ? Number.isFinite(local) ? local as number : track._elapsed
+      : track._elapsed + delta * track._rate;
+    return Math.min(track._program._duration, Math.max(0, time));
+  }
   _sync(now?: number): number {
     if (this._busy) failMotion('easing: повторный вход');
     this._lock(true);
     try {
       now ??= number(this._engine._host.now(), 'clock');
-      let delta = Math.max(0, now - this._stamp);
-      if (this._native) {
-        const local = this._native.currentTime;
-        const current = typeof local === 'number' && Number.isFinite(local) ? local : this._nativeTime;
-        delta = current - this._nativeTime; this._nativeTime = current;
-      }
+      const delta = Math.max(0, now - this._stamp), local = this._native?.currentTime;
       this._stamp = Math.max(this._stamp, now);
       for (const track of this._tracks.values()) {
-        if (!track._paused && (this._native || track._rate !== 0))
-          track._elapsed = Math.min(track._program._duration, Math.max(0, track._elapsed + (this._native ? delta : delta * track._rate)));
+        track._elapsed = this._position(track, delta, local);
         this._sample(track);
       }
       return now;
@@ -262,7 +266,7 @@ class Surface {
     if (this._key === 'transform') {
       const state = this._transforms;
       for (const track of this._tracks.values()) {
-        const value = (at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value)[0]!;
+        const value = coordinates(track, at)[0]!;
         state[track._program._key] = value;
       }
       let identity = !at, translationOnly = !!at;
@@ -277,7 +281,7 @@ class Surface {
     if (!track) {
       const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
-    return format(track._program._key, at ? at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to : track._value, track._program._unit);
+    return format(track._program._key, coordinates(track, at), track._program._unit);
   }
   _render(): void {
     if (this._busy) failMotion('style: повторная запись');
@@ -344,7 +348,7 @@ class Surface {
       const effect = this._element.animate([{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
         duration: seg._end - seg._at, delay: seg._at, easing: _nativeEase, fill: 'both',
       });
-      this._native = effect; this._nativeTime = first._elapsed;
+      this._native = effect;
       this._watch();
       // Новый effect ещё не передан потребителю; сначала скорость, затем точная поза.
       if (first._rate !== 1) effect.playbackRate = first._rate;
@@ -394,7 +398,14 @@ class Surface {
       if (typeof action === 'function') {
         action(this, selected.filter(owns));
       } else {
-        this._detach();
+        const effect = this._native, first = selected[0]!;
+        // Полностью принадлежащая контролу шкала не меняет кривую при seek.
+        // Частичная команда, конец и внешний pause идут через handoff.
+        const reuse = action === 'seek' && effect?.playState === 'running' &&
+          selected.length === this._tracks.size && selected.every(owns) &&
+          effect.finished === this._token && effect.playbackRate === first._rate && time < first._program._duration;
+        const terminalNative = effect && action === 'finish';
+        if (!reuse && !terminalNative) this._detach();
         for (const track of selected) {
           if (!owns(track)) continue;
           if (action === 'pause') track._paused = true;
@@ -403,7 +414,16 @@ class Surface {
           else if (action === 'finish') track._elapsed = track._program._duration;
           this._sample(track);
         }
-        this._render();
+        if (reuse) {
+          this._lock(true);
+          try {
+            // Синхронная запись скорости сбрасывает отложенный updatePlaybackRate.
+            if (effect.pending) effect.playbackRate = first._rate;
+            effect.currentTime = time;
+          } finally { this._lock(false); }
+        }
+        if (terminalNative) this._detach();
+        else this._render();
         for (const track of selected) {
           if (!owns(track)) continue;
           if (action === 'stop') this._end(track, false);

@@ -106,5 +106,15 @@
       "sha256": "603f1a7a5562b0d38c4339dba164412fa645afbe714e6fd35431eaaf390325b6",
       "observations": 44
     }
-  }
+  },
+  "canonicalGitInputs": {
+    "package.json": "f23a461461bf58fa434958c63dd8d0d5cb361914db4a746981768d7065f0baf7",
+    "pnpm-lock.yaml": "1960fec07e58fdaedd7f1d5aa0187a81955aeb07e1fe9b8dc8eb91395ed3d805",
+    "scripts/size-gate.mjs": "caf3ff95f01f0cbe7563515948f39fbea6c325acd97bb9e53db5625a4c5852e6",
+    "scripts/compression-oracle.mjs": "736f72336d54bca93dca1cfe426ff79476eb6b2fbd266296b00802eef565a6bb",
+    "scripts/compression-policy.mjs": "78535921e66d3f1e9bb2936722cce03f0464ec835cd88ab4ac9a1cbd97cc38a4",
+    "bench/compare/direct-preparation-probe.mjs": "25e001a134be156bc4101a9abb7edcae6d5d3dfe47d482495de50731428cef11",
+    "bench/compare/direct-frame-probe.mjs": "f14e994b5bca6a4d05f41345cd2e352b97d7616b01ed02720b1ff8580368966c"
+  },
+  "inputHashSemantics": "inputs records actual Windows working-tree bytes used in the measurement, including checkout-specific CRLF or LF; canonicalGitInputs records exact Git blobs from the pinned measured source revision for portable verification. Source revision fingerprint and dist bytes are unchanged."
 }
