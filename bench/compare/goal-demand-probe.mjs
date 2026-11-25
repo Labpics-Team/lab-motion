@@ -1,5 +1,5 @@
 import { serveDist } from './serve-dist.mjs';
-import { realpathSync } from 'node:fs';
+import { realpathSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
@@ -17,13 +17,16 @@ const revision=root=>({
 });
 const inputs=['bench/compare/goal-demand-probe.mjs','bench/compare/serve-dist.mjs','bench/compare/provenance.mjs','package.json','pnpm-lock.yaml'];
 const capture=()=>{
- const environment=captureBenchmarkEnvironment(checkout,resolve(checkout,'bench/compare'),[],{requiredRootPackages:['@playwright/test','tsup','typescript','esbuild','terser']});
+ const environment=captureBenchmarkEnvironment(checkout,resolve(checkout,'bench/compare'),[],{requiredRootPackages:['@playwright/test','tsup','typescript','esbuild']});
+ const terser=realpathSync(resolve(checkout,'node_modules/terser'));
+ const packages=Object.fromEntries(Object.entries(environment.rootPackages).map(([k,v])=>[k,{version:v.version,sha256:v.sha256}]));
+ packages.terser={version:JSON.parse(readFileSync(resolve(terser,'package.json'),'utf8')).version,sha256:hashFileTree(terser).sha256};
  return {
   harness:revision(checkout),
   measured:Object.fromEntries(Object.entries(roots).map(([name,root])=>[name,revision(dirname(root))])),
   canonicalInputs:Object.fromEntries(inputs.map(f=>[f,sha256Bytes(git(checkout,'show','HEAD:'+f))])),
   workingInputs:Object.fromEntries(inputs.map(f=>[f,sha256File(resolve(checkout,f))])),
-  environment:{node:environment.node,nodeExecutableSha256:environment.nodeExecutableSha256,pnpm:environment.pnpm,packages:Object.fromEntries(Object.entries(environment.rootPackages).map(([k,v])=>[k,{version:v.version,sha256:v.sha256}]))}
+  environment:{node:environment.node,nodeExecutableSha256:environment.nodeExecutableSha256,pnpm:environment.pnpm,packages}
  };
 };
 const provenance=capture();
