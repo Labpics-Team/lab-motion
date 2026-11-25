@@ -2,7 +2,7 @@ import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
@@ -223,13 +223,13 @@ class Surface {
   _read(key: string): Point & { readonly _velocity: readonly number[] } {
     const track = this._tracks.get(key);
     if (track) return { _coordinates: [...track._value], _unit: track._program._unit, _velocity: [...track._velocity] };
-    if (isTransform(key)) return { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], _unit: '', _velocity: [0] };
+    if (isTransform(key)) return { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], _unit: '', _velocity: zeroVelocity };
     let initial = this._rest;
     if (!initial) {
       const text = this._engine._host.styles(this._element).getPropertyValue(key);
       initial = point(key, key === 'opacity' ? text === '' ? 1 : number(Number(text), 'opacity') : text || 0);
     }
-    return { ...initial, _velocity: initial._coordinates.map(() => 0) };
+    return { ...initial, _velocity: zeroVelocity };
   }
   _sync(now?: number): number {
     if (this._busy) failMotion('easing: повторный вход');
@@ -549,7 +549,7 @@ export class Runtime {
           }
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
-          const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
+          const current = explicit ? { ...explicit, _velocity: zeroVelocity } : group._read(property._key);
           const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
           result.push({ _group: group, _program: spec, _reduced: reduced });
         }
@@ -574,7 +574,7 @@ export class Runtime {
         if (!touched.has(group)) { group._sync(now); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!._from;
         const track = draft as Track;
-        track._group = group; track._value = [...first]; track._velocity = first.map(() => 0);
+        track._group = group; track._value = first.slice(); track._velocity = first.slice();
         track._owner = undefined; track._elapsed = draft._reduced ? draft._program._duration : 0;
         track._rate = 1; track._paused = false;
         group._sample(track);

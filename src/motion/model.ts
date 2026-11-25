@@ -15,8 +15,27 @@ const EASES: Readonly<Record<string, readonly [number, number, number, number]>>
   standard: STANDARD_EASING_COORDS, ease: [.25, .1, .25, 1],
   'ease-in': [.42, 0, 1, 1], 'ease-out': [0, 0, .58, 1], 'ease-in-out': [.42, 0, .58, 1],
 };
-const standard: (t: number) => number = /* @__PURE__ */ cubicBezierUnchecked(...STANDARD_EASING_COORDS);
-const standardCss = `cubic-bezier(${STANDARD_EASING_COORDS.join(',')})`;
+type Ease = (t: number) => number;
+type Curve = readonly [string | Ease, (p: number) => readonly number[]];
+function curve(ease: Ease, id: string | Ease): Curve {
+  let recent = [NaN, 0, 0, 1], previous = recent.slice();
+  return [id, p => {
+    if (typeof id === 'string') {
+      if (recent[0] === p) return recent;
+      if (previous[0] === p) return previous;
+      const other = recent; recent = previous; previous = other;
+    }
+    const low = Math.max(0, p - 0.001), high = Math.min(1, p + 0.001);
+    const dy = (ease(high) - ease(low)) * 1000, value = ease(p);
+    recent[0] = p; recent[1] = value; recent[2] = dy; recent[3] = high - low;
+    return recent;
+  }];
+}
+function cubic(points: readonly [number, number, number, number]): Curve {
+  return curve(cubicBezierUnchecked(...points), `cubic-bezier(${points.join(',')})`);
+}
+const standard = /* @__PURE__ */ cubic(STANDARD_EASING_COORDS);
+const linearCurve = /* @__PURE__ */ curve(linear, 'linear');
 
 export function number(value: unknown, name: string, minimum: number = -Infinity): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum)
@@ -42,12 +61,9 @@ export function snapshot<T>(input: readonly T[], name: string, minimum = 0): T[]
 
 /** Внутренний снимок: пользовательские getters больше не читаются исполнителем. */
 export interface Timing {
-  readonly _defaultMotion: boolean;
-  readonly _defaultEase: boolean;
   readonly _spring: SpringParams | undefined;
   readonly _duration: number | undefined;
-  readonly _ease: (progress: number) => number;
-  readonly _cssEase: string | undefined;
+  readonly _curve: Curve;
   readonly _delay: number;
   readonly _stagger: number;
   readonly _times: readonly number[] | undefined;
@@ -55,7 +71,7 @@ export interface Timing {
 }
 
 export function physics(input: MotionSpring | undefined): SpringParams {
-  if (input === undefined) return { ...DEFAULT_SPRING };
+  if (input === undefined) return DEFAULT_SPRING;
   const source = record(input, 'spring');
   const keys = Object.keys(source);
   if (keys.some(key => !['mass', 'stiffness', 'damping', 'response', 'bounce'].includes(key)))
@@ -87,11 +103,10 @@ export function timing(input: MotionOptions | undefined): Timing {
     failMotion('Задайте spring или duration/ease');
   if (reducedMotion !== undefined && reducedMotion !== 'user' && reducedMotion !== 'always')
     failMotion('reducedMotion: user|always');
-  let easeFunction: (p: number) => number = standard;
-  let _cssEase: string | undefined = standardCss;
+  let _curve = standard;
   if (ease !== undefined) {
-    if (typeof ease === 'function') { easeFunction = ease as (p: number) => number; _cssEase = undefined; }
-    else if (ease === 'linear') { easeFunction = linear; _cssEase = 'linear'; }
+    if (typeof ease === 'function') _curve = curve(ease as Ease, ease as Ease);
+    else if (ease === 'linear') _curve = linearCurve;
     else {
       const points = typeof ease === 'string' && Object.hasOwn(EASES, ease) ? EASES[ease] : ease;
       const values = snapshot(points as readonly number[], 'ease', 4);
@@ -99,8 +114,7 @@ export function timing(input: MotionOptions | undefined): Timing {
       values.forEach((v, i) => number(v, `ease[${i}]`));
       if (values[0]! < 0 || values[0]! > 1 || values[2]! < 0 || values[2]! > 1)
         failMotion('ease: X вне [0,1]');
-      easeFunction = cubicBezierUnchecked(values[0]!, values[1]!, values[2]!, values[3]!);
-      _cssEase = `cubic-bezier(${values.join(',')})`;
+      _curve = cubic(values as [number, number, number, number]);
     }
   }
   const stops = times === undefined ? undefined : snapshot(times as readonly number[], 'times', 2);
@@ -110,23 +124,19 @@ export function timing(input: MotionOptions | undefined): Timing {
       failMotion('times: рост в [0,1]');
   }
   return {
-    _defaultMotion: spring === undefined && duration === undefined && ease === undefined,
-    _defaultEase: ease === undefined,
     _spring: duration !== undefined || ease !== undefined ? undefined : physics(spring as MotionSpring | undefined),
     _duration: duration === undefined ? ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
-    _ease: easeFunction, _cssEase, _delay: number(delay ?? 0, 'delay', 0), _stagger: number(stagger ?? 0, 'stagger', 0),
+    _curve, _delay: number(delay ?? 0, 'delay', 0), _stagger: number(stagger ?? 0, 'stagger', 0),
     _times: stops, _reduced: reducedMotion === 'always',
   };
 }
 
 /** Авторская траектория выбирает собственные defaults без повторного чтения опций. */
 export function authoredTiming(clock: Timing): Timing {
-  return { ...clock,
-    _spring: clock._defaultMotion ? undefined : clock._spring,
-    _duration: clock._defaultMotion ? DEFAULT_DURATION_MS : clock._duration,
-    _ease: clock._defaultEase ? linear : clock._ease,
-    _cssEase: clock._defaultEase ? 'linear' : clock._cssEase,
-  };
+  if (clock._curve !== standard) return clock;
+  const implicit = clock._spring === DEFAULT_SPRING;
+  return { ...clock, _spring: implicit ? undefined : clock._spring,
+    _duration: implicit ? DEFAULT_DURATION_MS : clock._duration, _curve: linearCurve };
 }
 
 export function isVariable(value: MotionScalar): value is string {

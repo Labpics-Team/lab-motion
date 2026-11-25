@@ -62,22 +62,21 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
   if (from._unit !== to._unit || from._coordinates.length !== to._coordinates.length)
     failMotion('Разные единицы from/to');
   let normalized: number | undefined;
-  let aligned = true, extent = 1;
+  let extent = 1;
   for (let i = 0; i < from._coordinates.length; i++) {
     const distance = to._coordinates[i]! - from._coordinates[i]!;
     if (!Number.isFinite(distance)) failMotion('Диапазон вне Number');
     const v = velocity[i] ?? 0;
     extent = Math.max(extent, Math.abs(distance));
-    if (distance === 0) { if (v !== 0) aligned = false; }
+    if (distance === 0) { if (v !== 0) normalized = NaN; }
     else if (normalized === undefined) normalized = v / distance;
-    else if (normalized !== v / distance) aligned = false;
+    else if (normalized !== v / distance) normalized = NaN;
   }
   let artifact: SpringExecutionArtifactTuple | undefined;
   let length = duration ?? timing._duration ?? 0;
   if (timing._spring) {
-    if (aligned && Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, 0.05 / extent));
-    const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
-    length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, energy) * 1000;
+    if (Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, 0.05 / extent));
+    length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent) * 1000;
   }
   if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) failMotion('Непредставимая длительность');
   return { _at: at, _end: at + length, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
@@ -100,29 +99,25 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
     current = next;
   }
   const first = _segments[0]!, last = _segments.at(-1)!;
+  const id = timing._curve[0];
   const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
-    timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
-  const native = count === 1 && from._unit !== 'color' && (key !== 'opacity' ||
+    timing._duration, id, timing._delay + offset];
+  const native = typeof id === 'string' && count === 1 && from._unit !== 'color' && (key !== 'opacity' ||
     Math.min(first._from[0]!, first._to[0]!) >= 0 && Math.max(first._from[0]!, first._to[0]!) <= 1);
   return { _key: key, _unit: from._unit, _segments, _duration: last._end,
-    _nativeEase: native ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
+    _nativeEase: native ? first._artifact?.[0] ?? (timing._spring ? undefined : id) : undefined,
     _identity };
 }
 
 // Отсутствующие координаты скорости означают ноль; внутренние сегменты не наследуют скорость.
-const zeroVelocity: readonly number[] = [];
+export const zeroVelocity: readonly number[] = [];
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
 export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1): void {
   const _segments = program._segments;
-  if (time >= program._duration) {
-    const final = _segments.at(-1)!._to;
-    for (let i = 0; i < final.length; i++) { value[i] = final[i]!; velocity[i] = 0; }
-    return;
-  }
-  // Последнее начало <= time: совпадающие границы и обратный seek сохраняют семантику.
-  let at = 0, end = _segments.length;
+  // The terminal pose is the last segment; all other times use the same upper bound.
+  let end = _segments.length, at = time >= program._duration ? end - 1 : 0;
   while (at + 1 < end) {
     const middle = (at + end) >>> 1;
     if (time >= _segments[middle]!._at) at = middle;
@@ -141,10 +136,8 @@ export function sample(program: Program, time: number, value: number[], velocity
   } else if (segment._timing._spring) {
     sampleSpringBasisUnchecked(segment._timing._spring, _elapsed / 1000, basis);
   } else if (_elapsed > 0 && p < 1) {
-    const low = Math.max(0, p - 0.001), high = Math.min(1, p + 0.001);
-    const ease = segment._timing._ease;
-    dp = (ease(high) - ease(low)) * 1000 / ((high - low) * duration);
-    p = ease(p);
+    const phase = segment._timing._curve[1](p);
+    dp = phase[2]! / (phase[3]! * duration); p = phase[1]!;
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
   for (let i = 0; i < segment._from.length; i++) {
