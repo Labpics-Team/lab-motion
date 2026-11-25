@@ -1,0 +1,26 @@
+{
+  "baselineRevision": "381fb2614130270aae8fdae43d555c78721664c7",
+  "measuredRevision": "1ac32d100531e256f3a486c9c3f14afd7808fe82",
+  "initialMeasuredRevision": "858b7f949a5f0b06a3fd08e766387648f40ac9ca",
+  "baselineRoot": "f862cdfc5a49582b9ad7a4ecfcf507804c6e3d6ed37c5d2924a9d8705d7068b0",
+  "finalRoot": "2ada976b14e9ec16dca137de012a50ebe46bea9eb9eae67cddf74588e6d240d8",
+  "initialRoot": "f3806e0b9cb7e3a73aaf541758a92bc6d5d980191be0f7a0a697da7246a9277d",
+  "files": {
+    "ab": {
+      "sha256": "6363747c53170ef971c9821aa73949f61a9c4320494e14bd00fb5baa28f9f92a",
+      "rows": 155
+    },
+    "aa": {
+      "sha256": "870d80ec78d07cf5b30c0bafd60f6d5ba09ce4b72d6578034ad3e1f257ddef17",
+      "rows": 155
+    },
+    "initial-ab": {
+      "sha256": "c6068a53a037a41ee1677b68628172529e4a4ecd06a9c6655d49afc5092ce41e",
+      "rows": 133
+    },
+    "initial-aa": {
+      "sha256": "b864af8f29971d817eecb412e489a9d8477fd1a0d07946249c9d5055b71db181",
+      "rows": 133
+    }
+  }
+}

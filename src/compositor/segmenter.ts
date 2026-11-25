@@ -246,6 +246,7 @@ export function tryBuildSpringNodes(
   params: SpringParams,
   v0: number,
   tolerance: number,
+  // Terminal projection retains the exact accepted horizon, never the nodes.
   terminal?: boolean,
 ): [nodes: Float64Array | undefined, horizon: number] | undefined {
   const settle = springCompileHorizon(params, v0, tolerance);
