@@ -353,7 +353,7 @@ class Surface {
       element.animate === realm.Element.prototype.animate ? batch : undefined;
     let active = false, aligned = true, i = 0;
     let reuse = !!(share && share._realm === realm && share._pose === this._written && share._programs?.length === tracks.size &&
-      cachedHost === CSS && cachedCheck === CSS.supports);
+      typeof CSS !== 'undefined' && cachedHost === CSS && cachedCheck === CSS.supports);
     for (const track of tracks.values()) {
       active ||= moving(track);
       aligned &&= !track._paused && track._rate === first._rate && track._elapsed === first._elapsed &&
