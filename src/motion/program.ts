@@ -54,7 +54,7 @@ export interface Program {
   readonly _segments: readonly Segment[];
   readonly _duration: number;
   /** To-only identity, undefined for authored, null for composed timelines. */
-  readonly _identity: readonly unknown[] | undefined | null;
+  readonly _identity: readonly unknown[] | undefined;
 }
 
 function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, end: number, positive: boolean): Segment {
@@ -102,13 +102,6 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
   return { _key: key, _unit: from._unit, _segments, _duration: last._end, _identity };
-}
-
-export function nativeEase(path: Program): string | undefined {
-  if (path._identity === null || path._segments.length !== 1 || path._unit === 'color') return;
-  const first = path._segments[0]!;
-  if (path._key === 'opacity' && !(Math.min(first._from[0]!, first._to[0]!) >= 0 && Math.max(first._from[0]!, first._to[0]!) <= 1)) return;
-  return segmentEase(first);
 }
 
 export function segmentEase(segment: Segment): string | undefined {

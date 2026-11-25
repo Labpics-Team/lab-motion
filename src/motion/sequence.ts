@@ -49,7 +49,7 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     // Общая программа нескольких целей получает одинаковый конец. Сегменты
     // разных историй по-прежнему объединяются в отдельной оболочке выше.
     const program: SequenceEnd = draft._program;
-    program._duration = end; program._identity = null;
+    program._duration = end; program._identity = undefined;
     drafts.push(draft);
   }
   return engine._execute(drafts, drafts.every(draft => draft._reduced) ? 0 : end);

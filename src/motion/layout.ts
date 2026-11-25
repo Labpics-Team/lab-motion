@@ -1,5 +1,5 @@
 import { FINISHED, STOPPED, failMotion, number, timing } from './model.js';
-import { program, nativeEase } from './program.js';
+import { program, segmentEase } from './program.js';
 import type { MotionEase, MotionOptions, MotionResult, MotionSpring, Playback, PlaybackState } from './types.js';
 
 interface LayoutCommon { readonly delay?: number; readonly reducedMotion?: 'user' | 'always' }
@@ -62,7 +62,7 @@ class LayoutRun implements Playback {
     this._mutate = mutate;
     this._session = { _root: root, _document: root.ownerDocument, _effects: [], _name: `lab-motion-${++serial}`,
       _previousName: '', _previousPriority: '',
-      _delay: config._delay, _easing: reduced ? undefined : nativeEase(path) };
+      _delay: config._delay, _easing: reduced ? undefined : segmentEase(path._segments[0]!) };
   }
   get state(): PlaybackState { return this._status; }
   private _inactive(): boolean { return this._settled || this._terminal !== undefined; }

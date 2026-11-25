@@ -202,10 +202,12 @@ export class Run implements Playback {
 
 // Scoped to one publication. Instructions contain no element or live Track.
 type Instruction = {
-  readonly programs: readonly Program[];
-  readonly pose: string | undefined;
-  readonly frames: Keyframe[];
-  readonly timing: KeyframeAnimationOptions;
+  readonly _programs: readonly Program[];
+  readonly _pose: string | undefined;
+  readonly _frames: Keyframe[];
+  readonly _timing: KeyframeAnimationOptions;
+  _template?: KeyframeEffect;
+  _realm?: Window | null;
 };
 class Surface {
   readonly _tracks: Map<string, Track> = new Map();
@@ -352,43 +354,52 @@ class Surface {
       this._engine._wake(this); return last;
     }
     const pose = this._written;
-    let instruction = last && pose === last.pose && active.length === last.programs.length &&
-      active.every((track, i) => track._program === last.programs[i]) ? last : undefined;
+    let instruction = last && pose === last._pose && active.length === last._programs.length &&
+      active.every((track, i) => track._program === last._programs[i]) ? last : undefined;
     try {
       this._lock(true);
       if (!instruction) {
         const delay = segments[0]!._at, duration = path._duration - delay;
-        const offsets: number[] = [], eases: string[] = [];
+        const frames: Keyframe[] = [];
+        let boundary = delay, offset = 0;
         if (duration > 0) for (let i = 0; i < segments.length; i++) {
-          const segment = segments[i]!, easing = segmentEase(segment);
-          const start = (segment._at - delay) / duration, end = (segment._end - delay) / duration;
-          if (!easing || !(end > start) || end > 1 || start < 0 ||
-              delay + start * duration !== segment._at || delay + end * duration !== segment._end ||
-              i > 0 && segments[i - 1]!._end !== segment._at ||
-              !active.every(track => {
+          const segment = segments[i]!, easing = segmentEase(segment), end = (segment._end - delay) / duration;
+          if (!easing || segment._at !== boundary || !(end > offset) ||
+              delay + end * duration !== segment._end || !active.every(track => {
                 const part = track._program._segments[i]!, from = part._from[0]!, to = part._to[0]!;
-                return part._at === segment._at && part._end === segment._end && segmentEase(part) === easing &&
-                  part._from.length === 1 && (this._key !== 'opacity' || Math.min(from, to) >= 0 && Math.max(from, to) <= 1) &&
+                return part._at === boundary && part._end === segment._end && segmentEase(part) === easing &&
+                  (this._key !== 'opacity' || Math.min(from, to) >= 0 && Math.max(from, to) <= 1) &&
                   (!i || track._program._segments[i - 1]!._to[0] === from);
               })) break;
-          offsets.push(start); eases.push(easing);
+          frames.push({ offset, easing }); boundary = segment._end; offset = end;
         }
-        if (offsets.length === segments.length) {
-          const frames: Keyframe[] = offsets.map((offset, i) => ({ [this._key]: this._text(1, i), offset, easing: eases[i] }));
-          const final = this._text(2, segments.length - 1), end = (segments.at(-1)!._end - delay) / duration;
-          frames.push({ [this._key]: final, offset: end });
-          if (end < 1) frames.push({ [this._key]: final, offset: 1 });
-          // A host must not be able to mutate the instruction for a sibling.
+        if (frames.length === segments.length) {
+          for (let i = 0; i < frames.length; i++) frames[i]![this._key] = this._text(1, i);
+          const final = this._text(2, segments.length - 1);
+          frames.push({ [this._key]: final, offset });
+          if (offset < 1) frames.push({ [this._key]: final, offset: 1 });
           for (const frame of frames) Object.freeze(frame);
           Object.freeze(frames);
-          instruction = { programs: active.map(track => track._program), pose, frames,
-            timing: Object.freeze({ duration, delay, easing: 'linear', fill: 'both' }) };
+          instruction = { _programs: active.map(track => track._program), _pose: pose, _frames: frames,
+            _timing: Object.freeze({ duration, delay, easing: 'linear', fill: 'both' }) };
         }
       }
-      if (!instruction || !instruction.frames.every(frame => !frame.easing || this._engine._host.supports(frame.easing))) {
+      if (!instruction || !instruction._frames.every(frame => !frame.easing || this._engine._host.supports(frame.easing))) {
         this._lock(false); this._engine._wake(this); return last;
       }
-      const effect = this._element.animate(instruction.frames, instruction.timing);
+      const element = this._element, realm = element.ownerDocument?.defaultView;
+      let effect: Animation;
+      if (instruction === last && realm?.KeyframeEffect && realm.Animation &&
+          element.animate === realm.Element.prototype.animate) {
+        if (instruction._realm !== realm) {
+          instruction._template = new realm.KeyframeEffect(null, instruction._frames, instruction._timing);
+          instruction._realm = realm;
+        }
+        const instance = new realm.KeyframeEffect(instruction._template!);
+        instance.target = element;
+        effect = new realm.Animation(instance, element.ownerDocument.timeline);
+        effect.play();
+      } else effect = element.animate(instruction._frames, instruction._timing);
       this._native = effect;
       this._watch();
       if (first._rate !== 1) effect.playbackRate = first._rate;
@@ -605,13 +616,17 @@ export class Runtime {
           if (!synced.has(group)) { synced.add(group); if (group._tracks.size) group._sync(now); }
           // Первый элемент уже содержит по одному Program на каждое свойство.
           // Явная литеральная траектория не зависит от элемента; состояние Track остаётся отдельным.
-          if (i && property._authored && property._literal && !clock._stagger) {
-            result.push({ _group: group, _program: result[j]!._program, _reduced: reduced }); continue;
+          const shared = i && property._literal && !clock._stagger ? result[j]!._program : undefined;
+          if (shared && property._authored) {
+            result.push({ _group: group, _program: shared, _reduced: reduced }); continue;
           }
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: zeroVelocity } : group._read(property._key);
-          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+          const initial = shared?._segments[0];
+          const spec = initial && !initial._velocity.length && !current._velocity.length &&
+            shared!._unit === current._unit && initial._from.every((v, k) => Object.is(v, current._coordinates[k]))
+            ? shared! : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
           result.push({ _group: group, _program: spec, _reduced: reduced });
         }
       }
