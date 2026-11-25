@@ -265,17 +265,15 @@ class Surface {
   private _text(at: 0 | 1 | 2 = 0): string {
     if (this._key === 'transform') {
       const state = this._transforms;
+      let translationOnly = !!at;
       for (const track of this._tracks.values()) {
-        const value = coordinates(track, at)[0]!;
-        state[track._program._key] = value;
+        const key = track._program._key;
+        state[key] = coordinates(track, at)[0]!;
+        translationOnly &&= key === 'x' || key === 'y';
       }
-      let identity = !at, translationOnly = !!at;
-      for (const key in TRANSFORMS) {
-        const neutral = state[key] === TRANSFORMS[key];
-        identity &&= neutral;
-        if (key !== 'x' && key !== 'y') translationOnly &&= neutral && !this._tracks.has(key);
-      }
-      return identity ? 'none' : transform(state, translationOnly);
+      const neutral = state.rotate === 0 && state.skewX === 0 && state.skewY === 0 &&
+        state.scaleX === 1 && state.scaleY === 1;
+      return !at && neutral && state.x === 0 && state.y === 0 ? 'none' : transform(state, translationOnly && neutral);
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {
@@ -570,7 +568,13 @@ export class Runtime {
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: zeroVelocity } : group._read(property._key);
-          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+          const shared = i && property._literal && !clock._stagger ? result[j]!._program : undefined;
+          const initial = shared?._segments[0];
+          const spec = initial && shared!._unit === current._unit &&
+            initial._from.length === current._coordinates.length &&
+            initial._from.every((v, k) => Object.is(v, current._coordinates[k])) &&
+            !initial._velocity.length && !current._velocity.length
+            ? shared! : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
           result.push({ _group: group, _program: spec, _reduced: reduced });
         }
       }
@@ -592,7 +596,7 @@ export class Runtime {
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
         if (!draft._reduced) for (const segment of draft._program._segments) materialize(segment);
-        if (!touched.has(group)) { group._sync(now); group._detach(); touched.add(group); }
+        if (!touched.has(group)) { if (group._tracks.size) { group._sync(now); group._detach(); } else group._stamp = Math.max(group._stamp, now); touched.add(group); }
         const first = draft._program._segments[0]!._from;
         const track = draft as Track;
         track._group = group; track._value = first.slice(); track._velocity = first.slice();
