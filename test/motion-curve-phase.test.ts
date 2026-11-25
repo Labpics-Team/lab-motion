@@ -6,7 +6,7 @@ import { program, sample } from '../src/motion/program.js';
 it('shares two exact normalized curve samples across independent bindings and durations', () => {
   const points = [.2, -.3, .8, 1.4] as const;
   const clock = timing({ duration: 1000, ease: points });
-  const curve = clock._curve, raw = cubicBezierUnchecked(...points);
+  const curve = clock._curve as readonly [string, (p: number) => readonly number[]], raw = cubicBezierUnchecked(...points);
   const first = curve[1](.125), second = curve[1](.625);
   expect(first).not.toBe(second);
   expect(curve[1](.125)).toBe(first);
@@ -32,11 +32,11 @@ it('shares two exact normalized curve samples across independent bindings and du
 
 it('does not memoize, mutate, or change the call order of effectful user easing', () => {
   let count = 0;
-  const inner = timing({ duration: 1000, ease: 'standard' })._curve;
+  const inner = timing({ duration: 1000, ease: 'standard' })._curve as readonly [string, (p: number) => readonly number[]];
   const fn = vi.fn((p: number) => { inner[1](.4); return p + ++count / 1000; });
   Object.freeze(fn);
   const clock = timing({ duration: 1000, ease: fn });
-  expect(clock._curve[0]).toBe(fn);
+  expect(clock._curve).toBe(fn);
   const path = program('width', { _coordinates: [0], _unit: 'px' }, [100], false, clock, []);
   const a: number[] = [], b: number[] = [], v: number[] = [];
   sample(path, 500, a, v);

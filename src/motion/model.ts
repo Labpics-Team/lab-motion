@@ -16,15 +16,13 @@ const EASES: Readonly<Record<string, readonly [number, number, number, number]>>
   'ease-in': [.42, 0, 1, 1], 'ease-out': [0, 0, .58, 1], 'ease-in-out': [.42, 0, .58, 1],
 };
 type Ease = (t: number) => number;
-type Curve = readonly [string | Ease, (p: number) => readonly number[]];
-function curve(ease: Ease, id: string | Ease): Curve {
+type Curve = Ease | readonly [string, (p: number) => readonly number[]];
+function curve(ease: Ease, id: string): Curve {
   let recent = [NaN, 0, 0, 1], previous = recent.slice();
   return [id, p => {
-    if (typeof id === 'string') {
-      if (recent[0] === p) return recent;
-      if (previous[0] === p) return previous;
-      const other = recent; recent = previous; previous = other;
-    }
+    if (recent[0] === p) return recent;
+    if (previous[0] === p) return previous;
+    const other = recent; recent = previous; previous = other;
     const low = Math.max(0, p - 0.001), high = Math.min(1, p + 0.001);
     const dy = (ease(high) - ease(low)) * 1000, value = ease(p);
     recent[0] = p; recent[1] = value; recent[2] = dy; recent[3] = high - low;
@@ -105,7 +103,7 @@ export function timing(input: MotionOptions | undefined): Timing {
     failMotion('reducedMotion: user|always');
   let _curve = standard;
   if (ease !== undefined) {
-    if (typeof ease === 'function') _curve = curve(ease as Ease, ease as Ease);
+    if (typeof ease === 'function') _curve = ease as Ease;
     else if (ease === 'linear') _curve = linearCurve;
     else {
       const points = typeof ease === 'string' && Object.hasOwn(EASES, ease) ? EASES[ease] : ease;

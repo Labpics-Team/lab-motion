@@ -99,7 +99,7 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
     current = next;
   }
   const first = _segments[0]!, last = _segments.at(-1)!;
-  const id = timing._curve[0];
+  const id = typeof timing._curve === 'function' ? timing._curve : timing._curve[0];
   const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, id, timing._delay + offset];
   const native = typeof id === 'string' && count === 1 && from._unit !== 'color' && (key !== 'opacity' ||
@@ -136,8 +136,15 @@ export function sample(program: Program, time: number, value: number[], velocity
   } else if (segment._timing._spring) {
     sampleSpringBasisUnchecked(segment._timing._spring, _elapsed / 1000, basis);
   } else if (_elapsed > 0 && p < 1) {
-    const phase = segment._timing._curve[1](p);
-    dp = phase[2]! / (phase[3]! * duration); p = phase[1]!;
+    const curve = segment._timing._curve;
+    if (typeof curve === 'function') {
+      const low = Math.max(0, p - 0.001), high = Math.min(1, p + 0.001);
+      dp = (curve(high) - curve(low)) * 1000 / ((high - low) * duration);
+      p = curve(p);
+    } else {
+      const phase = curve[1](p);
+      dp = phase[2]! / (phase[3]! * duration); p = phase[1]!;
+    }
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
   for (let i = 0; i < segment._from.length; i++) {
