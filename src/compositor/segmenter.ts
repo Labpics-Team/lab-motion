@@ -166,23 +166,23 @@ export function douglasPeuckerVertical(
 ): number[] {
   const n = xs.length;
   if (n <= 2) return n === 2 ? [0, 1] : n === 1 ? [0] : [];
-  // Правые половины обходятся первыми, как в прежнем DFS. Выданный endpoint
-  // становится правой границей следующего интервала: хранить её в стеке
-  // повторно не нужно. Порядок DFS сохраняет прежнюю глубину стека даже
-  // для перекошенного дерева; bitmap по всей сетке также не требуется.
-  const out = [n - 1];
-  const stack = protectedIndex > 0 && protectedIndex < n - 1
-    ? [0, protectedIndex]
-    : [0];
-  let j = n - 1;
+  return simplifyGrid(xs, ys, eps, protectedIndex > 0 && protectedIndex < n - 1
+    ? [0, protectedIndex] : [0]);
+}
+
+// A frontier contains left boundaries of intervals whose right boundary
+// is either the final grid point or the last emitted endpoint.
+function simplifyGrid(xs: readonly number[], ys: readonly number[], eps: number, stack: number[]): number[] {
+  let j = xs.length - 1;
+  const out = [j];
   while (stack.length > 0) {
     const i = stack.pop()!;
     if (j > i + 1) {
       const xi = xs[i]!;
       const yi = ys[i]!;
       const slope = (ys[j]! - yi) / (xs[j]! - xi);
-      let maxDev = -1;
-      let idx = -1;
+      let maxDev = eps;
+      let idx = 0;
       for (let k = i + 1; k < j; k++) {
         const lineY = yi + slope * (xs[k]! - xi);
         const dev = Math.abs(ys[k]! - lineY);
@@ -191,7 +191,7 @@ export function douglasPeuckerVertical(
           idx = k;
         }
       }
-      if (maxDev > eps) {
+      if (idx) {
         stack.push(i, idx);
         continue;
       }
@@ -318,7 +318,7 @@ function buildSpringNodesAtHorizon(
 
   // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
   // (baseGridSize её и гарантирует ≤ tol/2) ⇒ суммарная реконструкция ≤ tolerance.
-  const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);
+  const kept = simplifyGrid(xs, ys, tolerance / 2, [0, 1]);
   const samples = new Float64Array(kept.length * 2);
   for (let i = 0; i < kept.length; i++) {
     const k = kept[i]!;

@@ -1,5 +1,5 @@
 import { FINISHED, STOPPED, failMotion, number, timing } from './model.js';
-import { program } from './program.js';
+import { program, nativeEase } from './program.js';
 import type { MotionEase, MotionOptions, MotionResult, MotionSpring, Playback, PlaybackState } from './types.js';
 
 interface LayoutCommon { readonly delay?: number; readonly reducedMotion?: 'user' | 'always' }
@@ -55,14 +55,14 @@ class LayoutRun implements Playback {
     if (!config._cssEase) failMotion('layout использует CSS easing');
     const win = root.ownerDocument.defaultView;
     const reduced = config._reduced || win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-    const path = program('--lab-motion-progress', { _coordinates: [0], _unit: '' }, [1], false, config, [0], 0, reduced);
+    const path = program('--lab-motion-progress', { _coordinates: [0], _unit: '' }, [1], false, config, [0]);
     this.duration = reduced ? 0 : path._duration;
     this.finished = new Promise((yes, no) => { this._resolve = yes; this._reject = no; });
     void this.finished.catch(() => {});
     this._mutate = mutate;
     this._session = { _root: root, _document: root.ownerDocument, _effects: [], _name: `lab-motion-${++serial}`,
       _previousName: '', _previousPriority: '',
-      _delay: config._delay, _easing: path._nativeEase };
+      _delay: config._delay, _easing: reduced ? undefined : nativeEase(path) };
   }
   get state(): PlaybackState { return this._status; }
   private _inactive(): boolean { return this._settled || this._terminal !== undefined; }
