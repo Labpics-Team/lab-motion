@@ -57,7 +57,7 @@ function rateCommand(rate: number): ControlOperation {
 }
 function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<ControlOperation>[1], batch: Parameters<ControlOperation>[2], rate?: number): void {
   const requested = rate ?? -tracks[0]!._phase._rate, effect = group._native;
-  if (requested >= 0 && effect && tracks.length === group._tracks.size &&
+  if (requested >= 0 && effect && tracks.length === group._tracks.length &&
       typeof effect.updatePlaybackRate === 'function') {
     group._lock(true);
     try {
@@ -69,7 +69,7 @@ function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<Co
     } finally { group._lock(false); }
     return;
   }
-  group._detach();
+  group._detach(batch);
   for (const track of tracks) {
     group._transport(track, batch, rate ?? -track._phase._rate, track._phase._paused);
     group._sample(track);

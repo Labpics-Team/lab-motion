@@ -46,3 +46,19 @@ it('финализация sequence не продлевает уже работ�
     run.finish(); expect(await run.finished).toEqual({ status: 'finished' });
   } finally { previous.stop(); run?.stop(); }
 });
+
+it('rejects incompatible authored units and dimensions before publishing any surface', () => {
+  const h = harness();
+  for (const [first, second] of [
+    [['0px', '100px'], ['0%', '100%']],
+    [['#000', '#fff'], ['0px', '100px']],
+  ] as const) {
+    h.writes.length = 0;
+    expect(() => h.runtime.sequence([
+      [h.element, { '--mixed': first }, linear],
+      [h.element, { '--mixed': second }, linear],
+    ])).toThrow('Разные единицы sequence');
+    expect(h.writes).toHaveLength(0);
+    expect(h.updates.size + h.renders.size).toBe(0);
+  }
+});

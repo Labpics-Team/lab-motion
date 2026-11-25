@@ -8,14 +8,14 @@ function trajectory(count: number, gap = 0) {
     _at: index * (10 + gap), _end: index * (10 + gap) + 10,
     _from: [index], _to: [index + 1], _velocity: [0], _timing: clock, _artifact: undefined,
   }));
-  const program: Program = { _key: 'x', _unit: '', _segments: segments,
+  const program: Program = { ...segments[0]!, _key: 'x', _unit: '', _tail: segments.slice(1),
     _duration: segments.at(-1)!._end, _nativeEase: undefined, _identity: undefined };
-  return { segments, program };
+  return { segments: [program, ...program._tail!], program };
 }
 function read(program: Program, time: number) {
-  const value: number[] = [], velocity: number[] = [];
-  sample(program, time, value, velocity);
-  return { value: value[0]!, velocity: velocity[0]! };
+  const state: number[] = [0, 0];
+  sample(program, time, state);
+  return { value: state[0]!, velocity: state[1]! };
 }
 
 describe('поиск сегмента при произвольном времени', () => {
@@ -46,7 +46,7 @@ describe('поиск сегмента при произвольном време
   it('при совпадающих началах выбирает последний сегмент, как последовательный поиск', () => {
     const { program, segments } = trajectory(4);
     const equal = segments.map((segment, index) => ({ ...segment, _at: 0, _end: index === 3 ? 10 : 0 }));
-    const repeated: Program = { ...program, _segments: equal, _duration: 10 };
+    const repeated: Program = { ...program, ...equal[0]!, _tail: equal.slice(1), _duration: 10 };
     expect(read(repeated, 0)).toEqual({ value: 3, velocity: 0 });
     expect(read(repeated, 5).value).toBe(3.5);
     expect(read(repeated, 10)).toEqual({ value: 4, velocity: 0 });

@@ -48,10 +48,10 @@ export interface Segment {
   readonly _timing: Timing;
   readonly _artifact: SpringExecutionArtifactTuple | undefined;
 }
-export interface Program {
+export interface Program extends Segment {
   readonly _key: string;
   readonly _unit: string;
-  readonly _segments: readonly Segment[];
+  readonly _tail: readonly Segment[] | undefined;
   readonly _duration: number;
   /** Только точная форма, доступная нативному исполнителю. */
   readonly _nativeEase: string | undefined;
@@ -88,25 +88,27 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   const times = authored ? timing._times : undefined;
   if (times && times.length !== count + 1) failMotion('times: другая длина');
   if (timing._spring && count > 1) failMotion('keyframes: задайте duration/ease');
-  const _segments: Segment[] = [];
+  let first: Segment | undefined, last: Segment | undefined, tail: Segment[] | undefined;
   const duration = timing._duration ?? 0;
   let current = from;
   for (let i = 0; i < count; i++) {
     const next = point(key, values[i + start]!, current);
     const a = times?.[i] ?? i / count;
     const b = times?.[i + 1] ?? (i + 1) / count;
-    _segments.push(segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
-      offset + timing._delay + a * duration, (b - a) * duration));
+    last = segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
+      offset + timing._delay + a * duration, (b - a) * duration);
+    if (first) (tail ??= []).push(last); else first = last;
     current = next;
   }
-  const first = _segments[0]!, last = _segments.at(-1)!;
-  const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
+  // The first segment is the program itself; a tail exists only for multi-segment motion.
+  const root = first!;
+  const _identity = authored ? undefined : [from._unit, ...last!._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
   const native = count === 1 && from._unit !== 'color' && (key !== 'opacity' ||
-    Math.min(first._from[0]!, first._to[0]!) >= 0 && Math.max(first._from[0]!, first._to[0]!) <= 1);
-  return { _key: key, _unit: from._unit, _segments, _duration: last._end,
-    _nativeEase: native ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
-    _identity };
+    Math.min(root._from[0]!, root._to[0]!) >= 0 && Math.max(root._from[0]!, root._to[0]!) <= 1);
+  return Object.assign(root, { _key: key, _unit: from._unit, _tail: tail, _duration: last!._end,
+    _nativeEase: native ? root._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
+    _identity });
 }
 
 // Отсутствующие координаты скорости означают ноль; внутренние сегменты не наследуют скорость.
@@ -122,24 +124,19 @@ export interface CurveSample {
   _dy: number;
   _dx: number;
 }
-export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1, phase?: CurveSample): void {
-  const _segments = program._segments;
-  if (time >= program._duration) {
-    const final = _segments.at(-1)!._to;
-    for (let i = 0; i < final.length; i++) { value[i] = final[i]!; velocity[i] = 0; }
-    return;
-  }
-  // Последнее начало <= time: совпадающие границы и обратный seek сохраняют семантику.
-  let at = 0, end = _segments.length;
-  while (at + 1 < end) {
+export function sample(program: Program, time: number, state: number[], rate: number = 1, phase?: CurveSample): void {
+  const tail = program._tail;
+  // Upper bound in the optional tail. The first segment is always inline.
+  let end = tail?.length ?? 0, at = time >= program._duration ? end : 0;
+  while (at < end) {
     const middle = (at + end) >>> 1;
-    if (time >= _segments[middle]!._at) at = middle;
+    if (time >= tail![middle]!._at) at = middle + 1;
     else end = middle;
   }
-  const segment = _segments[at]!;
-  const _elapsed = Math.max(0, time - segment._at), duration = segment._end - segment._at;
-  if (time >= segment._end) {
-    for (let i = 0; i < segment._to.length; i++) { value[i] = segment._to[i]!; velocity[i] = 0; }
+  const segment = at ? tail![at - 1]! : program;
+  const _elapsed = Math.max(0, time - segment._at), duration = segment._end - segment._at, dimensions = segment._from.length;
+  if (time >= program._duration || time >= segment._end) {
+    for (let i = 0; i < dimensions; i++) { state[i] = segment._to[i]!; state[dimensions + i] = 0; }
     return;
   }
   let p = duration === 0 ? 1 : Math.min(1, _elapsed / duration), dp = 0;
@@ -163,14 +160,14 @@ export function sample(program: Program, time: number, value: number[], velocity
     }
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
-  for (let i = 0; i < segment._from.length; i++) {
+  for (let i = 0; i < dimensions; i++) {
     const a = segment._from[i]!, distance = segment._to[i]! - a;
-    if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
+    if (_elapsed === 0) { state[i] = a; state[dimensions + i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
     else if (segment._timing._spring && !segment._artifact) {
-      value[i] = a + distance * basis._value + (segment._velocity[i] ?? 0) * basis._valueV0;
-      velocity[i] = distance * basis._velocity + (segment._velocity[i] ?? 0) * basis._velocityV0;
-    } else { value[i] = a + distance * p; velocity[i] = distance * dp; }
-    if (rate !== 1) velocity[i] = rate === 0 ? 0 : velocity[i]! * rate;
-    if (!Number.isFinite(value[i]) || !Number.isFinite(velocity[i])) failMotion('Переполнение при sample');
+      state[i] = a + distance * basis._value + (segment._velocity[i] ?? 0) * basis._valueV0;
+      state[dimensions + i] = distance * basis._velocity + (segment._velocity[i] ?? 0) * basis._velocityV0;
+    } else { state[i] = a + distance * p; state[dimensions + i] = distance * dp; }
+    if (rate !== 1) state[dimensions + i] = rate === 0 ? 0 : state[dimensions + i]! * rate;
+    if (!Number.isFinite(state[i]) || !Number.isFinite(state[dimensions + i])) failMotion('Переполнение при sample');
   }
 }

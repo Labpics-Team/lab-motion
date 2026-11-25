@@ -11,17 +11,16 @@ it('sequence publishes a completed first segment before its following gap', asyn
   const samples: Array<{ key: string; value: number[]; velocity: number[] }> = [];
   const ownership = vi.spyOn(Run.prototype, '_own').mockImplementation(function (this: Run, track, reduced) {
     expect(track._owner).toBeUndefined();
-    expect(track._group._tracks.has(track._program._key)).toBe(false);
+    expect(track._group._tracks.some(current => current._program._key === track._program._key)).toBe(false);
     expect(track._program._duration).toBe(1200);
-    expect(track._program._segments[0]!._end).toBe(0);
-    expect(track._program._segments[1]!._at).toBe(200);
-    expect(track._value.length).toBe(track._program._segments.at(-1)!._to.length);
-    expect(track._velocity.length).toBe(track._value.length);
-    for (let i = 0; i < track._value.length; i++) {
-      expect(Number.isFinite(track._value[i])).toBe(true);
-      expect(Number.isFinite(track._velocity[i])).toBe(true);
+    expect(track._program._end).toBe(0);
+    expect(track._program._tail![0]!._at).toBe(200);
+    expect((track._state.length / 2)).toBe((track._program._tail?.at(-1) ?? track._program)._to.length);
+    for (let i = 0; i < (track._state.length / 2); i++) {
+      expect(Number.isFinite(track._state[i])).toBe(true);
+      expect(Number.isFinite(track._state[track._state.length / 2 + i])).toBe(true);
     }
-    samples.push({ key: track._program._key, value: [...track._value], velocity: [...track._velocity] });
+    samples.push({ key: track._program._key, value: track._state.slice(0, track._state.length / 2), velocity: track._state.slice(track._state.length / 2) });
     own.call(this, track, reduced);
   });
   let run: Playback | undefined;
@@ -45,7 +44,7 @@ it('sequence publishes a completed first segment before its following gap', asyn
     expect(h.effects).toHaveLength(0);
     expect(h.updates.size + h.renders.size).toBe(0);
     for (const [track] of ownership.mock.calls) {
-      expect(track._owner).toBeUndefined(); expect(track._group._tracks.size).toBe(0);
+      expect(track._owner).toBeUndefined(); expect(track._group._tracks.length).toBe(0);
     }
   } finally { run?.stop(); ownership.mockRestore(); }
 });
@@ -67,19 +66,19 @@ it('sequence clears live velocity at a completed segment and its following gap',
     run.seek(50);
     expect(h.x()).toBe(20);
     for (const track of tracks) {
-      expect(track._velocity.length).toBe(track._program._segments.at(-1)!._to.length);
-      for (let i = 0; i < track._velocity.length; i++) {
-        expect(Number.isFinite(track._velocity[i])).toBe(true);
-        expect(track._velocity[i]).toBeGreaterThan(0);
+      expect((track._state.length / 2)).toBe((track._program._tail?.at(-1) ?? track._program)._to.length);
+      for (let i = 0; i < (track._state.length / 2); i++) {
+        expect(Number.isFinite(track._state[track._state.length / 2 + i])).toBe(true);
+        expect(track._state[track._state.length / 2 + i]).toBeGreaterThan(0);
       }
     }
     for (const time of [100, 150]) {
       run.seek(time);
       expect(h.x()).toBe(40); expect(h.values.get('color')).toBe('rgba(255,255,255,1)');
       for (const track of tracks) {
-        expect(track._group._tracks.get(track._program._key)).toBe(track);
+        expect(track._group._tracks.find(current => current._program._key === track._program._key)).toBe(track);
         expect(track._owner).toBe(run);
-        for (let i = 0; i < track._velocity.length; i++) expect(track._velocity[i]).toBe(0);
+        for (let i = 0; i < (track._state.length / 2); i++) expect(track._state[track._state.length / 2 + i]).toBe(0);
       }
     }
     const finished = run.finished;
@@ -89,7 +88,7 @@ it('sequence clears live velocity at a completed segment and its following gap',
     expect(h.effects).toHaveLength(0);
     expect(h.updates.size + h.renders.size).toBe(0);
     for (const track of tracks) {
-      expect(track._owner).toBeUndefined(); expect(track._group._tracks.size).toBe(0);
+      expect(track._owner).toBeUndefined(); expect(track._group._tracks.length).toBe(0);
     }
   } finally { run?.stop(); ownership.mockRestore(); }
 });
@@ -102,13 +101,12 @@ for (const native of [false, true]) {
       const ownership = vi.spyOn(Run.prototype, '_own').mockImplementation(function (this: Run, track, reduced) {
         // Наблюдаем реальную границу публикации, не подменяя выборку или владение.
         expect(track._owner).toBeUndefined();
-        expect(track._value.length).toBe(track._program._segments.at(-1)!._to.length);
-        expect(track._velocity.length).toBe(track._value.length);
-        for (let i = 0; i < track._value.length; i++) {
-          expect(Number.isFinite(track._value[i])).toBe(true);
-          expect(Number.isFinite(track._velocity[i])).toBe(true);
+        expect((track._state.length / 2)).toBe((track._program._tail?.at(-1) ?? track._program)._to.length);
+            for (let i = 0; i < (track._state.length / 2); i++) {
+          expect(Number.isFinite(track._state[i])).toBe(true);
+          expect(Number.isFinite(track._state[track._state.length / 2 + i])).toBe(true);
         }
-        samples.push({ key: track._program._key, value: [...track._value], velocity: [...track._velocity] });
+        samples.push({ key: track._program._key, value: track._state.slice(0, track._state.length / 2), velocity: track._state.slice(track._state.length / 2) });
         own.call(this, track, reduced);
       });
       let run: Playback | undefined;
@@ -142,7 +140,7 @@ for (const native of [false, true]) {
         expect(h.effects.every(effect => effect.cancelled)).toBe(true);
         expect(h.updates.size + h.renders.size).toBe(0);
         for (const [track] of ownership.mock.calls) {
-          expect(track._owner).toBeUndefined(); expect(track._group._tracks.size).toBe(0);
+          expect(track._owner).toBeUndefined(); expect(track._group._tracks.length).toBe(0);
         }
       } finally { run?.stop(); ownership.mockRestore(); }
     });
@@ -154,11 +152,11 @@ for (const native of [false, true]) {
     const samples: Array<{ value: number; velocity: number }> = [];
     const ownership = vi.spyOn(Run.prototype, '_own').mockImplementation(function (this: Run, track, reduced) {
       expect(track._owner).toBeUndefined();
-      for (let i = 0; i < track._value.length; i++) {
-        expect(Number.isFinite(track._value[i])).toBe(true);
-        expect(Number.isFinite(track._velocity[i])).toBe(true);
+      for (let i = 0; i < (track._state.length / 2); i++) {
+        expect(Number.isFinite(track._state[i])).toBe(true);
+        expect(Number.isFinite(track._state[track._state.length / 2 + i])).toBe(true);
       }
-      samples.push({ value: track._value[0]!, velocity: track._velocity[0]! });
+      samples.push({ value: track._state[0]!, velocity: track._state[track._state.length / 2]! });
       own.call(this, track, reduced);
     });
     let first: Playback | undefined, successor: Playback | undefined;
@@ -166,7 +164,7 @@ for (const native of [false, true]) {
       first = h.runtime.animate(h.element, { x: 100 }, options);
       first.seek(100);
       const previous = ownership.mock.calls[0]![0];
-      const value = previous._value[0]!, velocity = previous._velocity[0]!;
+      const value = previous._state[0]!, velocity = previous._state[previous._state.length / 2]!;
       expect(velocity).toBeGreaterThan(0);
       const stopped = first.finished;
       successor = h.runtime.animate(h.element, { x: 200 }, options);
@@ -183,7 +181,7 @@ for (const native of [false, true]) {
       expect(h.effects.every(effect => effect.cancelled)).toBe(true);
       expect(h.updates.size + h.renders.size).toBe(0);
       for (const [track] of ownership.mock.calls) {
-        expect(track._owner).toBeUndefined(); expect(track._group._tracks.size).toBe(0);
+        expect(track._owner).toBeUndefined(); expect(track._group._tracks.length).toBe(0);
       }
     } finally { first?.stop(); successor?.stop(); ownership.mockRestore(); }
   });

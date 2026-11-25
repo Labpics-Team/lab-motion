@@ -62,7 +62,7 @@ for (const failureAt of ['write', 'animate'] as const) {
       // Then: реальные принятые tracks освобождены, original finished отклонён.
       expect(ownership.mock.calls).toHaveLength(2);
       for (const [track] of ownership.mock.calls) {
-        expect(track._owner).toBeUndefined(); expect(track._group._tracks.size).toBe(0);
+        expect(track._owner).toBeUndefined(); expect(track._group._tracks.length).toBe(0);
       }
       const owners = new Set(ownership.mock.contexts);
       expect(owners.size).toBe(1);

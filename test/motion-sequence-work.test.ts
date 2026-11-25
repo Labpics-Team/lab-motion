@@ -10,9 +10,10 @@ it('сборка длинной sequence читает сегменты лине�
   const observe = vi.spyOn(h.runtime, '_draft').mockImplementation((...args) => {
     const result = draft(...args);
     for (const entry of result) {
-      const segments = entry._program._segments;
+      const segments = [entry._program, ...(entry._program._tail ?? [])];
       for (const segment of segments) known.add(segment);
-      Object.freeze(segments);
+      Object.freeze(entry._program);
+      if (entry._program._tail) Object.freeze(entry._program._tail);
       inputs.push(segments);
     }
     return result;

@@ -32,7 +32,7 @@ it('preserves distinct initial coordinates across consecutive targets', () => {
   const a = harness(), b = harness(), c = harness(), d = harness();
   b.element.style.setProperty('transform', 'translate(20px,0px)');
   const drafts = a.runtime._draft([a.element, b.element, c.element, d.element], properties({ x: 100 }), timing(options));
-  expect(drafts.map(draft => draft._program._segments[0]!._from[0])).toEqual([0, 20, 0, 0]);
+  expect(drafts.map(draft => draft._program._from[0])).toEqual([0, 20, 0, 0]);
   const run = a.runtime._execute(drafts);
   try {
     run.seek(500);
@@ -43,7 +43,7 @@ it('preserves distinct initial coordinates across consecutive targets', () => {
 it('preserves staggered offsets and the delayed target pose', () => {
   const a = harness(), b = harness();
   const drafts = a.runtime._draft([a.element, b.element], properties({ x: 100 }), timing({ ...options, stagger: 100 }));
-  expect(drafts.map(draft => draft._program._segments[0]!._at)).toEqual([0, 100]);
+  expect(drafts.map(draft => draft._program._at)).toEqual([0, 100]);
   const run = a.runtime._execute(drafts);
   try { run.seek(50); expect(a.x()).toBe(5); expect(b.x()).toBe(0); }
   finally { run.stop(); }
@@ -58,9 +58,9 @@ it('captures different real interruption velocities at equal positions', () => {
     expect(a.x()).toBe(50); expect(b.x()).toBe(50);
     const drafts = a.runtime._draft([a.element, b.element], properties({ x: 300 }), timing(options));
     const [left, right] = drafts.map(draft => draft._program);
-    expect(left!._segments[0]!._from).toEqual(right!._segments[0]!._from);
-    expect(left!._segments[0]!._velocity[0]).toBeCloseTo(100, 8);
-    expect(right!._segments[0]!._velocity[0]).toBeCloseTo(200, 8);
+    expect(left!._from).toEqual(right!._from);
+    expect(left!._velocity[0]).toBeCloseTo(100, 8);
+    expect(right!._velocity[0]).toBeCloseTo(200, 8);
   } finally { first.stop(); second.stop(); }
 });
 
@@ -68,8 +68,8 @@ it('keeps signed-zero origin snapshots distinct', () => {
   const a = harness(), b = harness();
   const drafts = a.runtime._draft([a.element, b.element], properties({ x: 100 }), timing(options), 0,
     element => ({ _coordinates: [element === a.element ? -0 : 0], _unit: '' }));
-  expect(Object.is(drafts[0]!._program._segments[0]!._from[0], -0)).toBe(true);
-  expect(Object.is(drafts[1]!._program._segments[0]!._from[0], 0)).toBe(true);
+  expect(Object.is(drafts[0]!._program._from[0], -0)).toBe(true);
+  expect(Object.is(drafts[1]!._program._from[0], 0)).toBe(true);
 });
 
 it('executes spring, authored, string literal and general CSS channels on each target', () => {
@@ -122,8 +122,7 @@ it('retains distinct Tracks, buffers and independent successor controllers', asy
   const tracks = [...previous._tracks];
   expect(tracks).toHaveLength(2);
   expect(tracks[0]).not.toBe(tracks[1]);
-  expect(tracks[0]!._value).not.toBe(tracks[1]!._value);
-  expect(tracks[0]!._velocity).not.toBe(tracks[1]!._velocity);
+  expect(tracks[0]!._state).not.toBe(tracks[1]!._state);
   const successor = a.runtime.animate(a.element, { x: 200 }, options);
   try {
     successor.seek(500); expect(a.x()).toBe(100); expect(b.x()).toBe(0);
@@ -148,7 +147,7 @@ it('sequence extends one target history without mutating either input draft', as
   try {
     const originals = draft.mock.results[0]!.value;
     const original = originals[0]!._program, sibling = originals[1]!._program;
-    expect(original._segments).toHaveLength(1);
+    expect(original._tail).toBeUndefined();
     expect(original._duration).toBe(1000);
     expect(original._nativeEase).toBe('linear');
     expect(original._identity).toBeDefined();
@@ -156,16 +155,16 @@ it('sequence extends one target history without mutating either input draft', as
     const left = merged.find(item => item._element === a.element)!._program;
     const right = merged.find(item => item._element === b.element)!._program;
     expect(left).not.toBe(original); expect(right).not.toBe(original);
-    expect(left._segments).not.toBe(right._segments);
-    expect(left._segments).not.toBe(original._segments);
-    expect(right._segments).not.toBe(original._segments);
-    expect(left._segments).toHaveLength(2); expect(right._segments).toHaveLength(1);
+    expect(left._tail).not.toBe(right._tail);
+    expect(left._tail).not.toBe(original._tail);
+    expect(right).not.toBe(sibling);
+    expect(left._tail).toHaveLength(1); expect(right._tail).toBeUndefined();
     run.seek(1500); expect(a.x()).toBe(150); expect(b.x()).toBe(100);
     run.finish();
     expect(await run.finished).toEqual({ status: 'finished' });
     expect(a.x()).toBe(200); expect(b.x()).toBe(100);
-    expect(original._segments).toHaveLength(1); expect(original._duration).toBe(1000);
-    expect(sibling._segments).toHaveLength(1); expect(sibling._duration).toBe(1000);
+    expect(original._tail).toBeUndefined(); expect(original._duration).toBe(1000);
+    expect(sibling._tail).toBeUndefined(); expect(sibling._duration).toBe(1000);
     expect(sibling._nativeEase).toBe('linear'); expect(sibling._identity).toBeDefined();
   } finally { run.stop(); draft.mockRestore(); execute.mockRestore(); }
 });

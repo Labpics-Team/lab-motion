@@ -101,8 +101,7 @@ export interface Draft { readonly _element: Element; readonly _program: Program;
 interface Track {
   readonly _program: Program;
   readonly _group: Surface;
-  readonly _value: number[];
-  readonly _velocity: number[];
+  readonly _state: number[];
   _owner: Run | undefined;
   _elapsed: number;
   _phase: Phase;
@@ -135,7 +134,7 @@ class Phase implements CurveSample {
 class PhaseBatch {
   _now: number | undefined;
   private _last: Phase | undefined;
-  _clock(host: RuntimeHost): number { return this._now ??= number(host.now(), 'clock'); }
+  _clock(engine: Runtime): number { return this._now ??= number(engine._host.now(), 'clock'); }
   _bind(stamp: number, time: number, rate: number, paused: boolean): Phase {
     const last = this._last;
     return last && last._stamp === stamp && last._seen === stamp && last._time === time && Object.is(last._rate, rate) && last._paused === paused
@@ -144,7 +143,7 @@ class PhaseBatch {
 }
 
 function coordinates(track: Track, at: 0 | 1 | 2): readonly number[] {
-  return at === 0 ? track._value : at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to;
+  return at === 0 ? track._state : at === 1 ? track._program._from : track._program._to;
 }
 
 function moving(track: Track): boolean { return !track._phase._paused && track._phase._rate !== 0; }
@@ -220,7 +219,7 @@ export class Run implements Playback {
     engine?._operation(true);
     try {
       attemptAll(groups, group => group._control(
-        [...group._tracks.values()], action, time, this, batch,
+        group._tracks, action, time, this, batch,
       ), failures);
     } finally { engine?._operation(false); }
     try { engine?._flush(); } catch (error) { failures.push(error); }
@@ -235,31 +234,33 @@ export class Run implements Playback {
   finish(): void { this._apply('finish'); }
 }
 
+const EMPTY_TRACKS: readonly Track[] = [];
+
 class Surface {
-  readonly _tracks: Map<string, Track> = new Map();
+  // Membership is immutable. Readers keep a stable snapshot across callbacks;
+  // only attach/end replace the bounded vector (one CSS channel or seven axes).
+  _tracks: readonly Track[] = EMPTY_TRACKS;
+  _track(key: string): Track | undefined { return this._tracks.find(track => track._program._key === key); }
   private _rest: Point | undefined;
   private _transforms: Record<string, number> = {};
-  _stamp: number;
   _busy = false;
   _native: Animation | undefined;
   private _written: string | undefined;
   private _token: Promise<Animation> | undefined;
-  constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string, stamp: number) {
-    this._stamp = stamp;
-  }
+  constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string) {}
   _lock(busy: boolean): void {
     if (this._busy === busy) return;
     this._busy = busy;
     this._engine._operation(busy);
   }
   _refresh(): void {
-    if (this._tracks.size || this._written === (this._element as HTMLElement).style.getPropertyValue(this._key)) return;
+    if (this._tracks.length || this._written === (this._element as HTMLElement).style.getPropertyValue(this._key)) return;
     if (this._key === 'transform') this._transforms = initialTransforms(this._engine._host.styles(this._element));
     this._rest = undefined;
   }
   _read(key: string): Point & { readonly _velocity: readonly number[] } {
-    const track = this._tracks.get(key);
-    if (track) return { _coordinates: [...track._value], _unit: track._program._unit, _velocity: [...track._velocity] };
+    const track = this._track(key);
+    if (track) return { _coordinates: track._state.slice(0, track._state.length / 2), _unit: track._program._unit, _velocity: track._state.slice(track._state.length / 2) };
     if (isTransform(key)) return { _coordinates: [this._transforms[key] ?? TRANSFORMS[key]!], _unit: '', _velocity: [0] };
     let initial = this._rest;
     if (!initial) {
@@ -279,26 +280,22 @@ class Surface {
     if (this._busy) failMotion('easing: повторный вход');
     this._lock(true);
     try {
-      const now = batch._clock(this._engine._host);
+      const now = batch._clock(this._engine);
       const local = this._native?.currentTime;
-      this._stamp = Math.max(this._stamp, now);
-      for (const track of this._tracks.values()) {
-        if (this._native) track._elapsed = this._position(track, now, local);
-        else {
-          track._elapsed = Math.min(track._program._duration, track._phase._advance(now));
-          this._stamp = Math.max(this._stamp, track._phase._seen);
-        }
+      for (const track of this._tracks) {
+        const time = track._phase._advance(now);
+        track._elapsed = this._native ? this._position(track, now, local) : Math.min(track._program._duration, time);
         this._sample(track);
       }
     } finally { this._lock(false); }
   }
   _sample(track: Track): void {
     const phase = track._phase;
-    sample(track._program, track._elapsed, track._value, track._velocity,
+    sample(track._program, track._elapsed, track._state,
       phase._paused ? 0 : this._native?.playbackRate ?? phase._rate, phase);
   }
   _transport(track: Track, batch: PhaseBatch, rate: number, paused: boolean): void {
-    track._phase = batch._bind(this._stamp, track._elapsed, rate, paused);
+    track._phase = batch._bind(Math.max(track._phase._seen, batch._clock(this._engine)), track._elapsed, rate, paused);
   }
   _ended(track: Track): boolean {
     return track._phase._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
@@ -306,7 +303,7 @@ class Surface {
   private _text(at: 0 | 1 | 2 = 0): string {
     if (this._key === 'transform') {
       const state = this._transforms;
-      for (const track of this._tracks.values()) {
+      for (const track of this._tracks) {
         const value = coordinates(track, at)[0]!;
         state[track._program._key] = value;
       }
@@ -314,11 +311,11 @@ class Surface {
       for (const key in TRANSFORMS) {
         const neutral = state[key] === TRANSFORMS[key];
         identity &&= neutral;
-        if (key !== 'x' && key !== 'y') translationOnly &&= neutral && !this._tracks.has(key);
+        if (key !== 'x' && key !== 'y') translationOnly &&= neutral && !this._track(key);
       }
       return identity ? 'none' : transform(state, translationOnly);
     }
-    const track = this._tracks.values().next().value as Track | undefined;
+    const track = this._tracks[0];
     if (!track) {
       const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
@@ -334,12 +331,11 @@ class Surface {
     }
     finally { this._lock(false); }
   }
-  _detach(): void {
+  _detach(batch: PhaseBatch = new PhaseBatch()): void {
     const previous = this._native;
     this._native = undefined; this._token = undefined;
     if (previous) {
-      const batch = new PhaseBatch();
-      for (const track of this._tracks.values()) this._transport(track, batch, track._phase._rate, track._phase._paused);
+      for (const track of this._tracks) this._transport(track, batch, track._phase._rate, track._phase._paused);
       try { this._render(); }
       catch (error) {
         try { previous.cancel(); } catch { /* ошибка CSS-записи остаётся причиной */ }
@@ -349,26 +345,26 @@ class Surface {
     }
   }
   _attach(track: Track): void {
-    const previous = this._tracks.get(track._program._key);
+    const previous = this._track(track._program._key);
     // Во время замены поверхность сохраняет владельца и регистрацию.
-    this._tracks.set(track._program._key, track);
+    this._tracks = previous ? this._tracks.map(current => current === previous ? track : current) : [...this._tracks, track];
     if (previous) this._end(previous, false);
   }
   _end(track: Track, natural: boolean, failure?: { _error: unknown }): void {
     const owner = track._owner;
     if (!owner) return;
     track._owner = undefined;
-    if (this._tracks.get(track._program._key) === track) this._tracks.delete(track._program._key);
-    if (this._key !== 'transform') this._rest = { _coordinates: [...track._value], _unit: track._program._unit };
-    if (isTransform(track._program._key)) this._transforms[track._program._key] = track._value[0]!;
-    if (this._tracks.size === 0) {
+    if (this._tracks.includes(track)) this._tracks = this._tracks.length === 1 ? EMPTY_TRACKS : this._tracks.filter(current => current !== track);
+    if (this._key !== 'transform') this._rest = { _coordinates: track._state.slice(0, track._state.length / 2), _unit: track._program._unit };
+    if (isTransform(track._program._key)) this._transforms[track._program._key] = track._state[0]!;
+    if (this._tracks.length === 0) {
       try { this._engine._idle(this); } catch (error) { failure ??= { _error: error }; }
     }
     owner._settle(track, natural, failure);
   }
   _fail(error: unknown): void {
     // Снимок полномочий делается до host.cancel: callback может принять successor.
-    const owned = [...this._tracks.values()].map(track => [track, track._owner] as const);
+    const owned = this._tracks.map(track => [track, track._owner] as const);
     for (const [, owner] of owned) owner?._fault(error);
     const native = this._native; this._native = undefined; this._token = undefined;
     try { native?.cancel(); } catch { /* исходное исключение остаётся причиной */ }
@@ -377,14 +373,14 @@ class Surface {
     }
   }
   _reconcile(): void {
-    if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
-    const active = [...this._tracks.values()];
+    if (this._native || this._tracks.length === 0) { this._engine._idle(this); return; }
+    const active = this._tracks;
     if (!active.some(moving)) { this._engine._idle(this); return; }
-    const first = active[0]!, seg = first._program._segments[0]!;
+    const first = active[0]!, seg = first._program;
     const _nativeEase = first._program._nativeEase;
     const canNative = first._phase._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._phase._paused && track._phase._rate === first._phase._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
-        track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
+      active.every(track => !track._phase._paused && track._phase._rate === first._phase._rate && track._program._nativeEase === _nativeEase && !track._program._tail &&
+        track._program._duration === first._program._duration && track._program._at === seg._at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
     try {
       this._lock(true);
@@ -409,11 +405,11 @@ class Surface {
       if (this._token !== token || this._native !== effect) return;
       if ((error as { name?: string })?.name !== 'AbortError') { this._fail(error); return; }
       this._native = undefined; this._token = undefined;
-      for (const track of [...this._tracks.values()]) this._end(track, false);
+      for (const track of this._tracks) this._end(track, false);
     };
     void finished.then(() => {
       if (this._token !== token || this._native !== effect) return;
-      const completed = [...this._tracks.values()].map(track => [track, track._owner] as const);
+      const completed = this._tracks.map(track => [track, track._owner] as const);
       try {
         for (const [track] of completed) {
           track._elapsed = track._program._duration;
@@ -426,7 +422,7 @@ class Surface {
     }, fail);
   }
   _control(selected: readonly Track[], action: ControlAction, time: number, owner?: Run, batch: PhaseBatch = new PhaseBatch()): void {
-    const owns = (track: Track): boolean => !!track._owner && this._tracks.get(track._program._key) === track &&
+    const owns = (track: Track): boolean => !!track._owner && this._track(track._program._key) === track &&
       (owner === undefined || track._owner === owner);
     // Пока команда ждала, траектория могла перейти к другому вызову.
     if (!selected.some(owns)) return;
@@ -445,9 +441,9 @@ class Surface {
         // Полностью принадлежащая контролу шкала не меняет кривую при seek.
         // Частичная команда, конец и внешний pause идут через handoff.
         const reuse = action === 'seek' && effect?.playState === 'running' &&
-          selected.length === this._tracks.size && selected.every(owns) &&
+          selected.length === this._tracks.length && selected.every(owns) &&
           effect.finished === this._token && effect.playbackRate === first._phase._rate && time < first._program._duration;
-        if (!reuse) this._detach();
+        if (!reuse) this._detach(batch);
         for (const track of selected) {
           if (!owns(track)) continue;
           if (action === 'seek') track._elapsed = Math.min(time, track._program._duration);
@@ -477,22 +473,16 @@ class Surface {
     } catch (error) { this._fail(error); throw error; }
   }
   _tick(batch: PhaseBatch): void {
-    if (this._native || this._tracks.size === 0) return;
+    if (this._native || this._tracks.length === 0) return;
     try { this._sync(batch); } catch (error) { this._fail(error); }
   }
   _paint(): void {
-    if (this._native || this._tracks.size === 0) return;
+    if (this._native || this._tracks.length === 0) return;
     try {
       this._render();
-      const tracks = this._tracks;
-      for (const track of tracks.values()) if (moving(track) && this._ended(track)) {
-        // Снимок нужен только перед callbacks завершения, не на каждом кадре.
-        for (const ending of [...tracks.values()]) {
-          if (moving(ending) && this._ended(ending)) this._end(ending, true);
-        }
-        break;
-      }
-      for (const track of tracks.values()) if (moving(track)) return;
+      // Membership is immutable, even when an end callback publishes a successor.
+      for (const track of this._tracks) if (moving(track) && this._ended(track)) this._end(track, true);
+      for (const track of this._tracks) if (moving(track)) return;
       this._engine._idle(this);
     } catch (error) { this._fail(error); }
   }
@@ -511,7 +501,7 @@ export class Runtime {
   constructor(readonly _host: RuntimeHost = defaultHost) {}
   _operation(enter: boolean): void { this._operations += enter ? 1 : -1; }
   _notify(element: Element, key: string, action: () => void): void {
-    const owner = this._surfaces.get(element)?.[key]?._tracks.get(key)?._owner;
+    const owner = this._surfaces.get(element)?.[key]?._track(key)?._owner;
     if (owner) owner._notifications++;
     this._after(() => {
       try { action(); }
@@ -538,7 +528,7 @@ export class Runtime {
     this._subscribing = true;
     const teardown = (): void => {
       this._offUpdate = this._offRender = undefined;
-      for (const current of [...this._active]) current._control([...current._tracks.values()], 'stop', 0);
+      for (const current of [...this._active]) current._control(current._tracks, 'stop', 0);
     };
     try {
       this._offUpdate = this._host.frame.update(() => {
@@ -562,7 +552,7 @@ export class Runtime {
   _idle(surface: Surface): void {
     this._active.delete(surface);
     const groups = this._surfaces.get(surface._element);
-    if (surface._tracks.size === 0 && surface._key !== 'transform' && groups?.[surface._key] === surface)
+    if (surface._tracks.length === 0 && surface._key !== 'transform' && groups?.[surface._key] === surface)
       delete groups[surface._key];
     if (this._active.size !== 0) return;
     const update = this._offUpdate, render = this._offRender;
@@ -575,7 +565,8 @@ export class Runtime {
     const name = isTransform(key) ? 'transform' : key;
     let group = groups[name];
     if (!group) {
-      const candidate = new Surface(this, element, name, batch._clock(this._host));
+      batch._clock(this);
+      const candidate = new Surface(this, element, name);
       // Чтение host-стиля может синхронно принять другой прогон.
       group = groups[name] ?? candidate; groups[name] = group;
     }
@@ -623,7 +614,7 @@ export class Runtime {
       }
     } finally {
       // План хранит значения; пустая CSS-поверхность не нужна между стадиями.
-      for (const group of synced) if (group._tracks.size === 0) this._idle(group);
+      for (const group of synced) if (group._tracks.length === 0) this._idle(group);
     }
     return result;
   }
@@ -633,20 +624,20 @@ export class Runtime {
     try {
       for (const draft of drafts) {
         const group = this._surface(draft._element, draft._program._key, batch);
-        const existing = group._tracks.get(draft._program._key);
+        const existing = group._track(draft._program._key);
         const equal = !draft._reduced && draft._program._identity && existing?._program._identity &&
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
-        if (!touched.has(group)) { group._sync(batch); group._detach(); touched.add(group); }
-        const first = draft._program._segments[0]!._from;
-        const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: first.map(() => 0),
-          _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _phase: batch._bind(group._stamp, 0, 1, false) };
+        if (!touched.has(group)) { group._sync(batch); group._detach(batch); touched.add(group); }
+        const first = draft._program._from;
+        const track: Track = { _program: draft._program, _group: group, _state: new Array<number>(first.length * 2).fill(0),
+          _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _phase: batch._bind(batch._clock(this), 0, 1, false) };
         group._sample(track);
         run._own(track, draft._reduced); group._attach(track);
       }
       for (const group of touched) {
         group._render();
-        for (const track of [...group._tracks.values()]) if (track._elapsed >= track._program._duration) group._end(track, true);
+        for (const track of group._tracks) if (track._elapsed >= track._program._duration) group._end(track, true);
         group._reconcile();
       }
       run._complete();

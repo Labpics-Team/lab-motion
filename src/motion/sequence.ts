@@ -6,7 +6,7 @@ import type { Segment } from './program.js';
 // До _execute сборщик владеет отдельным массивом сегментов каждого канала.
 // Входные программы остаются неизменными; готовый план читает только runtime.
 type SequenceDraft = Omit<Draft, '_program' | '_reduced'> & {
-  _program: Draft['_program'] & { readonly _segments: Segment[] };
+  _program: { -readonly [Key in keyof Draft['_program']]: Draft['_program'][Key] } & { _tail: Segment[] | undefined };
   _reduced: boolean;
 };
 type SequenceEnd = {
@@ -27,18 +27,25 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     const input = properties(props), clock = timing(rest);
     const drafts = engine._draft(target, input, clock, offset + sequenceClock._delay, (element, key) => {
       const prior = merged.get(element)?.get(key)?._program;
-      return prior && { _coordinates: prior._segments.at(-1)!._to, _unit: prior._unit };
+      return prior && { _coordinates: (prior._tail?.at(-1) ?? prior)._to, _unit: prior._unit };
     });
     for (const draft of drafts) {
-      count += draft._program._segments.length;
+      const incoming = draft._program;
+      count += 1 + (incoming._tail?.length ?? 0);
       if (count > MAX_CHANNELS) failMotion('Слишком много сегментов');
       let channels = merged.get(draft._element);
       if (!channels) { channels = new Map(); merged.set(draft._element, channels); }
       const before = channels.get(draft._program._key);
-      if (before && draft._program._segments[0]!._at < before._program._duration) failMotion('Пересечение шагов');
-      const segments = before?._program._segments ?? [];
-      for (const segment of draft._program._segments) segments.push(segment);
-      const next: SequenceDraft = { ...draft, _program: { ...draft._program, _segments: segments } };
+      if (before && incoming._at < before._program._duration) failMotion('Пересечение шагов');
+      const trajectory = before?._program ?? { ...incoming, _tail: incoming._tail?.slice() };
+      if (before) {
+        if (trajectory._unit !== incoming._unit || trajectory._from.length !== incoming._from.length)
+          failMotion('Разные единицы sequence');
+        (trajectory._tail ??= []).push(incoming);
+        if (incoming._tail) for (const segment of incoming._tail) trajectory._tail.push(segment);
+        trajectory._duration = incoming._duration;
+      }
+      const next: SequenceDraft = { ...draft, _program: trajectory };
       channels.set(draft._program._key, next);
       end = Math.max(end, next._program._duration);
     }

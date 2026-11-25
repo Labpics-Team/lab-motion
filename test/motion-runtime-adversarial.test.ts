@@ -129,8 +129,8 @@ it('10 000 повторных целей держат один эффект и �
     previous.stop(); previous.finish();
   }
   expect(h.effects).toHaveLength(1); expect(h.effects[0]!.cancelled).toBe(false);
-  const registry = (h.runtime as unknown as { _surfaces: WeakMap<Element, Record<string, { _tracks: Map<string, { _owner: unknown }> }>> })._surfaces;
-  expect(registry.get(h.element)!.transform!._tracks.get('x')!._owner).toBe(current);
+  const registry = (h.runtime as unknown as { _surfaces: WeakMap<Element, Record<string, { _tracks: Array<{ _program: { _key: string }; _owner: unknown }> }>> })._surfaces;
+  expect(registry.get(h.element)!.transform!._tracks.find(track => track._program._key === 'x')!._owner).toBe(current);
   current.finish(); expect(await current.finished).toEqual({ status: 'finished' });
   expect(await first.finished).toEqual({ status: 'stopped' });
 });
