@@ -42,7 +42,6 @@ export function snapshot<T>(input: readonly T[], name: string, minimum = 0): T[]
 
 /** Внутренний снимок: пользовательские getters больше не читаются исполнителем. */
 export interface Timing {
-  readonly _defaultMotion: boolean;
   readonly _spring: SpringParams | undefined;
   readonly _duration: number | undefined;
   readonly _ease: (progress: number) => number;
@@ -54,7 +53,7 @@ export interface Timing {
 }
 
 export function physics(input: MotionSpring | undefined): SpringParams {
-  if (input === undefined) return { ...DEFAULT_SPRING };
+  if (input === undefined) return DEFAULT_SPRING;
   const source = record(input, 'spring');
   const keys = Object.keys(source);
   if (keys.some(key => !['mass', 'stiffness', 'damping', 'response', 'bounce'].includes(key)))
@@ -109,7 +108,6 @@ export function timing(input: MotionOptions | undefined): Timing {
       failMotion('times: рост в [0,1]');
   }
   return {
-    _defaultMotion: spring === undefined && duration === undefined && ease === undefined,
     _spring: duration !== undefined || ease !== undefined ? undefined : physics(spring as MotionSpring | undefined),
     _duration: duration === undefined ? ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
     _ease: easeFunction, _cssEase, _delay: number(delay ?? 0, 'delay', 0), _stagger: number(stagger ?? 0, 'stagger', 0),
@@ -121,8 +119,8 @@ export function timing(input: MotionOptions | undefined): Timing {
 export function authoredTiming(clock: Timing): Timing {
   if (clock._ease !== standard) return clock;
   return { ...clock,
-    _spring: clock._defaultMotion ? undefined : clock._spring,
-    _duration: clock._defaultMotion ? DEFAULT_DURATION_MS : clock._duration,
+    _spring: clock._spring === DEFAULT_SPRING ? undefined : clock._spring,
+    _duration: clock._spring === DEFAULT_SPRING ? DEFAULT_DURATION_MS : clock._duration,
     _ease: linear,
     _cssEase: 'linear',
   };

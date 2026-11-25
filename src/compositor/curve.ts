@@ -148,15 +148,27 @@ export function compileSpringExecutionArtifactTupleUnchecked(
 }
 
 /**
- * Compile-as-preflight: cache hit возвращается сразу; безопасный miss строит и
- * кэширует готовый artifact; over-cap заканчивается до grid/RDP.
+ * Cache hit returns the exact artifact. On a safe miss, defer requests only
+ * the canonical horizon; immediate compilation materializes and caches stops.
+ * Over-cap returns before grid/RDP.
  */
+/** Validated cold request, never inserted into the artifact cache. */
+export type SpringExecutionRequest = readonly [easing: undefined, normalizedVelocity: number, durationMs: number, tolerance: number];
+export function tryCompileSpringExecutionArtifactTupleUnchecked(
+  spring: SpringParams, v0: number, tolerance: number,
+  cache?: SpringLinearCache<SpringExecutionArtifactTuple>, defer?: false,
+): SpringExecutionArtifactTuple | undefined;
+export function tryCompileSpringExecutionArtifactTupleUnchecked(
+  spring: SpringParams, v0: number, tolerance: number,
+  cache: SpringLinearCache<SpringExecutionArtifactTuple> | undefined, defer: true,
+): SpringExecutionArtifactTuple | SpringExecutionRequest | undefined;
 export function tryCompileSpringExecutionArtifactTupleUnchecked(
   spring: SpringParams,
   v0: number,
   tolerance: number,
   cache: SpringLinearCache<SpringExecutionArtifactTuple> = sharedCache,
-): SpringExecutionArtifactTuple | undefined {
+  defer?: boolean,
+): SpringExecutionArtifactTuple | SpringExecutionRequest | undefined {
   const { mass, stiffness, damping } = spring;
   // Единственный production-consumer: inline оставляет functional core отдельно
   // тестируемым в source, а import-cost ratchet контролирует итоговый артефакт.
@@ -169,9 +181,10 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
     tolerance,
   );
   if (hit) return hit;
-  const build = tryBuildSpringNodes(spring, v0, tolerance);
+  const build = tryBuildSpringNodes(spring, v0, tolerance, defer);
   if (!build) return;
-  const artifact = emitArtifact(build[0]!, tolerance, build[1] * 1000);
+  if (!build[0]) return [undefined, v0, build[1] * 1000, tolerance];
+  const artifact = emitArtifact(build[0], tolerance, build[1] * 1000);
   /* @__INLINE__ */ storeSpringLinearCache(
     cache,
     mass,

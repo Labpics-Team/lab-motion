@@ -1,0 +1,310 @@
+{
+  "inputsMeaning": "canonicalInputs are SHA-256 of exact bytes returned by git show <revision>:<path>; not Git SHA-1 object ids. workingInputs are observed checkout bytes including Windows line endings.",
+  "runs": {
+    "initial-ab": {
+      "sha256": "ee0c05584e9c53d8730d2ff863ef8dd70612da1a171377113d2226d67a57069f",
+      "rows": 177,
+      "artifacts": {
+        "baseline": {
+          "entry": "2ada976b14e9ec16dca137de012a50ebe46bea9eb9eae67cddf74588e6d240d8",
+          "runtime": "eb5bad629c7875e8b88df3ca98f882629237812b723ffec7f02f5e77b5ddef83"
+        },
+        "candidate": {
+          "entry": "df8b98ef3091161c96ad7eb834b053e5dad16f53b691c5a13fb9fcc434f88ccd",
+          "runtime": "4339067dc3f9fa491a7f712857dd52fe676591f6228f53712370b106433e346e"
+        }
+      },
+      "chrome": "158.0.8127.88",
+      "node": "v24.15.0",
+      "provenance": {
+        "harness": {
+          "revision": "26a4a80d7786dfeb2aaaf244d7c83be499c93cf7",
+          "tree": "d78a0c540b5895e2840c47282d5775cf433a0969",
+          "dirty": false
+        },
+        "measured": {
+          "baseline": {
+            "revision": "f2b9eb3bd4a6b96149dc840a510d99ab6dc58b9c",
+            "tree": "adce61242a98ca45dcb499da37e7238c2005e146",
+            "dirty": false
+          },
+          "candidate": {
+            "revision": "26a4a80d7786dfeb2aaaf244d7c83be499c93cf7",
+            "tree": "d78a0c540b5895e2840c47282d5775cf433a0969",
+            "dirty": false
+          }
+        },
+        "canonicalInputs": {
+          "bench/compare/goal-demand-probe.mjs": "63809651b9b2604f3ae7737be7a8cf6ef6e8c009e766fa1b5e17668340c584c1",
+          "bench/compare/serve-dist.mjs": "396cba56769065e739913f7551d1581e349e09ef6ac465291e0719332735b1f5",
+          "bench/compare/provenance.mjs": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+          "package.json": "513355ba2f93e86577b5da2779a40f8781dbad0433ace3c20e84b492fb87e40e",
+          "pnpm-lock.yaml": "1960fec07e58fdaedd7f1d5aa0187a81955aeb07e1fe9b8dc8eb91395ed3d805"
+        },
+        "workingInputs": {
+          "bench/compare/goal-demand-probe.mjs": "63809651b9b2604f3ae7737be7a8cf6ef6e8c009e766fa1b5e17668340c584c1",
+          "bench/compare/serve-dist.mjs": "5b4c4df97116c48bcf55daf47124c255de84c9917a72633054ae2a65bfa84f5e",
+          "bench/compare/provenance.mjs": "64309dc4c9211c13202a1e65bc440d812bc4d4d8dacc797fdd4f2e5d9de54513",
+          "package.json": "0eeb5d478306ae04d3210c4ab4ce133c7cc4ef74ba55e96b64d47802b8ea020e",
+          "pnpm-lock.yaml": "d57d3e3f38cb5c68403a3c0710c19c91a6c993783bf25d1107bfe969b676989f"
+        },
+        "environment": {
+          "node": "v24.15.0",
+          "nodeExecutableSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
+          "pnpm": "11.11.0",
+          "packages": {
+            "@playwright/test": {
+              "version": "1.64.1",
+              "sha256": "fc24ff9f45b6b12084dd6dbadd4697be3483a8287c49accc82b5edd02c8e0647"
+            },
+            "tsup": {
+              "version": "9.0.0",
+              "sha256": "f94699fa11c6c5151bb47aab777680d52bf705541300a4af9591c4129248d485"
+            },
+            "typescript": {
+              "version": "6.0.3",
+              "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86"
+            },
+            "esbuild": {
+              "version": "0.28.2",
+              "sha256": "2bf64d36c0195071857f7201129adceb39359ec725487bf537dec3f7351325bc"
+            },
+            "terser": {
+              "version": "5.51.2",
+              "sha256": "16901f87f3f301b5d4813244b09a13d39e8a87d1ae1c649e4d3f787639b75220"
+            }
+          }
+        }
+      }
+    },
+    "aa": {
+      "sha256": "3d1fd347e9a84a80fa99264cd9e49d28277ef7585eb687235075103de465338b",
+      "rows": 177,
+      "artifacts": {
+        "baseline": {
+          "entry": "2ada976b14e9ec16dca137de012a50ebe46bea9eb9eae67cddf74588e6d240d8",
+          "runtime": "eb5bad629c7875e8b88df3ca98f882629237812b723ffec7f02f5e77b5ddef83"
+        },
+        "candidate": {
+          "entry": "2ada976b14e9ec16dca137de012a50ebe46bea9eb9eae67cddf74588e6d240d8",
+          "runtime": "eb5bad629c7875e8b88df3ca98f882629237812b723ffec7f02f5e77b5ddef83"
+        }
+      },
+      "chrome": "158.0.8127.88",
+      "node": "v24.15.0",
+      "provenance": {
+        "harness": {
+          "revision": "26a4a80d7786dfeb2aaaf244d7c83be499c93cf7",
+          "tree": "d78a0c540b5895e2840c47282d5775cf433a0969",
+          "dirty": false
+        },
+        "measured": {
+          "baseline": {
+            "revision": "f2b9eb3bd4a6b96149dc840a510d99ab6dc58b9c",
+            "tree": "adce61242a98ca45dcb499da37e7238c2005e146",
+            "dirty": false
+          },
+          "candidate": {
+            "revision": "f2b9eb3bd4a6b96149dc840a510d99ab6dc58b9c",
+            "tree": "adce61242a98ca45dcb499da37e7238c2005e146",
+            "dirty": false
+          }
+        },
+        "canonicalInputs": {
+          "bench/compare/goal-demand-probe.mjs": "63809651b9b2604f3ae7737be7a8cf6ef6e8c009e766fa1b5e17668340c584c1",
+          "bench/compare/serve-dist.mjs": "396cba56769065e739913f7551d1581e349e09ef6ac465291e0719332735b1f5",
+          "bench/compare/provenance.mjs": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+          "package.json": "513355ba2f93e86577b5da2779a40f8781dbad0433ace3c20e84b492fb87e40e",
+          "pnpm-lock.yaml": "1960fec07e58fdaedd7f1d5aa0187a81955aeb07e1fe9b8dc8eb91395ed3d805"
+        },
+        "workingInputs": {
+          "bench/compare/goal-demand-probe.mjs": "63809651b9b2604f3ae7737be7a8cf6ef6e8c009e766fa1b5e17668340c584c1",
+          "bench/compare/serve-dist.mjs": "5b4c4df97116c48bcf55daf47124c255de84c9917a72633054ae2a65bfa84f5e",
+          "bench/compare/provenance.mjs": "64309dc4c9211c13202a1e65bc440d812bc4d4d8dacc797fdd4f2e5d9de54513",
+          "package.json": "0eeb5d478306ae04d3210c4ab4ce133c7cc4ef74ba55e96b64d47802b8ea020e",
+          "pnpm-lock.yaml": "d57d3e3f38cb5c68403a3c0710c19c91a6c993783bf25d1107bfe969b676989f"
+        },
+        "environment": {
+          "node": "v24.15.0",
+          "nodeExecutableSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
+          "pnpm": "11.11.0",
+          "packages": {
+            "@playwright/test": {
+              "version": "1.64.1",
+              "sha256": "fc24ff9f45b6b12084dd6dbadd4697be3483a8287c49accc82b5edd02c8e0647"
+            },
+            "tsup": {
+              "version": "9.0.0",
+              "sha256": "f94699fa11c6c5151bb47aab777680d52bf705541300a4af9591c4129248d485"
+            },
+            "typescript": {
+              "version": "6.0.3",
+              "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86"
+            },
+            "esbuild": {
+              "version": "0.28.2",
+              "sha256": "2bf64d36c0195071857f7201129adceb39359ec725487bf537dec3f7351325bc"
+            },
+            "terser": {
+              "version": "5.51.2",
+              "sha256": "16901f87f3f301b5d4813244b09a13d39e8a87d1ae1c649e4d3f787639b75220"
+            }
+          }
+        }
+      }
+    },
+    "ab": {
+      "sha256": "24347bc335088c60827481eff21e722537a27c1c09e2a57b8f6f237289d2d0a0",
+      "rows": 177,
+      "artifacts": {
+        "baseline": {
+          "entry": "2ada976b14e9ec16dca137de012a50ebe46bea9eb9eae67cddf74588e6d240d8",
+          "runtime": "eb5bad629c7875e8b88df3ca98f882629237812b723ffec7f02f5e77b5ddef83"
+        },
+        "candidate": {
+          "entry": "067026a93133929001a80b06845989f2d5c5f02fd8af8404afb582bcbf6d121d",
+          "runtime": "05d83e2e78bdd81639cd1fecefc650d880b2d16e8b9af2af50634dda1f9bebf9"
+        }
+      },
+      "chrome": "158.0.8127.88",
+      "node": "v24.15.0",
+      "provenance": {
+        "harness": {
+          "revision": "387ca2ec594cc3a02e44a17de2866aa359c25255",
+          "tree": "c02dd0952cbb166b24bd8a47780a5ed79b5a4274",
+          "dirty": false
+        },
+        "measured": {
+          "baseline": {
+            "revision": "f2b9eb3bd4a6b96149dc840a510d99ab6dc58b9c",
+            "tree": "adce61242a98ca45dcb499da37e7238c2005e146",
+            "dirty": false
+          },
+          "candidate": {
+            "revision": "387ca2ec594cc3a02e44a17de2866aa359c25255",
+            "tree": "c02dd0952cbb166b24bd8a47780a5ed79b5a4274",
+            "dirty": false
+          }
+        },
+        "canonicalInputs": {
+          "bench/compare/goal-demand-probe.mjs": "63809651b9b2604f3ae7737be7a8cf6ef6e8c009e766fa1b5e17668340c584c1",
+          "bench/compare/serve-dist.mjs": "396cba56769065e739913f7551d1581e349e09ef6ac465291e0719332735b1f5",
+          "bench/compare/provenance.mjs": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+          "package.json": "513355ba2f93e86577b5da2779a40f8781dbad0433ace3c20e84b492fb87e40e",
+          "pnpm-lock.yaml": "1960fec07e58fdaedd7f1d5aa0187a81955aeb07e1fe9b8dc8eb91395ed3d805"
+        },
+        "workingInputs": {
+          "bench/compare/goal-demand-probe.mjs": "63809651b9b2604f3ae7737be7a8cf6ef6e8c009e766fa1b5e17668340c584c1",
+          "bench/compare/serve-dist.mjs": "5b4c4df97116c48bcf55daf47124c255de84c9917a72633054ae2a65bfa84f5e",
+          "bench/compare/provenance.mjs": "64309dc4c9211c13202a1e65bc440d812bc4d4d8dacc797fdd4f2e5d9de54513",
+          "package.json": "0eeb5d478306ae04d3210c4ab4ce133c7cc4ef74ba55e96b64d47802b8ea020e",
+          "pnpm-lock.yaml": "d57d3e3f38cb5c68403a3c0710c19c91a6c993783bf25d1107bfe969b676989f"
+        },
+        "environment": {
+          "node": "v24.15.0",
+          "nodeExecutableSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
+          "pnpm": "11.11.0",
+          "packages": {
+            "@playwright/test": {
+              "version": "1.64.1",
+              "sha256": "fc24ff9f45b6b12084dd6dbadd4697be3483a8287c49accc82b5edd02c8e0647"
+            },
+            "tsup": {
+              "version": "9.0.0",
+              "sha256": "f94699fa11c6c5151bb47aab777680d52bf705541300a4af9591c4129248d485"
+            },
+            "typescript": {
+              "version": "6.0.3",
+              "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86"
+            },
+            "esbuild": {
+              "version": "0.28.2",
+              "sha256": "2bf64d36c0195071857f7201129adceb39359ec725487bf537dec3f7351325bc"
+            },
+            "terser": {
+              "version": "5.51.2",
+              "sha256": "16901f87f3f301b5d4813244b09a13d39e8a87d1ae1c649e4d3f787639b75220"
+            }
+          }
+        }
+      }
+    },
+    "initial-compiler": {
+      "sha256": "c1bdcd1a2ee62018ab809b850f01ca97af7cf77f371bc99c6a0dea823de07859",
+      "rows": 27,
+      "artifacts": {
+        "baseline": {
+          "entry": "3cc92c3a96227dfb63a233a87eae8ed86ade16d53c761f34adb98c64eafdddb5",
+          "runtime": "eb5bad629c7875e8b88df3ca98f882629237812b723ffec7f02f5e77b5ddef83"
+        },
+        "candidate": {
+          "entry": "a449ba5cf16133d32c35821274dc79122634b8f1bf4cac26b6e4e825048e37b2",
+          "runtime": "4339067dc3f9fa491a7f712857dd52fe676591f6228f53712370b106433e346e"
+        }
+      },
+      "mode": "exact",
+      "node": "v24.15.0",
+      "measuredRevisions": {
+        "baseline": {
+          "revision": "f2b9eb3bd4a6b96149dc840a510d99ab6dc58b9c",
+          "tree": "adce61242a98ca45dcb499da37e7238c2005e146",
+          "dirty": false
+        },
+        "candidate": {
+          "revision": "26a4a80d7786dfeb2aaaf244d7c83be499c93cf7",
+          "tree": "d78a0c540b5895e2840c47282d5775cf433a0969",
+          "dirty": false
+        }
+      }
+    },
+    "compiler": {
+      "sha256": "f2614fafb19495ba8d35537c873bf32faaa4585ddcd074bd2f64a6a325046906",
+      "rows": 27,
+      "artifacts": {
+        "baseline": {
+          "entry": "3cc92c3a96227dfb63a233a87eae8ed86ade16d53c761f34adb98c64eafdddb5",
+          "runtime": "eb5bad629c7875e8b88df3ca98f882629237812b723ffec7f02f5e77b5ddef83"
+        },
+        "candidate": {
+          "entry": "a449ba5cf16133d32c35821274dc79122634b8f1bf4cac26b6e4e825048e37b2",
+          "runtime": "05d83e2e78bdd81639cd1fecefc650d880b2d16e8b9af2af50634dda1f9bebf9"
+        }
+      },
+      "mode": "exact",
+      "node": "v24.15.0",
+      "measuredRevisions": {
+        "baseline": {
+          "revision": "f2b9eb3bd4a6b96149dc840a510d99ab6dc58b9c",
+          "tree": "adce61242a98ca45dcb499da37e7238c2005e146",
+          "dirty": false
+        },
+        "candidate": {
+          "revision": "387ca2ec594cc3a02e44a17de2866aa359c25255",
+          "tree": "c02dd0952cbb166b24bd8a47780a5ed79b5a4274",
+          "dirty": false
+        }
+      }
+    }
+  },
+  "size": {
+    "baseline": {
+      "gzip": 15598,
+      "brotli": 13996
+    },
+    "initial": {
+      "gzip": 15580,
+      "brotli": 13990
+    },
+    "final": {
+      "gzip": 15582,
+      "brotli": 13967
+    },
+    "limit": 15600
+  },
+  "checks": {
+    "targetedTests": 1145,
+    "chromeScenarios": 18,
+    "terminalAdoptionNegativeControl": "failed before fix; passed after fix",
+    "sizeGate": "pass"
+  }
+}

@@ -537,7 +537,7 @@
     "./dist/wc/index.cjs"
   ],
   "scripts": {
-    "build": "node scripts/project-spring-value.mjs --check && tsup && node scripts/emit-declarations.mjs",
+    "build": "node scripts/sync-motion-defaults.mjs --check && node scripts/project-spring-value.mjs --check && tsup && node scripts/emit-declarations.mjs",
     "generate:spring-value": "node scripts/project-spring-value.mjs",
     "audit": "pnpm audit --audit-level moderate",
     "typecheck": "tsc --noEmit",

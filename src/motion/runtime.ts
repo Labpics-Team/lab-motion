@@ -2,7 +2,7 @@ import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, nativeEase, materialize, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
@@ -338,9 +338,9 @@ class Surface {
     const active = [...this._tracks.values()];
     if (!active.some(moving)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
-    const _nativeEase = first._program._nativeEase;
-    const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase &&
+    const _nativeEase = this._key === 'transform' || this._key === 'opacity' ? nativeEase(first._program) : undefined;
+    const canNative = first._rate > 0 && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
+      active.every(track => !track._paused && track._rate === first._rate && nativeEase(track._program) === _nativeEase &&
         track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
     try {
@@ -570,7 +570,7 @@ export class Runtime {
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: zeroVelocity } : group._read(property._key);
-          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger, terminal ?? reduced);
+          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
           result.push({ _group: group, _program: spec, _reduced: reduced });
         }
       }
@@ -588,9 +588,10 @@ export class Runtime {
       for (const draft of drafts) {
         const group = this._surface(draft._group._element, draft._program._key, now ??= number(this._host.now(), 'clock'), draft._group);
         const existing = group._tracks.get(draft._program._key);
-        const equal = !draft._reduced && draft._program._identity && existing?._program._identity &&
+        const equal = !draft._reduced && existing && !existing._reduced && draft._program._identity && existing._program._identity &&
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
+        if (!draft._reduced) for (const segment of draft._program._segments) materialize(segment);
         if (!touched.has(group)) { group._sync(now); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!._from;
         const track = draft as Track;
