@@ -1,0 +1,19 @@
+{
+  "durationMs": 200,
+  "spring": {
+    "mass": 1,
+    "stiffness": 170,
+    "damping": 26
+  },
+  "snappy": {
+    "mass": 1,
+    "stiffness": 260,
+    "damping": 28
+  },
+  "standard": [
+    0.2,
+    0,
+    0,
+    1
+  ]
+}

@@ -49,14 +49,14 @@ val onTurn: () -> Unit = {
 - `dispose` идемпотентен, отменяет clock job и запрещает новые значения/эффекты. Отдельная остановка не отменяет coroutine scope приложения.
 - Все дорожки публикуют один кадр внутри snapshot. В покое нет coroutine или frame-clock waiter. В кадре нет компиляции, SVG parsing, поиска ID или новых списков/карт каналов.
 
-`MotionSpring(mass, stiffness, damping)` переводится в Compose `stiffness/mass` и `damping/(2*sqrt(stiffness*mass))`; все параметры конечны и положительны. `response` — естественный период в миллисекундах, `bounce=1-dampingRatio`. Нулевая damping отвергается как незавершаемая пружина. Порог видимости явно задан в единицах канала, по умолчанию `0.001`. Backend использует Float, native spring/Bezier и миллисекундное разрешение Compose; численная траектория и время оседания могут отличаться от JS, непрерывность и смысл controls сохраняются. Defaults генерирует `scripts/sync-defaults.mjs` из `src/internal/motion-defaults.ts`.
+`MotionSpring(mass, stiffness, damping)` переводится в Compose `stiffness/mass` и `damping/(2*sqrt(stiffness*mass))`; все параметры конечны и положительны. `response` — естественный период в миллисекундах, `bounce=1-dampingRatio`. Нулевая damping отвергается как незавершаемая пружина. Порог видимости явно задан в единицах канала, по умолчанию `0.001`. Backend использует Float, native spring/Bezier и миллисекундное разрешение Compose; численная траектория и время оседания могут отличаться от JS, непрерывность и смысл controls сохраняются. Общие defaults генерирует `scripts/sync-motion-defaults.mjs` для TypeScript и Kotlin из `src/internal/motion-defaults.json`.
 
 Это scalar effect API для native consumers. CSS, binary Motion Program wire format, repeat/infinite, цветовые codecs и layout mutation здесь не принимаются. Экспортёр должен отклонить неподдерживаемую операцию явно, а не удалить её. Компонент может хранить большой immutable `SymbolData` отдельно от исполняемых активных каналов.
 
 ## Проверка и выпуск
 
 ```sh
-node native/compose/scripts/sync-defaults.mjs --check
+node scripts/sync-motion-defaults.mjs --check
 cd native/compose
 ./gradlew desktopTest publishDesktopPublicationToDistributionRepository publishKotlinMultiplatformPublicationToDistributionRepository
 ./gradlew -p consumer run --args=--verify -PmotionRepository=/absolute/path/to/native/compose/build/repository

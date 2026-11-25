@@ -38,7 +38,7 @@ jobs:
             echo 'value=true' >> "$GITHUB_OUTPUT"
           else
             git diff --no-renames --name-only "$BASE" "$GITHUB_SHA" > "$RUNNER_TEMP/compose-changed"
-            if grep -E '^(native/compose/|src/internal/motion-defaults\.ts$|src/motion/(model|types)\.ts$|\.github/workflows/(native-compose|release-compose|ci)\.yml$)' "$RUNNER_TEMP/compose-changed" > /dev/null; then
+            if grep -E '^(native/compose/|src/internal/motion-default(s\.(ts|json)|-values\.generated\.ts)$|scripts/sync-motion-defaults\.mjs$|src/motion/(model|types)\.ts$|\.github/workflows/(native-compose|release-compose|ci)\.yml$)' "$RUNNER_TEMP/compose-changed" > /dev/null; then
               echo 'value=true' >> "$GITHUB_OUTPUT"
             else
               echo 'value=false' >> "$GITHUB_OUTPUT"
@@ -63,7 +63,7 @@ jobs:
         env:
           VERSION: ${{ inputs.publication_version }}
         run: |
-          node native/compose/scripts/sync-defaults.mjs --check
+          node scripts/sync-motion-defaults.mjs --check
           node --test native/compose/scripts/seal-repository.test.mjs
           bash native/compose/gradlew -p native/compose desktopTest \
             publishDesktopPublicationToDistributionRepository \

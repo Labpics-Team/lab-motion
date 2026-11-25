@@ -1,11 +1,6 @@
 /** SSOT дефолтов фасада, поведений и публичных motion-токенов. */
 
-import type { SpringParams } from './types.js';
-
-export const DEFAULT_DURATION_MS = 200;
-export const DEFAULT_SPRING: SpringParams = /* @__PURE__ */ Object.freeze({ mass: 1, stiffness: 170, damping: 26 });
-export const SNAPPY_SPRING = { mass: 1, stiffness: 260, damping: 28 } as const;
-export const STANDARD_EASING_COORDS = [0.2, 0, 0, 1] as const;
+export { DEFAULT_DURATION_MS, DEFAULT_SPRING, SNAPPY_SPRING, STANDARD_EASING_COORDS } from './motion-default-values.generated.js';
 
 /** Последняя внутренняя фаза общая для стандартных кривых одного кадра. */
 let lastInput = NaN;
