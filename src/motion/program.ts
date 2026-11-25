@@ -1,9 +1,8 @@
 import { tryParseValue } from '../value/parse.js';
 import { settleTimeUpperBound } from '../spring.js';
 import { sampleSpringBasisUnchecked, type MutableSpringBasis } from '../internal/solver.js';
-import { tryCompileSpringExecutionArtifactTupleUnchecked, type SpringExecutionArtifactTuple } from '../compositor/curve.js';
+import { tryCompileSpringExecutionArtifactTupleUnchecked, type SpringExecutionArtifactTuple, type SpringExecutionRequest } from '../compositor/curve.js';
 import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
-import { tryBuildSpringNodes } from '../compositor/segmenter.js';
 import { failMotion, number, type Timing } from './model.js';
 import type { MotionScalar } from './types.js';
 
@@ -47,7 +46,7 @@ export interface Segment {
   readonly _to: readonly number[];
   readonly _velocity: readonly number[];
   readonly _timing: Timing;
-  readonly _artifact: SpringExecutionArtifactTuple | undefined;
+  _artifact: SpringExecutionArtifactTuple | SpringExecutionRequest | undefined;
 }
 export interface Program {
   readonly _key: string;
@@ -55,12 +54,11 @@ export interface Program {
   readonly _segments: readonly Segment[];
   readonly _duration: number;
   /** Только точная форма, доступная нативному исполнителю. */
-  readonly _nativeEase: string | undefined;
+  _nativeEase: string | null | undefined;
   readonly _identity: readonly unknown[] | undefined;
-  readonly _realize?: (() => Program) | undefined;
 }
 
-function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration: number, terminal: boolean): Segment {
+function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration: number): Segment {
   if (from._unit !== to._unit || from._coordinates.length !== to._coordinates.length)
     failMotion('Разные единицы from/to');
   let normalized: number | undefined;
@@ -74,53 +72,51 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     else if (normalized === undefined) normalized = v / distance;
     else if (normalized !== v / distance) normalized = NaN;
   }
-  let artifact: SpringExecutionArtifactTuple | undefined;
+  let artifact: SpringExecutionArtifactTuple | SpringExecutionRequest | undefined;
   let length = duration;
   if (timing._spring) {
-    let horizon: number | undefined;
-    if (Number.isFinite(normalized ?? 0)) {
-      const tolerance = Math.min(0.001, 0.05 / extent);
-      if (terminal) horizon = tryBuildSpringNodes(timing._spring, normalized ?? 0, tolerance, true)?.[1];
-      else artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, tolerance);
-    }
-    length = artifact?.[2] ?? (horizon ?? settleTimeUpperBound(timing._spring, velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent)) * 1000;
+    if (Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, 0.05 / extent), undefined, true);
+    length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent) * 1000;
   }
   if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) failMotion('Непредставимая длительность');
   return { _at: at, _end: at + length, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
 }
 
-export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0, terminal = false, previous?: Program): Program {
+export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0): Program {
   const start = authored ? 1 : 0, count = values.length - start;
   const times = authored ? timing._times : undefined;
   if (times && times.length !== count + 1) failMotion('times: другая длина');
   if (timing._spring && count > 1) failMotion('keyframes: задайте duration/ease');
   const _segments: Segment[] = [];
   const duration = timing._duration ?? 0;
-  let current = from, reuse = false, _identity: readonly unknown[] | undefined;
+  let current = from;
   for (let i = 0; i < count; i++) {
     const next = point(key, values[i + start]!, current);
-    if (!authored && !terminal) {
-      _identity = [from._unit, ...next._coordinates, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
-        timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
-      reuse = !!timing._spring && equalGoal(_identity, previous?._identity);
-    }
     const a = times?.[i] ?? i / count;
     const b = times?.[i + 1] ?? (i + 1) / count;
     _segments.push(segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
-      offset + timing._delay + a * duration, (b - a) * duration, terminal || reuse));
+      offset + timing._delay + a * duration, (b - a) * duration));
     current = next;
   }
   const first = _segments[0]!, last = _segments.at(-1)!;
-
+  const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
+    timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
   const native = count === 1 && from._unit !== 'color' && (key !== 'opacity' ||
     Math.min(first._from[0]!, first._to[0]!) >= 0 && Math.max(first._from[0]!, first._to[0]!) <= 1);
   return { _key: key, _unit: from._unit, _segments, _duration: last._end,
-    _nativeEase: native ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
-    _identity, _realize: reuse ? () => program(key, from, values, authored, timing, initialVelocity, offset, terminal) : undefined };
+    _nativeEase: native ? first._artifact ? first._artifact[0] ?? null : timing._spring ? undefined : timing._cssEase : undefined,
+    _identity };
 }
 
-export function equalGoal(a: readonly unknown[] | undefined, b: readonly unknown[] | undefined): boolean {
-  return !!(a && b && a.length === b.length && a.every((v, i) => Object.is(v, b[i])));
+// Materialize only paths actually accepted for playback; shared segments
+// retain one artifact. Terminal projection needs no stop buffer.
+export function materialize(path: Program): void {
+  for (const seg of path._segments) {
+    const artifact = seg._artifact;
+    if (artifact && artifact[0] === undefined)
+      seg._artifact = tryCompileSpringExecutionArtifactTupleUnchecked(seg._timing._spring!, ...artifact[1]);
+  }
+  if (path._nativeEase === null) path._nativeEase = path._segments[0]!._artifact?.[0];
 }
 
 // Отсутствующие координаты скорости означают ноль; внутренние сегменты не наследуют скорость.
@@ -145,7 +141,7 @@ export function sample(program: Program, time: number, value: number[], velocity
   }
   let p = duration === 0 ? 1 : Math.min(1, _elapsed / duration), dp = 0;
   if (segment._artifact) {
-    sampleSerializedSpringIntoUnchecked(segment._artifact[1], duration, _elapsed, 0, springSample);
+    sampleSerializedSpringIntoUnchecked((segment._artifact as SpringExecutionArtifactTuple)[1], duration, _elapsed, 0, springSample);
     p = springSample.value; dp = springSample.velocity;
   } else if (segment._timing._spring) {
     sampleSpringBasisUnchecked(segment._timing._spring, _elapsed / 1000, basis);

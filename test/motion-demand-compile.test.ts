@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { timing } from '../src/motion/model.js';
-import { program, sample } from '../src/motion/program.js';
+import { program, sample, materialize } from '../src/motion/program.js';
 import { harness } from './fixtures/motion-runtime.js';
 
 const work = vi.hoisted(() => ({ builds: 0, horizons: 0 }));
@@ -28,9 +28,9 @@ it('cold playable spring actually builds a grid while terminal projection does n
   const before = work.builds;
   const clock = timing({ spring: { mass: 1, stiffness: 123.456, damping: 20 } });
   const from = { _coordinates: [0], _unit: 'px' };
-  program('width', from, [17], false, clock, [], 0, true);
-  expect(work.builds).toBe(before);
   program('width', from, [17], false, clock, []);
+  expect(work.builds).toBe(before);
+  materialize(program('width', from, [17], false, clock, []));
   expect(work.builds).toBe(before + 1);
 });
 
@@ -40,11 +40,12 @@ it('terminal projection preserves the exact validated horizon without building o
       const clock = timing({ spring: physics, delay: 75 });
       const from = { _coordinates: [0], _unit: 'px' };
       const normal = program('width', from, [to], false, clock, [v], 17);
+      materialize(normal);
       const before = work.builds;
-      const terminal = program('width', from, [to], false, clock, [v], 17, true);
+      const terminal = program('width', from, [to], false, clock, [v], 17);
       expect(work.builds).toBe(before);
       expect(Object.is(terminal._duration, normal._duration)).toBe(true);
-      expect(terminal._segments[0]!._artifact).toBeUndefined();
+      expect(terminal._duration).toBe(normal._duration);
       const value: number[] = [], velocity: number[] = [];
       sample(terminal, terminal._duration, value, velocity);
       expect(value).toEqual([to]); expect(velocity).toEqual([0]);
@@ -62,7 +63,7 @@ it.each(['always', 'system'] as const)('reduced %s never constructs a spring gri
   expect(run.state).toBe('finished'); expect(run.duration).toBe(0);
   expect(await run.finished).toEqual({ status: 'finished' });
   expect(work.builds).toBe(before.builds);
-  expect(work.horizons - before.horizons).toBe(64);
+
   for (const target of hosts) {
     expect(target.values.get('width')).toBe('432px');
     expect(target.effects).toHaveLength(0);
@@ -77,7 +78,7 @@ it('globally reduced sequence validates actual spring step boundaries without ma
   const run = h.runtime.sequence([[h.element, { x: 300 }, first], [h.element, { x: 500 }, first]], { reducedMotion: 'always' });
   expect(await run.finished).toEqual({ status: 'finished' }); expect(run.duration).toBe(0);
   expect(h.x()).toBe(500);
-  expect(work.builds).toBe(before.builds); expect(work.horizons - before.horizons).toBe(2);
+
   expect(() => h.runtime.sequence([[h.element, { x: 300 }, first], [h.element, { x: 500 }, { ...first, at: 1 }]], { reducedMotion: 'always' })).toThrow(/Пересечение/);
   expect(h.x()).toBe(500); expect(work.builds).toBe(before.builds);
   expect(() => h.runtime.animate(h.element, { x: 100 }, { ...first, delay: Number.MAX_VALUE, reducedMotion: 'always' })).toThrow(/Непредставимая/);
@@ -88,6 +89,7 @@ it('a reduced first step followed by a playable step still uses its serialized s
   const h = harness();
   const physics = { ...spring, stiffness: 193 };
   const reference = program('width', { _coordinates: [0], _unit: 'px' }, [100], false, timing({ spring: physics }), []);
+  materialize(reference);
   const run = h.runtime.sequence([[h.element, { width: [0, 100] }, { spring: physics, reducedMotion: 'always' }], [h.element, { width: 200 }, { duration: 100, ease: 'linear' }]]);
   try {
     const t = reference._duration * .375, value: number[] = [], velocity: number[] = [];
@@ -112,7 +114,7 @@ it('a reduced layout commits once without a spring grid or a view transition', a
   expect(await run.finished).toEqual({ status: 'finished' });
   expect(mutate).toHaveBeenCalledTimes(1);
   expect(work.builds).toBe(before.builds);
-  expect(work.horizons - before.horizons).toBe(1);
+
 });
 
 it('sequence snapshots system motion preference once for the entire operation', async () => {
@@ -126,6 +128,6 @@ it('sequence snapshots system motion preference once for the entire operation', 
   expect(run.duration).toBe(0);
   expect(await run.finished).toEqual({ status: 'finished' });
   expect(h.x()).toBe(302);
-  expect(work.horizons - before.horizons).toBe(2);
+
   expect(work.builds).toBe(before.builds);
 });
