@@ -1,5 +1,6 @@
 import { pathToFileURL } from 'node:url';
-import { resolve, realpathSync } from 'node:path';
+import { resolve } from 'node:path';
+import { realpathSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { sha256File, hashFileTree } from './provenance.mjs';
 if(!global.gc)throw Error('Run with --expose-gc');
