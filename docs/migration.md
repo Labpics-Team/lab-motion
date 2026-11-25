@@ -75,7 +75,7 @@ lifecycle. Полный целевой пользовательский охва
 | `animate('.item', …, { delay: stagger(0.05) })` | `animate('.item', …, { stagger: 50 })` | шаг-мс между целями |
 | `const a = animate(…); a.pause(); a.play()` | то же | после естественного завершения Motion перезапускается, Lab Motion — нет |
 | `await animate(…)` или `animate(…).then(…)` | `await animate(…).finished` | у Motion контрол — thenable; у Lab Motion — отдельный Promise `finished` |
-| `a.time = 0.5` | `a.seek(500)` | у Motion — секунды; Lab Motion использует мс, чтение — `playhead(a).time` |
+| `a.time = 0.5` | `a.seek(500)` | у Motion — секунды; Lab Motion использует мс, чтение — `playhead(a).time` (может быть `undefined` при разных фазах или при позднем создании playhead после завершения) |
 | `a.stop()` | `a.stop()` | оба сохраняют текущую позу |
 | `a.cancel()` | прямого эквивалента нет | Motion возвращает initial pose; Lab Motion сохраняет текущую |
 | `animate(el, { '--x': 100 })` | `animate(el, { '--x': ['0px', '100px'] })` | CSS-переменная с юнитом |
@@ -108,7 +108,8 @@ inertia/decay, произвольные object targets и SVG-атрибуты.
 подписками, дочерними областями и значениями. `createAnimateScope` из
 `./animate` остаётся прежним контрактом для мигрирующих потребителей.
 `dispose()` не восстанавливает прежние inline-стили и не заменяет полностью
-Motion useAnimate, Anime Scope или GSAP Context/revert.
+Motion useAnimate, Anime Scope или GSAP Context/revert. Если cleanup должен
+вернуть исходный внешний вид оставшегося DOM, восстановите стили отдельно.
 
 ## Контролируемая перестановка вместо собственного sortable resolver
 

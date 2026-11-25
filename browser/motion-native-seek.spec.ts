@@ -49,8 +49,9 @@ test('seek while play and rate changes are pending preserves the owned effect an
       effect.updatePlaybackRate(2);
       run.seek(250);
       await effect.ready;
-      return { same: el.getAnimations()[0] === effect, rate: effect.playbackRate };
+      return { same: el.getAnimations()[0] === effect, rate: effect.playbackRate, time: Number(effect.currentTime) };
     } finally { run.stop(); el.remove(); }
   });
-  expect(result).toEqual({ same: true, rate: 1 });
+  expect(result.same).toBe(true); expect(result.rate).toBe(1);
+  expect(result.time).toBeGreaterThanOrEqual(249); expect(result.time).toBeLessThan(350);
 });
