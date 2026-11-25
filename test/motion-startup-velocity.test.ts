@@ -15,7 +15,7 @@ it('sequence publishes a completed first segment before its following gap', asyn
     expect(track._program._duration).toBe(1200);
     expect(track._program._segments[0]!._end).toBe(0);
     expect(track._program._segments[1]!._at).toBe(200);
-    expect(track._value.length).toBe(track._program._final.length);
+    expect(track._value.length).toBe(track._program._segments.at(-1)!._to.length);
     expect(track._velocity.length).toBe(track._value.length);
     for (let i = 0; i < track._value.length; i++) {
       expect(Number.isFinite(track._value[i])).toBe(true);
@@ -67,7 +67,7 @@ it('sequence clears live velocity at a completed segment and its following gap',
     run.seek(50);
     expect(h.x()).toBe(20);
     for (const track of tracks) {
-      expect(track._velocity.length).toBe(track._program._final.length);
+      expect(track._velocity.length).toBe(track._program._segments.at(-1)!._to.length);
       for (let i = 0; i < track._velocity.length; i++) {
         expect(Number.isFinite(track._velocity[i])).toBe(true);
         expect(track._velocity[i]).toBeGreaterThan(0);
@@ -102,7 +102,7 @@ for (const native of [false, true]) {
       const ownership = vi.spyOn(Run.prototype, '_own').mockImplementation(function (this: Run, track, reduced) {
         // Наблюдаем реальную границу публикации, не подменяя выборку или владение.
         expect(track._owner).toBeUndefined();
-        expect(track._value.length).toBe(track._program._final.length);
+        expect(track._value.length).toBe(track._program._segments.at(-1)!._to.length);
         expect(track._velocity.length).toBe(track._value.length);
         for (let i = 0; i < track._value.length; i++) {
           expect(Number.isFinite(track._value[i])).toBe(true);

@@ -9,7 +9,7 @@ function trajectory(count: number, gap = 0) {
     _from: [index], _to: [index + 1], _velocity: [0], _timing: clock, _artifact: undefined,
   }));
   const program: Program = { _key: 'x', _unit: '', _segments: segments,
-    _duration: segments.at(-1)!._end, _final: [count], _nativeEase: undefined, _identity: undefined };
+    _duration: segments.at(-1)!._end, _nativeEase: undefined, _identity: undefined };
   return { segments, program };
 }
 function read(program: Program, time: number) {

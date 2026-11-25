@@ -7,6 +7,8 @@ describe('однопроходная нормализация authored-кана�
     expect(() => properties({ '--gain': Number.NaN })).toThrow('--gain');
     expect(() => properties({ scaleX: 1, 'scale-x': 2 })).toThrow('scaleX');
     expect(() => properties({ scale: [1, 2], 'scale-x': 4 })).toThrow('scaleX');
+    expect(() => properties({ scale: 1, scaleY: 2 })).toThrow('scaleY');
+    expect(() => properties({ scaleX: 2, scale: 1 })).toThrow('scaleX');
   });
   it('создаёт ровно одну числовую проекцию для каждого разрешённого канала', () => {
     expect(properties({ scale: [1, 2], skewY: 5 }).map(channel => channel._key))
