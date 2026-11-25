@@ -55,14 +55,14 @@ try {
         const css=getComputedStyle(el);
         const v=kind==='to'?new DOMMatrixReadOnly(css.transform).m41:el.getBoundingClientRect().width;
         const expected=(kind==='to'?100:k-1)*t;
-        if(Math.abs(v-expected)>.05)throw Error(kind+' pose '+v+' != '+expected);
+        if(Math.abs(v-expected)>.05 || kind==='to' && Math.abs(Number(css.opacity)-t)>.002)throw Error(kind+' pose '+v+' != '+expected);
        }
       }
       run.finish();if((await run.finished).status!=='finished')throw Error('outcome');
       for(const el of targets){
        const css=getComputedStyle(el);
        const v=kind==='to'?new DOMMatrixReadOnly(css.transform).m41:el.getBoundingClientRect().width;
-       if(Math.abs(v-(kind==='to'?100:k-1))>.05||el.getAnimations().length)throw Error('finish');
+       if(Math.abs(v-(kind==='to'?100:k-1))>.05 || kind==='to' && Number(css.opacity)!==1 || el.getAnimations().length)throw Error('finish');
       }
      });
      if(round>=0){const r={kind,n,k,round,name,startMs:startup,retained:after.usedSize-before.usedSize};rows.push(r);console.log(JSON.stringify(r));}

@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "builds": {
+    "baseline": {
+      "revision": "b14f9a7d280429fd1faf60492c9c907be0668fc4",
+      "shortRevision": "b14f9a7d2804",
+      "revisionLabel": "b14f9a7d2804",
+      "dirty": false,
+      "trackedRevisionSha256": "d203a793bf51d88f4fdf3602426fcadfa5f31fbbd77bca36c00d12244f7949d1",
+      "worktreeSha256": "1cac1e255379fd176d8d8aa91970e1656fbc11ed530ef190b5df9cadaf56cb2a",
+      "builtAt": "2026-11-25T03:54:39.866Z",
+      "inputs": {
+        "root/package.json": "cd84d1d9ef0e80c99f66a6904f411236275a227be758f3ef468bac63aed66e0f",
+        "root/pnpm-lock.yaml": "d57d3e3f38cb5c68403a3c0710c19c91a6c993783bf25d1107bfe969b676989f",
+        "root/pnpm-workspace.yaml": "cf90d8995a58146bbf9224b18bb2bc8febdc9421ddcaf70fb92a364c8a1794b2",
+        "bench/package.json": "ddc6b6f694f2a7a0f6d5abb234c188c47569ed8178e3efeb9771a3470e7c81c1",
+        "bench/pnpm-lock.yaml": "24e8526596c5b7d74e89e4f1e1164e5480cc9af1541ec0c2c4c36077c08eba25",
+        "bench/pnpm-workspace.yaml": "28404ea10ef114d2b3ff91d120fc5d8113b417860d74d54b223d8858e1668a0f",
+        "trajectory-factor-run.mjs": "f5b67fe03a3adcd1c28357d74339fb853088a1ac389ff5fbd1c438ae1b3a836b",
+        "trajectory-factor-probe.mjs": "df4d2e817d7651c4050a78de92f2b9f4b27956b4f2eb1d5856d64067ac0c924f",
+        "trajectory-factor-browser.mjs": "438f1c54f08510fb5a3769e9f01627d3b40dbee00f576c7edadcbd406d8bef83",
+        "provenance.mjs": "64309dc4c9211c13202a1e65bc440d812bc4d4d8dacc797fdd4f2e5d9de54513"
+      },
+      "distRuntime": {
+        "sha256": "e6ee87424058bfb912c81fc8e6ff65c6ac0ff1ab4c0b8759b7cb91edc7dde261",
+        "files": 92
+      },
+      "environment": {
+        "node": "v24.15.0",
+        "nodeExecutableSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
+        "pnpm": "11.11.0",
+        "packages": {
+          "playwright": {
+            "version": "1.61.1",
+            "sha256": "4ff8c75661a97091c47d068dc2054e3f4a49b78e9f2c527cd6625c2f2a2f0e86",
+            "files": 65
+          }
+        },
+        "rootPackages": {
+          "tsup": {
+            "version": "9.0.0",
+            "sha256": "4ef9e3470090053bbd200ed15f370d073b32744a06f093dac1f0ec21c6690d37",
+            "files": 39
+          },
+          "typescript": {
+            "version": "6.0.3",
+            "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+            "files": 140
+          },
+          "esbuild": {
+            "version": "0.28.2",
+            "sha256": "9ea0b027366f03da4d1b290f9921c0589b77d8e7dccb36acf9ed3aeec136a65c",
+            "files": 10
+          }
+        }
+      }
+    },
+    "candidate": {
+      "revision": "8b47d832886bda7d736e3e05d67dcdf791e34afe",
+      "shortRevision": "8b47d832886b",
+      "revisionLabel": "8b47d832886b",
+      "dirty": false,
+      "trackedRevisionSha256": "f76173218271b31b93aeef6c57927e6b193809031d992aefc5cdf0f0c318ec74",
+      "worktreeSha256": "83ae685d57c164ca3d35ba8676272756caa331bb13a163ce858da7fbac198ad1",
+      "builtAt": "2026-11-25T03:54:49.964Z",
+      "inputs": {
+        "root/package.json": "cd84d1d9ef0e80c99f66a6904f411236275a227be758f3ef468bac63aed66e0f",
+        "root/pnpm-lock.yaml": "d57d3e3f38cb5c68403a3c0710c19c91a6c993783bf25d1107bfe969b676989f",
+        "root/pnpm-workspace.yaml": "cf90d8995a58146bbf9224b18bb2bc8febdc9421ddcaf70fb92a364c8a1794b2",
+        "bench/package.json": "ddc6b6f694f2a7a0f6d5abb234c188c47569ed8178e3efeb9771a3470e7c81c1",
+        "bench/pnpm-lock.yaml": "24e8526596c5b7d74e89e4f1e1164e5480cc9af1541ec0c2c4c36077c08eba25",
+        "bench/pnpm-workspace.yaml": "28404ea10ef114d2b3ff91d120fc5d8113b417860d74d54b223d8858e1668a0f",
+        "trajectory-factor-run.mjs": "f5b67fe03a3adcd1c28357d74339fb853088a1ac389ff5fbd1c438ae1b3a836b",
+        "trajectory-factor-probe.mjs": "df4d2e817d7651c4050a78de92f2b9f4b27956b4f2eb1d5856d64067ac0c924f",
+        "trajectory-factor-browser.mjs": "438f1c54f08510fb5a3769e9f01627d3b40dbee00f576c7edadcbd406d8bef83",
+        "provenance.mjs": "64309dc4c9211c13202a1e65bc440d812bc4d4d8dacc797fdd4f2e5d9de54513"
+      },
+      "distRuntime": {
+        "sha256": "49f7c05a5155de624159e123525e275778cdaf50e6b2190647af1d985149c0ff",
+        "files": 92
+      },
+      "environment": {
+        "node": "v24.15.0",
+        "nodeExecutableSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
+        "pnpm": "11.11.0",
+        "packages": {
+          "playwright": {
+            "version": "1.61.1",
+            "sha256": "4ff8c75661a97091c47d068dc2054e3f4a49b78e9f2c527cd6625c2f2a2f0e86",
+            "files": 65
+          }
+        },
+        "rootPackages": {
+          "tsup": {
+            "version": "9.0.0",
+            "sha256": "4f8573198eed196343b45787679784508343e037e60477dabcb9722bea1c5ea5",
+            "files": 39
+          },
+          "typescript": {
+            "version": "6.0.3",
+            "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+            "files": 140
+          },
+          "esbuild": {
+            "version": "0.28.2",
+            "sha256": "ead23880942611654e495b865a616ca076e2c5a03856e1d97eaec2ea75a9842f",
+            "files": 10
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "trajectory-factor-run.mjs": "f5b67fe03a3adcd1c28357d74339fb853088a1ac389ff5fbd1c438ae1b3a836b",
+    "trajectory-factor-probe.mjs": "df4d2e817d7651c4050a78de92f2b9f4b27956b4f2eb1d5856d64067ac0c924f",
+    "trajectory-factor-browser.mjs": "438f1c54f08510fb5a3769e9f01627d3b40dbee00f576c7edadcbd406d8bef83",
+    "provenance.mjs": "64309dc4c9211c13202a1e65bc440d812bc4d4d8dacc797fdd4f2e5d9de54513"
+  },
+  "rows": {
+    "node-evidence": {
+      "sha256": "fd1c0df92b9ca14e3c5527cf279ffe3d17170a06a6ba50b4925b7d7442a96e9e",
+      "diagnostic": ""
+    },
+    "node-aa": {
+      "sha256": "ae079f9559378db694cf93fd5ff2e818917acc635b6a155a93246082193ac1b3",
+      "diagnostic": ""
+    },
+    "browser-evidence": {
+      "sha256": "f22646560d6a2a15d93f34eaecffb9c5c60aa0e2a483b7b2b148b845ee0e264b",
+      "diagnostic": "Chrome 158.0.8127.88, all poses and cleanup checked"
+    },
+    "browser-aa": {
+      "sha256": "b2d33555945e54ccc8c7b19cb74932d57962c7a96c706a95c74de4dbe81e4d58",
+      "diagnostic": "Chrome 158.0.8127.88, all poses and cleanup checked"
+    }
+  },
+  "sizeReports": {
+    "baseline": "cc5739e4b52ad894aea77dc9ce5de352d0c562219a9517d7d19e45ac4cf55f72",
+    "candidate": "5ca384ebeafe615dc0ca9241a41424179fe26b7924a0436dfe8b95bb5d2bcf7a"
+  }
+}
