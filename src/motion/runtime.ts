@@ -97,12 +97,11 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
 export type ControlOperation = (surface: Surface, selected: readonly Track[]) => void;
 type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | ControlOperation;
 
-export interface Draft { readonly _element: Element; readonly _program: Program; readonly _reduced: boolean }
-interface Track {
-  readonly _program: Program;
-  readonly _group: Surface;
-  readonly _value: number[];
-  readonly _velocity: number[];
+// A prepared binding is the same object that will become the live track.
+export interface Draft { _group: Surface; readonly _program: Program; readonly _reduced: boolean }
+interface Track extends Draft {
+  _value: number[];
+  _velocity: number[];
   _owner: Run | undefined;
   _elapsed: number;
   _rate: number;
@@ -207,9 +206,9 @@ class Surface {
   _nativeTime = 0;
   private _written: string | undefined;
   private _token: Promise<Animation> | undefined;
-  constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string) {
+  constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string, stamp: number) {
     this._transforms = {};
-    this._stamp = number(_engine._host.now(), 'clock');
+    this._stamp = stamp;
   }
   _lock(busy: boolean): void {
     if (this._busy === busy) return;
@@ -232,11 +231,11 @@ class Surface {
     }
     return { ...initial, _velocity: initial._coordinates.map(() => 0) };
   }
-  _sync(): void {
+  _sync(now?: number): number {
     if (this._busy) failMotion('easing: повторный вход');
     this._lock(true);
     try {
-      const now = number(this._engine._host.now(), 'clock');
+      now ??= number(this._engine._host.now(), 'clock');
       let delta = Math.max(0, now - this._stamp);
       if (this._native) {
         const local = this._native.currentTime;
@@ -249,6 +248,7 @@ class Surface {
           track._elapsed = Math.min(track._program._duration, Math.max(0, track._elapsed + (this._native ? delta : delta * track._rate)));
         this._sample(track);
       }
+      return now;
     } finally { this._lock(false); }
   }
   _sample(track: Track): void {
@@ -336,7 +336,7 @@ class Surface {
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
     const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
+      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase &&
         track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
     try {
@@ -414,10 +414,6 @@ class Surface {
       this._engine._flush();
     } catch (error) { this._fail(error); throw error; }
   }
-  _tick(): void {
-    if (this._native || this._tracks.size === 0) return;
-    try { this._sync(); } catch (error) { this._fail(error); }
-  }
   _paint(): void {
     if (this._native || this._tracks.size === 0) return;
     try {
@@ -481,7 +477,10 @@ export class Runtime {
     try {
       this._offUpdate = this._host.frame.update(() => {
         this._prepared = [...this._active];
-        for (const current of this._prepared) current._tick();
+        let now: number | undefined;
+        for (const current of this._prepared) if (!current._native && current._tracks.size) {
+          try { now = current._sync(now); } catch (error) { current._fail(error); }
+        }
         this._flush();
       }, { onTeardown: teardown });
       this._offRender = this._host.frame.render(() => {
@@ -506,16 +505,12 @@ export class Runtime {
     this._offUpdate = this._offRender = undefined; this._prepared = [];
     if (update || render) rethrow(attemptAll([update, render], release => release?.()), 'Frame cleanup failed');
   }
-  private _surface(element: Element, key: string): Surface {
+  private _surface(element: Element, key: string, now: number, prepared?: Surface): Surface {
     let groups = this._surfaces.get(element);
     if (!groups) { groups = Object.create(null) as Record<string, Surface>; this._surfaces.set(element, groups); }
     const name = isTransform(key) ? 'transform' : key;
-    let group = groups[name];
-    if (!group) {
-      const candidate = new Surface(this, element, name);
-      // Чтение host-стиля может синхронно принять другой прогон.
-      group = groups[name] ?? candidate; groups[name] = group;
-    }
+    // Allocation is now pure: clock is captured before registry lookup.
+    const group = groups[name] ??= prepared ?? new Surface(this, element, name, now);
     group._refresh();
     return group;
   }
@@ -539,23 +534,24 @@ export class Runtime {
     const reduced = clock._reduced || this._host.reduced();
     const author = authoredTiming(clock);
     const result: Draft[] = [], synced = new Set<Surface>();
+    let now: number | undefined;
     try {
       for (let i = 0; i < elements.length; i++) {
         const element = elements[i]!;
         for (let j = 0; j < props.length; j++) {
           const property = props[j]!;
-          const group = this._surface(element, property._key);
-          if (!synced.has(group)) { synced.add(group); group._sync(); }
+          const group = this._surface(element, property._key, now ??= number(this._host.now(), 'clock'));
+          if (!synced.has(group)) { synced.add(group); if (group._tracks.size) group._sync(now); }
           // Первый элемент уже содержит по одному Program на каждое свойство.
           // Явная литеральная траектория не зависит от элемента; состояние Track остаётся отдельным.
           if (i && property._authored && property._literal && !clock._stagger) {
-            result.push({ ...result[j]!, _element: element }); continue;
+            result.push({ _group: group, _program: result[j]!._program, _reduced: reduced }); continue;
           }
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
           const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
-          result.push({ _element: element, _program: spec, _reduced: reduced });
+          result.push({ _group: group, _program: spec, _reduced: reduced });
         }
       }
     } finally {
@@ -567,17 +563,20 @@ export class Runtime {
   _execute(drafts: readonly Draft[], total?: number): Playback {
     const run = new Run(total ?? 0);
     const touched = new Set<Surface>();
+    let now: number | undefined;
     try {
       for (const draft of drafts) {
-        const group = this._surface(draft._element, draft._program._key);
+        const group = this._surface(draft._group._element, draft._program._key, now ??= number(this._host.now(), 'clock'), draft._group);
         const existing = group._tracks.get(draft._program._key);
         const equal = !draft._reduced && draft._program._identity && existing?._program._identity &&
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
-        if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
+        if (!touched.has(group)) { group._sync(now); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!._from;
-        const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: first.map(() => 0),
-          _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _rate: 1, _paused: false };
+        const track = draft as Track;
+        track._group = group; track._value = [...first]; track._velocity = first.map(() => 0);
+        track._owner = undefined; track._elapsed = draft._reduced ? draft._program._duration : 0;
+        track._rate = 1; track._paused = false;
         group._sample(track);
         run._own(track, draft._reduced); group._attach(track);
       }

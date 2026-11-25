@@ -32,8 +32,8 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     for (const draft of drafts) {
       count += draft._program._segments.length;
       if (count > MAX_CHANNELS) failMotion('Слишком много сегментов');
-      let channels = merged.get(draft._element);
-      if (!channels) { channels = new Map(); merged.set(draft._element, channels); }
+      let channels = merged.get(draft._group._element);
+      if (!channels) { channels = new Map(); merged.set(draft._group._element, channels); }
       const before = channels.get(draft._program._key);
       if (before && draft._program._segments[0]!._at < before._program._duration) failMotion('Пересечение шагов');
       const segments = before?._program._segments ?? [];
