@@ -2,7 +2,7 @@ import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, equalGoal, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
@@ -98,7 +98,7 @@ export type ControlOperation = (surface: Surface, selected: readonly Track[]) =>
 type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | ControlOperation;
 
 // A prepared binding is the same object that will become the live track.
-export interface Draft { _group: Surface; readonly _program: Program; readonly _reduced: boolean }
+export interface Draft { _group: Surface; _program: Program; readonly _reduced: boolean }
 interface Track extends Draft {
   _value: number[];
   _velocity: number[];
@@ -570,7 +570,7 @@ export class Runtime {
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: zeroVelocity } : group._read(property._key);
-          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger, terminal ?? reduced);
+          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger, terminal ?? reduced, origin ? undefined : group._tracks.get(property._key)?._program);
           result.push({ _group: group, _program: spec, _reduced: reduced });
         }
       }
@@ -588,13 +588,12 @@ export class Runtime {
       for (const draft of drafts) {
         const group = this._surface(draft._group._element, draft._program._key, now ??= number(this._host.now(), 'clock'), draft._group);
         const existing = group._tracks.get(draft._program._key);
-        const equal = !draft._reduced && draft._program._identity && existing?._program._identity &&
-          draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
-        if (equal) { run._own(existing!); continue; }
+        if (!draft._reduced && equalGoal(draft._program._identity, existing?._program._identity)) { run._own(existing!); continue; }
+        const ready = draft._program._realize?.() ?? draft._program;
         if (!touched.has(group)) { group._sync(now); group._detach(); touched.add(group); }
-        const first = draft._program._segments[0]!._from;
+        const first = ready._segments[0]!._from;
         const track = draft as Track;
-        track._group = group; track._value = first.slice(); track._velocity = first.slice();
+        track._program = ready; track._group = group; track._value = first.slice(); track._velocity = first.slice();
         track._owner = undefined; track._elapsed = draft._reduced ? draft._program._duration : 0;
         track._rate = 1; track._paused = false;
         group._sample(track);
