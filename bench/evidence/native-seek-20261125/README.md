@@ -21,3 +21,7 @@ For 100 elements the A/A control was 765.9 / 727.2 ms and 12200 effects in both 
 Other scenarios are preserved in `final.jsonl` rather than selecting favorable results. Some show adverse/noisy timings (notably start 1000, frames 1000 and keyframes); they are not yet qualified as non-regressions. The probe is not a substitute for the existing calibrated PROFILE/SELECT or browser conformance. No claim about Motion.dev is made.
 
 The existing size gate passed: complete root ESM closure 15598 gzip bytes against the unchanged 15600-byte cap. Root animate consumer 12506 gzip bytes vs baseline 12479; the extra control behavior is not a 10× package-size reduction.
+
+## Follow-up: preserve the existing numeric parser
+
+The speculative root numeric parser shortcut was removed. The rest of the runtime change remains identical. The resulting build (`dist/motion/index.js` SHA-256 `2a78d51e41a645f2294d4a155599d58da795dc027372fc2544472dbfeed56c98`) retains the 15598 B gzip closure and passes the unchanged size gate; consumer cost is 12509 B gzip. `after-parser-revert.jsonl` preserves all eight paired samples. Seek 100: 763.2 → 86.5 ms (8.82×), 12200 → 200 native effects. Seek 1: 5.2 → 1.3 ms. The startup-1000 total and frames-1000 still show adverse measurements (152.9 → 229.4 and 271.8 → 331.5 ms respectively); they prevent a non-regression claim. Keyframe preparation and completion return to parity. An alternate pure phase helper was discarded because its gzip closure exceeded the cap; no threshold changed.
