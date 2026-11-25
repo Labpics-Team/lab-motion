@@ -157,8 +157,6 @@ export function properties(input: MotionProperties): PropertyInput[] {
     const channels = key === 'scale' ? ['scaleX', 'scaleY'] : [normalized];
     count += values.length * channels.length;
     if (count > MAX_CHANNELS) failMotion('Лимит значений');
-    if (key === 'scale' && (Object.hasOwn(source, 'scaleX') || Object.hasOwn(source, 'scaleY')))
-      failMotion('scale конфликтует с scaleX/Y');
     for (const channel of channels) {
       if (declared.has(channel)) failMotion(`Свойство ${channel} задано несколько раз`);
       declared.add(channel);

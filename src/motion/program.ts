@@ -53,7 +53,6 @@ export interface Program {
   readonly _unit: string;
   readonly _segments: readonly Segment[];
   readonly _duration: number;
-  readonly _final: readonly number[];
   /** Только точная форма, доступная нативному исполнителю. */
   readonly _nativeEase: string | undefined;
   readonly _identity: readonly unknown[] | undefined;
@@ -85,39 +84,41 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
 }
 
 export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0): Program {
-  // _draft уже разобрал первый authored keyframe; используем готовый снимок.
-  const resolved: Point[] = [from];
-  let current = from;
-  for (let i = authored ? 1 : 0; i < values.length; i++) {
-    current = point(key, values[i]!, current); resolved.push(current);
-  }
+  const start = authored ? 1 : 0, count = values.length - start;
   const times = authored ? timing._times : undefined;
-  if (times && times.length !== resolved.length) failMotion('times: другая длина');
-  if (timing._spring && resolved.length > 2) failMotion('keyframes: задайте duration/ease');
-  // _draft и layout передают собственный снимок; Segment читает его без мутаций.
+  if (times && times.length !== count + 1) failMotion('times: другая длина');
+  if (timing._spring && count > 1) failMotion('keyframes: задайте duration/ease');
   const _segments: Segment[] = [];
   const duration = timing._duration ?? 0;
-  for (let i = 0; i < resolved.length - 1; i++) {
-    const a = times?.[i] ?? i / (resolved.length - 1);
-    const b = times?.[i + 1] ?? (i + 1) / (resolved.length - 1);
-    _segments.push(segment(resolved[i]!, resolved[i + 1]!, i === 0 ? initialVelocity : resolved[i]!._coordinates.map(() => 0), timing,
+  let current = from;
+  for (let i = 0; i < count; i++) {
+    const next = point(key, values[i + start]!, current);
+    const a = times?.[i] ?? i / count;
+    const b = times?.[i + 1] ?? (i + 1) / count;
+    _segments.push(segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
       offset + timing._delay + a * duration, (b - a) * duration));
+    current = next;
   }
-  const last = _segments.at(-1)!;
-  const first = _segments[0]!;
+  const first = _segments[0]!, last = _segments.at(-1)!;
   const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
-  return { _key: key, _unit: from._unit, _segments, _duration: last._end, _final: last._to,
-    _nativeEase: from._unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : _segments.length === 1 ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
+  const native = count === 1 && from._unit !== 'color' && (key !== 'opacity' ||
+    Math.min(first._from[0]!, first._to[0]!) >= 0 && Math.max(first._from[0]!, first._to[0]!) <= 1);
+  return { _key: key, _unit: from._unit, _segments, _duration: last._end,
+    _nativeEase: native ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
     _identity };
 }
+
+// Отсутствующие координаты скорости означают ноль; внутренние сегменты не наследуют скорость.
+const zeroVelocity: readonly number[] = [];
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
 export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1): void {
   const _segments = program._segments;
   if (time >= program._duration) {
-    for (let i = 0; i < program._final.length; i++) { value[i] = program._final[i]!; velocity[i] = 0; }
+    const final = _segments.at(-1)!._to;
+    for (let i = 0; i < final.length; i++) { value[i] = final[i]!; velocity[i] = 0; }
     return;
   }
   // Последнее начало <= time: совпадающие границы и обратный seek сохраняют семантику.

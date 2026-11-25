@@ -15,7 +15,7 @@ it('preserves element-major mixed-property drafts and per-element reads', () => 
   expect(reads.mock.calls.map(([element]) => element)).toEqual([a.element, a.element, a.element, b.element, b.element, b.element, c.element, c.element, c.element]);
   expect(drafts).toHaveLength(9);
   expect(drafts.map(draft => draft._element)).toEqual([a.element, a.element, a.element, b.element, b.element, b.element, c.element, c.element, c.element]);
-  expect(drafts.map(draft => draft._key)).toEqual(['x', 'width', 'opacity', 'x', 'width', 'opacity', 'x', 'width', 'opacity']);
+  expect(drafts.map(draft => draft._program._key)).toEqual(['x', 'width', 'opacity', 'x', 'width', 'opacity', 'x', 'width', 'opacity']);
   reads.mockRestore();
   const run = a.runtime._execute(drafts);
   try {
