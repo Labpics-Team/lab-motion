@@ -114,7 +114,15 @@ const zeroVelocity: readonly number[] = [];
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
-export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1): void {
+/** Scratch belongs to a shared temporal cohort, not to a target or a global cache. */
+export interface CurveSample {
+  _curve: Timing['_ease'] | undefined;
+  _input: number;
+  _p: number;
+  _dy: number;
+  _dx: number;
+}
+export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1, phase?: CurveSample): void {
   const _segments = program._segments;
   if (time >= program._duration) {
     const final = _segments.at(-1)!._to;
@@ -141,10 +149,18 @@ export function sample(program: Program, time: number, value: number[], velocity
   } else if (segment._timing._spring) {
     sampleSpringBasisUnchecked(segment._timing._spring, _elapsed / 1000, basis);
   } else if (_elapsed > 0 && p < 1) {
-    const low = Math.max(0, p - 0.001), high = Math.min(1, p + 0.001);
     const ease = segment._timing._ease;
-    dp = (ease(high) - ease(low)) * 1000 / ((high - low) * duration);
-    p = ease(p);
+    const shared = segment._timing._cssEase === undefined ? undefined : phase;
+    if (shared && shared._curve === ease && shared._input === p) {
+      dp = shared._dy / (shared._dx * duration); p = shared._p;
+    } else {
+      const low = Math.max(0, p - 0.001), high = Math.min(1, p + 0.001);
+      const dy = (ease(high) - ease(low)) * 1000, dx = high - low;
+      dp = dy / (dx * duration);
+      const result = ease(p);
+      if (shared) { shared._curve = ease; shared._input = p; shared._p = result; shared._dy = dy; shared._dx = dx; }
+      p = result;
+    }
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
   for (let i = 0; i < segment._from.length; i++) {

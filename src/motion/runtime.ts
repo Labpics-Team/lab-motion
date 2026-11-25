@@ -2,7 +2,7 @@ import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment, type CurveSample } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
@@ -94,7 +94,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
   return values;
 }
 
-export type ControlOperation = (surface: Surface, selected: readonly Track[]) => void;
+export type ControlOperation = (surface: Surface, selected: readonly Track[], batch: PhaseBatch) => void;
 type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | ControlOperation;
 
 export interface Draft { readonly _element: Element; readonly _program: Program; readonly _reduced: boolean }
@@ -105,15 +105,49 @@ interface Track {
   readonly _velocity: number[];
   _owner: Run | undefined;
   _elapsed: number;
-  _rate: number;
-  _paused: boolean;
+  _phase: Phase;
+}
+
+// One clock per cohort, independent of targets and durations. Controls replace
+// the reference instead of changing another binding's transport.
+class Phase implements CurveSample {
+  _curve: Timing['_ease'] | undefined;
+  _input: number = NaN;
+  _p = 0;
+  _dy = 0;
+  _dx = 1;
+  _seen: number;
+  _sampled: number;
+  constructor(readonly _stamp: number, readonly _time: number, readonly _rate: number, readonly _paused: boolean) {
+    this._seen = _stamp; this._sampled = _time;
+  }
+  _at(now: number): number {
+    if (now <= this._seen) return this._sampled;
+    return this._paused || this._rate === 0 ? this._time
+      : Math.max(0, this._time + (now - this._stamp) * this._rate);
+  }
+  _advance(now: number): number {
+    if (now > this._seen) { this._sampled = this._at(now); this._seen = now; }
+    return this._sampled;
+  }
+}
+
+class PhaseBatch {
+  _now: number | undefined;
+  private _last: Phase | undefined;
+  _clock(host: RuntimeHost): number { return this._now ??= number(host.now(), 'clock'); }
+  _bind(stamp: number, time: number, rate: number, paused: boolean): Phase {
+    const last = this._last;
+    return last && last._stamp === stamp && last._seen === stamp && last._time === time && Object.is(last._rate, rate) && last._paused === paused
+      ? last : this._last = new Phase(stamp, time, rate, paused);
+  }
 }
 
 function coordinates(track: Track, at: 0 | 1 | 2): readonly number[] {
   return at === 0 ? track._value : at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to;
 }
 
-function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
+function moving(track: Track): boolean { return !track._phase._paused && track._phase._rate !== 0; }
 
 export class Run implements Playback {
   readonly _tracks: Set<Track> = new Set();
@@ -133,7 +167,7 @@ export class Run implements Playback {
   }
   get state(): PlaybackState {
     if (this._status === 'running') {
-      for (const track of this._tracks) if (!track._paused) return 'running';
+      for (const track of this._tracks) if (!track._phase._paused) return 'running';
       if (this._tracks.size) return 'paused';
     }
     return this._status;
@@ -182,11 +216,11 @@ export class Run implements Playback {
     if (engine?._operations) { engine._after(() => this._apply(action, time)); return; }
     const groups = new Set<Surface>();
     for (const track of this._tracks) groups.add(track._group);
-    const failures: unknown[] = [];
+    const failures: unknown[] = [], batch = new PhaseBatch();
     engine?._operation(true);
     try {
       attemptAll(groups, group => group._control(
-        [...group._tracks.values()], action, time, this,
+        [...group._tracks.values()], action, time, this, batch,
       ), failures);
     } finally { engine?._operation(false); }
     try { engine?._flush(); } catch (error) { failures.push(error); }
@@ -210,8 +244,8 @@ class Surface {
   _native: Animation | undefined;
   private _written: string | undefined;
   private _token: Promise<Animation> | undefined;
-  constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string) {
-    this._stamp = number(_engine._host.now(), 'clock');
+  constructor(readonly _engine: Runtime, readonly _element: Element, readonly _key: string, stamp: number) {
+    this._stamp = stamp;
   }
   _lock(busy: boolean): void {
     if (this._busy === busy) return;
@@ -234,33 +268,40 @@ class Surface {
     }
     return { ...initial, _velocity: initial._coordinates.map(() => 0) };
   }
-  // Native currentTime уже находится на исходной шкале Program.
-  _position(track: Track, delta: number, local: CSSNumberish | null | undefined): number {
-    if (track._paused || !this._native && track._rate === 0) return track._elapsed;
+  _position(track: Track, now: number, local: CSSNumberish | null | undefined): number {
+    const phase = track._phase;
     const time = this._native
-      ? Number.isFinite(local) ? local as number : track._elapsed
-      : track._elapsed + delta * track._rate;
-    return Math.min(track._program._duration, Math.max(0, time));
+      ? phase._paused || !Number.isFinite(local) ? track._elapsed : local as number
+      : phase._at(now);
+    return Math.min(track._program._duration, time < 0 ? 0 : time);
   }
-  _sync(): void {
+  _sync(batch: PhaseBatch): void {
     if (this._busy) failMotion('easing: повторный вход');
     this._lock(true);
     try {
-      const now = number(this._engine._host.now(), 'clock');
-      const delta = Math.max(0, now - this._stamp), local = this._native?.currentTime;
+      const now = batch._clock(this._engine._host);
+      const local = this._native?.currentTime;
       this._stamp = Math.max(this._stamp, now);
       for (const track of this._tracks.values()) {
-        track._elapsed = this._position(track, delta, local);
+        if (this._native) track._elapsed = this._position(track, now, local);
+        else {
+          track._elapsed = Math.min(track._program._duration, track._phase._advance(now));
+          this._stamp = Math.max(this._stamp, track._phase._seen);
+        }
         this._sample(track);
       }
     } finally { this._lock(false); }
   }
   _sample(track: Track): void {
+    const phase = track._phase;
     sample(track._program, track._elapsed, track._value, track._velocity,
-      track._paused ? 0 : this._native?.playbackRate ?? track._rate);
+      phase._paused ? 0 : this._native?.playbackRate ?? phase._rate, phase);
+  }
+  _transport(track: Track, batch: PhaseBatch, rate: number, paused: boolean): void {
+    track._phase = batch._bind(this._stamp, track._elapsed, rate, paused);
   }
   _ended(track: Track): boolean {
-    return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
+    return track._phase._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
   }
   private _text(at: 0 | 1 | 2 = 0): string {
     if (this._key === 'transform') {
@@ -297,6 +338,8 @@ class Surface {
     const previous = this._native;
     this._native = undefined; this._token = undefined;
     if (previous) {
+      const batch = new PhaseBatch();
+      for (const track of this._tracks.values()) this._transport(track, batch, track._phase._rate, track._phase._paused);
       try { this._render(); }
       catch (error) {
         try { previous.cancel(); } catch { /* ошибка CSS-записи остаётся причиной */ }
@@ -339,8 +382,8 @@ class Surface {
     if (!active.some(moving)) { this._engine._idle(this); return; }
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
-    const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
+    const canNative = first._phase._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
+      active.every(track => !track._phase._paused && track._phase._rate === first._phase._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
         track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
     try {
@@ -351,7 +394,7 @@ class Surface {
       this._native = effect;
       this._watch();
       // Новый effect ещё не передан потребителю; сначала скорость, затем точная поза.
-      if (first._rate !== 1) effect.playbackRate = first._rate;
+      if (first._phase._rate !== 1) effect.playbackRate = first._phase._rate;
       if (first._elapsed !== 0) effect.currentTime = first._elapsed;
       this._lock(false);
       this._engine._idle(this);
@@ -382,7 +425,7 @@ class Surface {
       } catch (error) { this._fail(error); }
     }, fail);
   }
-  _control(selected: readonly Track[], action: ControlAction, time: number, owner?: Run): void {
+  _control(selected: readonly Track[], action: ControlAction, time: number, owner?: Run, batch: PhaseBatch = new PhaseBatch()): void {
     const owns = (track: Track): boolean => !!track._owner && this._tracks.get(track._program._key) === track &&
       (owner === undefined || track._owner === owner);
     // Пока команда ждала, траектория могла перейти к другому вызову.
@@ -393,31 +436,32 @@ class Surface {
       return;
     }
     try {
-      this._sync();
+      this._sync(batch);
       if (!selected.some(owns)) return;
       if (typeof action === 'function') {
-        action(this, selected.filter(owns));
+        action(this, selected.filter(owns), batch);
       } else {
         const effect = this._native, first = selected[0]!;
         // Полностью принадлежащая контролу шкала не меняет кривую при seek.
         // Частичная команда, конец и внешний pause идут через handoff.
         const reuse = action === 'seek' && effect?.playState === 'running' &&
           selected.length === this._tracks.size && selected.every(owns) &&
-          effect.finished === this._token && effect.playbackRate === first._rate && time < first._program._duration;
+          effect.finished === this._token && effect.playbackRate === first._phase._rate && time < first._program._duration;
         if (!reuse) this._detach();
         for (const track of selected) {
           if (!owns(track)) continue;
-          if (action === 'pause') track._paused = true;
-          else if (action === 'play') track._paused = false;
-          else if (action === 'seek') track._elapsed = Math.min(time, track._program._duration);
+          if (action === 'seek') track._elapsed = Math.min(time, track._program._duration);
           else if (action === 'finish') track._elapsed = track._program._duration;
+          const phase = track._phase;
+          if (action === 'seek' || action === 'pause' || action === 'play')
+            this._transport(track, batch, phase._rate, action === 'pause' || action !== 'play' && phase._paused);
           this._sample(track);
         }
         if (reuse) {
           this._lock(true);
           try {
             // Синхронная запись скорости сбрасывает отложенный updatePlaybackRate.
-            if (effect.pending) effect.playbackRate = first._rate;
+            if (effect.pending) effect.playbackRate = first._phase._rate;
             effect.currentTime = time;
           } finally { this._lock(false); }
         }
@@ -432,9 +476,9 @@ class Surface {
       this._engine._flush();
     } catch (error) { this._fail(error); throw error; }
   }
-  _tick(): void {
+  _tick(batch: PhaseBatch): void {
     if (this._native || this._tracks.size === 0) return;
-    try { this._sync(); } catch (error) { this._fail(error); }
+    try { this._sync(batch); } catch (error) { this._fail(error); }
   }
   _paint(): void {
     if (this._native || this._tracks.size === 0) return;
@@ -499,7 +543,8 @@ export class Runtime {
     try {
       this._offUpdate = this._host.frame.update(() => {
         this._prepared = [...this._active];
-        for (const current of this._prepared) current._tick();
+        const batch = new PhaseBatch();
+        for (const current of this._prepared) current._tick(batch);
         this._flush();
       }, { onTeardown: teardown });
       this._offRender = this._host.frame.render(() => {
@@ -524,13 +569,13 @@ export class Runtime {
     this._offUpdate = this._offRender = undefined; this._prepared = [];
     if (update || render) rethrow(attemptAll([update, render], release => release?.()), 'Frame cleanup failed');
   }
-  private _surface(element: Element, key: string): Surface {
+  private _surface(element: Element, key: string, batch: PhaseBatch): Surface {
     let groups = this._surfaces.get(element);
     if (!groups) { groups = Object.create(null) as Record<string, Surface>; this._surfaces.set(element, groups); }
     const name = isTransform(key) ? 'transform' : key;
     let group = groups[name];
     if (!group) {
-      const candidate = new Surface(this, element, name);
+      const candidate = new Surface(this, element, name, batch._clock(this._host));
       // Чтение host-стиля может синхронно принять другой прогон.
       group = groups[name] ?? candidate; groups[name] = group;
     }
@@ -556,14 +601,14 @@ export class Runtime {
     if (elements.length * props.reduce((sum, p) => sum + p._values.length, 0) > MAX_CHANNELS) failMotion('Слишком много каналов');
     const reduced = clock._reduced || this._host.reduced();
     const author = authoredTiming(clock);
-    const result: Draft[] = [], synced = new Set<Surface>();
+    const result: Draft[] = [], synced = new Set<Surface>(), batch = new PhaseBatch();
     try {
       for (let i = 0; i < elements.length; i++) {
         const element = elements[i]!;
         for (let j = 0; j < props.length; j++) {
           const property = props[j]!;
-          const group = this._surface(element, property._key);
-          if (!synced.has(group)) { synced.add(group); group._sync(); }
+          const group = this._surface(element, property._key, batch);
+          if (!synced.has(group)) { synced.add(group); group._sync(batch); }
           // Первый элемент уже содержит по одному Program на каждое свойство.
           // Явная литеральная траектория не зависит от элемента; состояние Track остаётся отдельным.
           if (i && property._authored && property._literal && !clock._stagger) {
@@ -584,18 +629,18 @@ export class Runtime {
   }
   _execute(drafts: readonly Draft[], total?: number): Playback {
     const run = new Run(total ?? 0);
-    const touched = new Set<Surface>();
+    const touched = new Set<Surface>(), batch = new PhaseBatch();
     try {
       for (const draft of drafts) {
-        const group = this._surface(draft._element, draft._program._key);
+        const group = this._surface(draft._element, draft._program._key, batch);
         const existing = group._tracks.get(draft._program._key);
         const equal = !draft._reduced && draft._program._identity && existing?._program._identity &&
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
-        if (!touched.has(group)) { group._sync(); group._detach(); touched.add(group); }
+        if (!touched.has(group)) { group._sync(batch); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!._from;
         const track: Track = { _program: draft._program, _group: group, _value: [...first], _velocity: first.map(() => 0),
-          _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _rate: 1, _paused: false };
+          _owner: undefined, _elapsed: draft._reduced ? draft._program._duration : 0, _phase: batch._bind(group._stamp, 0, 1, false) };
         group._sample(track);
         run._own(track, draft._reduced); group._attach(track);
       }

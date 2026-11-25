@@ -27,7 +27,7 @@ export function playhead(playback: Playback): MotionPlayback {
         now ??= number(track._group._engine._host.now(), 'clock');
         const group = track._group;
         const current = group._busy ? track._elapsed
-          : group._position(track, Math.max(0, now - group._stamp), group._native?.currentTime);
+          : group._position(track, now, group._native?.currentTime);
         if (position !== undefined && position !== current) return undefined;
         position = current;
       }
@@ -37,8 +37,8 @@ export function playhead(playback: Playback): MotionPlayback {
       get(): number | undefined {
         let rate: number | undefined;
         for (const track of run._tracks) {
-          if (rate !== undefined && rate !== track._rate) return undefined;
-          rate = track._rate;
+          if (rate !== undefined && rate !== track._phase._rate) return undefined;
+          rate = track._phase._rate;
         }
         return rate ?? lastRate;
       },
@@ -46,24 +46,24 @@ export function playhead(playback: Playback): MotionPlayback {
     },
     reverse: { value(): void { run._apply(reverseRate); } },
   });
-  run._capture = track => { lastTime = Math.min(run.duration, track._elapsed); lastRate = track._rate; };
+  run._capture = track => { lastTime = Math.min(run.duration, track._elapsed); lastRate = track._phase._rate; };
   return run as Run & MotionPlayback;
 }
 
 /** Подключается только представлением playhead, не является отдельным исполнителем. */
 const reverseRate: ControlOperation = applyRate;
 function rateCommand(rate: number): ControlOperation {
-  return (group, tracks) => applyRate(group, tracks, rate);
+  return (group, tracks, batch) => applyRate(group, tracks, batch, rate);
 }
-function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<ControlOperation>[1], rate?: number): void {
-  const requested = rate ?? -tracks[0]!._rate, effect = group._native;
+function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<ControlOperation>[1], batch: Parameters<ControlOperation>[2], rate?: number): void {
+  const requested = rate ?? -tracks[0]!._phase._rate, effect = group._native;
   if (requested >= 0 && effect && tracks.length === group._tracks.size &&
       typeof effect.updatePlaybackRate === 'function') {
     group._lock(true);
     try {
       effect.updatePlaybackRate(requested);
       for (const track of tracks) {
-        track._rate = rate ?? -track._rate;
+        group._transport(track, batch, rate ?? -track._phase._rate, track._phase._paused);
         group._sample(track);
       }
     } finally { group._lock(false); }
@@ -71,9 +71,9 @@ function applyRate(group: Parameters<ControlOperation>[0], tracks: Parameters<Co
   }
   group._detach();
   for (const track of tracks) {
-    track._rate = rate ?? -track._rate;
+    group._transport(track, batch, rate ?? -track._phase._rate, track._phase._paused);
     group._sample(track);
   }
   group._render();
-  for (const track of tracks) if (!track._paused && group._ended(track)) group._end(track, true);
+  for (const track of tracks) if (!track._phase._paused && group._ended(track)) group._end(track, true);
 }
