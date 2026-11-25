@@ -115,7 +115,8 @@ function emitArtifact(
         : roundShortest(samples[i]!, percentDigits);
     out += (i === 0 ? '' : ', ') + progress + ' ' + percent + '%';
     // Number(token) моделирует CSS parser один раз на cold compile. TypedArray
-    // принадлежит компилятору и не выходит host-коду.
+    // до эмиссии принадлежит компилятору; затем тот же буфер становится
+    // защищённой частью внутреннего artifact, без передачи raw-узлов наружу.
     samples[i] = +percent;
     samples[i + 1] = +progress;
   }

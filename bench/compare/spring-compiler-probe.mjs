@@ -2,8 +2,16 @@ import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import assert from 'node:assert/strict';
-const apis=Object.fromEntries(await Promise.all(['baseline','candidate'].map(async(name,i)=>[name,await import(pathToFileURL(resolve(process.argv[i+2],'compositor/index.js')))])));
+import { hashFileTree, sha256File } from './provenance.mjs';
 const mode=process.argv[4]??'exact';
+assert(['exact','adaptive'].includes(mode),'Unknown comparison mode');
+const paths=Object.fromEntries(['baseline','candidate'].map((name,i)=>[name,resolve(process.argv[i+2])]));
+const fingerprints=()=>Object.fromEntries(Object.entries(paths).map(([name,root])=>[name,{
+ entry:sha256File(resolve(root,'compositor/index.js')), runtime:hashFileTree(root,file=>/\.(?:c?js|mjs)$/.test(file)).sha256
+}]));
+const hashes=fingerprints();
+const apis=Object.fromEntries(await Promise.all(Object.entries(paths).map(async([name,root])=>[name,await import(pathToFileURL(resolve(root,'compositor/index.js')))])));
+console.log(JSON.stringify({artifacts:hashes,mode,node:process.version}));
 const rows=[];
 for(let round=-3;round<12;round++){
  const order=(round+Math.floor(round/2))%2?['candidate','baseline']:['baseline','candidate'];
@@ -13,7 +21,7 @@ for(let round=-3;round<12;round++){
  });
  let reference;
  for(const name of order){
-  const api=apis[name],cache=api.createSpringLinearCache({capacity:256});
+  const api=apis[name],cache=api.createSpringLinearCache(256);
   const start=performance.now();
   const outputs=specs.map(s=>cache.compile(s.spring,{v0:s.v0,tolerance:s.tolerance}));
   const ms=performance.now()-start;
@@ -26,7 +34,7 @@ for(let round=-3;round<12;round++){
     assert(plan.nodes.every((x,k)=>Number.isFinite(x.progress)&&Number.isFinite(x.percent)&&(!k||x.percent>plan.nodes[k-1].percent)));
    }
   }
-  if(round>=0){const row={round,name,ms,bytes,stops};rows.push(row);console.log(JSON.stringify(row))}
+  if(round>=0){const row={round,name,ms,bytes,stops,entrySha256:hashes[name].entry,runtimeSha256:hashes[name].runtime};rows.push(row);console.log(JSON.stringify(row))}
  }
 }
 const med=a=>a.sort((x,y)=>x-y)[Math.floor(a.length/2)];
@@ -34,3 +42,5 @@ for(const name of ['baseline','candidate']){
  const r=rows.filter(x=>x.name===name);
  console.log(JSON.stringify({summary:true,name,...Object.fromEntries(['ms','bytes','stops'].map(k=>[k,med(r.map(x=>x[k]))]))}));
 }
+
+assert.deepEqual(fingerprints(),hashes,'Build artifacts changed during measurement');
