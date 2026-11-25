@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "builds": {
+    "baseline": {
+      "revision": "b14f9a7d280429fd1faf60492c9c907be0668fc4",
+      "shortRevision": "b14f9a7d2804",
+      "revisionLabel": "b14f9a7d2804",
+      "dirty": false,
+      "trackedRevisionSha256": "d203a793bf51d88f4fdf3602426fcadfa5f31fbbd77bca36c00d12244f7949d1",
+      "worktreeSha256": "1cac1e255379fd176d8d8aa91970e1656fbc11ed530ef190b5df9cadaf56cb2a",
+      "builtAt": "2026-11-25T04:07:41.720Z",
+      "inputs": {
+        "root/package.json": "cd84d1d9ef0e80c99f66a6904f411236275a227be758f3ef468bac63aed66e0f",
+        "root/pnpm-lock.yaml": "d57d3e3f38cb5c68403a3c0710c19c91a6c993783bf25d1107bfe969b676989f",
+        "root/pnpm-workspace.yaml": "cf90d8995a58146bbf9224b18bb2bc8febdc9421ddcaf70fb92a364c8a1794b2",
+        "bench/package.json": "ddc6b6f694f2a7a0f6d5abb234c188c47569ed8178e3efeb9771a3470e7c81c1",
+        "bench/pnpm-lock.yaml": "24e8526596c5b7d74e89e4f1e1164e5480cc9af1541ec0c2c4c36077c08eba25",
+        "bench/pnpm-workspace.yaml": "28404ea10ef114d2b3ff91d120fc5d8113b417860d74d54b223d8858e1668a0f",
+        "trajectory-factor-run.mjs": "44cd3af8f72f52e5d409c91e8a981196a45d61d7de066aa235706c26500c7d0b",
+        "trajectory-factor-probe.mjs": "306cf9e4695de193e7dfdac489a9bff8ac0ffd861414b792e7e007841fe3295d",
+        "trajectory-factor-browser.mjs": "06f301a81e9192151681c72b54877159b02be5bec105e69198778f97e2ac8fac",
+        "trajectory-factor-cases.mjs": "0d3b496d17871ba84cb17937cbd2b7f499b5d8cb75ff7894773d48b8ec723889",
+        "provenance.mjs": "64309dc4c9211c13202a1e65bc440d812bc4d4d8dacc797fdd4f2e5d9de54513"
+      },
+      "distRuntime": {
+        "sha256": "e6ee87424058bfb912c81fc8e6ff65c6ac0ff1ab4c0b8759b7cb91edc7dde261",
+        "files": 92
+      },
+      "environment": {
+        "node": "v24.15.0",
+        "nodeExecutableSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
+        "pnpm": "11.11.0",
+        "packages": {
+          "playwright": {
+            "version": "1.61.1",
+            "sha256": "50847a0ba8a3a719c170374a71d501b1aa179bbe7a1e56f57d77f47e685247bc",
+            "files": 65
+          }
+        },
+        "rootPackages": {
+          "tsup": {
+            "version": "9.0.0",
+            "sha256": "4f8573198eed196343b45787679784508343e037e60477dabcb9722bea1c5ea5",
+            "files": 39
+          },
+          "typescript": {
+            "version": "6.0.3",
+            "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+            "files": 140
+          },
+          "esbuild": {
+            "version": "0.28.2",
+            "sha256": "ead23880942611654e495b865a616ca076e2c5a03856e1d97eaec2ea75a9842f",
+            "files": 10
+          }
+        }
+      }
+    },
+    "candidate": {
+      "revision": "d253594269fa22381079fcce84c6f90d6a00ae30",
+      "shortRevision": "d253594269fa",
+      "revisionLabel": "d253594269fa",
+      "dirty": false,
+      "trackedRevisionSha256": "54625ae70f131c28e4be2efbd05b9652954cce434b3ebff67c9d14b33af4c269",
+      "worktreeSha256": "0dc9f36629be402f6f49c7c40bbebb5954f88596f09d27068c24af1cf208e84d",
+      "builtAt": "2026-11-25T04:07:51.213Z",
+      "inputs": {
+        "root/package.json": "cd84d1d9ef0e80c99f66a6904f411236275a227be758f3ef468bac63aed66e0f",
+        "root/pnpm-lock.yaml": "d57d3e3f38cb5c68403a3c0710c19c91a6c993783bf25d1107bfe969b676989f",
+        "root/pnpm-workspace.yaml": "cf90d8995a58146bbf9224b18bb2bc8febdc9421ddcaf70fb92a364c8a1794b2",
+        "bench/package.json": "ddc6b6f694f2a7a0f6d5abb234c188c47569ed8178e3efeb9771a3470e7c81c1",
+        "bench/pnpm-lock.yaml": "24e8526596c5b7d74e89e4f1e1164e5480cc9af1541ec0c2c4c36077c08eba25",
+        "bench/pnpm-workspace.yaml": "28404ea10ef114d2b3ff91d120fc5d8113b417860d74d54b223d8858e1668a0f",
+        "trajectory-factor-run.mjs": "44cd3af8f72f52e5d409c91e8a981196a45d61d7de066aa235706c26500c7d0b",
+        "trajectory-factor-probe.mjs": "306cf9e4695de193e7dfdac489a9bff8ac0ffd861414b792e7e007841fe3295d",
+        "trajectory-factor-browser.mjs": "06f301a81e9192151681c72b54877159b02be5bec105e69198778f97e2ac8fac",
+        "trajectory-factor-cases.mjs": "0d3b496d17871ba84cb17937cbd2b7f499b5d8cb75ff7894773d48b8ec723889",
+        "provenance.mjs": "64309dc4c9211c13202a1e65bc440d812bc4d4d8dacc797fdd4f2e5d9de54513"
+      },
+      "distRuntime": {
+        "sha256": "49f7c05a5155de624159e123525e275778cdaf50e6b2190647af1d985149c0ff",
+        "files": 92
+      },
+      "environment": {
+        "node": "v24.15.0",
+        "nodeExecutableSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
+        "pnpm": "11.11.0",
+        "packages": {
+          "playwright": {
+            "version": "1.61.1",
+            "sha256": "50847a0ba8a3a719c170374a71d501b1aa179bbe7a1e56f57d77f47e685247bc",
+            "files": 65
+          }
+        },
+        "rootPackages": {
+          "tsup": {
+            "version": "9.0.0",
+            "sha256": "4f8573198eed196343b45787679784508343e037e60477dabcb9722bea1c5ea5",
+            "files": 39
+          },
+          "typescript": {
+            "version": "6.0.3",
+            "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+            "files": 140
+          },
+          "esbuild": {
+            "version": "0.28.2",
+            "sha256": "ead23880942611654e495b865a616ca076e2c5a03856e1d97eaec2ea75a9842f",
+            "files": 10
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "trajectory-factor-run.mjs": "44cd3af8f72f52e5d409c91e8a981196a45d61d7de066aa235706c26500c7d0b",
+    "trajectory-factor-probe.mjs": "306cf9e4695de193e7dfdac489a9bff8ac0ffd861414b792e7e007841fe3295d",
+    "trajectory-factor-browser.mjs": "06f301a81e9192151681c72b54877159b02be5bec105e69198778f97e2ac8fac",
+    "trajectory-factor-cases.mjs": "0d3b496d17871ba84cb17937cbd2b7f499b5d8cb75ff7894773d48b8ec723889",
+    "provenance.mjs": "64309dc4c9211c13202a1e65bc440d812bc4d4d8dacc797fdd4f2e5d9de54513"
+  },
+  "rows": {
+    "node-evidence": {
+      "sha256": "f9d081aa7d82e870f6c0d05cbcfce030f32193e9c8203f7d654fefb4162db16f",
+      "diagnostic": ""
+    },
+    "node-aa": {
+      "sha256": "cffe922cbaf292a3bcc778437a8d5ca6bf42166bbaf6f47505feec8b2e652f9c",
+      "diagnostic": ""
+    },
+    "browser-evidence": {
+      "sha256": "d84596744dbb4df635c75cb60a6631632c9836935bc45d59f4076d323ff79cb5",
+      "diagnostic": "Chrome 158.0.8127.88, all poses and cleanup checked"
+    },
+    "browser-aa": {
+      "sha256": "b5f8e021cf26b733d9b579d335b37aafd9251e90f7e96a218416122f142260a4",
+      "diagnostic": "Chrome 158.0.8127.88, all poses and cleanup checked"
+    }
+  },
+  "sizeReports": {
+    "baseline": "e545e51dad86a7efe3746106106ac471d98fa54ed9e603b316bbee02c8ef7389",
+    "candidate": "f9377fd4a99d49faa14ed7ebc2ac54036b29986466d7d5190e99ef78ee1a06c1"
+  }
+}

@@ -1,11 +1,12 @@
 import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
+import {nodeCases,nodeRounds,warmupRounds} from './trajectory-factor-cases.mjs';
 if(!global.gc)throw Error('Run with --expose-gc');
 const apis=Object.fromEntries(await Promise.all(['baseline','candidate'].map(async (name,i)=>[name,await import(pathToFileURL(resolve(process.argv[i+2],'motion/index.js')))])));
 const rows=[];
-for(const [n,k] of [[100,64],[100,960],[1000,8]]) {
- for(let round=-2;round<8;round++){
+for(const [n,k] of nodeCases) {
+ for(let round=-warmupRounds;round<nodeRounds;round++){
   const order=(round+Math.floor(round/2))%2?['candidate','baseline']:['baseline','candidate'];
   for(const name of order){
    const values=Array.from({length:k},(_,i)=>i);
@@ -25,7 +26,7 @@ for(const [n,k] of [[100,64],[100,960],[1000,8]]) {
  }
 }
 const med=x=>x.sort((a,b)=>a-b)[Math.floor(x.length/2)];
-for(const [n,k] of [[100,64],[100,960],[1000,8]])for(const name of ['baseline','candidate']){
+for(const [n,k] of nodeCases)for(const name of ['baseline','candidate']){
  const r=rows.filter(x=>x.n===n&&x.k===k&&x.name===name);
  console.log(JSON.stringify({summary:true,n,k,name,startMs:med(r.map(x=>x.startMs)),retained:med(r.map(x=>x.retained))}));
 }
