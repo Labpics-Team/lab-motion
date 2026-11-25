@@ -107,7 +107,11 @@ export function nativeEase(path: Program): string | undefined {
   if (path._identity === null || path._segments.length !== 1 || path._unit === 'color') return;
   const first = path._segments[0]!;
   if (path._key === 'opacity' && !(Math.min(first._from[0]!, first._to[0]!) >= 0 && Math.max(first._from[0]!, first._to[0]!) <= 1)) return;
-  return first._timing._spring ? materialize(first)?.[0] : first._timing._cssEase;
+  return segmentEase(first);
+}
+
+export function segmentEase(segment: Segment): string | undefined {
+  return segment._timing._spring ? materialize(segment)?.[0] : segment._timing._cssEase;
 }
 
 // The first consumer resolves a validated request; terminal samples never do.

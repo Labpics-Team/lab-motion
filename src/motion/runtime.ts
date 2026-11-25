@@ -2,7 +2,7 @@ import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, nativeEase, materialize, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, segmentEase, materialize, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
@@ -108,8 +108,8 @@ interface Track extends Draft {
   _paused: boolean;
 }
 
-function coordinates(track: Track, at: 0 | 1 | 2): readonly number[] {
-  return at === 0 ? track._value : at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to;
+function coordinates(track: Track, at: 0 | 1 | 2, index = 0): readonly number[] {
+  return at === 0 ? track._value : at === 1 ? track._program._segments[index]!._from : track._program._segments[index]!._to;
 }
 
 function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
@@ -262,24 +262,26 @@ class Surface {
   _ended(track: Track): boolean {
     return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
   }
-  private _text(at: 0 | 1 | 2 = 0): string {
+  private _text(at: 0 | 1 | 2 = 0, index = 0): string {
     if (this._key === 'transform') {
       const state = this._transforms;
-      let translationOnly = !!at;
       for (const track of this._tracks.values()) {
-        const key = track._program._key;
-        state[key] = coordinates(track, at)[0]!;
-        translationOnly &&= key === 'x' || key === 'y';
+        const value = coordinates(track, at, index)[0]!;
+        state[track._program._key] = value;
       }
-      const neutral = state.rotate === 0 && state.skewX === 0 && state.skewY === 0 &&
-        state.scaleX === 1 && state.scaleY === 1;
-      return !at && neutral && state.x === 0 && state.y === 0 ? 'none' : transform(state, translationOnly && neutral);
+      let identity = !at, translationOnly = !!at;
+      for (const key in TRANSFORMS) {
+        const neutral = state[key] === TRANSFORMS[key];
+        identity &&= neutral;
+        if (key !== 'x' && key !== 'y') translationOnly &&= neutral && !this._tracks.has(key);
+      }
+      return identity ? 'none' : transform(state, translationOnly);
     }
     const track = this._tracks.values().next().value as Track | undefined;
     if (!track) {
       const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
-    return format(track._program._key, coordinates(track, at), track._program._unit);
+    return format(track._program._key, coordinates(track, at, index), track._program._unit);
   }
   _render(): void {
     if (this._busy) failMotion('style: повторная запись');
@@ -335,17 +337,38 @@ class Surface {
     if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
     const active = [...this._tracks.values()];
     if (!active.some(moving)) { this._engine._idle(this); return; }
-    const first = active[0]!, seg = first._program._segments[0]!;
-    const _nativeEase = this._key === 'transform' || this._key === 'opacity' ? nativeEase(first._program) : undefined;
-    const canNative = first._rate > 0 && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && nativeEase(track._program) === _nativeEase &&
-        track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
-    if (!canNative) { this._engine._wake(this); return; }
+    const first = active[0]!, path = first._program, segments = path._segments;
+    const delay = segments[0]!._at, duration = path._duration - delay;
+    if (!(duration > 0) || first._rate <= 0 || (this._key !== 'transform' && this._key !== 'opacity') ||
+        typeof this._element.animate !== 'function' || !active.every(track =>
+          !track._paused && track._rate === first._rate && track._elapsed === first._elapsed &&
+          track._program._duration === path._duration && track._program._segments.length === segments.length)) {
+      this._engine._wake(this); return;
+    }
+    const offsets: number[] = [], eases: string[] = [];
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i]!, easing = segmentEase(segment);
+      const start = (segment._at - delay) / duration, end = (segment._end - delay) / duration;
+      if (!easing || !(end > start) || end > 1 || start < 0 ||
+          delay + start * duration !== segment._at || delay + end * duration !== segment._end ||
+          i > 0 && segments[i - 1]!._end !== segment._at ||
+          !this._engine._host.supports(easing) || !active.every(track => {
+            const part = track._program._segments[i]!, from = part._from[0]!, to = part._to[0]!;
+            return part._at === segment._at && part._end === segment._end && segmentEase(part) === easing &&
+              part._from.length === 1 && (this._key !== 'opacity' || Math.min(from, to) >= 0 && Math.max(from, to) <= 1) &&
+              (!i || track._program._segments[i - 1]!._to[0] === from);
+          })) {
+        this._engine._wake(this); return;
+      }
+      offsets.push(start); eases.push(easing);
+    }
     try {
       this._lock(true);
-      const effect = this._element.animate([{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
-        duration: seg._end - seg._at, delay: seg._at, easing: _nativeEase, fill: 'both',
-      });
+      const frames: Keyframe[] = offsets.map((offset, i) => ({ [this._key]: this._text(1, i), offset, easing: eases[i] }));
+      const last = this._text(2, segments.length - 1), end = (segments.at(-1)!._end - delay) / duration;
+      frames.push({ [this._key]: last, offset: end });
+      if (end < 1) frames.push({ [this._key]: last, offset: 1 });
+      const effect = this._element.animate(frames, { duration, delay, easing: 'linear', fill: 'both' });
       this._native = effect;
       this._watch();
       // Новый effect ещё не передан потребителю; сначала скорость, затем точная поза.
@@ -568,13 +591,7 @@ export class Runtime {
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: zeroVelocity } : group._read(property._key);
-          const shared = i && property._literal && !clock._stagger ? result[j]!._program : undefined;
-          const initial = shared?._segments[0];
-          const spec = initial && shared!._unit === current._unit &&
-            initial._from.length === current._coordinates.length &&
-            initial._from.every((v, k) => Object.is(v, current._coordinates[k])) &&
-            !initial._velocity.length && !current._velocity.length
-            ? shared! : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
           result.push({ _group: group, _program: spec, _reduced: reduced });
         }
       }
@@ -596,7 +613,7 @@ export class Runtime {
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
         if (!draft._reduced) for (const segment of draft._program._segments) materialize(segment);
-        if (!touched.has(group)) { if (group._tracks.size) { group._sync(now); group._detach(); } else group._stamp = Math.max(group._stamp, now); touched.add(group); }
+        if (!touched.has(group)) { group._sync(now); group._detach(); touched.add(group); }
         const first = draft._program._segments[0]!._from;
         const track = draft as Track;
         track._group = group; track._value = first.slice(); track._velocity = first.slice();
