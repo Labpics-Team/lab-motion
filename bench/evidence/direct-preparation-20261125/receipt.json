@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "scope": "diagnostic paired local comparisons, not PROFILE/SELECT release qualification",
+  "builds": {
+    "baseline": {
+      "revision": "b29e214de450ff78292257b8b3bf0f9c8e710c61",
+      "trackedRevisionSha256": "b07cc4c2571b81ff1f9881acb4436a18b3b5dd60f778815c2dc1e19d77f9a217",
+      "distRuntime": {
+        "sha256": "49f7c05a5155de624159e123525e275778cdaf50e6b2190647af1d985149c0ff",
+        "files": 92
+      },
+      "rootEsmSha256": "72032c02b39d6f8b0b8558f47b6cf7074781954673ad2ae3d1ca8b1d8f3164a6",
+      "frameEsmSha256": "49aa9a8461d52a7f290e2aec3b81646c2b64a51cf3525f3bc2146d9c5892c565",
+      "closure": {
+        "rawBytes": 38517,
+        "gzBytes": 15582,
+        "brBytes": 13996,
+        "entryRawBytes": 36905,
+        "entryGzBytes": 14774,
+        "entryBrBytes": 13245,
+        "closureFiles": 2
+      }
+    },
+    "candidate": {
+      "revision": "7c60aacd878296214ac1a9c28471adf7b03b21fd",
+      "trackedRevisionSha256": "0c4739238d0ce4557f2e39dc67e96f069ff028fb115a685d75d45d6b3f521427",
+      "distRuntime": {
+        "sha256": "47cf22fa3b16bfaef8e1b3e5c414166aef7e1bcd9eac99b8fe80d208c272bd9a",
+        "files": 92
+      },
+      "rootEsmSha256": "cf3308d2d55004a05b0afa90860dbb8a3f777ff7e145785f1ae69c00808333ab",
+      "frameEsmSha256": "49aa9a8461d52a7f290e2aec3b81646c2b64a51cf3525f3bc2146d9c5892c565",
+      "closure": {
+        "rawBytes": 38551,
+        "gzBytes": 15595,
+        "brBytes": 13977,
+        "entryRawBytes": 36939,
+        "entryGzBytes": 14787,
+        "entryBrBytes": 13226,
+        "closureFiles": 2
+      }
+    }
+  },
+  "buildSetup": "same isolated worktree and single frozen root dependency install; baseline copied before source edit; candidate source commit and exact built artifacts measured",
+  "toolchain": {
+    "node": "v24.15.0",
+    "nodeExecutableSha256": "3331e1ffe19874215472217c5e94f5a0c6d8e18c4ac7111d3937aa0ad5e9b4a5",
+    "pnpm": "11.11.0",
+    "chrome": "158.0.8127.88",
+    "packages": {
+      "tsup": {
+        "version": "9.0.0",
+        "sha256": "3c97b93277dc33552bc470948d14bba0a51a6ef668820273741b0412f31bf829",
+        "files": 39
+      },
+      "typescript": {
+        "version": "6.0.3",
+        "sha256": "829607e617796d2a86fcf18ee47b9cfb259ae2f73e93351241ae8f7f8b68ba86",
+        "files": 140
+      },
+      "esbuild": {
+        "version": "0.28.2",
+        "sha256": "27ed9ed318c6e7020a774439ddceb0b8f696d4bbae1e3d46952b2265ab700c86",
+        "files": 10
+      },
+      "terser": {
+        "version": "5.51.2",
+        "sha256": "04df4378b4e870d4eed70e9d1293710e562967092c6ea80adddbb58c5991e6b1",
+        "files": 46
+      },
+      "pako": {
+        "version": "3.0.2",
+        "sha256": "d25b61fb8b74f8fc46fb16312d80fdafeabb83bbef355e92c880ace60339d763",
+        "files": 20
+      },
+      "@playwright/test": {
+        "version": "1.64.1",
+        "sha256": "68860ba7c8ca263ab26da761b0d174a376a40ae36668e933aeb8094c11151242",
+        "files": 14
+      }
+    }
+  },
+  "inputs": {
+    "package.json": "cd84d1d9ef0e80c99f66a6904f411236275a227be758f3ef468bac63aed66e0f",
+    "pnpm-lock.yaml": "d57d3e3f38cb5c68403a3c0710c19c91a6c993783bf25d1107bfe969b676989f",
+    "scripts/size-gate.mjs": "01ed61b616a03e79c7826f8bc340617ba95b2e95db3b20ed98453ee965c90e65",
+    "scripts/compression-oracle.mjs": "cab7eeebfc2155450d4dfacc5c024279d7b9b99640e2badb13a6b502807d4ff9",
+    "scripts/compression-policy.mjs": "e918c4bf71408771cbdf8d969b29ba4a848cc46f1ec694f57a41aa777c62c880",
+    "bench/compare/direct-preparation-probe.mjs": "25e001a134be156bc4101a9abb7edcae6d5d3dfe47d482495de50731428cef11",
+    "bench/compare/direct-frame-probe.mjs": "f14e994b5bca6a4d05f41345cd2e352b97d7616b01ed02720b1ff8580368966c"
+  },
+  "rows": {
+    "startup": {
+      "sha256": "0c5f511d2e06d2250f24497c841daa018f7cd3b121a3b1582312ca70748bbaee",
+      "observations": 132
+    },
+    "startup-aa": {
+      "sha256": "506ccf8ede6220c047ca74f3bcfd7a7cd623e402a1f913079b6f7780ba66adb2",
+      "observations": 132
+    },
+    "frame": {
+      "sha256": "871644f1b91ecd1b50944a5f7f90597150b90b49b6ba9b70c21752366760bf13",
+      "observations": 44
+    },
+    "frame-aa": {
+      "sha256": "603f1a7a5562b0d38c4339dba164412fa645afbe714e6fd35431eaaf390325b6",
+      "observations": 44
+    }
+  },
+  "canonicalGitInputs": {
+    "package.json": "f23a461461bf58fa434958c63dd8d0d5cb361914db4a746981768d7065f0baf7",
+    "pnpm-lock.yaml": "1960fec07e58fdaedd7f1d5aa0187a81955aeb07e1fe9b8dc8eb91395ed3d805",
+    "scripts/size-gate.mjs": "caf3ff95f01f0cbe7563515948f39fbea6c325acd97bb9e53db5625a4c5852e6",
+    "scripts/compression-oracle.mjs": "736f72336d54bca93dca1cfe426ff79476eb6b2fbd266296b00802eef565a6bb",
+    "scripts/compression-policy.mjs": "78535921e66d3f1e9bb2936722cce03f0464ec835cd88ab4ac9a1cbd97cc38a4",
+    "bench/compare/direct-preparation-probe.mjs": "25e001a134be156bc4101a9abb7edcae6d5d3dfe47d482495de50731428cef11",
+    "bench/compare/direct-frame-probe.mjs": "f14e994b5bca6a4d05f41345cd2e352b97d7616b01ed02720b1ff8580368966c"
+  },
+  "inputHashSemantics": "inputs records actual Windows working-tree bytes used in the measurement, including checkout-specific CRLF or LF; canonicalGitInputs records exact Git blobs from the pinned measured source revision for portable verification. Source revision fingerprint and dist bytes are unchanged."
+}

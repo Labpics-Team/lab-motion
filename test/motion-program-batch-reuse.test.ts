@@ -14,7 +14,7 @@ it('preserves element-major mixed-property drafts and per-element reads', () => 
   const drafts = a.runtime._draft(targets, input, clock);
   expect(reads.mock.calls.map(([element]) => element)).toEqual([a.element, a.element, a.element, b.element, b.element, b.element, c.element, c.element, c.element]);
   expect(drafts).toHaveLength(9);
-  expect(drafts.map(draft => draft._element)).toEqual([a.element, a.element, a.element, b.element, b.element, b.element, c.element, c.element, c.element]);
+  expect(drafts.map(draft => draft._group._element)).toEqual([a.element, a.element, a.element, b.element, b.element, b.element, c.element, c.element, c.element]);
   expect(drafts.map(draft => draft._program._key)).toEqual(['x', 'width', 'opacity', 'x', 'width', 'opacity', 'x', 'width', 'opacity']);
   reads.mockRestore();
   const run = a.runtime._execute(drafts);
@@ -153,8 +153,8 @@ it('sequence extends one target history without mutating either input draft', as
     expect(original._nativeEase).toBe('linear');
     expect(original._identity).toBeDefined();
     const merged = execute.mock.calls[0]![0];
-    const left = merged.find(item => item._element === a.element)!._program;
-    const right = merged.find(item => item._element === b.element)!._program;
+    const left = merged.find(item => item._group._element === a.element)!._program;
+    const right = merged.find(item => item._group._element === b.element)!._program;
     expect(left).not.toBe(original); expect(right).not.toBe(original);
     expect(left._segments).not.toBe(right._segments);
     expect(left._segments).not.toBe(original._segments);
