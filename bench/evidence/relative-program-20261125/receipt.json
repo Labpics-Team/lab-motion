@@ -1,0 +1,902 @@
+{
+  "baseline": {
+    "revision": "1aa0d516b16fb075667b7db5d4f61794162da036",
+    "entry": "c8a4aa4ff70dec57b293d434686abbf5f94baa5de31085b21c36250a24cbcb68",
+    "gzip": 16113
+  },
+  "final": {
+    "revision": "91e6eabb4756c6dac00a1dc66dbdcfaed4f13409",
+    "entry": "d5c61343557498de0145b2c60a0666fc24a4b53837da3e4ac894a040f891036c",
+    "gzip": 16434
+  },
+  "initial": {
+    "revision": "196c35667b5c26d2c1b8e0f006f69bea582de060",
+    "entry": "50626c6d6339830647417c6e15e52092a3b66c3b9d21d675e869aee9949d7b96",
+    "gzip": 16255
+  },
+  "sizeLimit": 15600,
+  "checks": {
+    "focusedTests": 1149,
+    "browserScenarios": 29,
+    "typecheck": true,
+    "sizeGate": false,
+    "independentReview": "attempted; no verdict (CLI waiting for stdin, owned process stopped)"
+  },
+  "harness": {
+    "revision": "335a0d371fcff8c529cd89666a8674880ce5311b",
+    "inputs": {
+      "bench/compare/relative-program-node.mjs": {
+        "canonicalContentSha256": "bf457dacd7be36860f0b4e31ec33b2f655e98ebc59e39ef3a1fdd25257f655ea",
+        "workingContentSha256": "bf457dacd7be36860f0b4e31ec33b2f655e98ebc59e39ef3a1fdd25257f655ea"
+      },
+      "bench/compare/leadership-timeline-probe.mjs": {
+        "canonicalContentSha256": "06fb8f593b50539af8cf8b0f8630279239316816302af232baaaae5a5115b473",
+        "workingContentSha256": "06fb8f593b50539af8cf8b0f8630279239316816302af232baaaae5a5115b473"
+      },
+      "bench/compare/leadership-startup-probe.mjs": {
+        "canonicalContentSha256": "1b04a333ee1f42662f2c9367194483c0b5e521deef234492aee728cc30511a65",
+        "workingContentSha256": "4e8b1b9f5c9b0869696f5592a1ae00a6afdd0a9e4038c6ad82898e712ca19bda"
+      },
+      "bench/compare/serve-dist.mjs": {
+        "canonicalContentSha256": "396cba56769065e739913f7551d1581e349e09ef6ac465291e0719332735b1f5",
+        "workingContentSha256": "5b4c4df97116c48bcf55daf47124c255de84c9917a72633054ae2a65bfa84f5e"
+      },
+      "bench/compare/provenance.mjs": {
+        "canonicalContentSha256": "51881a4a6ea2e1ad0330888e7e1b9c8b6e7c7aef3a3eb798a4185c7c3b846623",
+        "workingContentSha256": "64309dc4c9211c13202a1e65bc440d812bc4d4d8dacc797fdd4f2e5d9de54513"
+      },
+      "bench/compare/pnpm-lock.yaml": {
+        "canonicalContentSha256": "6e6401b2004bc1eaae05440a0457635e6b8ee56564a4172794974d60606eaa90",
+        "workingContentSha256": "24e8526596c5b7d74e89e4f1e1164e5480cc9af1541ec0c2c4c36077c08eba25"
+      },
+      "package.json": {
+        "canonicalContentSha256": "513355ba2f93e86577b5da2779a40f8781dbad0433ace3c20e84b492fb87e40e",
+        "workingContentSha256": "0eeb5d478306ae04d3210c4ab4ce133c7cc4ef74ba55e96b64d47802b8ea020e"
+      },
+      "pnpm-lock.yaml": {
+        "canonicalContentSha256": "1960fec07e58fdaedd7f1d5aa0187a81955aeb07e1fe9b8dc8eb91395ed3d805",
+        "workingContentSha256": "d57d3e3f38cb5c68403a3c0710c19c91a6c993783bf25d1107bfe969b676989f"
+      }
+    }
+  },
+  "runs": {
+    "node-ab": {
+      "sha256": "8a8e9e58c8fa9c97df8ba6d0bf4472cd0fd78197bd56dbe99b54bc863390ead6",
+      "rows": 55,
+      "meta": {
+        "artifacts": {
+          "baseline": {
+            "entry": "c8a4aa4ff70dec57b293d434686abbf5f94baa5de31085b21c36250a24cbcb68",
+            "runtime": "2ca0ca773f7bf9b349242bab09e6984814739c058a0ccbeb38e8e7325af8e3ad"
+          },
+          "candidate": {
+            "entry": "d5c61343557498de0145b2c60a0666fc24a4b53837da3e4ac894a040f891036c",
+            "runtime": "2ad27a3ecd32057ea6679ee7613a90bbd1ee216bdce28c3cad9efb9ff6742462"
+          }
+        },
+        "node": "v24.15.0"
+      },
+      "summaries": [
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 100,
+          "k": 960,
+          "name": "baseline",
+          "startMs": 11.605,
+          "retained": 17269192
+        },
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 100,
+          "k": 960,
+          "name": "candidate",
+          "startMs": 2.4273,
+          "retained": 273472
+        },
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 1000,
+          "k": 8,
+          "name": "baseline",
+          "startMs": 4.8693,
+          "retained": 2360312
+        },
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 1000,
+          "k": 8,
+          "name": "candidate",
+          "startMs": 2.7168,
+          "retained": 867056
+        },
+        {
+          "summary": true,
+          "kind": "sequence",
+          "n": 100,
+          "k": 8,
+          "name": "baseline",
+          "startMs": 1.8032,
+          "retained": 236256
+        },
+        {
+          "summary": true,
+          "kind": "sequence",
+          "n": 100,
+          "k": 8,
+          "name": "candidate",
+          "startMs": 1.6269,
+          "retained": 113320
+        }
+      ]
+    },
+    "node-aa": {
+      "sha256": "d7c3170656abc3c81a4f6847244dbb1360d59767799d98d869bed8d82ded4920",
+      "rows": 55,
+      "meta": {
+        "artifacts": {
+          "baseline": {
+            "entry": "c8a4aa4ff70dec57b293d434686abbf5f94baa5de31085b21c36250a24cbcb68",
+            "runtime": "2ca0ca773f7bf9b349242bab09e6984814739c058a0ccbeb38e8e7325af8e3ad"
+          },
+          "candidate": {
+            "entry": "c8a4aa4ff70dec57b293d434686abbf5f94baa5de31085b21c36250a24cbcb68",
+            "runtime": "2ca0ca773f7bf9b349242bab09e6984814739c058a0ccbeb38e8e7325af8e3ad"
+          }
+        },
+        "node": "v24.15.0"
+      },
+      "summaries": [
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 100,
+          "k": 960,
+          "name": "baseline",
+          "startMs": 11.1122,
+          "retained": 17261920
+        },
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 100,
+          "k": 960,
+          "name": "candidate",
+          "startMs": 10.8318,
+          "retained": 17262400
+        },
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 1000,
+          "k": 8,
+          "name": "baseline",
+          "startMs": 4.8754,
+          "retained": 2362856
+        },
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 1000,
+          "k": 8,
+          "name": "candidate",
+          "startMs": 4.4545,
+          "retained": 2366008
+        },
+        {
+          "summary": true,
+          "kind": "sequence",
+          "n": 100,
+          "k": 8,
+          "name": "baseline",
+          "startMs": 1.9073,
+          "retained": 236888
+        },
+        {
+          "summary": true,
+          "kind": "sequence",
+          "n": 100,
+          "k": 8,
+          "name": "candidate",
+          "startMs": 1.9657,
+          "retained": 238744
+        }
+      ]
+    },
+    "dense-stagger-first": {
+      "sha256": "7e2d12b664a4af0278849c315ad321ed33454285b8365dab512c45a317c37e47",
+      "rows": 41,
+      "meta": {
+        "artifacts": {
+          "base": {
+            "entry": "c8a4aa4ff70dec57b293d434686abbf5f94baa5de31085b21c36250a24cbcb68",
+            "runtime": "2ca0ca773f7bf9b349242bab09e6984814739c058a0ccbeb38e8e7325af8e3ad"
+          },
+          "lab": {
+            "entry": "d5c61343557498de0145b2c60a0666fc24a4b53837da3e4ac894a040f891036c",
+            "runtime": "2ad27a3ecd32057ea6679ee7613a90bbd1ee216bdce28c3cad9efb9ff6742462"
+          }
+        },
+        "adapters": {
+          "base": "2c3c0da9fb15c47231ca5a6d6c8d60445b6d7ed1974d82feed27925dc5e9fe17",
+          "lab": "ac142e5307814670d923247ccf384ea3e4b6427ab16c42e8e1e68e18da4b9772",
+          "motion": "ef3bf34ed12cb318799b8e1075e0bd08fc9c9da4c174037974733d9d7987289c",
+          "raw": "1088954412a817c75971c8f6420db0e2f89e57bf4e0ea729ae4169a29d4951be"
+        },
+        "motion": {
+          "version": "14.5.0",
+          "tree": "373de740683b5eca4c8c2cbd1a0b710f9993cc5032c84a6a9e1ca1551329fa3b"
+        },
+        "chrome": "158.0.8127.88",
+        "node": "v24.15.0",
+        "frames": 129,
+        "duration": 512,
+        "counts": [
+          100
+        ],
+        "gap": 2
+      },
+      "summaries": [
+        {
+          "summary": true,
+          "n": 100,
+          "id": "base",
+          "apiMs": 17,
+          "completionMs": 738.5,
+          "raf": 0,
+          "taskMs": 121.218,
+          "styleMs": 27.563000000000002
+        },
+        {
+          "summary": true,
+          "n": 100,
+          "id": "lab",
+          "apiMs": 8.200000002980232,
+          "completionMs": 729.5,
+          "raf": 0,
+          "taskMs": 112.06300000000002,
+          "styleMs": 28.421
+        },
+        {
+          "summary": true,
+          "n": 100,
+          "id": "motion",
+          "apiMs": 7.399999998509884,
+          "completionMs": 713.3000000044703,
+          "raf": 0,
+          "taskMs": 155.23700000000002,
+          "styleMs": 24.410999999999998
+        },
+        {
+          "summary": true,
+          "n": 100,
+          "id": "raw",
+          "apiMs": 25.799999997019768,
+          "completionMs": 747,
+          "raf": 0,
+          "taskMs": 120.47000000000001,
+          "styleMs": 28.404
+        }
+      ]
+    },
+    "dense-stagger-repeat": {
+      "sha256": "8953b04cb9f3cdd7f244ef3dd67f852e3b93225729844e593513e72bd56eb9fa",
+      "rows": 41,
+      "meta": {
+        "artifacts": {
+          "base": {
+            "entry": "c8a4aa4ff70dec57b293d434686abbf5f94baa5de31085b21c36250a24cbcb68",
+            "runtime": "2ca0ca773f7bf9b349242bab09e6984814739c058a0ccbeb38e8e7325af8e3ad"
+          },
+          "lab": {
+            "entry": "d5c61343557498de0145b2c60a0666fc24a4b53837da3e4ac894a040f891036c",
+            "runtime": "2ad27a3ecd32057ea6679ee7613a90bbd1ee216bdce28c3cad9efb9ff6742462"
+          }
+        },
+        "adapters": {
+          "base": "2c3c0da9fb15c47231ca5a6d6c8d60445b6d7ed1974d82feed27925dc5e9fe17",
+          "lab": "ac142e5307814670d923247ccf384ea3e4b6427ab16c42e8e1e68e18da4b9772",
+          "motion": "ef3bf34ed12cb318799b8e1075e0bd08fc9c9da4c174037974733d9d7987289c",
+          "raw": "1088954412a817c75971c8f6420db0e2f89e57bf4e0ea729ae4169a29d4951be"
+        },
+        "motion": {
+          "version": "14.5.0",
+          "tree": "373de740683b5eca4c8c2cbd1a0b710f9993cc5032c84a6a9e1ca1551329fa3b"
+        },
+        "chrome": "158.0.8127.88",
+        "node": "v24.15.0",
+        "frames": 129,
+        "duration": 512,
+        "counts": [
+          100
+        ],
+        "gap": 2
+      },
+      "summaries": [
+        {
+          "summary": true,
+          "n": 100,
+          "id": "base",
+          "apiMs": 17.399999998509884,
+          "completionMs": 739.1999999955297,
+          "raf": 0,
+          "taskMs": 111.14600000000002,
+          "styleMs": 26.363
+        },
+        {
+          "summary": true,
+          "n": 100,
+          "id": "lab",
+          "apiMs": 8.100000001490116,
+          "completionMs": 727.7999999970198,
+          "raf": 0,
+          "taskMs": 103.977,
+          "styleMs": 26.281
+        },
+        {
+          "summary": true,
+          "n": 100,
+          "id": "motion",
+          "apiMs": 7.399999998509884,
+          "completionMs": 713.7999999970198,
+          "raf": 0,
+          "taskMs": 140.05100000000002,
+          "styleMs": 21.122
+        },
+        {
+          "summary": true,
+          "n": 100,
+          "id": "raw",
+          "apiMs": 27,
+          "completionMs": 746.3000000044703,
+          "raf": 0,
+          "taskMs": 105.87999999999998,
+          "styleMs": 25.535
+        }
+      ]
+    },
+    "initial-startup": {
+      "sha256": "84c800b859d4d66e56ae68c433ca08339662af6ef50f6d891718b152e56391de",
+      "rows": 145,
+      "meta": {
+        "provenance": {
+          "artifacts": {
+            "base": {
+              "entry": "067026a93133929001a80b06845989f2d5c5f02fd8af8404afb582bcbf6d121d",
+              "runtime": "05d83e2e78bdd81639cd1fecefc650d880b2d16e8b9af2af50634dda1f9bebf9"
+            },
+            "lab": {
+              "entry": "50626c6d6339830647417c6e15e52092a3b66c3b9d21d675e869aee9949d7b96",
+              "runtime": "f16f3e6efef4c953f09b210b5c7264173dbedb05d5e763b4f83ce43408ecda84"
+            }
+          },
+          "adapters": {
+            "base": "ca8bdae5dbfa241cd0a6bb2ff512286e31640af0f257646748a0a44376b7f75b",
+            "lab": "13dc57ee943685f4a9b45f40d634cbfa77456f090ef9670031c821de5c2ae871",
+            "motion": "aea66e54ec5723d90c5f1116c7ed8fd50758a8ca79546c56f4608880bdfc595d",
+            "raw": "77d604aaed8a34893e9b7cdebc3543f9b2ff9e2cb0653981b257b58d87707edb"
+          },
+          "motion": {
+            "version": "14.5.0",
+            "tree": "373de740683b5eca4c8c2cbd1a0b710f9993cc5032c84a6a9e1ca1551329fa3b"
+          },
+          "node": "v24.15.0"
+        },
+        "chrome": "158.0.8127.88",
+        "mode": "candidate"
+      },
+      "summaries": [
+        {
+          "summary": true,
+          "kind": "cold",
+          "n": 100,
+          "id": "base",
+          "apiMs": 4.100000001490116,
+          "completionMs": 408.5,
+          "taskMs": 15.345999999999998,
+          "scriptMs": 0.079,
+          "styleMs": 3.552,
+          "atReturn": {
+            "styles": 200,
+            "transformReads": 400,
+            "writes": 100,
+            "effects": 100,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 200,
+            "transformReads": 400,
+            "writes": 200,
+            "effects": 100,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "cold",
+          "n": 100,
+          "id": "lab",
+          "apiMs": 3.8000000044703484,
+          "completionMs": 406.09999999403954,
+          "taskMs": 14.461,
+          "scriptMs": 0.004,
+          "styleMs": 3.428,
+          "atReturn": {
+            "styles": 200,
+            "transformReads": 400,
+            "writes": 100,
+            "effects": 100,
+            "templates": 1,
+            "clones": 99
+          },
+          "counts": {
+            "styles": 200,
+            "transformReads": 400,
+            "writes": 200,
+            "effects": 100,
+            "templates": 1,
+            "clones": 99
+          }
+        },
+        {
+          "summary": true,
+          "kind": "cold",
+          "n": 100,
+          "id": "motion",
+          "apiMs": 1.7999999970197678,
+          "completionMs": 404.8999999985099,
+          "taskMs": 19.473,
+          "scriptMs": 7.014,
+          "styleMs": 3.197,
+          "atReturn": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 0,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 100,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 101,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "cold",
+          "n": 100,
+          "id": "raw",
+          "apiMs": 1.1000000014901161,
+          "completionMs": 404.79999999701977,
+          "taskMs": 10.625,
+          "scriptMs": 0.07200000000000001,
+          "styleMs": 2.993,
+          "atReturn": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 100,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 100,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "cold",
+          "n": 1000,
+          "id": "base",
+          "apiMs": 20.200000002980232,
+          "completionMs": 447.70000000298023,
+          "taskMs": 85.926,
+          "scriptMs": 0.785,
+          "styleMs": 25.244,
+          "atReturn": {
+            "styles": 2000,
+            "transformReads": 4000,
+            "writes": 1000,
+            "effects": 1000,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 2000,
+            "transformReads": 4000,
+            "writes": 2000,
+            "effects": 1000,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "cold",
+          "n": 1000,
+          "id": "lab",
+          "apiMs": 14.200000002980232,
+          "completionMs": 441.3999999985099,
+          "taskMs": 81.959,
+          "scriptMs": 0.003,
+          "styleMs": 26.828999999999997,
+          "atReturn": {
+            "styles": 2000,
+            "transformReads": 4000,
+            "writes": 1000,
+            "effects": 1000,
+            "templates": 1,
+            "clones": 999
+          },
+          "counts": {
+            "styles": 2000,
+            "transformReads": 4000,
+            "writes": 2000,
+            "effects": 1000,
+            "templates": 1,
+            "clones": 999
+          }
+        },
+        {
+          "summary": true,
+          "kind": "cold",
+          "n": 1000,
+          "id": "motion",
+          "apiMs": 6.800000004470348,
+          "completionMs": 414.8999999985099,
+          "taskMs": 99.626,
+          "scriptMs": 24.296000000000003,
+          "styleMs": 29.046,
+          "atReturn": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 0,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 1000,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 1001,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "cold",
+          "n": 1000,
+          "id": "raw",
+          "apiMs": 9.100000001490116,
+          "completionMs": 431.1000000014901,
+          "taskMs": 73.1,
+          "scriptMs": 0.733,
+          "styleMs": 25.712,
+          "atReturn": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 1000,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 1000,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "warm",
+          "n": 1000,
+          "id": "base",
+          "apiMs": 14.100000001490116,
+          "completionMs": 437.5,
+          "taskMs": 78.42200000000001,
+          "scriptMs": 0.749,
+          "styleMs": 25.657,
+          "atReturn": {
+            "styles": 2000,
+            "transformReads": 4000,
+            "writes": 1000,
+            "effects": 1000,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 2000,
+            "transformReads": 4000,
+            "writes": 2000,
+            "effects": 1000,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "warm",
+          "n": 1000,
+          "id": "lab",
+          "apiMs": 11.300000004470348,
+          "completionMs": 436.6000000014901,
+          "taskMs": 80.58699999999999,
+          "scriptMs": 0.002,
+          "styleMs": 26.814999999999998,
+          "atReturn": {
+            "styles": 2000,
+            "transformReads": 4000,
+            "writes": 1000,
+            "effects": 1000,
+            "templates": 1,
+            "clones": 999
+          },
+          "counts": {
+            "styles": 2000,
+            "transformReads": 4000,
+            "writes": 2000,
+            "effects": 1000,
+            "templates": 1,
+            "clones": 999
+          }
+        },
+        {
+          "summary": true,
+          "kind": "warm",
+          "n": 1000,
+          "id": "motion",
+          "apiMs": 2.3000000044703484,
+          "completionMs": 412.3999999985099,
+          "taskMs": 88.46600000000001,
+          "scriptMs": 17.407,
+          "styleMs": 28.29,
+          "atReturn": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 0,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 1000,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 1000,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "warm",
+          "n": 1000,
+          "id": "raw",
+          "apiMs": 8.299999997019768,
+          "completionMs": 429.5,
+          "taskMs": 65.39200000000001,
+          "scriptMs": 0.6759999999999999,
+          "styleMs": 23.338,
+          "atReturn": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 1000,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 1000,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 200,
+          "id": "base",
+          "apiMs": 6.100000001490116,
+          "completionMs": 807.6000000014901,
+          "taskMs": 146.43800000000002,
+          "scriptMs": 0.15,
+          "styleMs": 46.546,
+          "atReturn": {
+            "styles": 400,
+            "transformReads": 800,
+            "writes": 200,
+            "effects": 200,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 400,
+            "transformReads": 800,
+            "writes": 400,
+            "effects": 200,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 200,
+          "id": "lab",
+          "apiMs": 4.800000004470348,
+          "completionMs": 805.9000000059605,
+          "taskMs": 138.83700000000002,
+          "scriptMs": 0.002,
+          "styleMs": 43.8,
+          "atReturn": {
+            "styles": 400,
+            "transformReads": 800,
+            "writes": 200,
+            "effects": 200,
+            "templates": 1,
+            "clones": 199
+          },
+          "counts": {
+            "styles": 400,
+            "transformReads": 800,
+            "writes": 400,
+            "effects": 200,
+            "templates": 1,
+            "clones": 199
+          }
+        },
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 200,
+          "id": "motion",
+          "apiMs": 3.100000001490116,
+          "completionMs": 801.1000000014901,
+          "taskMs": 148.02599999999998,
+          "scriptMs": 13.25,
+          "styleMs": 43.971000000000004,
+          "atReturn": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 0,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 200,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 201,
+            "templates": 0,
+            "clones": 0
+          }
+        },
+        {
+          "summary": true,
+          "kind": "stagger",
+          "n": 200,
+          "id": "raw",
+          "apiMs": 2.0999999940395355,
+          "completionMs": 802.7999999970198,
+          "taskMs": 122.06,
+          "scriptMs": 0.187,
+          "styleMs": 44.934000000000005,
+          "atReturn": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 200,
+            "templates": 0,
+            "clones": 0
+          },
+          "counts": {
+            "styles": 0,
+            "transformReads": 0,
+            "writes": 0,
+            "effects": 200,
+            "templates": 0,
+            "clones": 0
+          }
+        }
+      ]
+    },
+    "initial-dense": {
+      "sha256": "c3de4d965dc9f6bf8f16c923a47bbaed3c5dcebce107e96859b46f8eee587926",
+      "rows": 41,
+      "meta": {
+        "artifacts": {
+          "base": {
+            "entry": "067026a93133929001a80b06845989f2d5c5f02fd8af8404afb582bcbf6d121d",
+            "runtime": "05d83e2e78bdd81639cd1fecefc650d880b2d16e8b9af2af50634dda1f9bebf9"
+          },
+          "lab": {
+            "entry": "50626c6d6339830647417c6e15e52092a3b66c3b9d21d675e869aee9949d7b96",
+            "runtime": "f16f3e6efef4c953f09b210b5c7264173dbedb05d5e763b4f83ce43408ecda84"
+          }
+        },
+        "adapters": {
+          "base": "17f7000716814311ce26a52f59b743948528bcfb44faa027d50828403706cdb7",
+          "lab": "915c5392c2e4ab86c0a2c32683910f29ef2b51fe364f94ecaad8b84e5303b3dc",
+          "motion": "a548d1ab32ec09f92976b5b80cb98616e76f0d2e94f9afbfbf197907eefe34e5",
+          "raw": "56fc8b2d7cfed45b656b2622db014d40103adf8f4008abd85d1cd690207ee8db"
+        },
+        "motion": {
+          "version": "14.5.0",
+          "tree": "373de740683b5eca4c8c2cbd1a0b710f9993cc5032c84a6a9e1ca1551329fa3b"
+        },
+        "chrome": "158.0.8127.88",
+        "node": "v24.15.0",
+        "frames": 129,
+        "duration": 512,
+        "counts": [
+          100
+        ]
+      },
+      "summaries": [
+        {
+          "summary": true,
+          "n": 100,
+          "id": "base",
+          "apiMs": 2.899999998509884,
+          "completionMs": 516.8999999985099,
+          "raf": 125,
+          "taskMs": 81.659,
+          "styleMs": 20.87
+        },
+        {
+          "summary": true,
+          "n": 100,
+          "id": "lab",
+          "apiMs": 8,
+          "completionMs": 529.6000000014901,
+          "raf": 0,
+          "taskMs": 30.329,
+          "styleMs": 7.101999999999999
+        },
+        {
+          "summary": true,
+          "n": 100,
+          "id": "motion",
+          "apiMs": 6.700000002980232,
+          "completionMs": 518.3999999985099,
+          "raf": 0,
+          "taskMs": 81.58600000000001,
+          "styleMs": 11.07
+        },
+        {
+          "summary": true,
+          "n": 100,
+          "id": "raw",
+          "apiMs": 24.600000001490116,
+          "completionMs": 545.6999999955297,
+          "raf": 0,
+          "taskMs": 46.589999999999996,
+          "styleMs": 7.144
+        }
+      ]
+    }
+  }
+}
