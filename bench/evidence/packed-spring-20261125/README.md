@@ -1,0 +1,7 @@
+﻿# Packed canonical spring artifact
+
+Measured source 5908df33b6bce443b5afe1f742f79e1678113e51; baseline 9d473473e6e3ac5a91bb74bfed2eac5c205aa31a, source-identical to the built 37a1e2c9. Root ESM SHA-256 ee13a8ea541398da0d72b99741f73e6af638f39f0f6060ce5e679d955bc2a588 (base 7133d2bcde7340a9bba6237a21fb0df1268fd5e6be93feff67027878c23b2aa1); compositor ESM SHA-256 498d5b20c19dfdedd94f8d60cbc9f433776a98b1dedf1e004465992525b8e066 (base 0bc67669701640dc1a06b42331cf33d70e65f35cc32bc3ec8a28432d32fb4950).
+
+The grid and RDP algorithm are unchanged; retained stops are written directly into a Float64Array and the emitter serializes the same buffer in place. Only explicit diagnostic callers construct objects. Unused prebuilt-node and duration parameters removed. Exact canonical MotionProgram V1 regeneration remains green.
+
+Node 24.15.0, Windows. 160 cold compilations per arm, fresh isolated cache, varied physics/velocity/tolerance. Three warmup and twelve measured pairs, alternating arms, upper median: 6.8839 -> 6.4929 ms, identical CSS strings, 7083 median stops and 112539 characters. This is a modest diagnostic comparison, not calibrated superiority; the previous compiler A/A from the related experiment varied by about 7.5 percent. Run node bench/compare/spring-compiler-probe.mjs <base-dist> <new-dist> exact. All raw rows saved. Complete root closure 15598 -> 15564 B gzip, 14008 -> 13970 B Brotli. Full size gate passed. Typecheck and 374 targeted tests passed including compositor, canonical wire and native spring; normalized Windows path in borrow-type test.
