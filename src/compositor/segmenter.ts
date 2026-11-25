@@ -230,16 +230,12 @@ export function buildSpringNodesWithHorizon(
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] {
   const settle = springCompileHorizon(params, v0, tolerance);
-  return [
-    buildSpringNodesAtHorizon(
-      params,
-      v0,
-      tolerance,
-      settle,
-      baseGridSize(params, settle, tolerance, v0),
-    ),
-    settle,
-  ];
+  const packed = buildSpringNodesAtHorizon(params, v0, tolerance, settle,
+    baseGridSize(params, settle, tolerance, v0));
+  const nodes: SpringNode[] = [];
+  for (let i = 0; i < packed.length; i += 2)
+    nodes.push({ percent: packed[i]!, progress: packed[i + 1]! });
+  return [nodes, settle];
 }
 
 /**
@@ -250,7 +246,7 @@ export function tryBuildSpringNodes(
   params: SpringParams,
   v0: number,
   tolerance: number,
-): [nodes: SpringNode[], horizon: number] | undefined {
+): [nodes: Float64Array, horizon: number] | undefined {
   const settle = springCompileHorizon(params, v0, tolerance);
   const intervals = requiredGridSize(params, settle, tolerance, v0);
   if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return undefined;
@@ -264,7 +260,7 @@ export function tryBuildSpringNodes(
 export function buildRestingSpringNodesWithHorizon(
   params: SpringParams,
   tolerance: number,
-): [nodes: SpringNode[], horizon: number] {
+): [nodes: Float64Array, horizon: number] {
   const settle = springCompileHorizon(params, 0, tolerance);
   return [
     buildSpringNodesAtHorizon(
@@ -284,7 +280,7 @@ function buildSpringNodesAtHorizon(
   tolerance: number,
   settle: number,
   intervals: number,
-): SpringNode[] {
+): Float64Array {
   // Валидный набор params всегда оседает в бюджет (гарантия validateSpringForFrameLoop),
   // так что settle конечно; на всякий случай — деградация к малой ненулевой шкале.
   const T = Number.isFinite(settle) && settle > 0 ? settle : 1;
@@ -321,8 +317,11 @@ function buildSpringNodesAtHorizon(
   // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
   // (baseGridSize её и гарантирует ≤ tol/2) ⇒ суммарная реконструкция ≤ tolerance.
   const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);
-  return kept.map((k, n): SpringNode => ({
-    progress: n === kept.length - 1 ? 1 : ys[k]!,
-    percent: xs[k]! * 100,
-  }));
+  const samples = new Float64Array(kept.length * 2);
+  for (let i = 0; i < kept.length; i++) {
+    const k = kept[i]!;
+    samples[i * 2] = xs[k]! * 100;
+    samples[i * 2 + 1] = i === kept.length - 1 ? 1 : ys[k]!;
+  }
+  return samples;
 }
