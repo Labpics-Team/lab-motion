@@ -38,13 +38,16 @@ try{
      document.body.append(root);const targets=[...root.children];
      if(kind==='warm'){const warm=targets.map(el=>{const copy=el.cloneNode();root.append(copy);return copy});const c=adapter.start(warm,300,40,0);await c.finished;c.cancel();for(const el of warm)el.remove();}
      root.getBoundingClientRect();await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-     const counts={styles:0,transformReads:0,writes:0,effects:0};
+     const counts={styles:0,transformReads:0,writes:0,effects:0,templates:0,clones:0};
      const styles=window.getComputedStyle, read=CSSStyleDeclaration.prototype.getPropertyValue, write=CSSStyleDeclaration.prototype.setProperty, animate=Element.prototype.animate;
      window.getComputedStyle=function(...args){counts.styles++;return Reflect.apply(styles,this,args)};
      CSSStyleDeclaration.prototype.getPropertyValue=function(k){if(k==='transform')counts.transformReads++;return Reflect.apply(read,this,[k])};
      CSSStyleDeclaration.prototype.setProperty=function(...args){counts.writes++;return Reflect.apply(write,this,args)};
      Element.prototype.animate=function(...args){counts.effects++;return Reflect.apply(animate,this,args)};
-     window.measure={root,targets,counts,styles,read,write,animate};
+     const AnimationCtor=window.Animation, EffectCtor=window.KeyframeEffect;
+     window.Animation=new Proxy(AnimationCtor,{construct(target,args,newTarget){counts.effects++;return Reflect.construct(target,args,newTarget)}});
+     window.KeyframeEffect=new Proxy(EffectCtor,{construct(target,args,newTarget){if(args.length===1)counts.clones++;else counts.templates++;return Reflect.construct(target,args,newTarget)}});
+     window.measure={root,targets,counts,styles,read,write,animate,AnimationCtor,EffectCtor};
     },{n,kind});
     await cdp.send('Performance.enable',{timeDomain:'threadTicks'});
     const metrics=async()=>Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(m=>[m.name,m.value]));
@@ -55,7 +58,7 @@ try{
      let timer;try{await Promise.race([c.finished,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('completion watchdog')),10000)})]);}finally{clearTimeout(timer)}
      const completionMs=performance.now()-t;
      const counts={...m.counts};
-     window.getComputedStyle=m.styles;CSSStyleDeclaration.prototype.getPropertyValue=m.read;CSSStyleDeclaration.prototype.setProperty=m.write;Element.prototype.animate=m.animate;
+     window.getComputedStyle=m.styles;CSSStyleDeclaration.prototype.getPropertyValue=m.read;CSSStyleDeclaration.prototype.setProperty=m.write;Element.prototype.animate=m.animate;window.Animation=m.AnimationCtor;window.KeyframeEffect=m.EffectCtor;
      window.measure.control=c;
      return {apiMs,completionMs,atReturn,counts};
     },{kind,n});
