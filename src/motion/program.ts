@@ -12,10 +12,10 @@ const PIXELS = /^(?:width|height|min-width|max-width|min-height|max-height|top|r
 
 export interface Point { readonly _coordinates: readonly number[]; readonly _unit: string }
 export function point(key: string, input: MotionScalar, reference?: Point): Point {
-  if (isTransform(key) || key === 'opacity') return { _coordinates: [number(input, key)], _unit: '' };
+  if (typeof input === 'number' || isTransform(key) || key === 'opacity') return { _coordinates: [number(input, key)], _unit: PIXELS.test(key) ? 'px' : '' };
   const ast = tryParseValue(input);
   if (!ast) failMotion(`${key}: неподдерживаемый CSS ${String(input)}`);
-  if (ast.kind === 'unit') return { _coordinates: [ast.value], _unit: typeof input === 'number' && PIXELS.test(key) ? 'px' : ast.unit };
+  if (ast.kind === 'unit') return { _coordinates: [ast.value], _unit: ast.unit };
   if (ast.kind === 'relative') {
     if (!reference || reference._coordinates.length !== 1 || ast.unit && ast.unit !== reference._unit)
       failMotion(`${key}: несовместимая единица относительного значения`);

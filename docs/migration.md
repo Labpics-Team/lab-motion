@@ -57,15 +57,15 @@
 
 ## Перенос с Motion JS / Anime.js
 
-`./animate` даёт похожую one-liner форму для перечисленного ниже подмножества
+Корневой `animate` даёт похожую one-liner форму для перечисленного ниже подмножества
 одиночных переходов CSS-стилей DOM- и SVG-элементов. Таблицы — карта переноса
 конкретных вызовов, а не утверждение о совпадении возможностей, поведения или
 lifecycle. Полный целевой пользовательский охват ведётся в
 [roadmap #106](https://github.com/Labpics-Team/lab-motion/issues/106).
 
-## Motion JS → `./animate`
+## Motion JS → root API
 
-| Motion JS | `@labpics/motion/animate` | Заметка |
+| Motion JS | `@labpics/motion` | Заметка |
 |---|---|---|
 | `animate(el, { x: 100 })` | `animate(el, { x: 100 })` | совпадает этот `x/y`-срез; у Motion набор transform-осей шире |
 | `animate(el, { opacity: [0, 1] })` | `animate(el, { opacity: [0, 1] })` | пара `[from, to]` — тот же смысл |
@@ -75,14 +75,14 @@ lifecycle. Полный целевой пользовательский охва
 | `animate('.item', …, { delay: stagger(0.05) })` | `animate('.item', …, { stagger: 50 })` | шаг-мс между целями |
 | `const a = animate(…); a.pause(); a.play()` | то же | после естественного завершения Motion перезапускается, Lab Motion — нет |
 | `await animate(…)` или `animate(…).then(…)` | `await animate(…).finished` | у Motion контрол — thenable; у Lab Motion — отдельный Promise `finished` |
-| `a.time = 0.5` | `a.seek(500)` | у Motion — секунды и getter/setter; `seek` у Lab Motion — write-only, мс |
-| `a.stop()` | `a.stop()` | оба сохраняют текущую позу; в Lab Motion `stop` — алиас `cancel` |
+| `a.time = 0.5` | `a.seek(500)` | у Motion — секунды; Lab Motion использует мс, чтение — `playhead(a).time` |
+| `a.stop()` | `a.stop()` | оба сохраняют текущую позу |
 | `a.cancel()` | прямого эквивалента нет | Motion возвращает initial pose; Lab Motion сохраняет текущую |
 | `animate(el, { '--x': 100 })` | `animate(el, { '--x': ['0px', '100px'] })` | CSS-переменная с юнитом |
 
-## Anime.js (v4) → `./animate`
+## Anime.js (v4) → root API
 
-| Anime.js v4 | `@labpics/motion/animate` | Заметка |
+| Anime.js v4 | `@labpics/motion` | Заметка |
 |---|---|---|
 | `animate(el, { translateX: 100 })` | `animate(el, { x: 100 })` | Anime v4 также допускает shorthand `x`; Lab Motion использует `x/y` |
 | `animate(el, { opacity: [0, 1], duration: 300 })` | `animate(el, { opacity: [0, 1] }, { duration: 300 })` | у Anime параметры — во втором объекте; у Lab Motion опции — третий аргумент |
@@ -90,34 +90,25 @@ lifecycle. Полный целевой пользовательский охва
 | `{ delay: stagger(50) }` | `{ stagger: 50 }` | в Anime v4 `stagger` — именованный импорт |
 | `animate(targets, parameters)` | `animate(targets, props, options)` | разные сигнатуры, общий только one-liner характер |
 
-## Границы объединённого
+## Границы root API
 
-`./animate` объединяет одним lifecycle только from/to-переходы поддерживаемых
-CSS-стилей и transform-шортхендов: spring/tween, delay/stagger и контролы
-`finished/play/pause/seek/cancel/stop`.
+Root API объединяет одиночные цели, keyframes, последовательности, числовые
+значения, области компонентов и управление временем. См. [API](api.md) для
+точных поддерживаемых опций. Повтор, произвольные object targets, SVG-атрибуты
+и другие специализированные контракты не следует считать автоматически
+эквивалентными API конкурентов.
 
-Не объединены: N-keyframes и offsets, per-segment и per-property transitions,
-repeat/reverse/mirror/repeatDelay, inertia/decay, sequences/timeline,
-value/object targets, HTML/SVG attributes и path-specific SVG-каналы.
-`SVGElement` при этом уже является допустимой целью для поддерживаемых
-CSS-стилей. Низкоуровневые субпути не объединены общим владельцем: нет общего
-`finished` и контракта прерывания/cleanup. Также отсутствуют thenable control,
-`time/speed/duration` getters, `reverse`, `complete` и `restart`. Публичного
-API регистрации произвольных кодеков или адаптеров целей пакет не
-предоставляет.
-
+Прежний `./animate` сохранён для совместимости; это не ускоренный вариант root.
+Прямой `./native` возвращает браузерные `Animation` и предназначен для
+интеграций с WAAPI, а не для выбора уровня производительности.
 
 ## Компонентные области
 
-Для локальных селекторов и совместной остановки используйте `createAnimateScope`
-из `./animate`: создавайте scope в setup/mount и вызывайте `scope.destroy()` при
-cleanup. В React область принадлежит конкретному запуску эффекта, в Solid — owner.
-[Полные runnable-примеры](recipes.md#анимации-принадлежащие-компоненту).
+Для нового кода используйте `scope(root)` из `@labpics/motion` и
+`scope.dispose()` при cleanup. Область управляет локальными анимациями,
+подписками, дочерними областями и значениями. `createAnimateScope` из
+`./animate` остаётся прежним контрактом для мигрирующих потребителей.
 
-Это не полная замена Motion `useAnimate`, Anime Scope или GSAP Context. В частности,
-`destroy` сохраняет текущую позу согласно Lab Motion cancel и не восстанавливает
-старые inline styles, как revert. Область не владеет произвольными listeners и
-не добавляет отсутствующие keyframes/sequences/playback возможности.
 ## Контролируемая перестановка вместо собственного sortable resolver
 
 Для list/grid используйте `createReorder` из `@labpics/motion/behaviors/reorder`.

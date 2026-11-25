@@ -12,7 +12,7 @@ export function harness(native = false) {
     render: cb => { renders.add(cb); return () => { renders.delete(cb); }; },
     cancelAll() { updates.clear(); renders.clear(); },
   };
-  const effects: Array<{ currentTime: number | null; playbackRate: number; updatePlaybackRate(rate: number): void; cancelled: boolean; keys: Keyframe[]; timing: KeyframeAnimationOptions; finished: Promise<unknown>; complete(): void; cancel(): void }> = [];
+  const effects: Array<{ currentTime: number | null; readonly playState: AnimationPlayState; playbackRate: number; updatePlaybackRate(rate: number): void; cancelled: boolean; keys: Keyframe[]; timing: KeyframeAnimationOptions; finished: Promise<unknown>; complete(): void; cancel(): void }> = [];
   const host: RuntimeHost = { frame: loop, now: () => time, reduced: () => false,
     styles: element => (element as HTMLElement).style, supports: () => native };
   const engine = new Runtime(host);
@@ -27,11 +27,12 @@ export function harness(native = false) {
     setProperty(key: string, value: string) { values.set(key, value); writes.push([key, value]); },
     getPropertyValue(key: string) { return values.get(key) ?? ''; },
   }, ...(native ? { animate(keys: Keyframe[], timing: KeyframeAnimationOptions) {
-    let finish!: () => void;
+    let finish!: () => void; let completed = false;
     const effect = { keys, timing, currentTime: 0 as number | null, playbackRate: 1, cancelled: false,
       updatePlaybackRate(rate: number) { effect.playbackRate = rate; },
+      get playState(): AnimationPlayState { return effect.cancelled ? "idle" : completed ? "finished" : "running"; },
       finished: new Promise<void>(resolve => { finish = resolve; }),
-      complete() { finish(); }, cancel() { effect.cancelled = true; } };
+      complete() { completed = true; finish(); }, cancel() { effect.cancelled = true; } };
     effects.push(effect); return effect;
   } } : {}) } as unknown as HTMLElement;
   return { host, runtime, element, effects, writes, values, updates, renders,
