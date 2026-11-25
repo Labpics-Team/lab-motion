@@ -200,6 +200,13 @@ export class Run implements Playback {
   finish(): void { this._apply('finish'); }
 }
 
+// Scoped to one publication. Instructions contain no element or live Track.
+type Instruction = {
+  readonly programs: readonly Program[];
+  readonly pose: string | undefined;
+  readonly frames: Keyframe[];
+  readonly timing: KeyframeAnimationOptions;
+};
 class Surface {
   readonly _tracks: Map<string, Track> = new Map();
   private _rest: Point | undefined;
@@ -333,49 +340,62 @@ class Surface {
       if (owner && track._owner === owner) this._end(track, false, { _error: error });
     }
   }
-  _reconcile(): void {
-    if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
+  _reconcile(last?: Instruction): Instruction | undefined {
+    if (this._native || this._tracks.size === 0) { this._engine._idle(this); return last; }
     const active = [...this._tracks.values()];
-    if (!active.some(moving)) { this._engine._idle(this); return; }
+    if (!active.some(moving)) { this._engine._idle(this); return last; }
     const first = active[0]!, path = first._program, segments = path._segments;
-    const delay = segments[0]!._at, duration = path._duration - delay;
-    if (!(duration > 0) || first._rate <= 0 || (this._key !== 'transform' && this._key !== 'opacity') ||
+    if (first._rate <= 0 || (this._key !== 'transform' && this._key !== 'opacity') ||
         typeof this._element.animate !== 'function' || !active.every(track =>
           !track._paused && track._rate === first._rate && track._elapsed === first._elapsed &&
           track._program._duration === path._duration && track._program._segments.length === segments.length)) {
-      this._engine._wake(this); return;
+      this._engine._wake(this); return last;
     }
-    const offsets: number[] = [], eases: string[] = [];
-    for (let i = 0; i < segments.length; i++) {
-      const segment = segments[i]!, easing = segmentEase(segment);
-      const start = (segment._at - delay) / duration, end = (segment._end - delay) / duration;
-      if (!easing || !(end > start) || end > 1 || start < 0 ||
-          delay + start * duration !== segment._at || delay + end * duration !== segment._end ||
-          i > 0 && segments[i - 1]!._end !== segment._at ||
-          !this._engine._host.supports(easing) || !active.every(track => {
-            const part = track._program._segments[i]!, from = part._from[0]!, to = part._to[0]!;
-            return part._at === segment._at && part._end === segment._end && segmentEase(part) === easing &&
-              part._from.length === 1 && (this._key !== 'opacity' || Math.min(from, to) >= 0 && Math.max(from, to) <= 1) &&
-              (!i || track._program._segments[i - 1]!._to[0] === from);
-          })) {
-        this._engine._wake(this); return;
-      }
-      offsets.push(start); eases.push(easing);
-    }
+    const pose = this._written;
+    let instruction = last && pose === last.pose && active.length === last.programs.length &&
+      active.every((track, i) => track._program === last.programs[i]) ? last : undefined;
     try {
       this._lock(true);
-      const frames: Keyframe[] = offsets.map((offset, i) => ({ [this._key]: this._text(1, i), offset, easing: eases[i] }));
-      const last = this._text(2, segments.length - 1), end = (segments.at(-1)!._end - delay) / duration;
-      frames.push({ [this._key]: last, offset: end });
-      if (end < 1) frames.push({ [this._key]: last, offset: 1 });
-      const effect = this._element.animate(frames, { duration, delay, easing: 'linear', fill: 'both' });
+      if (!instruction) {
+        const delay = segments[0]!._at, duration = path._duration - delay;
+        const offsets: number[] = [], eases: string[] = [];
+        if (duration > 0) for (let i = 0; i < segments.length; i++) {
+          const segment = segments[i]!, easing = segmentEase(segment);
+          const start = (segment._at - delay) / duration, end = (segment._end - delay) / duration;
+          if (!easing || !(end > start) || end > 1 || start < 0 ||
+              delay + start * duration !== segment._at || delay + end * duration !== segment._end ||
+              i > 0 && segments[i - 1]!._end !== segment._at ||
+              !active.every(track => {
+                const part = track._program._segments[i]!, from = part._from[0]!, to = part._to[0]!;
+                return part._at === segment._at && part._end === segment._end && segmentEase(part) === easing &&
+                  part._from.length === 1 && (this._key !== 'opacity' || Math.min(from, to) >= 0 && Math.max(from, to) <= 1) &&
+                  (!i || track._program._segments[i - 1]!._to[0] === from);
+              })) break;
+          offsets.push(start); eases.push(easing);
+        }
+        if (offsets.length === segments.length) {
+          const frames: Keyframe[] = offsets.map((offset, i) => ({ [this._key]: this._text(1, i), offset, easing: eases[i] }));
+          const final = this._text(2, segments.length - 1), end = (segments.at(-1)!._end - delay) / duration;
+          frames.push({ [this._key]: final, offset: end });
+          if (end < 1) frames.push({ [this._key]: final, offset: 1 });
+          // A host must not be able to mutate the instruction for a sibling.
+          for (const frame of frames) Object.freeze(frame);
+          Object.freeze(frames);
+          instruction = { programs: active.map(track => track._program), pose, frames,
+            timing: Object.freeze({ duration, delay, easing: 'linear', fill: 'both' }) };
+        }
+      }
+      if (!instruction || !instruction.frames.every(frame => !frame.easing || this._engine._host.supports(frame.easing))) {
+        this._lock(false); this._engine._wake(this); return last;
+      }
+      const effect = this._element.animate(instruction.frames, instruction.timing);
       this._native = effect;
       this._watch();
-      // Новый effect ещё не передан потребителю; сначала скорость, затем точная поза.
       if (first._rate !== 1) effect.playbackRate = first._rate;
       if (first._elapsed !== 0) effect.currentTime = first._elapsed;
       this._lock(false);
       this._engine._idle(this);
+      return instruction;
     } catch (error) { this._lock(false); this._fail(error); throw error; }
   }
   _watch(): void {
@@ -622,10 +642,11 @@ export class Runtime {
         group._sample(track);
         run._own(track, draft._reduced); group._attach(track);
       }
+      let instruction: Instruction | undefined;
       for (const group of touched) {
         group._render();
         for (const track of [...group._tracks.values()]) if (track._elapsed >= track._program._duration) group._end(track, true);
-        group._reconcile();
+        instruction = group._reconcile(instruction);
       }
       run._complete();
     } catch (error) { run._error(error); throw error; }
