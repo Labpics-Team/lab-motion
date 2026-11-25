@@ -54,9 +54,8 @@ export interface ParsedVar {
 
 // ── Регулярки ─────────────────────────────────────────────────────────────────
 
-// Статические грамматики: те же capture groups без import-time RegExp-конструкторов.
-const UNIT_RE = /^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)((?:px|%|deg|rem|vh|vw|em|rad|turn|ms|s|fr|))$/i;
-const RELATIVE_RE = /^([+-])=([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)((?:px|%|deg|rem|vh|vw|em|rad|turn|ms|s|fr|))$/i;
+// Статическая грамматика: оператор, число, юнит; без import-time RegExp-конструкторов.
+const UNIT_RE = /^(?:([+-])=)?([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)((?:px|%|deg|rem|vh|vw|em|rad|turn|ms|s|fr|))$/i;
 // ЛИНЕЙНЫЙ (не catastrophic-backtracking) var()-регекс: ровно ОДИН
 // неограниченный квантификатор на fallback-хвост (`[\s\S]*`), захваченный
 // "сырым" (пробелы вокруг триммятся в коде через .trim(), не в самой
@@ -105,25 +104,14 @@ function parseUnitImpl(value: string | number, diagnostic: boolean): UnitAST | u
     };
   }
 
-  // Относительные +=/-=
-  const relMatch = RELATIVE_RE.exec(s);
-  if (relMatch) {
-    return {
-      kind: 'relative',
-      op: relMatch[1] as '+' | '-',
-      amount: clampFinite(parseFloat(relMatch[2])),
-      unit: relMatch[3].toLowerCase(),
-    };
-  }
-
-  // Числовое + юнит
-  const unitMatch = UNIT_RE.exec(s);
-  if (unitMatch) {
-    return {
-      kind: 'unit',
-      value: clampFinite(parseFloat(unitMatch[1])),
-      unit: unitMatch[2].toLowerCase(),
-    };
+  // Одна грамматика числа и единицы: относительный знак — необязательный префикс.
+  const match = UNIT_RE.exec(s);
+  if (match) {
+    const value = clampFinite(parseFloat(match[2]));
+    const unit = match[3].toLowerCase();
+    return match[1]
+      ? { kind: 'relative', op: match[1] as '+' | '-', amount: value, unit }
+      : { kind: 'unit', value, unit };
   }
 
   if (diagnostic) {

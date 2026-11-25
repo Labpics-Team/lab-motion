@@ -110,19 +110,14 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
 }
 
 // Отсутствующие координаты скорости означают ноль; внутренние сегменты не наследуют скорость.
-const zeroVelocity: readonly number[] = [];
+export const zeroVelocity: readonly number[] = [];
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
 export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1): void {
   const _segments = program._segments;
-  if (time >= program._duration) {
-    const final = _segments.at(-1)!._to;
-    for (let i = 0; i < final.length; i++) { value[i] = final[i]!; velocity[i] = 0; }
-    return;
-  }
-  // Последнее начало <= time: совпадающие границы и обратный seek сохраняют семантику.
-  let at = 0, end = _segments.length;
+  // Terminal time selects the final segment through the same endpoint path.
+  let end = _segments.length, at = time >= program._duration ? end - 1 : 0;
   while (at + 1 < end) {
     const middle = (at + end) >>> 1;
     if (time >= _segments[middle]!._at) at = middle;
