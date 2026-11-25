@@ -3,6 +3,7 @@ import { realpathSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { sha256File, hashFileTree } from './provenance.mjs';
@@ -12,13 +13,17 @@ const artifacts=fingerprints();
 const harnessDirectory=dirname(fileURLToPath(import.meta.url)), checkout=resolve(harnessDirectory,'../..');
 const git=(...args)=>execFileSync('git',args,{cwd:checkout,encoding:'utf8'}).trim();
 const inputs=['bench/compare/demand-spring-probe.mjs','bench/compare/serve-dist.mjs','bench/compare/provenance.mjs','package.json','pnpm-lock.yaml'];
+const require=createRequire(import.meta.url);
+const resolvePackage=(name,from=require)=>dirname(from.resolve(name+'/package.json'));
+const playwrightRequire=createRequire(resolve(resolvePackage('@playwright/test'),'package.json'));
+const coreRequire=createRequire(resolve(resolvePackage('playwright',playwrightRequire),'package.json'));
 const capture=()=>({
  revision:git('rev-parse','HEAD'),dirty:git('status','--porcelain'),
  inputs:Object.fromEntries(inputs.map(f=>[f,sha256File(resolve(checkout,f))])),
  node:process.version,nodeExecutable:sha256File(process.execPath),
  pnpm:execFileSync('pnpm',['--version'],{encoding:'utf8',shell:process.platform==='win32'}).trim(),
  packages:Object.fromEntries(['@playwright/test','playwright','playwright-core','tsup','typescript','esbuild','terser'].map(name=>{
-  const dir=realpathSync(resolve(checkout,'node_modules',name));
+  const dir=realpathSync(resolvePackage(name,name==='playwright'?playwrightRequire:name==='playwright-core'?coreRequire:require));
   return [name,{version:JSON.parse(readFileSync(resolve(dir,'package.json'),'utf8')).version,tree:hashFileTree(dir).sha256}];
  }))
 });
