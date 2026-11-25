@@ -51,3 +51,58 @@ it('завершение прежнего эффекта не завершает
   expect(h.effects.every(item => item.cancelled)).toBe(true);
   expect(h.updates.size + h.renders.size).toBe(0);
 });
+
+it('explicit native finish publishes only the final pose before cancelling', async () => {
+  const h = harness(true);
+  const run = h.runtime.animate(h.element, { x: [0, 100], y: [0, 200] }, { duration: 1000, ease: 'linear' });
+  const effect = h.effects[0]!, cancel = effect.cancel;
+  effect.currentTime = 250;
+  effect.cancel = () => {
+    expect(h.x()).toBe(100); expect(h.y()).toBe(200);
+    cancel();
+  };
+  h.writes.length = 0;
+  run.finish();
+  expect(await run.finished).toEqual({ status: 'finished' });
+  expect(h.writes).toHaveLength(1);
+  expect(effect.cancelled).toBe(true);
+  expect(h.updates.size + h.renders.size).toBe(0);
+});
+
+it('finishing one native channel publishes its endpoint without advancing a sibling', async () => {
+  const h = harness(true);
+  const old = h.runtime.animate(h.element, { x: 100, y: 200 }, { duration: 1000, ease: 'linear' });
+  const effect = h.effects[0]!, cancel = effect.cancel;
+  effect.currentTime = 250;
+  const x = h.runtime.animate(h.element, { x: 100 }, { duration: 1000, ease: 'linear' });
+  effect.cancel = () => {
+    expect(h.x()).toBe(100); expect(h.y()).toBe(50);
+    cancel();
+  };
+  h.writes.length = 0;
+  x.finish();
+  expect(await x.finished).toEqual({ status: 'finished' });
+  expect(h.writes).toHaveLength(1);
+  expect(old.state).toBe('running');
+  old.finish();
+  expect(h.y()).toBe(200);
+  expect(await old.finished).toEqual({ status: 'stopped' });
+});
+
+it('a successor accepted during explicit finish cancellation is not settled by the old command', async () => {
+  const h = harness(true);
+  const old = h.runtime.animate(h.element, { x: 100 }, { duration: 1000, ease: 'linear' });
+  const effect = h.effects[0]!, cancel = effect.cancel;
+  let successor: ReturnType<typeof h.runtime.animate> | undefined;
+  effect.cancel = () => {
+    expect(h.x()).toBe(100);
+    cancel();
+    successor = h.runtime.animate(h.element, { x: 200 }, { duration: 1000, ease: 'linear' });
+  };
+  old.finish();
+  expect(await old.finished).toEqual({ status: 'stopped' });
+  expect(successor?.state).toBe('running');
+  successor!.seek(500); expect(h.x()).toBe(150);
+  successor!.finish();
+  expect(await successor!.finished).toEqual({ status: 'finished' });
+});

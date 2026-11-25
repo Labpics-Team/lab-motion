@@ -340,7 +340,7 @@ class Surface {
     const first = active[0]!, seg = first._program._segments[0]!;
     const _nativeEase = first._program._nativeEase;
     const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
+      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase &&
         track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
     if (!canNative) { this._engine._wake(this); return; }
     try {
@@ -404,7 +404,8 @@ class Surface {
         const reuse = action === 'seek' && effect?.playState === 'running' &&
           selected.length === this._tracks.size && selected.every(owns) &&
           effect.finished === this._token && effect.playbackRate === first._rate && time < first._program._duration;
-        if (!reuse) this._detach();
+        const terminalNative = effect && action === 'finish';
+        if (!reuse && !terminalNative) this._detach();
         for (const track of selected) {
           if (!owns(track)) continue;
           if (action === 'pause') track._paused = true;
@@ -421,7 +422,8 @@ class Surface {
             effect.currentTime = time;
           } finally { this._lock(false); }
         }
-        this._render();
+        if (terminalNative) this._detach();
+        else this._render();
         for (const track of selected) {
           if (!owns(track)) continue;
           if (action === 'stop') this._end(track, false);

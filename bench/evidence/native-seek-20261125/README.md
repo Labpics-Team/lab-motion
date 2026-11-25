@@ -31,3 +31,18 @@ The speculative root numeric parser shortcut was removed. The rest of the runtim
 Baseline is the independent factoring commit 8b47d832886bda7d736e3e05d67dcdf791e34afe (root ESM SHA-256 72032c02b39d6f8b0b8558f47b6cf7074781954673ad2ae3d1ca8b1d8f3164a6). Candidate is its source merge with 93e05f0a (a4f99620, root ESM SHA-256 49b28bf2f58bf8683cde1b4ef259ce24ebf2a455ffef507ed32384c5fdb25bd1). Root closure 15586 gzip bytes, unchanged size cap PASS. Same Chrome and machine; updated probe performs untimed geometry verification for every seek target before the timed trial. `integrated-factor.jsonl` retains all eight paired observations. The earlier A/A used the earlier probe; no calibrated non-inferiority claim for this integration.
 
 100-target seek: 858.3 → 95.7 ms total, 12200 → 200 effect creations. The 1000-target JS seek scenario: 267.9 → 248 ms. To-only startup 1000: 26 → 18.7 ms API-return, but total 167.2 → 211.4 ms (includes immediate finish and all-target validation). This adverse measurement still needs isolated cleanup/render diagnosis. Keep draft; merge only after independent factoring acceptance and review of the residual regression. Targeted 12 tests, typecheck, and two real Chrome seek regressions (including pending rate and phase) passed.
+
+## Explicit native finish: publish once before cancellation
+
+Candidate root SHA-256: e8501dfde50982a0dc8dd10e6e17ca639855e0cab97d9c051d9d8564295fb117. Full size gate PASS, root closure 15597 gzip bytes / unchanged cap 15600; root animate consumer 12544 bytes. The previous implementation published a temporary sampled pose before cancelling and then the final pose. Explicit finish now publishes only the selected endpoints (with the siblings' synchronized pose) before cancellation, then settles only the channels still owned by the command. Native eligibility uses the already-computed nativeEase invariant instead of repeating its single-segment check. Three regressions cover one write, partial ownership, and adoption during cancel.
+
+`finish-probe.mjs` uses fresh real Chrome pages, two warmup pairs and ten measured pairs, alternating ABBA/BAAB. It independently times creation and finish, counts actual CSSStyleDeclaration.setProperty calls during finish, verifies all final x/opacity values and effect cleanup. Run `node bench/evidence/native-seek-20261125/finish-probe.mjs <baseline-dist> <candidate-dist>`.
+
+| 1000 targets | Startup ms | Finish ms | Total ms | Finish writes |
+|---|---:|---:|---:|---:|
+| dcf136a8 (root SHA 49b28bf2...fd1), before change | 27.6 | 6.9 | 63.9 | 4000 |
+| Candidate, same run | 27.8 | 6.3 | 62.9 | 2000 |
+| 8b47d832 factoring (root SHA 72032c02...a6), independent run | 28.4 | 7.0 | 64.4 | 4000 |
+| Candidate, independent run | 27.6 | 6.4 | 64.0 | 2000 |
+
+Raw pairs: `finish-once.jsonl` and `finish-vs-factor.jsonl`. The deterministic halving of writes is the result; elapsed differences are diagnostic, not calibrated significance. In the broader single-page probe (`finalization-integrated.jsonl`, vs factoring), 100-target seek was 881.8 -> 94.2 ms total, 12200 -> 200 native effects; 1000-target API return was 19.9 -> 17.2 ms but total was 171.4 -> 200.6 ms. That noisy adverse total is retained, not declared resolved universally by the separate fresh-page experiment. No release-ranking claim. Existing PROFILE/SELECT remains authoritative.
