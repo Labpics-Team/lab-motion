@@ -114,6 +114,25 @@ const zeroVelocity: readonly number[] = [];
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
+// Two coefficient registers cover alternating old/new phases of a seek.
+// They retain only trusted pure curve functions, never a Program or target.
+function coefficientRegister() {
+  return { _ease: undefined as Timing['_ease'] | undefined, _input: -1, _p: 0, _dy: 0, _dx: 1 };
+}
+let recent = coefficientRegister(), previous = coefficientRegister();
+function coefficients(ease: Timing['_ease'], input: number) {
+  if (recent._ease === ease && recent._input === input) return recent;
+  const other = previous; previous = recent; recent = other;
+  if (recent._ease !== ease || recent._input !== input) {
+    const low = Math.max(0, input - 0.001), high = Math.min(1, input + 0.001);
+    recent._dy = (ease(high) - ease(low)) * 1000;
+    recent._dx = high - low;
+    recent._p = ease(input);
+    recent._ease = ease; recent._input = input;
+  }
+  return recent;
+}
+
 export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1): void {
   const _segments = program._segments;
   if (time >= program._duration) {
@@ -143,8 +162,14 @@ export function sample(program: Program, time: number, value: number[], velocity
   } else if (_elapsed > 0 && p < 1) {
     const low = Math.max(0, p - 0.001), high = Math.min(1, p + 0.001);
     const ease = segment._timing._ease;
-    dp = (ease(high) - ease(low)) * 1000 / ((high - low) * duration);
-    p = ease(p);
+    if (segment._timing._cssEase !== undefined) {
+      const phase = coefficients(ease, p);
+      dp = phase._dy / (phase._dx * duration);
+      p = phase._p;
+    } else {
+      dp = (ease(high) - ease(low)) * 1000 / ((high - low) * duration);
+      p = ease(p);
+    }
   }
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
   for (let i = 0; i < segment._from.length; i++) {
