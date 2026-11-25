@@ -1,5 +1,5 @@
 import { FINISHED, STOPPED, failMotion, number, timing } from './model.js';
-import { program, segmentEase } from './program.js';
+import { program, segmentEase, validatePlacement } from './program.js';
 import type { MotionEase, MotionOptions, MotionResult, MotionSpring, Playback, PlaybackState } from './types.js';
 
 interface LayoutCommon { readonly delay?: number; readonly reducedMotion?: 'user' | 'always' }
@@ -56,7 +56,8 @@ class LayoutRun implements Playback {
     const win = root.ownerDocument.defaultView;
     const reduced = config._reduced || win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
     const path = program('--lab-motion-progress', { _coordinates: [0], _unit: '' }, [1], false, config, [0]);
-    this.duration = reduced ? 0 : path._duration;
+    validatePlacement(path, config._delay);
+    this.duration = reduced ? 0 : config._delay + path._duration;
     this.finished = new Promise((yes, no) => { this._resolve = yes; this._reject = no; });
     void this.finished.catch(() => {});
     this._mutate = mutate;

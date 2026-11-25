@@ -1,5 +1,5 @@
 import { MAX_CHANNELS, failMotion, number, properties, snapshot, timing } from './model.js';
-import { runtime, type Runtime, type Draft } from './runtime.js';
+import { runtime, endOf, type Runtime, type Draft } from './runtime.js';
 import type { MotionOptions, Playback, SequenceOptions, SequenceStep } from './types.js';
 import type { Segment } from './program.js';
 
@@ -35,13 +35,13 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
       let channels = merged.get(draft._group._element);
       if (!channels) { channels = new Map(); merged.set(draft._group._element, channels); }
       const before = channels.get(draft._program._key);
-      if (before && draft._program._offset + draft._program._segments[0]!._at < before._program._duration) failMotion('Пересечение шагов');
+      if (before && draft._offset + draft._program._segments[0]!._at < before._program._duration) failMotion('Пересечение шагов');
       const segments = before?._program._segments ?? [];
-      const placement = draft._program._offset;
+      const placement = draft._offset;
       for (const segment of draft._program._segments) segments.push(placement ? { ...segment, _at: placement + segment._at, _end: placement + segment._end } : segment);
-      const next: SequenceDraft = { ...draft, _program: { ...draft._program, _segments: segments, _offset: 0 } };
+      const next: SequenceDraft = { ...draft, _offset: 0, _program: { ...draft._program, _segments: segments, _duration: endOf(draft) } };
       channels.set(draft._program._key, next);
-      end = Math.max(end, next._program._duration);
+      end = Math.max(end, endOf(draft));
     }
     previousStart = offset; cursor = Math.max(0, end - sequenceClock._delay);
   }

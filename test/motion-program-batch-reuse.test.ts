@@ -44,8 +44,8 @@ it('preserves distinct initial coordinates across consecutive targets', () => {
 it('preserves staggered offsets and the delayed target pose', () => {
   const a = harness(), b = harness();
   const drafts = a.runtime._draft([a.element, b.element], properties({ x: 100 }), timing({ ...options, stagger: 100 }));
-  expect(drafts.map(draft => draft._program._offset)).toEqual([0, 100]);
-  expect(drafts[0]!._program._segments).toBe(drafts[1]!._program._segments);
+  expect(drafts.map(draft => draft._offset)).toEqual([0, 100]);
+  expect(drafts[0]!._program).toBe(drafts[1]!._program);
   const run = a.runtime._execute(drafts);
   try { run.seek(50); expect(a.x()).toBe(5); expect(b.x()).toBe(0); }
   finally { run.stop(); }

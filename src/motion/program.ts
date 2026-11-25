@@ -53,8 +53,6 @@ export interface Program {
   readonly _unit: string;
   readonly _segments: readonly Segment[];
   readonly _duration: number;
-  /** Placement in run time; segments belong to the local shape. */
-  readonly _offset: number;
   /** Minimum positive local interval (Infinity for a step-only shape). */
   readonly _span: number;
   /** To-only identity; timing placement is compared separately. */
@@ -86,7 +84,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
   return { _at: at, _end: end, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
 }
 
-export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0): Program {
+export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[]): Program {
   const start = authored ? 1 : 0, count = values.length - start;
   const times = authored ? timing._times : undefined;
   if (times && times.length !== count + 1) failMotion('times: другая длина');
@@ -107,13 +105,13 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   const last = _segments.at(-1)!;
   const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, timing._cssEase ?? timing._ease];
-  return place({ _key: key, _unit: from._unit, _segments, _duration: last._end, _offset: 0, _span: span, _identity }, offset + timing._delay);
+  return { _key: key, _unit: from._unit, _segments, _duration: last._end, _span: span, _identity };
 }
 
 /** A placement owns no new geometry. Check every positive interval in run time. */
-export function place(path: Program, offset: number): Program {
-  if (Object.is(offset, path._offset)) return path;
-  const duration = offset + path._segments.at(-1)!._end;
+export function validatePlacement(path: Program, offset: number): void {
+  if (offset === 0) return;
+  const duration = offset + path._duration;
   if (!Number.isFinite(duration)) failMotion('Непредставимая длительность');
   // A conservative upper bound on rounding error for both endpoint additions.
   // Ordinary placement is constant work; ambiguous floating-point intervals
@@ -122,7 +120,6 @@ export function place(path: Program, offset: number): Program {
     if (segment._end > segment._at && offset + segment._end === offset + segment._at)
       failMotion('Непредставимая длительность');
   }
-  return { ...path, _offset: offset, _duration: duration };
 }
 
 export function segmentEase(segment: Segment): string | undefined {
@@ -142,19 +139,20 @@ export const zeroVelocity: readonly number[] = [];
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
-export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1): void {
+export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1, offset = 0): void {
   const _segments = program._segments;
   // Terminal time selects the final segment through the same endpoint path.
-  let end = _segments.length, at = time >= program._duration ? end - 1 : 0;
+  const terminal = time >= offset + program._duration;
+  let end = _segments.length, at = terminal ? end - 1 : 0;
   while (at + 1 < end) {
     const middle = (at + end) >>> 1;
-    if (time >= program._offset + _segments[middle]!._at) at = middle;
+    if (time >= offset + _segments[middle]!._at) at = middle;
     else end = middle;
   }
   const segment = _segments[at]!;
-  const begin = program._offset + segment._at, finish = program._offset + segment._end;
-  const _elapsed = Math.max(0, time - begin), duration = finish - begin;
-  if (time >= finish || time >= program._duration) {
+  const start = segment._at, begin = offset + start, finish = offset + segment._end;
+  const _elapsed = time <= begin ? 0 : Math.max(0, time - offset - start), duration = segment._end - start;
+  if (time >= finish || terminal) {
     for (let i = 0; i < segment._to.length; i++) { value[i] = segment._to[i]!; velocity[i] = 0; }
     return;
   }
