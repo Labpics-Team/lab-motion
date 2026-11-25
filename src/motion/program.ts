@@ -57,7 +57,7 @@ export interface Program {
   readonly _identity: readonly unknown[] | undefined | null;
 }
 
-function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration: number): Segment {
+function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, end: number, positive: boolean): Segment {
   if (from._unit !== to._unit || from._coordinates.length !== to._coordinates.length)
     failMotion('Разные единицы from/to');
   let normalized: number | undefined;
@@ -72,13 +72,14 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     else if (normalized !== v / distance) normalized = NaN;
   }
   let artifact: SpringExecutionArtifactTuple | SpringExecutionRequest | undefined;
-  let length = duration;
+  let length = end - at;
   if (timing._spring) {
     if (Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, 0.05 / extent), undefined, true);
     length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent) * 1000;
+    end = at + length; positive = length > 0;
   }
-  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) failMotion('Непредставимая длительность');
-  return { _at: at, _end: at + length, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
+  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(end) || positive && end === at) failMotion('Непредставимая длительность');
+  return { _at: at, _end: end, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
 }
 
 export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0): Program {
@@ -87,14 +88,14 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   if (times && times.length !== count + 1) failMotion('times: другая длина');
   if (timing._spring && count > 1) failMotion('keyframes: задайте duration/ease');
   const _segments: Segment[] = [];
-  const duration = timing._duration ?? 0;
+  const duration = timing._duration ?? 0, base = offset + timing._delay;
   let current = from;
   for (let i = 0; i < count; i++) {
     const next = point(key, values[i + start]!, current);
     const a = times?.[i] ?? i / count;
     const b = times?.[i + 1] ?? (i + 1) / count;
     _segments.push(segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
-      offset + timing._delay + a * duration, (b - a) * duration));
+      base + a * duration, base + b * duration, duration > 0));
     current = next;
   }
   const last = _segments.at(-1)!;
