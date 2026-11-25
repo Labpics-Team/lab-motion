@@ -55,6 +55,8 @@ export interface Program {
   readonly _duration: number;
   /** Placement in run time; segments belong to the local shape. */
   readonly _offset: number;
+  /** Minimum positive local interval (Infinity for a step-only shape). */
+  readonly _span: number;
   /** To-only identity; timing placement is compared separately. */
   readonly _identity: readonly unknown[] | undefined;
 }
@@ -91,30 +93,36 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   if (timing._spring && count > 1) failMotion('keyframes: задайте duration/ease');
   const _segments: Segment[] = [];
   const duration = timing._duration ?? 0;
-  let current = from;
+  let current = from, span = Infinity;
   for (let i = 0; i < count; i++) {
     const next = point(key, values[i + start]!, current);
     const a = times?.[i] ?? i / count;
     const b = times?.[i + 1] ?? (i + 1) / count;
-    _segments.push(segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
-      a * duration, b * duration, duration > 0));
+    const part = segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
+      a * duration, b * duration, duration > 0);
+    _segments.push(part);
+    if (part._end > part._at) span = Math.min(span, part._end - part._at);
     current = next;
   }
   const last = _segments.at(-1)!;
   const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, timing._cssEase ?? timing._ease];
-  return place({ _key: key, _unit: from._unit, _segments, _duration: last._end, _offset: 0, _identity }, offset + timing._delay);
+  return place({ _key: key, _unit: from._unit, _segments, _duration: last._end, _offset: 0, _span: span, _identity }, offset + timing._delay);
 }
 
 /** A placement owns no new geometry. Check every positive interval in run time. */
 export function place(path: Program, offset: number): Program {
   if (Object.is(offset, path._offset)) return path;
-  for (const segment of path._segments) {
-    const at = offset + segment._at, end = offset + segment._end;
-    if (!Number.isFinite(end) || segment._end > segment._at && end === at)
+  const duration = offset + path._segments.at(-1)!._end;
+  if (!Number.isFinite(duration)) failMotion('Непредставимая длительность');
+  // A conservative upper bound on rounding error for both endpoint additions.
+  // Ordinary placement is constant work; ambiguous floating-point intervals
+  // take the exact original representability check, never an epsilon snap.
+  if (path._span <= duration * (2 * Number.EPSILON)) for (const segment of path._segments) {
+    if (segment._end > segment._at && offset + segment._end === offset + segment._at)
       failMotion('Непредставимая длительность');
   }
-  return { ...path, _offset: offset, _duration: offset + path._segments.at(-1)!._end };
+  return { ...path, _offset: offset, _duration: duration };
 }
 
 export function segmentEase(segment: Segment): string | undefined {
