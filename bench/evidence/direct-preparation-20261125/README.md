@@ -1,10 +1,10 @@
 # Direct channel preparation and shared clock snapshots — 2026-11-25
 
-Main baseline b29e214de450ff78292257b8b3bf0f9c8e710c61; measured production source 7c60aacd878296214ac1a9c28471adf7b03b21fd. Both builds used one frozen dependency installation in the same isolated Windows checkout. Exact source, runtime-tree, entry, toolchain, compression-policy, script and raw-row fingerprints are in receipt.json. The baseline root hash also matches the accepted #581 build. Complete root ESM closure 15582 -> 15595 gzip bytes, unchanged 15600-byte cap; Brotli 13996 -> 13977. Full size gate passed.
+Main baseline b29e214de450ff78292257b8b3bf0f9c8e710c61; measured production source 7c60aacd878296214ac1a9c28471adf7b03b21fd. Both builds used one frozen dependency installation in the same isolated Windows checkout. Source revision, runtime-tree, entry, toolchain and raw-row fingerprints are in receipt.json. The inputs record observed Windows working-tree bytes (mixed LF/CRLF); canonicalGitInputs gives portable exact Git-blob hashes for the pinned revision. The baseline root hash also matches the accepted #581 build. Complete root ESM closure 15582 -> 15595 gzip bytes, unchanged 15600-byte cap; Brotli 13996 -> 13977. Full size gate passed.
 
 A prepared channel becomes the live Track in place, with the current registered Surface winning over a retired prepared Surface. Unpublished non-transform surfaces need not be recreated. Allocation of Surface is pure; preparation, publication and each successful update frame obtain a single clock snapshot. Each native effect still supplies its own currentTime. Failed clock/sample reads follow the existing per-surface failure path. No extra scheduler, public API, or global cache.
 
-Fresh Chrome 158.0.8127.88 pages on Windows, Node 24.15.0. Two warmup and ten measured paired observations per workload, alternating arms. The startup probe measures the synchronous animate return and counts actual performance.now / getComputedStyle calls; an initial warmup is excluded. It verifies all intermediate and final geometry and effect cleanup. A/A runs use the same baseline artifact in both arms.
+Fresh Chrome 158.0.8127.88 pages on Windows, Node 24.15.0. Two warmup and ten measured paired observations per workload, alternating arms. The startup probe measures the synchronous animate return and counts actual performance.now / getComputedStyle calls; an initial warmup is excluded. It checks intermediate and final geometry for exact equivalence across artifacts, verifies finished status and absence of leaked native effects. Independent expected-pose correctness is covered by the existing conformance suite, not by this equivalence probe. A/A runs use the same baseline artifact in both arms.
 
 | Startup workload | Base ms | New ms | A/A ms | Clock reads before -> after |
 |---|---:|---:|---:|---:|
@@ -15,7 +15,7 @@ Fresh Chrome 158.0.8127.88 pages on Windows, Node 24.15.0. Two warmup and ten me
 | Native + width/height 1000 | 32.8 | 30.6 | 34.3 / 34.5 | 14000 -> 2 |
 | Authored width/height 1000 | 6.3 | 4.6 | 6.5 / 6.4 | 8000 -> 2 |
 
-The mixed workload's isolated finish was adverse (5.3 -> 6.1 ms, A/A 5.6 / 5.6). No universal non-regression or competitor leadership claim. The frame probe drives the real JS scheduler using virtual timestamps and actual DOM. Its timed interval measures synchronous frame callbacks and CSS writes, not presentation latency or FPS.
+The mixed workload's isolated finish was adverse (5.3 -> 6.1 ms, A/A 5.6 / 5.6). No universal non-regression or competitor leadership claim. The frame probe manually invokes captured requestAnimationFrame callbacks synchronously using virtual timestamps and actual DOM. The measured wall-clock interval covers those callback computations and CSS writes, not the browser frame scheduler, presentation latency or FPS. It checks intermediate geometry for equivalence and final geometry against expected endpoints.
 
 | 120 virtual frames | Base ms | New ms | A/A ms | Clock reads before -> after |
 |---|---:|---:|---:|---:|
