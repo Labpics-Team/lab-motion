@@ -1,22 +1,31 @@
-import { createServer } from 'node:http';
-import { readFileSync, realpathSync } from 'node:fs';
-import { resolve, relative, isAbsolute } from 'node:path';
+import { serveDist } from './serve-dist.mjs';
+import { realpathSync, readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { sha256File, hashFileTree } from './provenance.mjs';
 const roots={baseline:realpathSync(process.argv[2]),candidate:realpathSync(process.argv[3])};
 const fingerprints=()=>Object.fromEntries(Object.entries(roots).map(([k,v])=>[k,{entry:sha256File(resolve(v,'motion/index.js')),runtime:hashFileTree(v,f=>/\.(?:c?js|mjs)$/.test(f)).sha256}]));
 const artifacts=fingerprints();
-const server=createServer((req,res)=>{
- try {
-  if(req.url==='/'){res.setHeader('Content-Type','text/html');return res.end('<!doctype html>');}
-  const [,name,...parts]=new URL(req.url,'http://localhost').pathname.split('/');
-  const root=roots[name],file=realpathSync(resolve(root,...parts)),rel=relative(root,file);
-  if(rel==='..'||rel.startsWith('../')||rel.startsWith('..\\')||isAbsolute(rel))throw Error('path');
-  res.setHeader('Content-Type','text/javascript');res.end(readFileSync(file));
- }catch{res.statusCode=404;res.end();}
+const harnessDirectory=dirname(fileURLToPath(import.meta.url)), checkout=resolve(harnessDirectory,'../..');
+const git=(...args)=>execFileSync('git',args,{cwd:checkout,encoding:'utf8'}).trim();
+const inputs=['bench/compare/demand-spring-probe.mjs','bench/compare/serve-dist.mjs','bench/compare/provenance.mjs','package.json','pnpm-lock.yaml'];
+const capture=()=>({
+ revision:git('rev-parse','HEAD'),dirty:git('status','--porcelain'),
+ inputs:Object.fromEntries(inputs.map(f=>[f,sha256File(resolve(checkout,f))])),
+ node:process.version,nodeExecutable:sha256File(process.execPath),
+ pnpm:execFileSync('pnpm',['--version'],{encoding:'utf8',shell:process.platform==='win32'}).trim(),
+ packages:Object.fromEntries(['@playwright/test','playwright','playwright-core','tsup','typescript','esbuild','terser'].map(name=>{
+  const dir=realpathSync(resolve(checkout,'node_modules',name));
+  return [name,{version:JSON.parse(readFileSync(resolve(dir,'package.json'),'utf8')).version,tree:hashFileTree(dir).sha256}];
+ }))
 });
-await new Promise(r=>server.listen(0,'127.0.0.1',r));
+const provenance=capture();
+assert(!provenance.dirty,'benchmark harness checkout must be clean');
+
+const server=await serveDist(roots);
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const cases=[['reduced',100],['reduced',1000],['system',1000],['sequence',200],['sequence-system',200],['normal',100],['normal',1000]];
 const rows=[];
@@ -54,7 +63,8 @@ try{
   }
  }
  assert.deepEqual(fingerprints(),artifacts);
- console.log(JSON.stringify({artifacts,chrome:browser.version(),node:process.version}));
+ assert.deepEqual(capture(),provenance);
+ console.log(JSON.stringify({artifacts,chrome:browser.version(),node:process.version,provenance}));
  const med=x=>x.sort((a,b)=>a-b)[Math.floor(x.length/2)];
  for(const [kind,n] of cases)for(const name of ['baseline','candidate']){
   const r=rows.filter(x=>x.kind===kind&&x.n===n&&x.name===name);

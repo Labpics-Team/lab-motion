@@ -9,12 +9,30 @@ vi.mock('../src/compositor/segmenter.js', async importOriginal => {
   return { ...actual,
     tryBuildSpringNodes(...args: Parameters<typeof actual.tryBuildSpringNodes>) {
       if (args[3]) work.horizons++;
-      else work.builds++;
       return actual.tryBuildSpringNodes(...args);
     },
   };
 });
+vi.mock('../src/internal/solver.js', async importOriginal => {
+  const actual = await importOriginal<typeof import('../src/internal/solver.js')>();
+  return { ...actual,
+    makeSpringValueSampler(...args: Parameters<typeof actual.makeSpringValueSampler>) {
+      work.builds++;
+      return actual.makeSpringValueSampler(...args);
+    },
+  };
+});
 const spring = { mass: 1, stiffness: 173, damping: 26 };
+
+it('cold playable spring actually builds a grid while terminal projection does not', () => {
+  const before = work.builds;
+  const clock = timing({ spring: { mass: 1, stiffness: 123.456, damping: 20 } });
+  const from = { _coordinates: [0], _unit: 'px' };
+  program('width', from, [17], false, clock, [], 0, true);
+  expect(work.builds).toBe(before);
+  program('width', from, [17], false, clock, []);
+  expect(work.builds).toBe(before + 1);
+});
 
 it('terminal projection preserves the exact validated horizon without building or caching stops', () => {
   for (const physics of [spring, { mass: 1, stiffness: 100, damping: 20 }, { mass: 1, stiffness: 100, damping: 60 }])
