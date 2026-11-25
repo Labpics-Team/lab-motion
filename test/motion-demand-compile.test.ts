@@ -78,3 +78,36 @@ it('a reduced first step followed by a playable step still uses its serialized s
     expect(h.values.get('width')).toBe(value[0] + 'px');
   } finally { run.stop(); }
 });
+
+it('a reduced layout commits once without a spring grid or a view transition', async () => {
+  const { layout } = await import('../src/motion/layout.js');
+  const h = harness();
+  const root = Object.assign(h.element, {
+    ownerDocument: { defaultView: { matchMedia: () => ({ matches: true }) } },
+    getBoundingClientRect: () => ({ width: 10, height: 10 }),
+  });
+  Object.assign(root.style, { getPropertyPriority: () => '' });
+  const before = { ...work };
+  const mutate = vi.fn();
+  const run = layout(root, mutate, { spring });
+  expect(run.duration).toBe(0);
+  expect(await run.finished).toEqual({ status: 'finished' });
+  expect(mutate).toHaveBeenCalledTimes(1);
+  expect(work.builds).toBe(before.builds);
+  expect(work.horizons - before.horizons).toBe(1);
+});
+
+it('sequence snapshots system motion preference once for the entire operation', async () => {
+  const h = harness();
+  let reads = 0;
+  h.host.reduced = () => ++reads === 1;
+  const before = { ...work };
+  const opts = { spring };
+  const run = h.runtime.sequence([[h.element, { x: 101 }, opts], [h.element, { x: 302 }, opts]]);
+  expect(reads).toBe(1);
+  expect(run.duration).toBe(0);
+  expect(await run.finished).toEqual({ status: 'finished' });
+  expect(h.x()).toBe(302);
+  expect(work.horizons - before.horizons).toBe(2);
+  expect(work.builds).toBe(before.builds);
+});

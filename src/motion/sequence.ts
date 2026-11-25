@@ -5,9 +5,8 @@ import type { Segment } from './program.js';
 
 // До _execute сборщик владеет отдельным массивом сегментов каждого канала.
 // Входные программы остаются неизменными; готовый план читает только runtime.
-type SequenceDraft = Omit<Draft, '_program' | '_reduced'> & {
+type SequenceDraft = Omit<Draft, '_program'> & {
   _program: Draft['_program'] & { readonly _segments: Segment[] };
-  _reduced: boolean;
 };
 type SequenceEnd = {
   -readonly [Key in '_duration' | '_nativeEase' | '_identity']: Draft['_program'][Key];
@@ -17,6 +16,7 @@ type SequenceEnd = {
 export function runSequence(engine: Runtime, steps: readonly SequenceStep[], options?: SequenceOptions): Playback {
   const list = snapshot(steps, 'sequence');
   const sequenceClock = timing(options as MotionOptions | undefined);
+  const terminal = sequenceClock._reduced || engine._host.reduced();
   const merged = new Map<Element, Map<string, SequenceDraft>>();
   let cursor = 0, previousStart = 0, end = 0, count = 0;
   for (const tuple of list) {
@@ -28,7 +28,7 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     const drafts = engine._draft(target, input, clock, offset + sequenceClock._delay, (element, key) => {
       const prior = merged.get(element)?.get(key)?._program;
       return prior && { _coordinates: prior._segments.at(-1)!._to, _unit: prior._unit };
-    }, sequenceClock._reduced);
+    }, terminal);
     for (const draft of drafts) {
       count += draft._program._segments.length;
       if (count > MAX_CHANNELS) failMotion('Слишком много сегментов');
@@ -46,7 +46,6 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
   }
   const drafts: Draft[] = [];
   for (const channels of merged.values()) for (const draft of channels.values()) {
-    draft._reduced ||= sequenceClock._reduced;
     // Общая программа нескольких целей получает одинаковый конец. Сегменты
     // разных историй по-прежнему объединяются в отдельной оболочке выше.
     const program: SequenceEnd = draft._program;

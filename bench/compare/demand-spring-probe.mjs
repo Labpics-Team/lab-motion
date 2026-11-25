@@ -18,13 +18,13 @@ const server=createServer((req,res)=>{
 });
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true});
-const cases=[['reduced',100],['reduced',1000],['system',1000],['sequence',200],['normal',100],['normal',1000]];
+const cases=[['reduced',100],['reduced',1000],['system',1000],['sequence',200],['sequence-system',200],['normal',100],['normal',1000]];
 const rows=[];
 try{
  for(const [kind,n] of cases)for(let round=-2;round<10;round++){
   const order=(round+Math.floor(round/2))%2?['candidate','baseline']:['baseline','candidate'];let reference;
   for(const name of order){
-   const page=await browser.newPage({reducedMotion:kind==='system'?'reduce':'no-preference'});
+   const page=await browser.newPage({reducedMotion:(kind==='system'||kind==='sequence-system')?'reduce':'no-preference'});
    try{
     await page.goto('http://127.0.0.1:'+server.address().port);
     const data=await page.evaluate(async({name,n,kind})=>{
@@ -35,7 +35,7 @@ try{
      document.body.append(root);root.getBoundingClientRect();
      const props={width:1500};
      const opts={spring:{mass:1,stiffness:170,damping:26},...(kind==='reduced'?{reducedMotion:'always'}:{})};
-     const t=performance.now(),run=kind==='sequence'?sequence([[targets,props,opts],[targets,{width:2000},opts]],{reducedMotion:'always'}):animate(targets,props,opts);
+     const sequenced=kind.startsWith('sequence'); const t=performance.now(),run=sequenced?sequence([[targets,props,opts],[targets,{width:2000},opts]],kind==='sequence'?{reducedMotion:'always'}:undefined):animate(targets,props,opts);
      const startup=performance.now()-t, state=run.state,duration=run.duration;
      const poses=[];
      if(kind==='normal'){
@@ -44,7 +44,7 @@ try{
       run.finish();
      }else if(state!=='finished'||duration!==0)throw Error('not synchronously reduced');
      const result=await run.finished;
-     if(result.status!=='finished'||targets.some(el=>el.style.width!==(kind==='sequence'?'2000px':'1500px')||el.getAnimations().length))throw Error('end/cleanup mismatch');
+     if(result.status!=='finished'||targets.some(el=>el.style.width!==(sequenced?'2000px':'1500px')||el.getAnimations().length))throw Error('end/cleanup mismatch');
      return {startup,state,duration,poses};
     },{name,n,kind});
     const {startup,...semantic}=data;
