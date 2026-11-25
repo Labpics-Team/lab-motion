@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { timing } from '../src/motion/model.js';
-import { program, sample, materialize } from '../src/motion/program.js';
+import { program, sample, materialize, validatePlacement } from '../src/motion/program.js';
 import { harness } from './fixtures/motion-runtime.js';
 
 const work = vi.hoisted(() => ({ builds: 0 }));
@@ -31,12 +31,14 @@ it('terminal projection preserves the exact validated horizon without building o
       const clock = timing({ spring: physics, delay: 75 });
       const from = { _coordinates: [0], _unit: 'px' };
       const before = work.builds;
-      const terminal = program('width', from, [to], false, clock, [v], 17);
+      const terminal = program('width', from, [to], false, clock, [v]);
       const value: number[] = [], velocity: number[] = [];
-      sample(terminal, terminal._duration, value, velocity);
+      const offset = 17 + clock._delay;
+      validatePlacement(terminal, offset);
+      sample(terminal, offset + terminal._duration, value, velocity, 1, offset);
       expect(work.builds).toBe(before);
       expect(value).toEqual([to]); expect(velocity).toEqual([0]);
-      const normal = program('width', from, [to], false, clock, [v], 17);
+      const normal = program('width', from, [to], false, clock, [v]);
       materialize(normal._segments[0]!);
       expect(Object.is(terminal._duration, normal._duration)).toBe(true);
     }

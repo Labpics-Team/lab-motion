@@ -1,16 +1,31 @@
 import { MAX_CHANNELS, failMotion, number, properties, snapshot, timing } from './model.js';
-import { runtime, type Runtime, type Draft } from './runtime.js';
+import { runtime, endOf, type Runtime, type Draft } from './runtime.js';
 import type { MotionOptions, Playback, SequenceOptions, SequenceStep } from './types.js';
-import type { Segment } from './program.js';
+import type { Program, Segment } from './program.js';
 
-// До _execute сборщик владеет отдельным массивом сегментов каждого канала.
-// Входные программы остаются неизменными; готовый план читает только runtime.
-type SequenceDraft = Omit<Draft, '_program'> & {
-  _program: Draft['_program'] & { readonly _segments: Segment[] };
-};
-type SequenceEnd = {
-  -readonly [Key in '_duration' | '_identity']: Draft['_program'][Key];
-};
+// Immutable histories are shared when the same channel takes the same step.
+interface History {
+  readonly _previous: History | undefined;
+  readonly _part: Program;
+  readonly _offset: number;
+  _composed?: Program;
+}
+type SequenceDraft = Draft & { readonly _history: History };
+
+function compose(history: History, duration: number): Program {
+  if (history._composed) return history._composed;
+  const segments: Segment[] = [];
+  for (let node: History | undefined = history; node; node = node._previous) {
+    const offset = node._offset, part = node._part._segments;
+    for (let i = part.length; i--;) {
+      const segment = part[i]!;
+      segments.push(offset ? { ...segment, _at: offset + segment._at, _end: offset + segment._end } : segment);
+    }
+  }
+  segments.reverse();
+  return history._composed = { ...history._part, _segments: segments, _duration: duration,
+    _span: 0, _identity: undefined };
+}
 
 /** Планирование шкалы отделено от исполнения: одиночный animate не удерживает его код. */
 export function runSequence(engine: Runtime, steps: readonly SequenceStep[], options?: SequenceOptions): Playback {
@@ -29,28 +44,26 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
       const prior = merged.get(element)?.get(key)?._program;
       return prior && { _coordinates: prior._segments.at(-1)!._to, _unit: prior._unit };
     }, terminal);
+    const histories = new Map<Program, History>();
     for (const draft of drafts) {
       count += draft._program._segments.length;
       if (count > MAX_CHANNELS) failMotion('Слишком много сегментов');
       let channels = merged.get(draft._group._element);
       if (!channels) { channels = new Map(); merged.set(draft._group._element, channels); }
       const before = channels.get(draft._program._key);
-      if (before && draft._program._segments[0]!._at < before._program._duration) failMotion('Пересечение шагов');
-      const segments = before?._program._segments ?? [];
-      for (const segment of draft._program._segments) segments.push(segment);
-      const next: SequenceDraft = { ...draft, _program: { ...draft._program, _segments: segments } };
-      channels.set(draft._program._key, next);
-      end = Math.max(end, next._program._duration);
+      if (before && draft._offset + draft._program._segments[0]!._at < endOf(before)) failMotion('Пересечение шагов');
+      const previous = before?._history, part = draft._program, cached = histories.get(part);
+      const history = cached && cached._previous === previous && cached._offset === draft._offset
+        ? cached : { _previous: previous, _part: part, _offset: draft._offset };
+      histories.set(part, history);
+      channels.set(part._key, { ...draft, _history: history });
+      end = Math.max(end, endOf(draft));
     }
     previousStart = offset; cursor = Math.max(0, end - sequenceClock._delay);
   }
   const drafts: Draft[] = [];
   for (const channels of merged.values()) for (const draft of channels.values()) {
-    // Общая программа нескольких целей получает одинаковый конец. Сегменты
-    // разных историй по-прежнему объединяются в отдельной оболочке выше.
-    const program: SequenceEnd = draft._program;
-    program._duration = end; program._identity = null;
-    drafts.push(draft);
+    drafts.push({ _group: draft._group, _program: compose(draft._history, end), _offset: 0, _reduced: draft._reduced });
   }
   return engine._execute(drafts, drafts.every(draft => draft._reduced) ? 0 : end);
 }

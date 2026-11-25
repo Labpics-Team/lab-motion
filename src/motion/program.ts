@@ -53,11 +53,13 @@ export interface Program {
   readonly _unit: string;
   readonly _segments: readonly Segment[];
   readonly _duration: number;
-  /** To-only identity, undefined for authored, null for composed timelines. */
-  readonly _identity: readonly unknown[] | undefined | null;
+  /** Minimum positive local interval (Infinity for a step-only shape). */
+  readonly _span: number;
+  /** To-only identity; timing placement is compared separately. */
+  readonly _identity: readonly unknown[] | undefined;
 }
 
-function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration: number): Segment {
+function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, end: number, positive: boolean): Segment {
   if (from._unit !== to._unit || from._coordinates.length !== to._coordinates.length)
     failMotion('Разные единицы from/to');
   let normalized: number | undefined;
@@ -72,42 +74,56 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     else if (normalized !== v / distance) normalized = NaN;
   }
   let artifact: SpringExecutionArtifactTuple | SpringExecutionRequest | undefined;
-  let length = duration;
+  let length = end - at;
   if (timing._spring) {
     if (Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, 0.05 / extent), undefined, true);
     length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent) * 1000;
+    end = at + length; positive = length > 0;
   }
-  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) failMotion('Непредставимая длительность');
-  return { _at: at, _end: at + length, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
+  if (!Number.isFinite(length) || length < 0 || !Number.isFinite(end) || positive && end === at) failMotion('Непредставимая длительность');
+  return { _at: at, _end: end, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
 }
 
-export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0): Program {
+export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[]): Program {
   const start = authored ? 1 : 0, count = values.length - start;
   const times = authored ? timing._times : undefined;
   if (times && times.length !== count + 1) failMotion('times: другая длина');
   if (timing._spring && count > 1) failMotion('keyframes: задайте duration/ease');
   const _segments: Segment[] = [];
   const duration = timing._duration ?? 0;
-  let current = from;
+  let current = from, span = Infinity;
   for (let i = 0; i < count; i++) {
     const next = point(key, values[i + start]!, current);
     const a = times?.[i] ?? i / count;
     const b = times?.[i + 1] ?? (i + 1) / count;
-    _segments.push(segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
-      offset + timing._delay + a * duration, (b - a) * duration));
+    const part = segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
+      a * duration, b * duration, duration > 0);
+    _segments.push(part);
+    if (part._end > part._at) span = Math.min(span, part._end - part._at);
     current = next;
   }
   const last = _segments.at(-1)!;
   const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
-    timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
-  return { _key: key, _unit: from._unit, _segments, _duration: last._end, _identity };
+    timing._duration, timing._cssEase ?? timing._ease];
+  return { _key: key, _unit: from._unit, _segments, _duration: last._end, _span: span, _identity };
 }
 
-export function nativeEase(path: Program): string | undefined {
-  if (path._identity === null || path._segments.length !== 1 || path._unit === 'color') return;
-  const first = path._segments[0]!;
-  if (path._key === 'opacity' && !(Math.min(first._from[0]!, first._to[0]!) >= 0 && Math.max(first._from[0]!, first._to[0]!) <= 1)) return;
-  return first._timing._spring ? materialize(first)?.[0] : first._timing._cssEase;
+/** A placement owns no new geometry. Check every positive interval in run time. */
+export function validatePlacement(path: Program, offset: number): void {
+  if (offset === 0) return;
+  const duration = offset + path._duration;
+  if (!Number.isFinite(duration)) failMotion('Непредставимая длительность');
+  // A conservative upper bound on rounding error for both endpoint additions.
+  // Ordinary placement is constant work; ambiguous floating-point intervals
+  // take the exact original representability check, never an epsilon snap.
+  if (path._span <= duration * (2 * Number.EPSILON)) for (const segment of path._segments) {
+    if (segment._end > segment._at && offset + segment._end === offset + segment._at)
+      failMotion('Непредставимая длительность');
+  }
+}
+
+export function segmentEase(segment: Segment): string | undefined {
+  return segment._timing._spring ? materialize(segment)?.[0] : segment._timing._cssEase;
 }
 
 // The first consumer resolves a validated request; terminal samples never do.
@@ -123,18 +139,20 @@ export const zeroVelocity: readonly number[] = [];
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
 const springSample = { value: 0, velocity: 0 };
-export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1): void {
+export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1, offset = 0): void {
   const _segments = program._segments;
   // Terminal time selects the final segment through the same endpoint path.
-  let end = _segments.length, at = time >= program._duration ? end - 1 : 0;
+  const terminal = time >= offset + program._duration;
+  let end = _segments.length, at = terminal ? end - 1 : 0;
   while (at + 1 < end) {
     const middle = (at + end) >>> 1;
-    if (time >= _segments[middle]!._at) at = middle;
+    if (time >= offset + _segments[middle]!._at) at = middle;
     else end = middle;
   }
   const segment = _segments[at]!;
-  const _elapsed = Math.max(0, time - segment._at), duration = segment._end - segment._at;
-  if (time >= segment._end) {
+  const start = segment._at, begin = offset + start, finish = offset + segment._end;
+  const _elapsed = time <= begin ? 0 : Math.max(0, time - offset - start), duration = segment._end - start;
+  if (time >= finish || terminal) {
     for (let i = 0; i < segment._to.length; i++) { value[i] = segment._to[i]!; velocity[i] = 0; }
     return;
   }
@@ -154,7 +172,7 @@ export function sample(program: Program, time: number, value: number[], velocity
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
   for (let i = 0; i < segment._from.length; i++) {
     const a = segment._from[i]!, distance = segment._to[i]! - a;
-    if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
+    if (_elapsed === 0) { value[i] = a; velocity[i] = time < begin ? 0 : segment._velocity[i] ?? 0; }
     else if (segment._timing._spring && !artifact) {
       value[i] = a + distance * basis._value + (segment._velocity[i] ?? 0) * basis._valueV0;
       velocity[i] = distance * basis._velocity + (segment._velocity[i] ?? 0) * basis._velocityV0;

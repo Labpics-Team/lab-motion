@@ -2,7 +2,7 @@ import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, nativeEase, materialize, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, validatePlacement, sample, transform, zeroVelocity, segmentEase, materialize, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
@@ -98,7 +98,7 @@ export type ControlOperation = (surface: Surface, selected: readonly Track[]) =>
 type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | ControlOperation;
 
 // A prepared binding is the same object that will become the live track.
-export interface Draft { _group: Surface; readonly _program: Program; readonly _reduced: boolean }
+export interface Draft { _group: Surface; readonly _program: Program; readonly _offset: number; readonly _reduced: boolean }
 interface Track extends Draft {
   _value: number[];
   _velocity: number[];
@@ -108,8 +108,10 @@ interface Track extends Draft {
   _paused: boolean;
 }
 
-function coordinates(track: Track, at: 0 | 1 | 2): readonly number[] {
-  return at === 0 ? track._value : at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to;
+export function endOf(binding: Draft): number { return binding._offset + binding._program._duration; }
+
+function coordinates(track: Track, at: 0 | 1 | 2, index = 0): readonly number[] {
+  return at === 0 ? track._value : at === 1 ? track._program._segments[index]!._from : track._program._segments[index]!._to;
 }
 
 function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
@@ -162,7 +164,7 @@ export class Run implements Playback {
     }
   }
   _own(track: Track, reduced = false): void {
-    if (!reduced) this.duration = Math.max(this.duration, track._program._duration);
+    if (!reduced) this.duration = Math.max(this.duration, endOf(track));
     // Новый вызов получает управление, сохраняя уже исполняемую траекторию.
     // Старый компонент не может остановить движение, принятое его преемником.
     track._owner?._settle(track, false);
@@ -200,6 +202,15 @@ export class Run implements Playback {
   finish(): void { this._apply('finish'); }
 }
 
+// A publication-local browser template, never attached to an element.
+interface NativeBatch {
+  _programs?: readonly Program[];
+  _pose?: string | undefined;
+  _template?: KeyframeEffect | undefined;
+  _frames?: Keyframe[];
+  _delay?: number;
+  _realm?: Window | null;
+}
 class Surface {
   readonly _tracks: Map<string, Track> = new Map();
   private _rest: Point | undefined;
@@ -239,7 +250,7 @@ class Surface {
     const time = this._native
       ? Number.isFinite(local) ? local as number : track._elapsed
       : track._elapsed + delta * track._rate;
-    return Math.min(track._program._duration, Math.max(0, time));
+    return Math.min(endOf(track), Math.max(0, time));
   }
   _sync(now?: number): number {
     if (this._busy) failMotion('easing: повторный вход');
@@ -257,16 +268,16 @@ class Surface {
   }
   _sample(track: Track): void {
     sample(track._program, track._elapsed, track._value, track._velocity,
-      track._paused ? 0 : this._native?.playbackRate ?? track._rate);
+      track._paused ? 0 : this._native?.playbackRate ?? track._rate, track._offset);
   }
   _ended(track: Track): boolean {
-    return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
+    return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= endOf(track);
   }
-  private _text(at: 0 | 1 | 2 = 0): string {
+  private _text(at: 0 | 1 | 2 = 0, index = 0): string {
     if (this._key === 'transform') {
       const state = this._transforms;
       for (const track of this._tracks.values()) {
-        const value = coordinates(track, at)[0]!;
+        const value = coordinates(track, at, index)[0]!;
         state[track._program._key] = value;
       }
       let identity = !at, translationOnly = !!at;
@@ -281,7 +292,7 @@ class Surface {
     if (!track) {
       const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
-    return format(track._program._key, coordinates(track, at), track._program._unit);
+    return format(track._program._key, coordinates(track, at, index), track._program._unit);
   }
   _render(): void {
     if (this._busy) failMotion('style: повторная запись');
@@ -333,26 +344,74 @@ class Surface {
       if (owner && track._owner === owner) this._end(track, false, { _error: error });
     }
   }
-  _reconcile(): void {
-    if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
-    const active = [...this._tracks.values()];
-    if (!active.some(moving)) { this._engine._idle(this); return; }
-    const first = active[0]!, seg = first._program._segments[0]!;
-    const _nativeEase = this._key === 'transform' || this._key === 'opacity' ? nativeEase(first._program) : undefined;
-    const canNative = first._rate > 0 && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && nativeEase(track._program) === _nativeEase &&
-        track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
-    if (!canNative) { this._engine._wake(this); return; }
+  _reconcile(batch?: NativeBatch): void {
+    const tracks = this._tracks;
+    if (this._native || !tracks.size) { this._engine._idle(this); return; }
+    const first = tracks.values().next().value!, path = first._program, segments = path._segments;
+    const origin = first._offset, start = segments[0]!._at, delay = origin + start, duration = path._duration - start;
+    const element = this._element, realm = element.ownerDocument?.defaultView;
+    const share = batch && this._engine._host === defaultHost && realm?.KeyframeEffect && realm.Animation &&
+      element.animate === realm.Element.prototype.animate ? batch : undefined;
+    let active = false, aligned = true, i = 0;
+    let reuse = !!(share && share._realm === realm && share._pose === this._written && share._programs?.length === tracks.size &&
+      typeof CSS !== 'undefined' && cachedHost === CSS && cachedCheck === CSS.supports);
+    for (const track of tracks.values()) {
+      active ||= moving(track);
+      aligned &&= !track._paused && track._rate === first._rate && track._elapsed === first._elapsed &&
+        track._program._duration === path._duration && track._offset === origin && track._program._segments.length === segments.length;
+      reuse &&= track._program === share!._programs![i++];
+    }
+    if (!active) { this._engine._idle(this); return; }
+    if (!aligned || !(duration > 0) || first._rate <= 0 || (this._key !== 'transform' && this._key !== 'opacity') ||
+        typeof element.animate !== 'function') { this._engine._wake(this); return; }
     try {
       this._lock(true);
-      const effect = this._element.animate([{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
-        duration: seg._end - seg._at, delay: seg._at, easing: _nativeEase, fill: 'both',
-      });
-      this._native = effect;
+      const timing: KeyframeAnimationOptions = { duration, delay, easing: 'linear', fill: 'both' };
+      let effect: Animation;
+      if (!reuse) {
+        const frames: Keyframe[] = [];
+        let boundary = segments[0]!._at, offset = 0;
+        projection: for (let i = 0; i < segments.length; i++) {
+          const segment = segments[i]!, easing = segmentEase(segment), end = (segment._end - start) / duration;
+          if (!easing || segment._at !== boundary || !(end > offset) ||
+              start + end * duration !== segment._end || !this._engine._host.supports(easing)) break;
+          for (const track of tracks.values()) {
+            const part = track._program._segments[i]!, from = part._from[0]!, to = part._to[0]!;
+            if (part._at !== boundary || part._end !== segment._end || segmentEase(part) !== easing ||
+                this._key === 'opacity' && !(Math.min(from, to) >= 0 && Math.max(from, to) <= 1) ||
+                i && track._program._segments[i - 1]!._to[0] !== from) break projection;
+          }
+          frames.push({ offset, easing }); boundary = segment._end; offset = end;
+        }
+        if (frames.length !== segments.length) {
+          this._lock(false); this._engine._wake(this); return;
+        }
+        for (let i = 0; i < frames.length; i++) frames[i]![this._key] = this._text(1, i);
+        const final = this._text(2, segments.length - 1);
+        frames.push({ [this._key]: final, offset });
+        if (offset < 1) frames.push({ [this._key]: final, offset: 1 });
+        if (share) {
+          share._template = undefined; share._frames = frames;
+          share._realm = realm;
+          share._programs = Array.from(tracks.values(), track => track._program); share._pose = this._written;
+        }
+        if (!reuse) effect = element.animate(frames, timing);
+      }
+      if (reuse) {
+        if (!share!._template) {
+          share!._template = new realm!.KeyframeEffect(null, share!._frames!, timing);
+          share!._delay = delay;
+        }
+        const instance = new realm!.KeyframeEffect(share!._template);
+        instance.target = element;
+        if (share!._delay !== delay) instance.updateTiming({ delay });
+        effect = this._native = new realm!.Animation(instance, element.ownerDocument.timeline);
+        effect.play();
+      }
+      this._native = effect!;
       this._watch();
-      // Новый effect ещё не передан потребителю; сначала скорость, затем точная поза.
-      if (first._rate !== 1) effect.playbackRate = first._rate;
-      if (first._elapsed !== 0) effect.currentTime = first._elapsed;
+      if (first._rate !== 1) effect!.playbackRate = first._rate;
+      if (first._elapsed !== 0) effect!.currentTime = first._elapsed;
       this._lock(false);
       this._engine._idle(this);
     } catch (error) { this._lock(false); this._fail(error); throw error; }
@@ -373,7 +432,7 @@ class Surface {
       const completed = [...this._tracks.values()].map(track => [track, track._owner] as const);
       try {
         for (const [track] of completed) {
-          track._elapsed = track._program._duration;
+          track._elapsed = endOf(track);
           this._sample(track);
         }
         this._detach();
@@ -403,15 +462,15 @@ class Surface {
         // Частичная команда, конец и внешний pause идут через handoff.
         const reuse = action === 'seek' && effect?.playState === 'running' &&
           selected.length === this._tracks.size && selected.every(owns) &&
-          effect.finished === this._token && effect.playbackRate === first._rate && time < first._program._duration;
+          effect.finished === this._token && effect.playbackRate === first._rate && time < endOf(first);
         const terminalNative = effect && action === 'finish';
         if (!reuse && !terminalNative) this._detach();
         for (const track of selected) {
           if (!owns(track)) continue;
           if (action === 'pause') track._paused = true;
           else if (action === 'play') track._paused = false;
-          else if (action === 'seek') track._elapsed = Math.min(time, track._program._duration);
-          else if (action === 'finish') track._elapsed = track._program._duration;
+          else if (action === 'seek') track._elapsed = Math.min(time, endOf(track));
+          else if (action === 'finish') track._elapsed = endOf(track);
           this._sample(track);
         }
         if (reuse) {
@@ -564,14 +623,20 @@ export class Runtime {
           if (!synced.has(group)) { synced.add(group); if (group._tracks.size) group._sync(now); }
           // Первый элемент уже содержит по одному Program на каждое свойство.
           // Явная литеральная траектория не зависит от элемента; состояние Track остаётся отдельным.
-          if (i && property._authored && property._literal && !clock._stagger) {
-            result.push({ _group: group, _program: result[j]!._program, _reduced: reduced }); continue;
+          const placement = offset + i * clock._stagger + clock._delay, shared = i && property._literal ? result[j]!._program : undefined;
+          if (shared && property._authored) {
+            validatePlacement(shared, placement);
+            result.push({ _group: group, _program: shared, _offset: placement, _reduced: reduced }); continue;
           }
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: zeroVelocity } : group._read(property._key);
-          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
-          result.push({ _group: group, _program: spec, _reduced: reduced });
+          const initial = shared?._segments[0];
+          const spec = initial && !initial._velocity.length && !current._velocity.length &&
+            shared!._unit === current._unit && initial._from.length === current._coordinates.length && initial._from.every((v, k) => Object.is(v, current._coordinates[k]))
+            ? shared! : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity);
+          validatePlacement(spec, placement);
+          result.push({ _group: group, _program: spec, _offset: placement, _reduced: reduced });
         }
       }
     } finally {
@@ -589,6 +654,8 @@ export class Runtime {
         const group = this._surface(draft._group._element, draft._program._key, now ??= number(this._host.now(), 'clock'), draft._group);
         const existing = group._tracks.get(draft._program._key);
         const equal = !draft._reduced && existing && !existing._reduced && draft._program._identity && existing._program._identity &&
+          Object.is(draft._offset, existing._offset) &&
+          draft._program._identity.length === existing._program._identity.length &&
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
         if (!draft._reduced) for (const segment of draft._program._segments) materialize(segment);
@@ -596,15 +663,16 @@ export class Runtime {
         const first = draft._program._segments[0]!._from;
         const track = draft as Track;
         track._group = group; track._value = first.slice(); track._velocity = first.slice();
-        track._owner = undefined; track._elapsed = draft._reduced ? draft._program._duration : 0;
+        track._owner = undefined; track._elapsed = draft._reduced ? endOf(draft) : 0;
         track._rate = 1; track._paused = false;
         group._sample(track);
         run._own(track, draft._reduced); group._attach(track);
       }
+      const batch: NativeBatch[] | undefined = touched.size > 1 ? [{}, {}] : undefined;
       for (const group of touched) {
         group._render();
-        for (const track of [...group._tracks.values()]) if (track._elapsed >= track._program._duration) group._end(track, true);
-        group._reconcile();
+        for (const track of [...group._tracks.values()]) if (track._elapsed >= endOf(track)) group._end(track, true);
+        group._reconcile(batch?.[group._key === 'transform' ? 0 : 1]);
       }
       run._complete();
     } catch (error) { run._error(error); throw error; }
