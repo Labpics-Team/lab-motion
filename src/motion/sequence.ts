@@ -28,7 +28,7 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     const drafts = engine._draft(target, input, clock, offset + sequenceClock._delay, (element, key) => {
       const prior = merged.get(element)?.get(key)?._program;
       return prior && { _coordinates: prior._segments.at(-1)!._to, _unit: prior._unit };
-    });
+    }, sequenceClock._reduced);
     for (const draft of drafts) {
       count += draft._program._segments.length;
       if (count > MAX_CHANNELS) failMotion('Слишком много сегментов');

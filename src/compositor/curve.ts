@@ -171,7 +171,7 @@ export function tryCompileSpringExecutionArtifactTupleUnchecked(
   if (hit) return hit;
   const build = tryBuildSpringNodes(spring, v0, tolerance);
   if (!build) return;
-  const artifact = emitArtifact(build[0], tolerance, build[1] * 1000);
+  const artifact = emitArtifact(build[0]!, tolerance, build[1] * 1000);
   /* @__INLINE__ */ storeSpringLinearCache(
     cache,
     mass,

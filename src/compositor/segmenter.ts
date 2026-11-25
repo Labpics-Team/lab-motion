@@ -246,12 +246,13 @@ export function tryBuildSpringNodes(
   params: SpringParams,
   v0: number,
   tolerance: number,
-): [nodes: Float64Array, horizon: number] | undefined {
+  terminal?: boolean,
+): [nodes: Float64Array | undefined, horizon: number] | undefined {
   const settle = springCompileHorizon(params, v0, tolerance);
   const intervals = requiredGridSize(params, settle, tolerance, v0);
   if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return undefined;
   return [
-    buildSpringNodesAtHorizon(params, v0, tolerance, settle, intervals),
+    terminal ? undefined : buildSpringNodesAtHorizon(params, v0, tolerance, settle, intervals),
     settle,
   ];
 }
