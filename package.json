@@ -537,7 +537,8 @@
     "./dist/wc/index.cjs"
   ],
   "scripts": {
-    "build": "tsup && node scripts/emit-declarations.mjs",
+    "build": "node scripts/project-spring-value.mjs --check && tsup && node scripts/emit-declarations.mjs",
+    "generate:spring-value": "node scripts/project-spring-value.mjs",
     "audit": "pnpm audit --audit-level moderate",
     "typecheck": "tsc --noEmit",
     "typecheck:browser": "tsc --noEmit -p tsconfig.browser.json",
