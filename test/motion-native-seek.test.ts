@@ -65,6 +65,42 @@ it('terminal seek commits and removes the native effect', async () => {
   run.seek(1000);
   expect(await run.finished).toEqual({ status: 'finished' });
   expect(h.x()).toBe(100);
-  expect(h.effects.every(effect => effect.cancelled)).toBe(true);
+  expect(h.effects).toHaveLength(1);
+  expect(h.effects[0]!.cancelled).toBe(true);
   expect(h.updates.size + h.renders.size).toBe(0);
+});
+
+it('seek hands off mismatched rate and externally paused effects; reverse remains JS', () => {
+  const h = harness(true);
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000, ease: 'linear' }));
+  const effect = h.effects[0]!;
+  effect.playbackRate = 2;
+  run.seek(250);
+  expect(effect.cancelled).toBe(true);
+  expect(h.x()).toBe(25);
+  const next = h.effects[1]!;
+  next.pause();
+  run.seek(500);
+  expect(next.cancelled).toBe(true);
+  expect(h.x()).toBe(50);
+  run.reverse();
+  run.seek(750);
+  expect(h.x()).toBe(75);
+  expect(h.effects.every(effect => effect.cancelled)).toBe(true);
+  run.stop();
+});
+
+it('renewed native finished promise cannot settle a rewound run', async () => {
+  const h = harness(true);
+  const run = playhead(h.runtime.animate(h.element, { x: [0, 100] }, { duration: 1000, ease: 'linear' }));
+  const effect = h.effects[0]!;
+  const old = effect.finished;
+  effect.complete();
+  effect.currentTime = 100;
+  run.seek(200);
+  await old;
+  expect(effect.cancelled).toBe(true);
+  expect(h.x()).toBe(20);
+  h.effects[1]!.complete();
+  expect(await run.finished).toEqual({ status: 'finished' });
 });

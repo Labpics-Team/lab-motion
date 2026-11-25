@@ -400,10 +400,10 @@ class Surface {
       } else {
         const effect = this._native, first = selected[0]!;
         // Полностью принадлежащая контролу шкала не меняет кривую при seek.
-        // Частичная команда, конец, внешний pause и pending-rate идут через handoff.
+        // Частичная команда, конец и внешний pause идут через handoff.
         const reuse = action === 'seek' && effect?.playState === 'running' &&
           selected.length === this._tracks.size && selected.every(owns) &&
-          first._rate > 0 && effect.playbackRate === first._rate && time < first._program._duration;
+          effect.finished === this._token && effect.playbackRate === first._rate && time < first._program._duration;
         if (!reuse) this._detach();
         for (const track of selected) {
           if (!owns(track)) continue;
@@ -415,7 +415,11 @@ class Surface {
         }
         if (reuse) {
           this._lock(true);
-          try { effect.currentTime = time; } finally { this._lock(false); }
+          try {
+            // Синхронная запись скорости сбрасывает отложенный updatePlaybackRate.
+            if (effect.pending) effect.playbackRate = first._rate;
+            effect.currentTime = time;
+          } finally { this._lock(false); }
         }
         this._render();
         for (const track of selected) {

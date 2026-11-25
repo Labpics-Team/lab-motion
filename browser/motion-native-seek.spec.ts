@@ -37,3 +37,20 @@ test('running native seek keeps the same effects, pose, and finished lifecycle',
   expect(result.remaining).toBe(0);
   expect(result.final).toBe(true);
 });
+
+test('seek while play and rate changes are pending preserves the owned effect and rate', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const { animate } = await import('/browser/.artifacts/motion-root.js');
+    const el = document.createElement('div');
+    document.body.append(el);
+    const run = animate(el, { x: [0, 100] }, { duration: 1000, ease: 'linear' });
+    const effect = el.getAnimations()[0]!;
+    try {
+      effect.updatePlaybackRate(2);
+      run.seek(250);
+      await effect.ready;
+      return { same: el.getAnimations()[0] === effect, rate: effect.playbackRate };
+    } finally { run.stop(); el.remove(); }
+  });
+  expect(result).toEqual({ same: true, rate: 1 });
+});

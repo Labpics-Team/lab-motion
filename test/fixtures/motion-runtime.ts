@@ -12,7 +12,7 @@ export function harness(native = false) {
     render: cb => { renders.add(cb); return () => { renders.delete(cb); }; },
     cancelAll() { updates.clear(); renders.clear(); },
   };
-  const effects: Array<{ currentTime: number | null; readonly playState: AnimationPlayState; playbackRate: number; updatePlaybackRate(rate: number): void; cancelled: boolean; keys: Keyframe[]; timing: KeyframeAnimationOptions; finished: Promise<unknown>; complete(): void; cancel(): void }> = [];
+  const effects: Array<{ currentTime: number | null; readonly playState: AnimationPlayState; playbackRate: number; updatePlaybackRate(rate: number): void; pause(): void; play(): void; cancelled: boolean; keys: Keyframe[]; timing: KeyframeAnimationOptions; finished: Promise<unknown>; complete(): void; cancel(): void }> = [];
   const host: RuntimeHost = { frame: loop, now: () => time, reduced: () => false,
     styles: element => (element as HTMLElement).style, supports: () => native };
   const engine = new Runtime(host);
@@ -27,11 +27,20 @@ export function harness(native = false) {
     setProperty(key: string, value: string) { values.set(key, value); writes.push([key, value]); },
     getPropertyValue(key: string) { return values.get(key) ?? ''; },
   }, ...(native ? { animate(keys: Keyframe[], timing: KeyframeAnimationOptions) {
-    let finish!: () => void; let completed = false;
-    const effect = { keys, timing, currentTime: 0 as number | null, playbackRate: 1, cancelled: false,
+    let finish!: () => void; let completed = false, paused = false;
+    let time: number | null = 0;
+    const completion = () => new Promise<void>(resolve => { finish = resolve; });
+    let finished = completion();
+    const effect = { keys, timing, get currentTime() { return time; },
+      set currentTime(value: number | null) {
+        time = value;
+        if (completed && value !== null && value < Number(timing.duration) + (timing.delay ?? 0)) { completed = false; finished = completion(); }
+      },
+      playbackRate: 1, cancelled: false,
       updatePlaybackRate(rate: number) { effect.playbackRate = rate; },
-      get playState(): AnimationPlayState { return effect.cancelled ? "idle" : completed ? "finished" : "running"; },
-      finished: new Promise<void>(resolve => { finish = resolve; }),
+      pause() { paused = true; }, play() { paused = false; },
+      get playState(): AnimationPlayState { return effect.cancelled ? "idle" : paused ? "paused" : completed ? "finished" : "running"; },
+      get finished() { return finished; },
       complete() { completed = true; finish(); }, cancel() { effect.cancelled = true; } };
     effects.push(effect); return effect;
   } } : {}) } as unknown as HTMLElement;

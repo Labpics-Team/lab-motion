@@ -35,9 +35,20 @@ try {
       root.getBoundingClientRect();
       const native=Element.prototype.animate; let effects=0;
       Element.prototype.animate=function(...args){effects++;return native.apply(this,args)};
-      let run; const start=performance.now(); let ready, main;
+      let run; let ready, main;
       const linear={duration:1000,ease:'linear'};
       try {
+       if(kind==='seek'){
+        const trial=animate(targets,{x:[0,100],opacity:[0,1]},linear);
+        try { for(const t of [25,500,900,100]){
+         trial.seek(t);
+         for(const el of targets){const cs=getComputedStyle(el);
+          if(Math.abs(new DOMMatrixReadOnly(cs.transform).m41-t/10)>0.15 || Math.abs(Number(cs.opacity)-t/1000)>.002)throw Error('intermediate target');}
+        } } finally {trial.stop();}
+        for(const el of targets){el.style.transform='';el.style.opacity='0';}
+        root.getBoundingClientRect();effects=0;
+       }
+       const start=performance.now();
        if(kind==='start') {
         run=animate(targets,{x:100,opacity:1},linear); ready=performance.now()-start;
        } else if(kind==='repeat') {
@@ -82,7 +93,7 @@ try {
    }
   }
   const med=(a,k)=>a.map(x=>x[k]).sort((a,b)=>a-b)[Math.floor(a.length/2)];
-  const row={kind,n,baseline:Object.fromEntries(['ready','main','total','effects'].map(k=>[k,med(samples.baseline,k)])),candidate:Object.fromEntries(['ready','main','total','effects'].map(k=>[k,med(samples.candidate,k)])),samples};
+  const row={kind,n,animated:kind==='keyframes'?100:n,baseline:Object.fromEntries(['ready','main','total','effects'].map(k=>[k,med(samples.baseline,k)])),candidate:Object.fromEntries(['ready','main','total','effects'].map(k=>[k,med(samples.candidate,k)])),samples};
   rows.push(row);
   console.log(JSON.stringify(row));
  }

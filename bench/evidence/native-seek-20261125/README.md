@@ -16,7 +16,7 @@ Exploratory paired measurement, not a release qualification or competitor rankin
 | 1 element, 60 seeks | 5.4 | 1.2 | 122 → 2 |
 | 100 elements, 60 seeks | 856.5 | 108.6 | 12200 → 200 |
 
-For 100 elements the A/A control was 765.9 / 727.2 ms and 12200 effects in both arms. The deterministic effect-count reduction is 61×; the measured elapsed ratio is 7.9× for the 100-element scenario. No generic runtime acceleration is inferred.
+For one element A/A total was 4.8 / 7.1 ms, so the single-target ratio is particularly noisy. The historical keyframes rows contain 1000 DOM nodes but animate only 100; new probe rows include the animated count. For 100 elements the A/A control was 765.9 / 727.2 ms and 12200 effects in both arms. The deterministic effect-count reduction is 61×; the measured elapsed ratio is 7.9× for the 100-element scenario. No generic runtime acceleration is inferred.
 
 Other scenarios are preserved in `final.jsonl` rather than selecting favorable results. Some show adverse/noisy timings (notably start 1000, frames 1000 and keyframes); they are not yet qualified as non-regressions. The probe is not a substitute for the existing calibrated PROFILE/SELECT or browser conformance. No claim about Motion.dev is made.
 
