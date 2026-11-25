@@ -58,7 +58,7 @@ export interface Program {
   readonly _identity: readonly unknown[] | undefined;
 }
 
-function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration?: number): Segment {
+function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration: number): Segment {
   if (from._unit !== to._unit || from._coordinates.length !== to._coordinates.length)
     failMotion('Разные единицы from/to');
   let normalized: number | undefined;
@@ -73,7 +73,7 @@ function segment(from: Point, to: Point, velocity: readonly number[], timing: Ti
     else if (normalized !== v / distance) normalized = NaN;
   }
   let artifact: SpringExecutionArtifactTuple | undefined;
-  let length = duration ?? timing._duration ?? 0;
+  let length = duration;
   if (timing._spring) {
     if (Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, 0.05 / extent));
     length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent) * 1000;

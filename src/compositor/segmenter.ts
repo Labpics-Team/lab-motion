@@ -164,7 +164,11 @@ export function douglasPeuckerVertical(
   eps: number,
   protectedIndex = -1,
 ): number[] {
-  const n = xs.length;
+  return simplify(ys, i => xs[i]!, eps, protectedIndex);
+}
+
+function simplify(ys: readonly number[], x: (index: number) => number, eps: number, protectedIndex: number): number[] {
+  const n = ys.length;
   if (n <= 2) return n === 2 ? [0, 1] : n === 1 ? [0] : [];
   // Правые половины обходятся первыми, как в прежнем DFS. Выданный endpoint
   // становится правой границей следующего интервала: хранить её в стеке
@@ -178,13 +182,13 @@ export function douglasPeuckerVertical(
   while (stack.length > 0) {
     const i = stack.pop()!;
     if (j > i + 1) {
-      const xi = xs[i]!;
+      const xi = x(i);
       const yi = ys[i]!;
-      const slope = (ys[j]! - yi) / (xs[j]! - xi);
+      const slope = (ys[j]! - yi) / (x(j) - xi);
       let maxDev = -1;
       let idx = -1;
       for (let k = i + 1; k < j; k++) {
-        const lineY = yi + slope * (xs[k]! - xi);
+        const lineY = yi + slope * (x(k) - xi);
         const dev = Math.abs(ys[k]! - lineY);
         if (dev > maxDev) {
           maxDev = dev;
@@ -230,16 +234,12 @@ export function buildSpringNodesWithHorizon(
   tolerance: number,
 ): [nodes: SpringNode[], horizon: number] {
   const settle = springCompileHorizon(params, v0, tolerance);
-  return [
-    buildSpringNodesAtHorizon(
-      params,
-      v0,
-      tolerance,
-      settle,
-      baseGridSize(params, settle, tolerance, v0),
-    ),
-    settle,
-  ];
+  const packed = buildSpringNodesAtHorizon(params, v0, tolerance, settle,
+    baseGridSize(params, settle, tolerance, v0));
+  const nodes: SpringNode[] = [];
+  for (let i = 0; i < packed.length; i += 2)
+    nodes.push({ percent: packed[i]!, progress: packed[i + 1]! });
+  return [nodes, settle];
 }
 
 /**
@@ -250,7 +250,7 @@ export function tryBuildSpringNodes(
   params: SpringParams,
   v0: number,
   tolerance: number,
-): [nodes: SpringNode[], horizon: number] | undefined {
+): [nodes: Float64Array, horizon: number] | undefined {
   const settle = springCompileHorizon(params, v0, tolerance);
   const intervals = requiredGridSize(params, settle, tolerance, v0);
   if (!Number.isSafeInteger(intervals) || intervals > BASE_GRID_MAX) return undefined;
@@ -264,7 +264,7 @@ export function tryBuildSpringNodes(
 export function buildRestingSpringNodesWithHorizon(
   params: SpringParams,
   tolerance: number,
-): [nodes: SpringNode[], horizon: number] {
+): [nodes: Float64Array, horizon: number] {
   const settle = springCompileHorizon(params, 0, tolerance);
   return [
     buildSpringNodesAtHorizon(
@@ -284,7 +284,7 @@ function buildSpringNodesAtHorizon(
   tolerance: number,
   settle: number,
   intervals: number,
-): SpringNode[] {
+): Float64Array {
   // Валидный набор params всегда оседает в бюджет (гарантия validateSpringForFrameLoop),
   // так что settle конечно; на всякий случай — деградация к малой ненулевой шкале.
   const T = Number.isFinite(settle) && settle > 0 ? settle : 1;
@@ -294,22 +294,20 @@ function buildSpringNodesAtHorizon(
   // добавляет ≤tol/16, итого ≤5tol/16. Первый slope физически равен v0;
   // anchor обязан пережить RDP, иначе эта граничная производная исчезнет.
   const count = intervals + 2;
-  const xs = new Array<number>(count);
   const ys = new Array<number>(count);
   // Инварианты пружины (omega0/zeta/omegaD/A/B) петле-инвариантны на всей сетке
   // (params/v0 фиксированы) → считаем их ОДИН раз фабрикой, а не на каждый узел.
   // Значение бит-в-бит равно solveSpring(...).value (см. makeSpringValueSampler).
   const sampleValue = makeSpringValueSampler(params, v0);
-  xs[0] = ys[0] = 0;
+  ys[0] = 0;
   const tangentTau = 0.5 / intervals;
-  xs[1] = tangentTau;
+  const x = (i: number): number => i < 2 ? i * tangentTau : (i - 1) / intervals;
   // Считаем через тот же percent→offset, который использует WebKit execution:
   // после shortest-roundtrip CSS и keyframes делят один физический slope.
   ys[1] = v0 * ((tangentTau * 100) / 100 * T);
   for (let i = 1; i <= intervals; i++) {
     const tau = i / intervals; // ∈ [0, 1]
     const index = i + 1;
-    xs[index] = tau;
     // Финитный страж (не-конечное → цель 1, зеркалит motion-value; для валидных
     // params не срабатывает — покрыто finiteness-fuzz; инвариант «в CSS никогда
     // не NaN/∞») заинлайнен в цикл — минус кадр вызова на КАЖДЫЙ узел сетки
@@ -320,9 +318,12 @@ function buildSpringNodesAtHorizon(
 
   // eps = tolerance/2: вторая половина бюджета — под дискретизацию базовой сетки
   // (baseGridSize её и гарантирует ≤ tol/2) ⇒ суммарная реконструкция ≤ tolerance.
-  const kept = douglasPeuckerVertical(xs, ys, tolerance / 2, 1);
-  return kept.map((k, n): SpringNode => ({
-    progress: n === kept.length - 1 ? 1 : ys[k]!,
-    percent: xs[k]! * 100,
-  }));
+  const kept = simplify(ys, x, tolerance / 2, 1);
+  const samples = new Float64Array(kept.length * 2);
+  for (let i = 0; i < kept.length; i++) {
+    const k = kept[i]!;
+    samples[i * 2] = x(k) * 100;
+    samples[i * 2 + 1] = i === kept.length - 1 ? 1 : ys[k]!;
+  }
+  return samples;
 }
