@@ -4,6 +4,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
+import { createHash } from 'node:crypto';
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
 import { sha256File, hashFileTree } from './provenance.mjs';
@@ -18,8 +19,9 @@ const resolvePackage=(name,from=require)=>dirname(from.resolve(name+'/package.js
 const playwrightRequire=createRequire(resolve(resolvePackage('@playwright/test'),'package.json'));
 const coreRequire=createRequire(resolve(resolvePackage('playwright',playwrightRequire),'package.json'));
 const capture=()=>({
- revision:git('rev-parse','HEAD'),dirty:git('status','--porcelain'),
+ harnessRevision:git('rev-parse','HEAD'),dirty:!!git('status','--porcelain'),
  inputs:Object.fromEntries(inputs.map(f=>[f,sha256File(resolve(checkout,f))])),
+ canonicalInputs:Object.fromEntries(inputs.map(f=>[f,createHash('sha256').update(execFileSync('git',['show','HEAD:'+f],{cwd:checkout})).digest('hex')])),
  node:process.version,nodeExecutable:sha256File(process.execPath),
  pnpm:execFileSync('pnpm',['--version'],{encoding:'utf8',shell:process.platform==='win32'}).trim(),
  packages:Object.fromEntries(['@playwright/test','playwright','playwright-core','tsup','typescript','esbuild','terser'].map(name=>{
