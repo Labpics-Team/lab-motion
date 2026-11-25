@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFileSync, realpathSync } from 'node:fs';
 import { resolve, relative, isAbsolute } from 'node:path';
 import { chromium } from 'playwright';
+import {browserCases,browserRounds,warmupRounds} from './trajectory-factor-cases.mjs';
 const roots={baseline:realpathSync(process.argv[2]),candidate:realpathSync(process.argv[3])};
 const server=createServer((req,res)=>{
  try {
@@ -15,10 +16,10 @@ const server=createServer((req,res)=>{
 await new Promise(r=>server.listen(0,'127.0.0.1',r));
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const rows=[];
-const tasks=[['keyframes',1,2],['keyframes',100,64],['keyframes',100,960],['keyframes',1000,8],['to',1000,2]];
+const tasks=browserCases;
 try {
  for(const [kind,n,k] of tasks){
-  for(let round=-2;round<10;round++){
+  for(let round=-warmupRounds;round<browserRounds;round++){
    const order=(round+Math.floor(round/2))%2?['candidate','baseline']:['baseline','candidate'];
    for(const name of order){
     const page=await browser.newPage();
