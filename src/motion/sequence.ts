@@ -27,19 +27,19 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     const input = properties(props), clock = timing(rest);
     const drafts = engine._draft(target, input, clock, offset + sequenceClock._delay, (element, key) => {
       const prior = merged.get(element)?.get(key)?._program;
-      return prior && { _coordinates: prior._final, _unit: prior._unit };
+      return prior && { _coordinates: prior._segments.at(-1)!._to, _unit: prior._unit };
     });
     for (const draft of drafts) {
       count += draft._program._segments.length;
       if (count > MAX_CHANNELS) failMotion('Слишком много сегментов');
       let channels = merged.get(draft._element);
       if (!channels) { channels = new Map(); merged.set(draft._element, channels); }
-      const before = channels.get(draft._key);
+      const before = channels.get(draft._program._key);
       if (before && draft._program._segments[0]!._at < before._program._duration) failMotion('Пересечение шагов');
       const segments = before?._program._segments ?? [];
       for (const segment of draft._program._segments) segments.push(segment);
       const next: SequenceDraft = { ...draft, _program: { ...draft._program, _segments: segments } };
-      channels.set(draft._key, next);
+      channels.set(draft._program._key, next);
       end = Math.max(end, next._program._duration);
     }
     previousStart = offset; cursor = Math.max(0, end - sequenceClock._delay);

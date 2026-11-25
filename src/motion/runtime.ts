@@ -97,7 +97,7 @@ function initialTransforms(style: CSSStyleDeclaration): Record<string, number> {
 export type ControlOperation = (surface: Surface, selected: readonly Track[]) => void;
 type ControlAction = 'pause' | 'play' | 'seek' | 'stop' | 'finish' | ControlOperation;
 
-export interface Draft { readonly _element: Element; readonly _key: string; readonly _program: Program; readonly _reduced: boolean }
+export interface Draft { readonly _element: Element; readonly _program: Program; readonly _reduced: boolean }
 interface Track {
   readonly _program: Program;
   readonly _group: Surface;
@@ -546,11 +546,16 @@ export class Runtime {
           const property = props[j]!;
           const group = this._surface(element, property._key);
           if (!synced.has(group)) { synced.add(group); group._sync(); }
+          // Первый элемент уже содержит по одному Program на каждое свойство.
+          // Явная литеральная траектория не зависит от элемента; состояние Track остаётся отдельным.
+          if (i && property._authored && property._literal && !clock._stagger) {
+            result.push({ ...result[j]!, _element: element }); continue;
+          }
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
           const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
-          result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });
+          result.push({ _element: element, _program: spec, _reduced: reduced });
         }
       }
     } finally {
@@ -564,8 +569,8 @@ export class Runtime {
     const touched = new Set<Surface>();
     try {
       for (const draft of drafts) {
-        const group = this._surface(draft._element, draft._key);
-        const existing = group._tracks.get(draft._key);
+        const group = this._surface(draft._element, draft._program._key);
+        const existing = group._tracks.get(draft._program._key);
         const equal = !draft._reduced && draft._program._identity && existing?._program._identity &&
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
