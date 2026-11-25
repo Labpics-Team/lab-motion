@@ -53,9 +53,6 @@ export interface Program {
   readonly _unit: string;
   readonly _segments: readonly Segment[];
   readonly _duration: number;
-  readonly _final: readonly number[];
-  /** Только точная форма, доступная нативному исполнителю. */
-  readonly _nativeEase: string | undefined;
   readonly _identity: readonly unknown[] | undefined;
 }
 
@@ -104,12 +101,15 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
       offset + timing._delay + a * duration, (b - a) * duration));
   }
   const last = _segments.at(-1)!;
-  const first = _segments[0]!;
   const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
-  return { _key: key, _unit: from._unit, _segments, _duration: last._end, _final: last._to,
-    _nativeEase: from._unit === 'color' || key === 'opacity' && resolved.some(p => p._coordinates[0]! < 0 || p._coordinates[0]! > 1) ? undefined : _segments.length === 1 ? first._artifact?.[0] ?? (timing._spring ? undefined : timing._cssEase) : undefined,
+  return { _key: key, _unit: from._unit, _segments, _duration: last._end,
     _identity };
+}
+
+/** CSS projection of the existing numerical segment; no second trajectory. */
+export function segmentEasing(segment: Segment): string | undefined {
+  return segment._artifact?.[0] ?? (segment._timing._spring ? undefined : segment._timing._cssEase);
 }
 
 const basis: MutableSpringBasis = { _value: 0, _valueV0: 0, _velocity: 0, _velocityV0: 0 };
@@ -117,7 +117,8 @@ const springSample = { value: 0, velocity: 0 };
 export function sample(program: Program, time: number, value: number[], velocity: number[], rate: number = 1): void {
   const _segments = program._segments;
   if (time >= program._duration) {
-    for (let i = 0; i < program._final.length; i++) { value[i] = program._final[i]!; velocity[i] = 0; }
+    const final = _segments.at(-1)!._to;
+    for (let i = 0; i < final.length; i++) { value[i] = final[i]!; velocity[i] = 0; }
     return;
   }
   // Последнее начало <= time: совпадающие границы и обратный seek сохраняют семантику.

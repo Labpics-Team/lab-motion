@@ -10,7 +10,7 @@ type SequenceDraft = Omit<Draft, '_program' | '_reduced'> & {
   _reduced: boolean;
 };
 type SequenceEnd = {
-  -readonly [Key in '_duration' | '_nativeEase' | '_identity']: Draft['_program'][Key];
+  -readonly [Key in '_duration' | '_identity']: Draft['_program'][Key];
 };
 
 /** Планирование шкалы отделено от исполнения: одиночный animate не удерживает его код. */
@@ -27,7 +27,7 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     const input = properties(props), clock = timing(rest);
     const drafts = engine._draft(target, input, clock, offset + sequenceClock._delay, (element, key) => {
       const prior = merged.get(element)?.get(key)?._program;
-      return prior && { _coordinates: prior._final, _unit: prior._unit };
+      return prior && { _coordinates: prior._segments.at(-1)!._to, _unit: prior._unit };
     });
     for (const draft of drafts) {
       count += draft._program._segments.length;
@@ -50,7 +50,7 @@ export function runSequence(engine: Runtime, steps: readonly SequenceStep[], opt
     // Общая программа нескольких целей получает одинаковый конец. Сегменты
     // разных историй по-прежнему объединяются в отдельной оболочке выше.
     const program: SequenceEnd = draft._program;
-    program._duration = end; program._nativeEase = undefined; program._identity = undefined;
+    program._duration = end; program._identity = undefined;
     drafts.push(draft);
   }
   return engine._execute(drafts, drafts.every(draft => draft._reduced) ? 0 : end);

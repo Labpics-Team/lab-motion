@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { properties, timing } from '../src/motion/model.js';
 import { Run } from '../src/motion/runtime.js';
+import { segmentEasing } from '../src/motion/program.js';
 import { harness } from './fixtures/motion-runtime.js';
 
 const options = { duration: 1000, ease: 'linear' } as const;
@@ -150,7 +151,7 @@ it('sequence extends one target history without mutating either input draft', as
     const original = originals[0]!._program, sibling = originals[1]!._program;
     expect(original._segments).toHaveLength(1);
     expect(original._duration).toBe(1000);
-    expect(original._nativeEase).toBe('linear');
+    expect(segmentEasing(original._segments[0]!)).toBe('linear');
     expect(original._identity).toBeDefined();
     const merged = execute.mock.calls[0]![0];
     const left = merged.find(item => item._element === a.element)!._program;
@@ -166,7 +167,7 @@ it('sequence extends one target history without mutating either input draft', as
     expect(a.x()).toBe(200); expect(b.x()).toBe(100);
     expect(original._segments).toHaveLength(1); expect(original._duration).toBe(1000);
     expect(sibling._segments).toHaveLength(1); expect(sibling._duration).toBe(1000);
-    expect(sibling._nativeEase).toBe('linear'); expect(sibling._identity).toBeDefined();
+    expect(segmentEasing(sibling._segments[0]!)).toBe('linear'); expect(sibling._identity).toBeDefined();
   } finally { run.stop(); draft.mockRestore(); execute.mockRestore(); }
 });
 

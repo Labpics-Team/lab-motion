@@ -2,7 +2,7 @@ import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, sample, segmentEasing, transform, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
@@ -109,8 +109,8 @@ interface Track {
   _paused: boolean;
 }
 
-function coordinates(track: Track, at: 0 | 1 | 2): readonly number[] {
-  return at === 0 ? track._value : at === 1 ? track._program._segments[0]!._from : track._program._segments[0]!._to;
+function coordinates(track: Track, at: 0 | 1 | 2, index: number): readonly number[] {
+  return at === 0 ? track._value : at === 1 ? track._program._segments[index]!._from : track._program._segments[index]!._to;
 }
 
 function moving(track: Track): boolean { return !track._paused && track._rate !== 0; }
@@ -262,11 +262,11 @@ class Surface {
   _ended(track: Track): boolean {
     return track._rate < 0 ? track._elapsed <= 0 : track._elapsed >= track._program._duration;
   }
-  private _text(at: 0 | 1 | 2 = 0): string {
+  private _text(at: 0 | 1 | 2 = 0, index = 0): string {
     if (this._key === 'transform') {
       const state = this._transforms;
       for (const track of this._tracks.values()) {
-        const value = coordinates(track, at)[0]!;
+        const value = coordinates(track, at, index)[0]!;
         state[track._program._key] = value;
       }
       let identity = !at, translationOnly = !!at;
@@ -281,7 +281,7 @@ class Surface {
     if (!track) {
       const held = this._rest!; return format(this._key, held._coordinates, held._unit);
     }
-    return format(track._program._key, coordinates(track, at), track._program._unit);
+    return format(track._program._key, coordinates(track, at, index), track._program._unit);
   }
   _render(): void {
     if (this._busy) failMotion('style: повторная запись');
@@ -337,17 +337,48 @@ class Surface {
     if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
     const active = [...this._tracks.values()];
     if (!active.some(moving)) { this._engine._idle(this); return; }
-    const first = active[0]!, seg = first._program._segments[0]!;
-    const _nativeEase = first._program._nativeEase;
-    const canNative = first._rate > 0 && (this._key === 'transform' || this._key === 'opacity') && _nativeEase !== undefined && typeof this._element.animate === 'function' && this._engine._host.supports(_nativeEase) &&
-      active.every(track => !track._paused && track._rate === first._rate && track._program._nativeEase === _nativeEase && track._program._segments.length === 1 &&
-        track._program._duration === first._program._duration && track._program._segments[0]!._at === seg._at && track._elapsed === first._elapsed);
-    if (!canNative) { this._engine._wake(this); return; }
+    const first = active[0]!, path = first._program, segments = path._segments;
+    if (first._rate <= 0 || (this._key !== 'transform' && this._key !== 'opacity') ||
+        typeof this._element.animate !== 'function' || !active.every(track =>
+          !track._paused && track._rate === first._rate && track._elapsed === first._elapsed &&
+          track._program._duration === path._duration && track._program._segments.length === segments.length)) {
+      this._engine._wake(this); return;
+    }
+    const delay = segments[0]!._at, duration = path._duration - delay;
+    let previousEase: string | undefined;
+    // Only continuous, scalar, synchronised channels can share a CSS effect.
+    // Discontinuities and zero-length steps retain the exact numerical executor.
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i]!, easing = segmentEasing(segment);
+      if (!easing || segment._end <= segment._at ||
+          easing !== previousEase && !this._engine._host.supports(easing)) {
+        this._engine._wake(this); return;
+      }
+      previousEase = easing;
+      for (const track of active) {
+        const part = track._program._segments[i]!;
+        const from = part._from[0]!, to = part._to[0]!;
+        if (part._at !== segment._at || part._end !== segment._end || segmentEasing(part) !== easing ||
+            part._from.length !== 1 || this._key === 'opacity' && (from < 0 || from > 1 || to < 0 || to > 1) ||
+            i > 0 && track._program._segments[i - 1]!._to[0] !== from) {
+          this._engine._wake(this); return;
+        }
+      }
+    }
     try {
       this._lock(true);
-      const effect = this._element.animate([{ [this._key]: this._text(1) }, { [this._key]: this._text(2) }], {
-        duration: seg._end - seg._at, delay: seg._at, easing: _nativeEase, fill: 'both',
-      });
+      // Both a one-shot and a sequence are projections of the same Program.
+      const frames: Keyframe[] = [];
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i]!;
+        const start = (segment._at - delay) / duration;
+        const end = (segment._end - delay) / duration;
+        if (i && segments[i - 1]!._end === segment._at) frames.pop();
+        frames.push({ [this._key]: this._text(1, i), offset: start, easing: segmentEasing(segment) });
+        frames.push({ [this._key]: this._text(2, i), offset: end });
+      }
+      if (frames.at(-1)!.offset !== 1) frames.push({ ...frames.at(-1), offset: 1 });
+      const effect = this._element.animate(frames, { duration, delay, fill: 'both', easing: 'linear' });
       this._native = effect;
       this._watch();
       // Новый effect ещё не передан потребителю; сначала скорость, затем точная поза.
@@ -553,6 +584,7 @@ export class Runtime {
     const reduced = clock._reduced || this._host.reduced();
     const author = authoredTiming(clock);
     const result: Draft[] = [], synced = new Set<Surface>();
+    const authored = new Array<Program | undefined>(props.length);
     try {
       for (let i = 0; i < elements.length; i++) {
         const element = elements[i]!;
@@ -560,10 +592,16 @@ export class Runtime {
           const property = props[j]!;
           const group = this._surface(element, property._key);
           if (!synced.has(group)) { synced.add(group); group._sync(); }
-          const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
-          const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
-          const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
-          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+          let spec = authored[j];
+          if (!spec) {
+            const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
+            const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
+            const current = explicit ? { ...explicit, _velocity: explicit._coordinates.map(() => 0) } : group._read(property._key);
+            spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+            // Literal authored values have no target-specific input; one immutable
+            // program belongs to the declaration, never to an individual track.
+            if (property._authored && property._literal && !clock._stagger) authored[j] = spec;
+          }
           result.push({ _element: element, _key: property._key, _program: spec, _reduced: reduced });
         }
       }
