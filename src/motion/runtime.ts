@@ -204,7 +204,11 @@ export class Run implements Playback {
 interface NativeBatch {
   _programs?: readonly Program[];
   _pose?: string | undefined;
-  _template?: KeyframeEffect;
+  _template?: KeyframeEffect | undefined;
+  _shape?: string;
+  _duration?: number;
+  _delay?: number;
+  _realm?: Window | null;
 }
 class Surface {
   readonly _tracks: Map<string, Track> = new Map();
@@ -340,37 +344,42 @@ class Surface {
     }
   }
   _reconcile(batch?: NativeBatch): void {
-    if (this._native || this._tracks.size === 0) { this._engine._idle(this); return; }
-    const active = [...this._tracks.values()];
-    if (!active.some(moving)) { this._engine._idle(this); return; }
-    const first = active[0]!, path = first._program, segments = path._segments;
-    if (first._rate <= 0 || (this._key !== 'transform' && this._key !== 'opacity') ||
-        typeof this._element.animate !== 'function' || !active.every(track =>
-          !track._paused && track._rate === first._rate && track._elapsed === first._elapsed &&
-          track._program._duration === path._duration && track._program._segments.length === segments.length)) {
-      this._engine._wake(this); return;
-    }
+    const tracks = this._tracks;
+    if (this._native || !tracks.size) { this._engine._idle(this); return; }
+    const first = tracks.values().next().value!, path = first._program, segments = path._segments;
+    const delay = segments[0]!._at, duration = path._duration - delay;
     const element = this._element, realm = element.ownerDocument?.defaultView;
-    const share = batch && this._engine._host === defaultHost && realm?.KeyframeEffect && realm.Animation && element.animate === realm.Element.prototype.animate ? batch : undefined;
+    const share = batch && this._engine._host === defaultHost && realm?.KeyframeEffect && realm.Animation &&
+      element.animate === realm.Element.prototype.animate ? batch : undefined;
+    let active = false, aligned = true, i = 0;
+    let reuse = !!(share && share._realm === realm && share._pose === this._written && share._programs?.length === tracks.size &&
+      cachedHost === CSS && cachedCheck === CSS.supports);
+    for (const track of tracks.values()) {
+      active ||= moving(track);
+      aligned &&= !track._paused && track._rate === first._rate && track._elapsed === first._elapsed &&
+        track._program._duration === path._duration && track._program._segments.length === segments.length;
+      reuse &&= track._program === share!._programs![i++];
+    }
+    if (!active) { this._engine._idle(this); return; }
+    if (!aligned || !(duration > 0) || first._rate <= 0 || (this._key !== 'transform' && this._key !== 'opacity') ||
+        typeof element.animate !== 'function') { this._engine._wake(this); return; }
     try {
       this._lock(true);
-      let template = share && cachedHost === CSS && cachedCheck === CSS.supports && share._pose === this._written &&
-        share._template instanceof realm!.KeyframeEffect &&
-        active.length === share._programs!.length &&
-        active.every((track, i) => track._program === share._programs![i]) ? share._template : undefined;
+      const timing: KeyframeAnimationOptions = { duration, delay, easing: 'linear', fill: 'both' };
       let effect: Animation;
-      if (!template) {
-        const delay = segments[0]!._at, duration = path._duration - delay, frames: Keyframe[] = [];
+      if (!reuse) {
+        const frames: Keyframe[] = [];
         let boundary = delay, offset = 0;
-        if (duration > 0) for (let i = 0; i < segments.length; i++) {
+        projection: for (let i = 0; i < segments.length; i++) {
           const segment = segments[i]!, easing = segmentEase(segment), end = (segment._end - delay) / duration;
           if (!easing || segment._at !== boundary || !(end > offset) ||
-              delay + end * duration !== segment._end || !this._engine._host.supports(easing) || !active.every(track => {
-                const part = track._program._segments[i]!, from = part._from[0]!, to = part._to[0]!;
-                return part._at === boundary && part._end === segment._end && segmentEase(part) === easing &&
-                  (this._key !== 'opacity' || Math.min(from, to) >= 0 && Math.max(from, to) <= 1) &&
-                  (!i || track._program._segments[i - 1]!._to[0] === from);
-              })) break;
+              delay + end * duration !== segment._end || !this._engine._host.supports(easing)) break;
+          for (const track of tracks.values()) {
+            const part = track._program._segments[i]!, from = part._from[0]!, to = part._to[0]!;
+            if (part._at !== boundary || part._end !== segment._end || segmentEase(part) !== easing ||
+                this._key === 'opacity' && !(Math.min(from, to) >= 0 && Math.max(from, to) <= 1) ||
+                i && track._program._segments[i - 1]!._to[0] !== from) break projection;
+          }
           frames.push({ offset, easing }); boundary = segment._end; offset = end;
         }
         if (frames.length !== segments.length) {
@@ -380,17 +389,28 @@ class Surface {
         const final = this._text(2, segments.length - 1);
         frames.push({ [this._key]: final, offset });
         if (offset < 1) frames.push({ [this._key]: final, offset: 1 });
-        const timing: KeyframeAnimationOptions = { duration, delay, easing: 'linear', fill: 'both' };
         if (share) {
-          template = share._template = new realm!.KeyframeEffect(null, frames, timing);
-          share._programs = active.map(track => track._program); share._pose = this._written;
-        } else effect = element.animate(frames, timing);
+          // The serialized projection contains no element, and excludes placement.
+          // Unique shapes use the direct host call; a repeat creates one template.
+          const shape = JSON.stringify(frames);
+          reuse = share._realm === realm && share._duration === duration && share._shape === shape;
+          if (!reuse) {
+            share._template = undefined; share._shape = shape;
+            share._duration = duration; share._realm = realm;
+          }
+          share._programs = Array.from(tracks.values(), track => track._program); share._pose = this._written;
+        }
+        if (!reuse) effect = element.animate(frames, timing);
       }
-      if (template) {
-        const instance = new realm!.KeyframeEffect(template);
+      if (reuse) {
+        if (!share!._template) {
+          share!._template = new realm!.KeyframeEffect(null, JSON.parse(share!._shape!), timing);
+          share!._delay = delay;
+        }
+        const instance = new realm!.KeyframeEffect(share!._template);
         instance.target = element;
-        effect = new realm!.Animation(instance, element.ownerDocument.timeline);
-        this._native = effect;
+        if (share!._delay !== delay) instance.updateTiming({ delay });
+        effect = this._native = new realm!.Animation(instance, element.ownerDocument.timeline);
         effect.play();
       }
       this._native = effect!;
