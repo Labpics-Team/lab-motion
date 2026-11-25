@@ -3,16 +3,7 @@ import { timing } from '../src/motion/model.js';
 import { program, sample, materialize } from '../src/motion/program.js';
 import { harness } from './fixtures/motion-runtime.js';
 
-const work = vi.hoisted(() => ({ builds: 0, horizons: 0 }));
-vi.mock('../src/compositor/segmenter.js', async importOriginal => {
-  const actual = await importOriginal<typeof import('../src/compositor/segmenter.js')>();
-  return { ...actual,
-    tryBuildSpringNodes(...args: Parameters<typeof actual.tryBuildSpringNodes>) {
-      if (args[3]) work.horizons++;
-      return actual.tryBuildSpringNodes(...args);
-    },
-  };
-});
+const work = vi.hoisted(() => ({ builds: 0 }));
 vi.mock('../src/internal/solver.js', async importOriginal => {
   const actual = await importOriginal<typeof import('../src/internal/solver.js')>();
   return { ...actual,
@@ -39,16 +30,15 @@ it('terminal projection preserves the exact validated horizon without building o
     for (const to of [0, 1, 500, 1e9]) for (const v of [-400, 0, 400]) {
       const clock = timing({ spring: physics, delay: 75 });
       const from = { _coordinates: [0], _unit: 'px' };
-      const normal = program('width', from, [to], false, clock, [v], 17);
-      materialize(normal._segments[0]!);
       const before = work.builds;
       const terminal = program('width', from, [to], false, clock, [v], 17);
-      expect(work.builds).toBe(before);
-      expect(Object.is(terminal._duration, normal._duration)).toBe(true);
-      expect(terminal._duration).toBe(normal._duration);
       const value: number[] = [], velocity: number[] = [];
       sample(terminal, terminal._duration, value, velocity);
+      expect(work.builds).toBe(before);
       expect(value).toEqual([to]); expect(velocity).toEqual([0]);
+      const normal = program('width', from, [to], false, clock, [v], 17);
+      materialize(normal._segments[0]!);
+      expect(Object.is(terminal._duration, normal._duration)).toBe(true);
     }
 });
 
@@ -63,7 +53,6 @@ it.each(['always', 'system'] as const)('reduced %s never constructs a spring gri
   expect(run.state).toBe('finished'); expect(run.duration).toBe(0);
   expect(await run.finished).toEqual({ status: 'finished' });
   expect(work.builds).toBe(before.builds);
-
   for (const target of hosts) {
     expect(target.values.get('width')).toBe('432px');
     expect(target.effects).toHaveLength(0);
@@ -78,7 +67,6 @@ it('globally reduced sequence validates actual spring step boundaries without ma
   const run = h.runtime.sequence([[h.element, { x: 300 }, first], [h.element, { x: 500 }, first]], { reducedMotion: 'always' });
   expect(await run.finished).toEqual({ status: 'finished' }); expect(run.duration).toBe(0);
   expect(h.x()).toBe(500);
-
   expect(() => h.runtime.sequence([[h.element, { x: 300 }, first], [h.element, { x: 500 }, { ...first, at: 1 }]], { reducedMotion: 'always' })).toThrow(/Пересечение/);
   expect(h.x()).toBe(500); expect(work.builds).toBe(before.builds);
   expect(() => h.runtime.animate(h.element, { x: 100 }, { ...first, delay: Number.MAX_VALUE, reducedMotion: 'always' })).toThrow(/Непредставимая/);
@@ -128,6 +116,5 @@ it('sequence snapshots system motion preference once for the entire operation', 
   expect(run.duration).toBe(0);
   expect(await run.finished).toEqual({ status: 'finished' });
   expect(h.x()).toBe(302);
-
   expect(work.builds).toBe(before.builds);
 });

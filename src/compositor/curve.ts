@@ -148,10 +148,12 @@ export function compileSpringExecutionArtifactTupleUnchecked(
 }
 
 /**
- * Compile-as-preflight: cache hit возвращается сразу; безопасный miss строит и
- * кэширует готовый artifact; over-cap заканчивается до grid/RDP.
+ * Cache hit returns the exact artifact. On a safe miss, defer requests only
+ * the canonical horizon; immediate compilation materializes and caches stops.
+ * Over-cap returns before grid/RDP.
  */
-export type SpringExecutionRequest = readonly [undefined, number, number, number];
+/** Validated cold request, never inserted into the artifact cache. */
+export type SpringExecutionRequest = readonly [easing: undefined, normalizedVelocity: number, durationMs: number, tolerance: number];
 export function tryCompileSpringExecutionArtifactTupleUnchecked(
   spring: SpringParams, v0: number, tolerance: number,
   cache?: SpringLinearCache<SpringExecutionArtifactTuple>, defer?: false,

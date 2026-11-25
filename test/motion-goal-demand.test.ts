@@ -104,3 +104,25 @@ it('rejected sequence never creates its spring stop buffers', () => {
   expect(work.grids).toBe(before);
   expect(h.writes).toHaveLength(0);
 });
+
+it('a terminal track exposed by reentrant host reads cannot be adopted as playable', async () => {
+  const h = harness(), other = harness();
+  const options = { spring: { mass: 1, stiffness: 196.317, damping: 26 } };
+  const prior = h.runtime.animate(h.element, { x: 300 }, options);
+  let successor: ReturnType<typeof h.runtime.animate> | undefined;
+  const read = other.element.style.getPropertyValue.bind(other.element.style);
+  other.element.style.getPropertyValue = key => {
+    if (!successor && prior.state === 'stopped')
+      successor = h.runtime.animate(h.element, { x: 100 }, options);
+    return read(key);
+  };
+  const terminal = h.runtime.animate([h.element, other.element], { x: 100 }, { ...options, reducedMotion: 'always' });
+  try {
+    expect(successor?.state).toBe('running');
+    expect(terminal.duration).toBe(0);
+    expect(successor!.duration).toBeGreaterThan(0);
+    successor!.finish();
+    expect(await successor!.finished).toEqual({ status: 'finished' });
+    expect(h.x()).toBe(100);
+  } finally { prior.stop(); terminal.stop(); successor?.stop(); }
+});

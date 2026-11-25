@@ -588,7 +588,7 @@ export class Runtime {
       for (const draft of drafts) {
         const group = this._surface(draft._group._element, draft._program._key, now ??= number(this._host.now(), 'clock'), draft._group);
         const existing = group._tracks.get(draft._program._key);
-        const equal = !draft._reduced && draft._program._identity && existing?._program._identity &&
+        const equal = !draft._reduced && existing && !existing._reduced && draft._program._identity && existing._program._identity &&
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
         if (!draft._reduced) for (const segment of draft._program._segments) materialize(segment);
