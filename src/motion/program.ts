@@ -53,7 +53,9 @@ export interface Program {
   readonly _unit: string;
   readonly _segments: readonly Segment[];
   readonly _duration: number;
-  /** To-only identity, undefined for authored, null for composed timelines. */
+  /** Placement in run time; segments belong to the local shape. */
+  readonly _offset: number;
+  /** To-only identity; timing placement is compared separately. */
   readonly _identity: readonly unknown[] | undefined;
 }
 
@@ -88,20 +90,31 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
   if (times && times.length !== count + 1) failMotion('times: другая длина');
   if (timing._spring && count > 1) failMotion('keyframes: задайте duration/ease');
   const _segments: Segment[] = [];
-  const duration = timing._duration ?? 0, base = offset + timing._delay;
+  const duration = timing._duration ?? 0;
   let current = from;
   for (let i = 0; i < count; i++) {
     const next = point(key, values[i + start]!, current);
     const a = times?.[i] ?? i / count;
     const b = times?.[i + 1] ?? (i + 1) / count;
     _segments.push(segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
-      base + a * duration, base + b * duration, duration > 0));
+      a * duration, b * duration, duration > 0));
     current = next;
   }
   const last = _segments.at(-1)!;
   const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
-    timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
-  return { _key: key, _unit: from._unit, _segments, _duration: last._end, _identity };
+    timing._duration, timing._cssEase ?? timing._ease];
+  return place({ _key: key, _unit: from._unit, _segments, _duration: last._end, _offset: 0, _identity }, offset + timing._delay);
+}
+
+/** A placement owns no new geometry. Check every positive interval in run time. */
+export function place(path: Program, offset: number): Program {
+  if (Object.is(offset, path._offset)) return path;
+  for (const segment of path._segments) {
+    const at = offset + segment._at, end = offset + segment._end;
+    if (!Number.isFinite(end) || segment._end > segment._at && end === at)
+      failMotion('Непредставимая длительность');
+  }
+  return { ...path, _offset: offset, _duration: offset + path._segments.at(-1)!._end };
 }
 
 export function segmentEase(segment: Segment): string | undefined {
@@ -127,12 +140,13 @@ export function sample(program: Program, time: number, value: number[], velocity
   let end = _segments.length, at = time >= program._duration ? end - 1 : 0;
   while (at + 1 < end) {
     const middle = (at + end) >>> 1;
-    if (time >= _segments[middle]!._at) at = middle;
+    if (time >= program._offset + _segments[middle]!._at) at = middle;
     else end = middle;
   }
   const segment = _segments[at]!;
-  const _elapsed = Math.max(0, time - segment._at), duration = segment._end - segment._at;
-  if (time >= segment._end) {
+  const begin = program._offset + segment._at, finish = program._offset + segment._end;
+  const _elapsed = Math.max(0, time - begin), duration = finish - begin;
+  if (time >= finish || time >= program._duration) {
     for (let i = 0; i < segment._to.length; i++) { value[i] = segment._to[i]!; velocity[i] = 0; }
     return;
   }
@@ -152,7 +166,7 @@ export function sample(program: Program, time: number, value: number[], velocity
   if (!Number.isFinite(p) || !Number.isFinite(dp)) failMotion('easing: не число');
   for (let i = 0; i < segment._from.length; i++) {
     const a = segment._from[i]!, distance = segment._to[i]! - a;
-    if (_elapsed === 0) { value[i] = a; velocity[i] = time < segment._at ? 0 : segment._velocity[i] ?? 0; }
+    if (_elapsed === 0) { value[i] = a; velocity[i] = time < begin ? 0 : segment._velocity[i] ?? 0; }
     else if (segment._timing._spring && !artifact) {
       value[i] = a + distance * basis._value + (segment._velocity[i] ?? 0) * basis._valueV0;
       velocity[i] = distance * basis._velocity + (segment._velocity[i] ?? 0) * basis._velocityV0;

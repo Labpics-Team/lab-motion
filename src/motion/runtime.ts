@@ -2,7 +2,7 @@ import { tryParseUnit } from '../value/units.js';
 import { attemptAll, rethrow } from './attempt-all.js';
 import { frame, type FrameLoop } from '../frame/index.js';
 import { FINISHED, STOPPED, MAX_CHANNELS, failMotion, number, properties, timing, authoredTiming, isVariable, type PropertyInput, type Timing } from './model.js';
-import { TRANSFORMS, isTransform, format, point, program, sample, transform, zeroVelocity, segmentEase, materialize, type Point, type Program, type Segment } from './program.js';
+import { TRANSFORMS, isTransform, format, point, program, place, sample, transform, zeroVelocity, segmentEase, materialize, type Point, type Program, type Segment } from './program.js';
 import type { MotionOptions, MotionProperties, MotionResult, MotionScalar, MotionTarget, Playback, PlaybackState } from './types.js';
 
 export interface RuntimeHost {
@@ -205,7 +205,7 @@ interface NativeBatch {
   _programs?: readonly Program[];
   _pose?: string | undefined;
   _template?: KeyframeEffect | undefined;
-  _shape?: string;
+  _frames?: Keyframe[];
   _duration?: number;
   _delay?: number;
   _realm?: Window | null;
@@ -347,18 +347,18 @@ class Surface {
     const tracks = this._tracks;
     if (this._native || !tracks.size) { this._engine._idle(this); return; }
     const first = tracks.values().next().value!, path = first._program, segments = path._segments;
-    const delay = segments[0]!._at, duration = path._duration - delay;
+    const origin = path._offset, delay = origin + segments[0]!._at, duration = path._duration - delay;
     const element = this._element, realm = element.ownerDocument?.defaultView;
     const share = batch && this._engine._host === defaultHost && realm?.KeyframeEffect && realm.Animation &&
       element.animate === realm.Element.prototype.animate ? batch : undefined;
     let active = false, aligned = true, i = 0;
-    let reuse = !!(share && share._realm === realm && share._pose === this._written && share._programs?.length === tracks.size &&
+    let reuse = !!(share && share._realm === realm && share._pose === this._written && share._programs?.length === tracks.size && share._duration === duration &&
       typeof CSS !== 'undefined' && cachedHost === CSS && cachedCheck === CSS.supports);
     for (const track of tracks.values()) {
       active ||= moving(track);
       aligned &&= !track._paused && track._rate === first._rate && track._elapsed === first._elapsed &&
-        track._program._duration === path._duration && track._program._segments.length === segments.length;
-      reuse &&= track._program === share!._programs![i++];
+        track._program._duration === path._duration && track._program._offset === origin && track._program._segments.length === segments.length;
+      reuse &&= track._program._segments === share!._programs![i++]!._segments;
     }
     if (!active) { this._engine._idle(this); return; }
     if (!aligned || !(duration > 0) || first._rate <= 0 || (this._key !== 'transform' && this._key !== 'opacity') ||
@@ -369,11 +369,11 @@ class Surface {
       let effect: Animation;
       if (!reuse) {
         const frames: Keyframe[] = [];
-        let boundary = delay, offset = 0;
+        let boundary = segments[0]!._at, offset = 0;
         projection: for (let i = 0; i < segments.length; i++) {
-          const segment = segments[i]!, easing = segmentEase(segment), end = (segment._end - delay) / duration;
+          const segment = segments[i]!, easing = segmentEase(segment), end = (origin + segment._end - delay) / duration;
           if (!easing || segment._at !== boundary || !(end > offset) ||
-              delay + end * duration !== segment._end || !this._engine._host.supports(easing)) break;
+              delay + end * duration !== origin + segment._end || !this._engine._host.supports(easing)) break;
           for (const track of tracks.values()) {
             const part = track._program._segments[i]!, from = part._from[0]!, to = part._to[0]!;
             if (part._at !== boundary || part._end !== segment._end || segmentEase(part) !== easing ||
@@ -390,21 +390,15 @@ class Surface {
         frames.push({ [this._key]: final, offset });
         if (offset < 1) frames.push({ [this._key]: final, offset: 1 });
         if (share) {
-          // The serialized projection contains no element, and excludes placement.
-          // Unique shapes use the direct host call; a repeat creates one template.
-          const shape = JSON.stringify(frames);
-          reuse = share._realm === realm && share._duration === duration && share._shape === shape;
-          if (!reuse) {
-            share._template = undefined; share._shape = shape;
-            share._duration = duration; share._realm = realm;
-          }
+          share._template = undefined; share._frames = frames;
+          share._duration = duration; share._realm = realm;
           share._programs = Array.from(tracks.values(), track => track._program); share._pose = this._written;
         }
         if (!reuse) effect = element.animate(frames, timing);
       }
       if (reuse) {
         if (!share!._template) {
-          share!._template = new realm!.KeyframeEffect(null, JSON.parse(share!._shape!), timing);
+          share!._template = new realm!.KeyframeEffect(null, share!._frames!, timing);
           share!._delay = delay;
         }
         const instance = new realm!.KeyframeEffect(share!._template);
@@ -628,17 +622,17 @@ export class Runtime {
           if (!synced.has(group)) { synced.add(group); if (group._tracks.size) group._sync(now); }
           // Первый элемент уже содержит по одному Program на каждое свойство.
           // Явная литеральная траектория не зависит от элемента; состояние Track остаётся отдельным.
-          const shared = i && property._literal && !clock._stagger ? result[j]!._program : undefined;
+          const placement = offset + i * clock._stagger, shared = i && property._literal ? result[j]!._program : undefined;
           if (shared && property._authored) {
-            result.push({ _group: group, _program: shared, _reduced: reduced }); continue;
+            result.push({ _group: group, _program: place(shared, placement + clock._delay), _reduced: reduced }); continue;
           }
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: zeroVelocity } : group._read(property._key);
           const initial = shared?._segments[0];
           const spec = initial && !initial._velocity.length && !current._velocity.length &&
-            shared!._unit === current._unit && initial._from.every((v, k) => Object.is(v, current._coordinates[k]))
-            ? shared! : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+            shared!._unit === current._unit && initial._from.length === current._coordinates.length && initial._from.every((v, k) => Object.is(v, current._coordinates[k]))
+            ? place(shared!, placement + clock._delay) : program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, placement);
           result.push({ _group: group, _program: spec, _reduced: reduced });
         }
       }
@@ -657,6 +651,8 @@ export class Runtime {
         const group = this._surface(draft._group._element, draft._program._key, now ??= number(this._host.now(), 'clock'), draft._group);
         const existing = group._tracks.get(draft._program._key);
         const equal = !draft._reduced && existing && !existing._reduced && draft._program._identity && existing._program._identity &&
+          Object.is(draft._program._offset, existing._program._offset) &&
+          draft._program._identity.length === existing._program._identity.length &&
           draft._program._identity.every((v, i) => Object.is(v, existing._program._identity![i]));
         if (equal) { run._own(existing!); continue; }
         if (!draft._reduced) for (const segment of draft._program._segments) materialize(segment);
