@@ -33,23 +33,29 @@ jobs:
       - id: changed
         shell: bash
         env:
-          BASE: ${{ steps.transition.outputs.before }}
-          AFTER: ${{ steps.transition.outputs.after }}
+          AVAILABLE: ${{ steps.transition.outputs.available }}
           RELEASE: ${{ inputs.release_artifacts }}
         run: |
           set -euo pipefail
-          if [[ "$RELEASE" == true || -z "$BASE" || -z "$AFTER" ]]; then
+          if [[ "$RELEASE" == true || "$AVAILABLE" != true ]]; then
             echo 'value=true' >> "$GITHUB_OUTPUT"
-          elif git diff --quiet --no-renames --no-ext-diff --ignore-submodules=none "$BASE" "$AFTER" -- \
-              native/compose/ src/internal/motion-defaults.ts src/motion/model.ts src/motion/types.ts \
-              .github/workflows/native-compose.yml .github/workflows/release-compose.yml .github/workflows/ci.yml \
-              .github/scripts/source_transition.py; then
-            echo 'value=false' >> "$GITHUB_OUTPUT"
-          else
-            status=$?
-            [[ "$status" == 1 ]] || exit "$status"
-            echo 'value=true' >> "$GITHUB_OUTPUT"
+            exit 0
           fi
+          paths=$(mktemp "$RUNNER_TEMP/compose-paths.XXXXXX")
+          trap 'rm -f "$paths"' EXIT
+          python3 -I .github/scripts/source_transition.py --format paths > "$paths"
+          changed=false
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              native/compose/*|src/internal/motion-defaults.ts|src/motion/model.ts|src/motion/types.ts|\
+              .github/workflows/native-compose.yml|.github/workflows/release-compose.yml|.github/workflows/ci.yml|\
+              .github/scripts/source_transition.py)
+                changed=true
+                break
+                ;;
+            esac
+          done < "$paths"
+          printf 'value=%s\n' "$changed" >> "$GITHUB_OUTPUT"
 
   desktop-android:
     needs: inputs

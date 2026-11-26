@@ -34,21 +34,39 @@ def _sha(value):
     return isinstance(value, str) and SHA.fullmatch(value) is not None and value != "0" * 40
 
 
-def _git(root, *args):
-    env = os.environ.copy()
-    for key in ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE"):
-        env.pop(key, None)
+def git_environment(root=None):
+    """Use the selected checkout's Git context, not the calling process's."""
+    env = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
     env.update(GIT_NO_REPLACE_OBJECTS="1", GIT_NO_LAZY_FETCH="1", GIT_TERMINAL_PROMPT="0")
+    if root is not None:
+        checkout = Path(root).resolve()
+        metadata = checkout / ".git"
+        if os.path.lexists(metadata):
+            env.update(GIT_DIR=str(metadata), GIT_WORK_TREE=str(checkout))
+        else:
+            # An explicitly supplied bare metadata root is also a Git source.
+            # Git validates this path directly; it never searches its parents.
+            env["GIT_DIR"] = str(checkout)
+    return env
+
+
+def git_read(root, *args, input=None, timeout=30):
+    """Read bytes from this checkout's raw Git objects, without implicit fetch.
+
+    Callers choose the read operation; this is not a command sandbox. Explicit
+    network operations use git_environment() at their own authority boundary.
+    """
     return subprocess.check_output(
         ["git", "--no-replace-objects", "-C", str(root), *args],
-        env=env, stderr=subprocess.PIPE, timeout=30,
+        env=git_environment(root), stderr=subprocess.PIPE, timeout=timeout,
+        **({"input": input} if input is not None else {}),
     )
 
 
 def _checked(root, sha):
     if not _sha(sha):
         raise ValueError("missing checked commit")
-    top, checked = _git(root, "rev-parse", "--show-toplevel", "HEAD^{commit}").splitlines()
+    top, checked = git_read(root, "rev-parse", "--show-toplevel", "HEAD^{commit}").splitlines()
     if Path(os.fsdecode(top)).resolve() != Path(root).resolve() or checked.decode("ascii") != sha:
         raise ValueError("checkout does not bind the execution commit")
 
@@ -58,14 +76,14 @@ def _commit(root, sha):
         raise ValueError("missing commit")
     # Inspect the raw object, not a shallow/grafted presentation of its parents.
     # A tag is not a commit identity, even if it peels to one.
-    if _git(root, "cat-file", "-t", sha).strip() != b"commit":
+    if git_read(root, "cat-file", "-t", sha).strip() != b"commit":
         raise ValueError("not a commit")
-    header = _git(root, "cat-file", "commit", sha).split(b"\n\n", 1)[0].splitlines()
+    header = git_read(root, "cat-file", "commit", sha).split(b"\n\n", 1)[0].splitlines()
     trees = [line[5:].decode("ascii") for line in header if line.startswith(b"tree ")]
     parents = [line[7:].decode("ascii") for line in header if line.startswith(b"parent ")]
     if len(trees) != 1 or not all(_sha(value) for value in trees + parents):
         raise ValueError("invalid commit object")
-    if _git(root, "cat-file", "-t", trees[0]).strip() != b"tree":
+    if git_read(root, "cat-file", "-t", trees[0]).strip() != b"tree":
         raise ValueError("missing tree")
     return trees[0], parents
 
@@ -88,7 +106,7 @@ def _advance(root, kind, checked, before, event_head):
     after_tree, _ = _commit(root, checked)
     before_tree, _ = _commit(root, before)
     # A missing history or a non-fast-forward event cannot justify skipping.
-    _git(root, "merge-base", "--is-ancestor", before, checked)
+    git_read(root, "merge-base", "--is-ancestor", before, checked)
     return Transition(kind, before, checked, before_tree, after_tree)
 
 
@@ -133,7 +151,7 @@ def changed_paths(root, transition):
     """Complete NUL-delimited Git paths, including both ends of renames."""
     if not isinstance(transition, Transition):
         raise ValueError("a proven transition is required")
-    paths = _git(root, "diff-tree", "-r", "--no-commit-id", "--no-renames",
+    paths = git_read(root, "diff-tree", "-r", "--no-commit-id", "--no-renames",
                  "--no-ext-diff", "--ignore-submodules=none", "--name-only", "-z",
                  transition.before_tree, transition.after_tree, "--")
     if paths and not paths.endswith(b"\0"):
@@ -142,12 +160,39 @@ def changed_paths(root, transition):
 
 
 def main(argv=None):
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    read_arguments = None
+    if "--read-git" in arguments:
+        index = arguments.index("--read-git")
+        read_arguments = arguments[index + 1:]
+        arguments = arguments[:index + 1]
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument("--root", default=os.environ.get("GITHUB_WORKSPACE") or ".")
-    parser.add_argument("--format", choices=("github", "json", "range"), default="json")
+    output = parser.add_mutually_exclusive_group()
+    output.add_argument("--format", choices=("github", "json", "range", "paths"), default="json")
+    output.add_argument("--read-git", action="store_true")
     parser.add_argument("--required", action="store_true")
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
+    if args.read_git:
+        if not read_arguments:
+            parser.error("--read-git requires a Git read operation")
+        try:
+            data = git_read(args.root, *read_arguments)
+        except (OSError, subprocess.SubprocessError, ValueError):
+            print("The Git object read could not be completed.", file=sys.stderr)
+            return 2
+        sys.stdout.buffer.write(data)
+        return 0
     result = from_github(args.root)
+    if args.format == "paths":
+        try:
+            paths = changed_paths(args.root, result)
+        except (OSError, subprocess.SubprocessError, ValueError):
+            print("The checked Git paths could not be established.", file=sys.stderr)
+            return 2
+        if paths:
+            sys.stdout.buffer.write(b"\0".join(paths) + b"\0")
+        return 0
     outputs = result.outputs() if result else {"available": "false"}
     if args.format == "github":
         for key, value in outputs.items():

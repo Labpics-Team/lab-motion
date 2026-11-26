@@ -94,34 +94,100 @@ describe('Compose release boundaries', () => {
     }
   });
 
-  it.each(['relevant', 'irrelevant', 'large', 'renamed', 'unknown', 'release', 'failed'])('selects changed inputs without hiding git failure: %s', scenario => {
-    const workflow = parse(sourceFiles.get('native-compose.yml')!) as Workflow;
-    const step = workflow.jobs.inputs!.steps!.find(item => item.id === 'changed')!;
-    const transition = workflow.jobs.inputs!.steps!.find(item => item.id === 'transition')!;
-    expect(transition.run).toContain('python3 -I .github/scripts/source_transition.py --format github');
-    // A pinned release may predate the helper: it must run every native check without loading it.
-    expect(transition.if).toBe('${{ !inputs.release_artifacts }}');
-    expect(step.env).toMatchObject({ BASE: '${{ steps.transition.outputs.before }}', AFTER: '${{ steps.transition.outputs.after }}' });
-    const directory = mkdtempSync(join(tmpdir(), 'motion-compose-inputs-'));
-    const normalized = directory.replaceAll('\\', '/');
-    try {
-      const script = `git() {
-        if [[ "$CASE" == failed || "$CASE" == release || "$CASE" == unknown ]]; then return 17; fi
-        if [[ "$*" != *--quiet* || "$*" != *--no-renames* || "$*" != *native/compose/* ]]; then return 19; fi
-        if [[ "$CASE" == irrelevant ]]; then return 0; fi
-        return 1
-      }\n${step.run}`;
-      const result = spawnSync(bash, ['-c', script], { encoding: 'utf8', env: {
-        ...process.env, CASE: scenario, RELEASE: String(scenario === 'release'), BASE: scenario === 'unknown' ? '' : 'a'.repeat(40), AFTER: 'b'.repeat(40),
-        RUNNER_TEMP: normalized, GITHUB_OUTPUT: `${normalized}/output`,
-      } });
-      if (scenario === 'failed') expect(result.status).not.toBe(0);
-      else {
+  it.each(['relevant', 'irrelevant', 'large', 'renamed', 'unknown', 'release', 'failed', 'replacement', 'target-only', 'merge-resolution'])(
+    'selects actual checked inputs without hiding read failure: %s', scenario => {
+      const workflow = parse(sourceFiles.get('native-compose.yml')!) as Workflow;
+      const step = workflow.jobs.inputs!.steps!.find(item => item.id === 'changed')!;
+      const transition = workflow.jobs.inputs!.steps!.find(item => item.id === 'transition')!;
+      expect(transition.if).toBe('${{ !inputs.release_artifacts }}');
+      expect(step.env).toMatchObject({ AVAILABLE: '${{ steps.transition.outputs.available }}' });
+      const temporary = mkdtempSync(join(tmpdir(), 'motion-compose-inputs-'));
+      const checkout = join(temporary, 'source');
+      const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !/^GIT_/i.test(key)));
+      mkdirSync(checkout);
+      const git = (...args: string[]) => {
+        const result = spawnSync('git', ['-C', checkout, ...args], { env: cleanEnv, encoding: 'utf8' });
         expect(result.status, result.stderr).toBe(0);
-        expect(readFileSync(join(directory, 'output'), 'utf8').trim()).toBe(`value=${scenario !== 'irrelevant'}`);
-      }
-    } finally { rmSync(directory, { recursive: true, force: true }); }
-  });
+        return result.stdout.trim();
+      };
+      const write = (path: string, content: string | Buffer) => {
+        mkdirSync(resolve(checkout, path, '..'), { recursive: true });
+        writeFileSync(join(checkout, path), content);
+      };
+      const commit = () => { git('add', '-A'); git('commit', '-qm', 'fixture'); return git('rev-parse', 'HEAD'); };
+      try {
+        git('init', '-q', '-b', 'main');
+        git('config', 'user.name', 'Fixture');
+        git('config', 'user.email', 'fixture@example.invalid');
+        git('config', 'commit.gpgsign', 'false');
+        git('config', 'core.autocrlf', 'false');
+        write('README.md', 'base');
+        write('native/compose/base.kt', 'original');
+        if (scenario !== 'release') {
+          write('.github/scripts/source_transition.py', readFileSync(new URL('../.github/scripts/source_transition.py', import.meta.url)));
+        }
+        const base = commit();
+        git('checkout', '-qb', 'author');
+        if (scenario === 'renamed') {
+          mkdirSync(join(checkout, 'docs'));
+          git('mv', 'native/compose/base.kt', 'docs/moved.md');
+        } else if (['irrelevant', 'target-only', 'merge-resolution', 'release'].includes(scenario)) {
+          write('README.md', 'author');
+        } else {
+          write('native/compose/new.kt', 'author');
+          if (scenario === 'large') for (let index = 0; index < 2000; index++) write('docs/file-' + index + '.md', 'docs');
+        }
+        const author = commit();
+        git('checkout', '-q', 'main');
+        if (['target-only', 'merge-resolution'].includes(scenario)) write('native/compose/base.kt', 'target');
+        else write('target.txt', 'target');
+        const target = commit();
+        git('merge', '--no-ff', '--no-commit', author);
+        if (scenario === 'merge-resolution') write('native/compose/base.kt', 'original');
+        let head = commit();
+        if (scenario === 'failed') {
+          const tree = spawnSync('git', ['-C', checkout, 'mktree', '--missing'], {
+            env: cleanEnv, input: '040000 tree ' + 'f'.repeat(40) + '\tmissing\n', encoding: 'utf8',
+          });
+          expect(tree.status, tree.stderr).toBe(0);
+          head = git('commit-tree', tree.stdout.trim(), '-p', target, '-p', author, '-m', 'unavailable tree');
+          git('update-ref', 'HEAD', head);
+        }
+        if (scenario === 'replacement') git('replace', head, target);
+        const event = join(temporary, 'event.json'), output = join(temporary, 'output');
+        writeFileSync(event, JSON.stringify({
+          number: 42, repository: { full_name: 'example/motion' },
+          pull_request: { head: { sha: author }, base: { sha: base, repo: { full_name: 'example/motion' } } },
+        }));
+        writeFileSync(output, '');
+        const env = {
+          ...cleanEnv, GITHUB_EVENT_PATH: event, GITHUB_EVENT_NAME: 'pull_request',
+          GITHUB_REPOSITORY: 'example/motion', GITHUB_REF: 'refs/pull/42/merge',
+          GITHUB_SHA: scenario === 'unknown' ? base : head, GITHUB_WORKSPACE: checkout,
+          RUNNER_TEMP: temporary.replaceAll('\\', '/'), GITHUB_OUTPUT: output.replaceAll('\\', '/'),
+        };
+        let available = '';
+        if (scenario !== 'release') {
+          const resolved = spawnSync(bash, ['-e', '-c', pythonSetup + transition.run], { cwd: checkout, encoding: 'utf8', env });
+          expect(resolved.status, resolved.stderr).toBe(0);
+          available = Object.fromEntries(readFileSync(output, 'utf8').trim().split(/\r?\n/).map(line => line.split('='))).available ?? '';
+          expect(available).toBe(scenario === 'unknown' ? 'false' : 'true');
+          writeFileSync(output, '');
+        }
+        const result = spawnSync(bash, ['-e', '-c', pythonSetup + step.run], {
+          cwd: checkout, encoding: 'utf8', env: { ...env, AVAILABLE: available, RELEASE: String(scenario === 'release') },
+        });
+        if (scenario === 'failed') {
+          expect(result.status).not.toBe(0);
+          expect(readFileSync(output, 'utf8')).toBe('');
+        } else {
+          expect(result.status, result.stderr).toBe(0);
+          expect(readFileSync(output, 'utf8').trim()).toBe('value=' + !['irrelevant', 'target-only'].includes(scenario));
+        }
+        expect(readdirSync(temporary).filter(name => name.startsWith('compose-paths.'))).toEqual([]);
+      } finally { rmSync(temporary, { recursive: true, force: true }); }
+    },
+  );
 });
 
 function unpin(uses: string): string {
