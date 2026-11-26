@@ -64,10 +64,13 @@ def git_read(root, *args, input=None, timeout=30):
 
 
 def _checked(root, sha):
+    checkout = Path(root).resolve()
+    if not os.path.lexists(checkout / ".git"):
+        raise ValueError("a checked worktree is required")
     if not _sha(sha):
         raise ValueError("missing checked commit")
     top, checked = git_read(root, "rev-parse", "--show-toplevel", "HEAD^{commit}").splitlines()
-    if Path(os.fsdecode(top)).resolve() != Path(root).resolve() or checked.decode("ascii") != sha:
+    if Path(os.fsdecode(top)).resolve() != checkout or checked.decode("ascii") != sha:
         raise ValueError("checkout does not bind the execution commit")
 
 
