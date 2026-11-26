@@ -43,7 +43,6 @@ export function snapshot<T>(input: readonly T[], name: string, minimum = 0): T[]
 /** Внутренний снимок: пользовательские getters больше не читаются исполнителем. */
 export interface Timing {
   readonly _defaultMotion: boolean;
-  readonly _defaultEase: boolean;
   readonly _spring: SpringParams | undefined;
   readonly _duration: number | undefined;
   readonly _ease: (progress: number) => number;
@@ -111,7 +110,6 @@ export function timing(input: MotionOptions | undefined): Timing {
   }
   return {
     _defaultMotion: spring === undefined && duration === undefined && ease === undefined,
-    _defaultEase: ease === undefined,
     _spring: duration !== undefined || ease !== undefined ? undefined : physics(spring as MotionSpring | undefined),
     _duration: duration === undefined ? ease !== undefined ? DEFAULT_DURATION_MS : undefined : number(duration, 'duration', 0),
     _ease: easeFunction, _cssEase, _delay: number(delay ?? 0, 'delay', 0), _stagger: number(stagger ?? 0, 'stagger', 0),
@@ -121,11 +119,12 @@ export function timing(input: MotionOptions | undefined): Timing {
 
 /** Авторская траектория выбирает собственные defaults без повторного чтения опций. */
 export function authoredTiming(clock: Timing): Timing {
+  if (clock._ease !== standard) return clock;
   return { ...clock,
     _spring: clock._defaultMotion ? undefined : clock._spring,
     _duration: clock._defaultMotion ? DEFAULT_DURATION_MS : clock._duration,
-    _ease: clock._defaultEase ? linear : clock._ease,
-    _cssEase: clock._defaultEase ? 'linear' : clock._cssEase,
+    _ease: linear,
+    _cssEase: 'linear',
   };
 }
 

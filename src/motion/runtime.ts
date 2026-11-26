@@ -548,10 +548,10 @@ export class Runtime {
     failMotion(`${key}: CSS var: цикл или глубина`);
   }
   _draft(input: MotionTarget, props: readonly PropertyInput[], clock: Timing, offset = 0,
-    origin?: (element: Element, key: string) => Point | undefined): Draft[] {
+    origin?: (element: Element, key: string) => Point | undefined, terminal?: boolean): Draft[] {
     const elements = targets(input);
     if (elements.length * props.reduce((sum, p) => sum + p._values.length, 0) > MAX_CHANNELS) failMotion('Слишком много каналов');
-    const reduced = clock._reduced || this._host.reduced();
+    const reduced = clock._reduced || (terminal ?? this._host.reduced());
     const author = authoredTiming(clock);
     const result: Draft[] = [], synced = new Set<Surface>();
     let now: number | undefined;
@@ -570,7 +570,7 @@ export class Runtime {
           const values = property._literal ? property._values : property._values.map(v => this._resolveValue(element, property._key, v));
           const explicit = property._authored ? point(property._key, values[0]!) : origin?.(element, property._key);
           const current = explicit ? { ...explicit, _velocity: zeroVelocity } : group._read(property._key);
-          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger);
+          const spec = program(property._key, current, values, property._authored, property._authored ? author : clock, current._velocity, offset + i * clock._stagger, terminal ?? reduced);
           result.push({ _group: group, _program: spec, _reduced: reduced });
         }
       }

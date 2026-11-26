@@ -3,6 +3,7 @@ import { settleTimeUpperBound } from '../spring.js';
 import { sampleSpringBasisUnchecked, type MutableSpringBasis } from '../internal/solver.js';
 import { tryCompileSpringExecutionArtifactTupleUnchecked, type SpringExecutionArtifactTuple } from '../compositor/curve.js';
 import { sampleSerializedSpringIntoUnchecked } from '../compositor/sample.js';
+import { tryBuildSpringNodes } from '../compositor/segmenter.js';
 import { failMotion, number, type Timing } from './model.js';
 import type { MotionScalar } from './types.js';
 
@@ -58,32 +59,36 @@ export interface Program {
   readonly _identity: readonly unknown[] | undefined;
 }
 
-function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration?: number): Segment {
+function segment(from: Point, to: Point, velocity: readonly number[], timing: Timing, at: number, duration: number, terminal: boolean): Segment {
   if (from._unit !== to._unit || from._coordinates.length !== to._coordinates.length)
     failMotion('Разные единицы from/to');
   let normalized: number | undefined;
-  let aligned = true, extent = 1;
+  let extent = 1;
   for (let i = 0; i < from._coordinates.length; i++) {
     const distance = to._coordinates[i]! - from._coordinates[i]!;
     if (!Number.isFinite(distance)) failMotion('Диапазон вне Number');
     const v = velocity[i] ?? 0;
     extent = Math.max(extent, Math.abs(distance));
-    if (distance === 0) { if (v !== 0) aligned = false; }
+    if (distance === 0) { if (v !== 0) normalized = NaN; }
     else if (normalized === undefined) normalized = v / distance;
-    else if (normalized !== v / distance) aligned = false;
+    else if (normalized !== v / distance) normalized = NaN;
   }
   let artifact: SpringExecutionArtifactTuple | undefined;
-  let length = duration ?? timing._duration ?? 0;
+  let length = duration;
   if (timing._spring) {
-    if (aligned && Number.isFinite(normalized ?? 0)) artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, Math.min(0.001, 0.05 / extent));
-    const energy = velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent;
-    length = artifact?.[2] ?? settleTimeUpperBound(timing._spring, energy) * 1000;
+    let horizon: number | undefined;
+    if (Number.isFinite(normalized ?? 0)) {
+      const tolerance = Math.min(0.001, 0.05 / extent);
+      if (terminal) horizon = tryBuildSpringNodes(timing._spring, normalized ?? 0, tolerance, true)?.[1];
+      else artifact = tryCompileSpringExecutionArtifactTupleUnchecked(timing._spring, normalized ?? 0, tolerance);
+    }
+    length = artifact?.[2] ?? (horizon ?? settleTimeUpperBound(timing._spring, velocity.reduce((max, v) => Math.max(max, Math.abs(v)), 0) / extent)) * 1000;
   }
   if (!Number.isFinite(length) || length < 0 || !Number.isFinite(at + length) || length > 0 && at + length === at) failMotion('Непредставимая длительность');
   return { _at: at, _end: at + length, _from: from._coordinates, _to: to._coordinates, _velocity: velocity, _timing: timing, _artifact: artifact };
 }
 
-export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0): Program {
+export function program(key: string, from: Point, values: readonly MotionScalar[], authored: boolean, timing: Timing, initialVelocity: readonly number[], offset = 0, terminal = false): Program {
   const start = authored ? 1 : 0, count = values.length - start;
   const times = authored ? timing._times : undefined;
   if (times && times.length !== count + 1) failMotion('times: другая длина');
@@ -96,11 +101,11 @@ export function program(key: string, from: Point, values: readonly MotionScalar[
     const a = times?.[i] ?? i / count;
     const b = times?.[i + 1] ?? (i + 1) / count;
     _segments.push(segment(current, next, i === 0 ? initialVelocity : zeroVelocity, timing,
-      offset + timing._delay + a * duration, (b - a) * duration));
+      offset + timing._delay + a * duration, (b - a) * duration, terminal));
     current = next;
   }
   const first = _segments[0]!, last = _segments.at(-1)!;
-  const _identity = authored ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
+  const _identity = authored || terminal ? undefined : [from._unit, ...last._to, timing._spring?.mass, timing._spring?.stiffness, timing._spring?.damping,
     timing._duration, timing._cssEase ?? timing._ease, timing._delay + offset];
   const native = count === 1 && from._unit !== 'color' && (key !== 'opacity' ||
     Math.min(first._from[0]!, first._to[0]!) >= 0 && Math.max(first._from[0]!, first._to[0]!) <= 1);
