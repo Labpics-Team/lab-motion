@@ -27,23 +27,35 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
           ref: ${{ inputs.source_sha || github.sha }}
+      - id: transition
+        if: ${{ !inputs.release_artifacts }}
+        run: python3 -I .github/scripts/source_transition.py --format github >> "$GITHUB_OUTPUT"
       - id: changed
         shell: bash
         env:
-          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
+          AVAILABLE: ${{ steps.transition.outputs.available }}
           RELEASE: ${{ inputs.release_artifacts }}
         run: |
           set -euo pipefail
-          if [[ "$RELEASE" == true || -z "$BASE" || "$BASE" =~ ^0+$ ]]; then
+          if [[ "$RELEASE" == true || "$AVAILABLE" != true ]]; then
             echo 'value=true' >> "$GITHUB_OUTPUT"
-          else
-            git diff --no-renames --name-only "$BASE" "$GITHUB_SHA" > "$RUNNER_TEMP/compose-changed"
-            if grep -E '^(native/compose/|src/internal/motion-defaults\.ts$|src/motion/(model|types)\.ts$|\.github/workflows/(native-compose|release-compose|ci)\.yml$)' "$RUNNER_TEMP/compose-changed" > /dev/null; then
-              echo 'value=true' >> "$GITHUB_OUTPUT"
-            else
-              echo 'value=false' >> "$GITHUB_OUTPUT"
-            fi
+            exit 0
           fi
+          paths=$(mktemp "$RUNNER_TEMP/compose-paths.XXXXXX")
+          trap 'rm -f "$paths"' EXIT
+          python3 -I .github/scripts/source_transition.py --format paths > "$paths"
+          changed=false
+          while IFS= read -r -d '' path; do
+            case "$path" in
+              native/compose/*|src/internal/motion-defaults.ts|src/motion/model.ts|src/motion/types.ts|\
+              .github/workflows/native-compose.yml|.github/workflows/release-compose.yml|.github/workflows/ci.yml|\
+              .github/scripts/source_transition.py)
+                changed=true
+                break
+                ;;
+            esac
+          done < "$paths"
+          printf 'value=%s\n' "$changed" >> "$GITHUB_OUTPUT"
 
   desktop-android:
     needs: inputs
