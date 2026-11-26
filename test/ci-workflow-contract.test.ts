@@ -94,23 +94,25 @@ describe('Compose release boundaries', () => {
     }
   });
 
-  it.each(['relevant', 'irrelevant', 'large', 'renamed', 'unknown', 'failed'])('selects changed inputs without hiding git failure: %s', scenario => {
+  it.each(['relevant', 'irrelevant', 'large', 'renamed', 'unknown', 'release', 'failed'])('selects changed inputs without hiding git failure: %s', scenario => {
     const workflow = parse(sourceFiles.get('native-compose.yml')!) as Workflow;
     const step = workflow.jobs.inputs!.steps!.find(item => item.id === 'changed')!;
     const transition = workflow.jobs.inputs!.steps!.find(item => item.id === 'transition')!;
     expect(transition.run).toContain('python3 -I .github/scripts/source_transition.py --format github');
+    // A pinned release may predate the helper: it must run every native check without loading it.
+    expect(transition.if).toBe('${{ !inputs.release_artifacts }}');
     expect(step.env).toMatchObject({ BASE: '${{ steps.transition.outputs.before }}', AFTER: '${{ steps.transition.outputs.after }}' });
     const directory = mkdtempSync(join(tmpdir(), 'motion-compose-inputs-'));
     const normalized = directory.replaceAll('\\', '/');
     try {
       const script = `git() {
-        if [[ "$CASE" == failed ]]; then return 17; fi
+        if [[ "$CASE" == failed || "$CASE" == release || "$CASE" == unknown ]]; then return 17; fi
         if [[ "$*" != *--quiet* || "$*" != *--no-renames* || "$*" != *native/compose/* ]]; then return 19; fi
         if [[ "$CASE" == irrelevant ]]; then return 0; fi
         return 1
       }\n${step.run}`;
       const result = spawnSync(bash, ['-c', script], { encoding: 'utf8', env: {
-        ...process.env, CASE: scenario, RELEASE: 'false', BASE: scenario === 'unknown' ? '' : 'a'.repeat(40), AFTER: 'b'.repeat(40),
+        ...process.env, CASE: scenario, RELEASE: String(scenario === 'release'), BASE: scenario === 'unknown' ? '' : 'a'.repeat(40), AFTER: 'b'.repeat(40),
         RUNNER_TEMP: normalized, GITHUB_OUTPUT: `${normalized}/output`,
       } });
       if (scenario === 'failed') expect(result.status).not.toBe(0);

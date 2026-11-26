@@ -28,6 +28,7 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.source_sha || github.sha }}
       - id: transition
+        if: ${{ !inputs.release_artifacts }}
         run: python3 -I .github/scripts/source_transition.py --format github >> "$GITHUB_OUTPUT"
       - id: changed
         shell: bash
